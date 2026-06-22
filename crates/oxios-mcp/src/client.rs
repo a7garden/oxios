@@ -9,9 +9,11 @@
 //! cycle, ensuring correct ordering.
 
 use anyhow::{Context, Result, anyhow};
+use std::sync::atomic::AtomicUsize;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
+use tokio::task::JoinHandle;
 use tokio::time::{Duration, timeout};
 
 use crate::protocol::*;
@@ -37,12 +39,19 @@ use crate::protocol::*;
 pub struct McpClient {
     /// Server configuration
     server: McpServer,
-    /// Child process handle (None when not running)
+    /// Child process handle (None when not running).
+    ///
+    /// The child is spawned with `kill_on_drop(true)` (F3) so it is reaped
+    /// even if the `McpClient` is dropped without an explicit `shutdown()`.
     child: RwLock<Option<Child>>,
     /// Persistent stdin handle for writing to the server process.
-    stdin: RwLock<Option<tokio::io::BufWriter<ChildStdin>>>,
+    ///
+    /// A `Mutex` (not `RwLock`) since access is always exclusive (F4).
+    stdin: Mutex<Option<tokio::io::BufWriter<ChildStdin>>>,
     /// Persistent stdout handle for reading from the server process.
-    stdout: RwLock<Option<BufReader<ChildStdout>>>,
+    ///
+    /// A `Mutex` (not `RwLock`) since access is always exclusive (F4).
+    stdout: Mutex<Option<BufReader<ChildStdout>>>,
     /// Whether the server has been initialized
     initialized: RwLock<bool>,
     /// Cached tool list (invalidated on refresh_tools)
@@ -51,6 +60,12 @@ pub struct McpClient {
     server_info: RwLock<Option<ServerInfo>>,
     /// Request timeout duration
     request_timeout: Duration,
+    /// Background task that drains the child's stderr so the OS pipe
+    /// buffer doesn't fill and deadlock the server (F1).
+    stderr_task: Mutex<Option<JoinHandle<()>>>,
+    /// Per-connection JSON-RPC request ID counter (F8: per-client instead
+    /// of a process-global counter, so logs unambiguously attribute ids).
+    next_id: AtomicUsize,
 }
 
 impl McpClient {
@@ -61,12 +76,14 @@ impl McpClient {
         Self {
             server,
             child: RwLock::new(None),
-            stdin: RwLock::new(None),
-            stdout: RwLock::new(None),
+            stdin: Mutex::new(None),
+            stdout: Mutex::new(None),
             initialized: RwLock::new(false),
             tool_cache: RwLock::new(None),
             server_info: RwLock::new(None),
             request_timeout: Duration::from_secs(30),
+            stderr_task: Mutex::new(None),
+            next_id: AtomicUsize::new(1),
         }
     }
 
@@ -78,18 +95,26 @@ impl McpClient {
     }
 
     /// Spawn the MCP server process and establish communication.
+    ///
+    /// On failure the spawned child is killed and all handles are cleared
+    /// (F3), so retrying `initialize()` never orphans a process. The child
+    /// is also spawned with `kill_on_drop(true)` as a safety net.
     pub async fn initialize(&self) -> Result<()> {
         if *self.initialized.read().await {
             return Ok(());
         }
 
-        // Spawn the child process
+        // Spawn the child process. `kill_on_drop(true)` guarantees the child
+        // is killed if the `Child` handle is dropped without an explicit
+        // kill — e.g. when `McpClient` is dropped or a handle is overwritten
+        // by a retry (F3, F7).
         let mut child = Command::new(&self.server.command)
             .args(&self.server.args)
             .envs(&self.server.env)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
+            .kill_on_drop(true)
             .spawn()
             .with_context(|| format!("Failed to spawn MCP server '{}'", self.server.name))?;
 
@@ -101,21 +126,71 @@ impl McpClient {
             .stdout
             .take()
             .expect("stdout not captured — stdout was piped");
+        let stderr = child
+            .stderr
+            .take()
+            .expect("stderr not captured — stderr was piped");
+
+        // F1: drain stderr continuously. If we don't read it, a chatty
+        // server can fill the OS pipe buffer (~64KiB on Linux) and block
+        // forever on stderr writes, deadlocking the whole connection.
+        let stderr_server_name = self.server.name.clone();
+        let stderr_task = tokio::spawn(async move {
+            let mut reader = BufReader::new(stderr);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match reader.read_line(&mut line).await {
+                    Ok(0) => break, // EOF — child closed stderr
+                    Ok(_) => {
+                        let trimmed = line.trim_end_matches(['\n', '\r']);
+                        if !trimmed.is_empty() {
+                            tracing::debug!(
+                                server = %stderr_server_name,
+                                stream = "stderr",
+                                "{}",
+                                trimmed
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            server = %stderr_server_name,
+                            stream = "stderr",
+                            error = %e,
+                            "stderr drain stopping"
+                        );
+                        break;
+                    }
+                }
+            }
+        });
 
         // Store persistent I/O handles (separate from child process handle)
-        *self.stdin.write().await = Some(tokio::io::BufWriter::new(stdin));
-        *self.stdout.write().await = Some(BufReader::new(stdout));
+        *self.stdin.lock().await = Some(tokio::io::BufWriter::new(stdin));
+        *self.stdout.lock().await = Some(BufReader::new(stdout));
+        *self.stderr_task.lock().await = Some(stderr_task);
 
         // Store child handle
         *self.child.write().await = Some(child);
 
-        // Send initialize request using persistent handles
+        // Send initialize request using persistent handles. Use do_request
+        // directly (not send_request) to avoid recursion, since send_request
+        // may call restart() which calls initialize().
         let params = InitializeParams::default();
-        let request = McpRequest::new("initialize").with_params(serde_json::to_value(&params)?);
+        let request = McpRequest::with_id(self.next_id(), "initialize")
+            .with_params(serde_json::to_value(&params)?);
 
-        // Use do_request directly (not send_request) to avoid recursion
-        // since send_request may call restart() which calls initialize().
-        let response = self.do_request(request).await?;
+        // F3: on any failure during the initialize handshake, tear down the
+        // spawned child so a retry starts clean (no orphaned process, no
+        // stale I/O handles).
+        let response = match self.do_request(request).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                self.cleanup_child().await;
+                return Err(e);
+            }
+        };
 
         // Parse initialize result
         let result_json = response.into_result()?;
@@ -124,8 +199,9 @@ impl McpClient {
         *self.server_info.write().await = Some(init_result.server_info.clone());
         *self.initialized.write().await = true;
 
-        // Send initialised notification (JSON-RPC 2.0 requires this)
-        let notification = McpRequest::new("notifications/initialized");
+        // Send the `initialized` notification (JSON-RPC 2.0 requires this
+        // after a successful `initialize`). Notifications carry no `id`.
+        let notification = McpRequest::notification("notifications/initialized");
         self.send_notification(notification).await?;
 
         tracing::debug!(
@@ -149,13 +225,15 @@ impl McpClient {
 
     /// Send a JSON-RPC request using persistent I/O handles.
     ///
-    /// Acquires write locks on both stdin and stdout for the duration of
-    /// the request-response cycle, serializing concurrent access.
+    /// Acquires exclusive locks on both stdin and stdout for the duration of
+    /// the request-response cycle, serializing concurrent access. Reads in a
+    /// loop, skipping JSON-RPC notifications / server-initiated requests, so
+    /// that interleaved server output can't be mistaken for our response (F2).
     async fn do_request(&self, request: McpRequest) -> Result<McpResponse> {
         let request_id = request.id.clone();
 
         // Acquire stdin lock for writing
-        let mut stdin_guard = self.stdin.write().await;
+        let mut stdin_guard = self.stdin.lock().await;
         let stdin = stdin_guard
             .as_mut()
             .ok_or_else(|| anyhow!("stdin not available on '{}'", self.server.name))?;
@@ -171,41 +249,68 @@ impl McpClient {
         .map_err(|e| anyhow::anyhow!("MCP request timed out (write): {e}"))??;
 
         // Acquire stdout lock for reading
-        let mut stdout_guard = self.stdout.write().await;
+        let mut stdout_guard = self.stdout.lock().await;
         let stdout = stdout_guard
             .as_mut()
             .ok_or_else(|| anyhow!("stdout not available on '{}'", self.server.name))?;
 
-        // Read the response (single JSON line)
-        let line: std::io::Result<Option<String>> = timeout(self.request_timeout, async {
-            stdout.lines().next_line().await
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("MCP request timed out (read): {e}"))?;
+        // F2: read lines until we get the response for *this* request id.
+        // The server may emit JSON-RPC notifications (no id, e.g. progress,
+        // logging) or server-initiated requests (has both id and method, e.g.
+        // sampling/createMessage) at any time. We log and skip those instead
+        // of misinterpreting them as our response.
+        loop {
+            let line: std::io::Result<Option<String>> = timeout(self.request_timeout, async {
+                stdout.lines().next_line().await
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("MCP request timed out (read): {e}"))?;
 
-        let response_str: String = line
-            .context("Failed to read MCP response line from stdout")?
-            .with_context(|| format!("MCP server {} returned no response", self.server.name))?;
+            let response_str: String = line
+                .context("Failed to read MCP response line from stdout")?
+                .with_context(|| format!("MCP server {} returned no response", self.server.name))?;
 
-        let parsed: McpResponse = serde_json::from_str(&response_str)
-            .with_context(|| format!("Failed to parse MCP response JSON: {response_str}"))?;
+            // Parse as a generic JSON value first so we can classify the
+            // message without committing to the response shape.
+            let value: serde_json::Value = serde_json::from_str(&response_str)
+                .with_context(|| format!("Failed to parse MCP message JSON: {response_str}"))?;
 
-        // Sanity check: ID should match
-        if parsed.id != request_id {
-            tracing::warn!(
-                server = %self.server.name,
-                expected_id = ?request_id,
-                got_id = ?parsed.id,
-                "MCP response ID mismatch"
-            );
+            // A "method" field means it's a notification or a server-initiated
+            // request — not a response to us. Log and keep reading.
+            if value.get("method").is_some() {
+                tracing::debug!(
+                    server = %self.server.name,
+                    method = ?value.get("method"),
+                    "MCP server sent a notification/server request; skipping"
+                );
+                continue;
+            }
+
+            // It's a response — verify the id matches.
+            let got_id = value.get("id");
+            if got_id != Some(&request_id) {
+                // A response for a different request id shouldn't happen under
+                // our serialized access, but if it does (e.g. a stale buffered
+                // response from a previous timed-out request) skip it rather
+                // than return the wrong result.
+                tracing::warn!(
+                    server = %self.server.name,
+                    expected_id = ?request_id,
+                    got_id = ?got_id,
+                    "MCP response ID mismatch, skipping"
+                );
+                continue;
+            }
+
+            let parsed: McpResponse = serde_json::from_value(value)
+                .with_context(|| format!("Failed to parse MCP response: {response_str}"))?;
+            return Ok(parsed);
         }
-
-        Ok(parsed)
     }
 
     /// Send a JSON-RPC notification (no response expected).
     async fn send_notification(&self, notification: McpRequest) -> Result<()> {
-        let mut stdin_guard = self.stdin.write().await;
+        let mut stdin_guard = self.stdin.lock().await;
         let stdin = stdin_guard
             .as_mut()
             .ok_or_else(|| anyhow!("stdin not available on '{}'", self.server.name))?;
@@ -219,9 +324,10 @@ impl McpClient {
 
     /// Send a JSON-RPC request via persistent I/O handles.
     ///
-    /// If the server is not running, attempts one automatic restart before failing.
-    /// The restart itself uses the low-level `do_request` path, not `send_request`,
-    /// to avoid async recursion.
+    /// If the server is not running, attempts one automatic restart before
+    /// failing. On a communication error mid-request, restarts and retries
+    /// the original request once (F5) instead of bailing out and asking the
+    /// caller to retry.
     pub(crate) async fn send_request(&self, request: McpRequest) -> Result<McpResponse> {
         // Verify server is running; attempt auto-restart if not
         {
@@ -237,32 +343,65 @@ impl McpClient {
             }
         }
 
+        // F5: keep a clone so we can transparently retry the original request
+        // after a restart-induced communication error.
+        let request_for_retry = request.clone();
         match self.do_request(request).await {
             Ok(resp) => Ok(resp),
             Err(e) => {
-                // Auto-restart on communication errors (crashed server)
+                // Auto-restart on communication errors (crashed server).
                 let err_str = e.to_string();
                 let is_comm_error = err_str.contains("not available")
                     || err_str.contains("broken pipe")
                     || err_str.contains("timed out")
-                    || err_str.contains("no response");
+                    || err_str.contains("no response")
+                    || err_str.contains("reset by peer");
 
                 if is_comm_error {
                     tracing::warn!(
                         server = %self.server.name,
                         error = %err_str,
-                        "MCP communication error, attempting auto-restart"
+                        "MCP communication error, attempting auto-restart + retry"
                     );
                     self.restart().await?;
-                    anyhow::bail!(
-                        "MCP server '{}' restarted after error. Please retry the request.",
-                        self.server.name
-                    );
+                    // F5: retry the original request once instead of pushing
+                    // the retry burden onto every caller.
+                    self.do_request(request_for_retry).await
                 } else {
                     Err(e)
                 }
             }
         }
+    }
+
+    /// Allocate the next per-connection request id (F8).
+    fn next_id(&self) -> usize {
+        self.next_id
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Best-effort teardown of the spawned child + I/O handles when
+    /// `initialize()` fails mid-handshake or a restart is required. Safe to
+    /// call when nothing is running. Idempotent (F3).
+    async fn cleanup_child(&self) {
+        // Drop I/O handles first so the child's pipes close.
+        *self.stdin.lock().await = None;
+        *self.stdout.lock().await = None;
+
+        // Abort the stderr drain task — the child is going away.
+        if let Some(handle) = self.stderr_task.lock().await.take() {
+            handle.abort();
+        }
+
+        // Kill and reap the child. `kill_on_drop(true)` would handle this
+        // when the Child drops, but explicit kill+wait avoids racing with
+        // a concurrent `initialize()` reusing the handle.
+        if let Some(mut child) = self.child.write().await.take() {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+        }
+
+        *self.initialized.write().await = false;
     }
 
     /// List all tools available from this MCP server.
@@ -279,7 +418,7 @@ impl McpClient {
 
     /// Force-refresh the tool list from the server.
     pub async fn refresh_tools(&self) -> Result<Vec<McpTool>> {
-        let request = McpRequest::new("tools/list");
+        let request = McpRequest::with_id(self.next_id(), "tools/list");
         let response = self.send_request(request).await?;
 
         let result_json = response.into_result()?;
@@ -310,7 +449,7 @@ impl McpClient {
             "arguments": arguments,
         });
 
-        let request = McpRequest::new("tools/call").with_params(params);
+        let request = McpRequest::with_id(self.next_id(), "tools/call").with_params(params);
         let response = self.send_request(request).await?;
 
         let result_json = response.into_result()?;
@@ -346,11 +485,17 @@ impl McpClient {
 
     /// Gracefully shutdown the MCP server process.
     ///
-    /// Drops persistent I/O handles first, then kills the child process.
+    /// Drops persistent I/O handles first, aborts the stderr drain, then
+    /// kills the child process.
     pub async fn shutdown(&self) -> Result<()> {
-        // Drop persistent I/O handles first
-        *self.stdin.write().await = None;
-        *self.stdout.write().await = None;
+        // Drop persistent I/O handles first so the child's pipes close.
+        *self.stdin.lock().await = None;
+        *self.stdout.lock().await = None;
+
+        // Abort the stderr drain task.
+        if let Some(handle) = self.stderr_task.lock().await.take() {
+            handle.abort();
+        }
 
         let mut child_guard = self.child.write().await;
 

@@ -144,6 +144,20 @@ pub(crate) async fn handle_workspace_file_put(
         }
     }
 
+    // F6: the parent-canonical check above does not catch a pre-existing
+    // symlink at `full_path` itself pointing outside the workspace —
+    // `tokio::fs::write` follows symlinks and would overwrite the target.
+    if let Ok(meta) = tokio::fs::symlink_metadata(&full_path).await
+        && meta.file_type().is_symlink()
+    {
+        let canonical_full = full_path
+            .canonicalize()
+            .map_err(|e| AppError::Internal(format!("failed to resolve path: {e}")))?;
+        if !canonical_full.starts_with(&canonical_base) {
+            return Err(AppError::Forbidden("path traversal denied".into()));
+        }
+    }
+
     match tokio::fs::write(&full_path, &body).await {
         Ok(_) => {
             tracing::info!(path = %path, "File written");
@@ -185,6 +199,22 @@ pub(crate) async fn handle_workspace_file_create(
             .canonicalize()
             .map_err(|_| AppError::NotFound("parent directory not found".into()))?;
         if !canonical_parent.starts_with(&canonical_base) {
+            return Err(AppError::Forbidden("path traversal denied".into()));
+        }
+    }
+
+    // F6: `full_path.exists()` follows symlinks, so a dangling symlink at
+    // `full_path` pointing outside the workspace would bypass the check
+    // and `tokio::fs::write` would create/overwrite the symlink target.
+    // Reject any pre-existing symlink outright (create requires the path
+    // to be absent anyway).
+    if let Ok(meta) = tokio::fs::symlink_metadata(&full_path).await
+        && meta.file_type().is_symlink()
+    {
+        let canonical_full = full_path
+            .canonicalize()
+            .map_err(|_| AppError::NotFound("path not found".into()))?;
+        if !canonical_full.starts_with(&canonical_base) {
             return Err(AppError::Forbidden("path traversal denied".into()));
         }
     }

@@ -239,6 +239,12 @@ fn extract_datetimes(
 }
 
 /// Convert a timezone-aware naive datetime to UTC.
+///
+/// F11: a recurring event whose local time lands in a fall-back overlap
+/// (ambiguous — occurs twice) is resolved to the *earliest* interpretation
+/// with a warning, rather than being rejected. Spring-forward gaps (no valid
+/// local time) are still surfaced as an explicit error since any choice would
+/// be a guess.
 fn convert_tz_to_utc(
     dt: chrono::NaiveDateTime,
     tzid: &str,
@@ -246,11 +252,20 @@ fn convert_tz_to_utc(
     let tz: chrono_tz::Tz = tzid
         .parse()
         .map_err(|_| anyhow::anyhow!("Unknown timezone: {tzid}"))?;
-    let local = dt
-        .and_local_timezone(tz)
-        .single()
-        .ok_or_else(|| anyhow::anyhow!("Ambiguous or invalid time in timezone {tzid}"))?;
-    Ok(local.to_utc())
+    match dt.and_local_timezone(tz) {
+        chrono::LocalResult::Single(local) => Ok(local.to_utc()),
+        chrono::LocalResult::Ambiguous(earliest, _latest) => {
+            tracing::warn!(
+                tzid,
+                naive = %dt,
+                "Ambiguous local time (fall-back DST overlap); using earliest interpretation"
+            );
+            Ok(earliest.to_utc())
+        }
+        chrono::LocalResult::None => Err(anyhow::anyhow!(
+            "Non-existent local time {dt} in timezone {tzid} (spring-forward gap)"
+        )),
+    }
 }
 
 /// Convert a [`DatePerhapsTime`] to UTC, treating dates as midnight.

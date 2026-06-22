@@ -147,9 +147,6 @@ struct EvolutionConfig {
     max_iterations: u32,
     /// Minimum score to pass evaluation.
     score_threshold: f64,
-    /// Enable evaluation result caching.
-    #[allow(dead_code)]
-    eval_cache_enabled: bool,
 }
 
 impl From<crate::config::OrchestratorConfig> for EvolutionConfig {
@@ -157,7 +154,6 @@ impl From<crate::config::OrchestratorConfig> for EvolutionConfig {
         Self {
             max_iterations: c.max_evolution_iterations,
             score_threshold: c.min_evaluation_score,
-            eval_cache_enabled: c.eval_cache_enabled,
         }
     }
 }
@@ -467,13 +463,20 @@ impl Orchestrator {
                 .unwrap_or_default();
 
             // Rebuild conversation history from user/agent exchanges.
+            // Use an index loop (not zip) so a trailing user message
+            // without a stored agent response (e.g. crash before flush)
+            // is preserved with an empty agent turn instead of dropped.
             let history: Vec<oxios_ouroboros::interview::Exchange> = session
                 .user_messages
                 .iter()
-                .zip(session.agent_responses.iter())
-                .map(|(user, agent)| oxios_ouroboros::interview::Exchange {
+                .enumerate()
+                .map(|(i, user)| oxios_ouroboros::interview::Exchange {
                     user: user.content.clone(),
-                    agent: agent.content.clone(),
+                    agent: session
+                        .agent_responses
+                        .get(i)
+                        .map(|a| a.content.clone())
+                        .unwrap_or_default(),
                 })
                 .collect();
             interview.conversation_history = history;
@@ -792,72 +795,22 @@ impl Orchestrator {
             self.publish_phase_completed(&session_id, Phase::Interview, "needs clarification")
                 .await;
 
-            // Try to produce structured questions for the interactive
-            // Web UI. This is best-effort: failure here does NOT block
-            // the interview flow — the frontend will fall back to
-            // rendering `response` as plain markdown.
-            //
-            // For follow-up interview rounds, pass the full multi-turn
-            // context so the LLM can produce relevant structured follow-ups.
-            // When this is the first round, multi_turn_input equals
-            // `user_message` so the behavior is unchanged.
-            let structured_input = if existing_history.is_some() {
-                // Rebuild the multi-turn context that was already fed
-                // to `self.ouroboros.interview()` above.
-                let mut context_parts = Vec::new();
-                if let Some(ref history) = existing_history {
-                    for exchange in history {
-                        context_parts.push(format!(
-                            "User: {}\nAgent: {}",
-                            exchange.user, exchange.agent
-                        ));
-                    }
-                }
-                context_parts.push(format!("User: {user_message}"));
-                context_parts.join("\n\n")
-            } else {
-                user_message.to_string()
-            };
+            // Structured questions for the interactive Web UI come from
+            // the same LLM call as `interview()` — the engine sanitizes
+            // them and synthesizes a free_text fallback when the LLM
+            // omitted the structured form. `None` means the frontend
+            // falls back to plain markdown rendering of `questions`.
+            let structured = interview.structured_questions.clone();
 
-            let mut structured = match self.ouroboros.interview_structured(&structured_input).await
-            {
-                Ok(Some(s)) if !s.is_empty() => Some(s),
-                Ok(_) => None,
-                Err(e) => {
-                    tracing::warn!(error = %e, "interview_structured failed; falling back to markdown");
-                    None
-                }
-            };
-
-            // Fallback: if the LLM did not produce structured questions
-            // but we have plain questions from the interview, synthesize
-            // free_text structured questions so the wizard UI still works.
-            // This prevents the second+ round from falling back to
-            // plain markdown when the LLM omits `structured_questions`.
-            if structured.is_none() && !questions.is_empty() {
-                structured = Some(
-                    questions
-                        .iter()
-                        .enumerate()
-                        .map(
-                            |(i, q)| oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput {
-                                id: format!("q{}", i + 1),
-                                text: q.clone(),
-                                kind: "free_text".to_string(),
-                                options: vec![],
-                            },
-                        )
-                        .collect(),
-                );
-            }
-
-            // Round = 1 + number of prior answers in the session's
-            // interview history (best-effort: 1 when not present).
+            // Round = completed user/agent exchange pairs in the interview
+            // history, minimum 1. Previously this read `answers`, which is
+            // never populated by `add_to_history` and left the round stuck
+            // at 1 forever.
             let interview_round = {
                 let sessions = self.sessions.read();
                 sessions
                     .get(&session_id)
-                    .map(|s| (s.interview.answers.len().saturating_sub(1)).max(1) as u32)
+                    .map(|s| ((s.interview.conversation_history.len() / 2) as u32).max(1))
                     .unwrap_or(1)
             };
 
@@ -961,6 +914,18 @@ impl Orchestrator {
                     sessions.remove(&session_id);
                 }
 
+                // Record the same duration/success metrics the single-agent
+                // path records, so multi-agent orchestration is observable.
+                let metrics = get_metrics();
+                metrics
+                    .orch_duration
+                    .observe(orch_start.elapsed().as_secs_f64());
+                if all_passed {
+                    metrics.agents_completed.inc();
+                } else {
+                    metrics.agents_failed.inc();
+                }
+
                 tracing::info!(
                     session_id = %session_id,
                     subtasks = results.len(),
@@ -1043,8 +1008,12 @@ impl Orchestrator {
                 .run_evolution_loop(&session_id, &seed, exec_result)
                 .await?;
 
-            let passed =
-                eval.all_passed() && eval.score >= self.evolution_config.read().score_threshold;
+            // Use a single read of the config so `passed` is consistent
+            // with itself (the loop takes its own snapshot internally).
+            let passed = {
+                let cfg = self.evolution_config.read();
+                eval.all_passed() && eval.score >= cfg.score_threshold
+            };
 
             self.publish_phase_completed(
                 &session_id,
@@ -1250,8 +1219,13 @@ impl Orchestrator {
         seed: &Seed,
         initial_result: ExecutionResult,
     ) -> Result<(ExecutionResult, EvaluationResult, Seed)> {
-        let max_iterations = self.evolution_config.read().max_iterations;
-        let threshold = self.evolution_config.read().score_threshold;
+        // Snapshot the config under a single read guard so a concurrent
+        // `update_evolution_config` call can't split max_iterations and
+        // score_threshold across two different config versions (TOCTOU).
+        let (max_iterations, threshold) = {
+            let cfg = self.evolution_config.read();
+            (cfg.max_iterations, cfg.score_threshold)
+        };
 
         let mut current_seed = seed.clone();
         let mut current_result = initial_result;
@@ -1280,11 +1254,13 @@ impl Orchestrator {
                 seed_id: current_seed.id,
                 passed: evaluation.all_passed(),
             });
-
-            // Update best if this iteration improved.
+            // Update best if this iteration *strictly* improved. A tie
+            // keeps the earlier (first-seen) result so a flat or wobbling
+            // score sequence doesn't let later iterations clobber the
+            // original.
             if best_eval
                 .as_ref()
-                .is_none_or(|b| evaluation.score >= b.score)
+                .is_none_or(|b| evaluation.score > b.score)
             {
                 best_result = current_result.clone();
                 best_seed = current_seed.clone();
@@ -1636,7 +1612,23 @@ impl Orchestrator {
             }
         }
 
-        let completed: Vec<SubTask> = results.into_iter().flatten().collect();
+        // Preserve subtask_count: a `None` slot means the task panicked or
+        // was lost. Previously flatten() dropped them, so `all(success)` on
+        // an empty vec returned true — total failure reported as success.
+        let completed: Vec<SubTask> = results
+            .into_iter()
+            .enumerate()
+            .map(|(idx, opt)| {
+                opt.unwrap_or_else(|| SubTask {
+                    id: Uuid::new_v4(),
+                    description: format!("subtask {idx} (failed)"),
+                    required_capability: None,
+                    result: Some("Task panicked or did not complete".into()),
+                    success: false,
+                    role: AgentRole::default(),
+                })
+            })
+            .collect();
         tracing::info!(
             completed = completed.len(),
             succeeded = completed.iter().filter(|r| r.success).count(),
@@ -1867,7 +1859,13 @@ fn format_execution_result(seed: &Seed, exec: &ExecutionResult) -> String {
     // Show a truncated preview of the output if present.
     if !exec.output.is_empty() {
         let preview = if exec.output.len() > 500 {
-            format!("{}...", &exec.output[..500])
+            // Char-boundary safe: roll back to avoid splitting a
+            // multibyte UTF-8 sequence (Korean, CJK, emoji).
+            let mut end = 500;
+            while end > 0 && !exec.output.is_char_boundary(end) {
+                end -= 1;
+            }
+            format!("{}...", &exec.output[..end])
         } else {
             exec.output.clone()
         };

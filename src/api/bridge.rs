@@ -17,6 +17,36 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock, broadcast, mpsc, oneshot, watch};
 
+/// Typed error for the HTTP→gateway request/response bridge.
+///
+/// F14: lets the HTTP layer classify a timeout (→ 504) from other
+/// failures (→ 500) by variant instead of by grepping the error message
+/// string. Replaces the previous `e.to_string().contains("timeout")`
+/// heuristic in `handle_chat`.
+#[derive(Debug)]
+pub enum BridgeSendError {
+    /// The incoming channel could not enqueue the message (gateway gone).
+    SendFailed(String),
+    /// The gateway dropped the response channel without replying.
+    ChannelDropped,
+    /// The gateway did not reply within the configured deadline.
+    Timeout,
+}
+
+impl std::fmt::Display for BridgeSendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BridgeSendError::SendFailed(msg) => {
+                write!(f, "incoming channel send failed: {msg}")
+            }
+            BridgeSendError::ChannelDropped => write!(f, "gateway response channel dropped"),
+            BridgeSendError::Timeout => write!(f, "gateway response timeout"),
+        }
+    }
+}
+
+impl std::error::Error for BridgeSendError {}
+
 /// The web bridge adapter.
 ///
 /// Bridges the axum HTTP server with the gateway's channel interface
@@ -236,9 +266,10 @@ impl WebBridgeHandle {
     ///
     /// RFC-024 SP1 / C1 (response guarantee): the wait is bounded by
     /// `response_timeout` (default 120 s). On timeout the correlation map
-    /// entry is removed (no leak) and the caller receives a `Timeout` error
-    /// so the HTTP layer can map it to a 504 Gateway Timeout.
-    pub async fn send_and_wait(&self, msg: IncomingMessage) -> Result<OutgoingMessage> {
+    pub async fn send_and_wait(
+        &self,
+        msg: IncomingMessage,
+    ) -> std::result::Result<OutgoingMessage, BridgeSendError> {
         self.send_and_wait_with_timeout(msg, self.response_timeout)
             .await
     }
@@ -250,7 +281,7 @@ impl WebBridgeHandle {
         &self,
         msg: IncomingMessage,
         timeout: std::time::Duration,
-    ) -> Result<OutgoingMessage> {
+    ) -> std::result::Result<OutgoingMessage, BridgeSendError> {
         let (tx, rx) = oneshot::channel::<OutgoingMessage>();
         let msg_id = msg.id;
 
@@ -264,7 +295,7 @@ impl WebBridgeHandle {
         if let Err(e) = self.incoming_tx.send(msg).await {
             // Could not even enqueue — drop our correlation entry.
             self.responses.write().await.remove(&msg_id);
-            return Err(anyhow::anyhow!("incoming channel send failed: {e}"));
+            return Err(BridgeSendError::SendFailed(e.to_string()));
         }
 
         match tokio::time::timeout(timeout, rx).await {
@@ -272,12 +303,12 @@ impl WebBridgeHandle {
             Ok(Err(_)) => {
                 // Gateway gave up; remove the entry.
                 self.responses.write().await.remove(&msg_id);
-                Err(anyhow::anyhow!("response channel dropped"))
+                Err(BridgeSendError::ChannelDropped)
             }
             Err(_) => {
                 // Deadline elapsed; remove the entry to prevent a leak.
                 self.responses.write().await.remove(&msg_id);
-                Err(anyhow::anyhow!("gateway response timeout"))
+                Err(BridgeSendError::Timeout)
             }
         }
     }

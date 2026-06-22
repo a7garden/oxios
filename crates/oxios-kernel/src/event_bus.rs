@@ -542,6 +542,10 @@ pub fn attach_audit_trail(bus: &EventBus, audit: Arc<AuditTrail>) {
                     audit.append(actor, action, resource);
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    // Surface the drop as a metric so operators can detect
+                    // incomplete audit trails instead of the events
+                    // vanishing silently (state-area F4).
+                    crate::metrics::get_metrics().audit_lagged_events.inc_by(n);
                     tracing::warn!(
                         skipped = n,
                         "Audit trail subscriber lagged, skipping events"

@@ -45,7 +45,9 @@ impl DecayEngine {
             return 1.0;
         }
 
-        let hours_since_access = (now - entry.accessed_at).num_hours().max(0) as f32;
+        // Use fractional hours (not num_hours, which truncates to whole hours
+        // and would treat a 59-minute-old access the same as a fresh one).
+        let hours_since_access = ((now - entry.accessed_at).num_seconds().max(0) as f32) / 3600.0;
         let base_rate = entry.memory_type.base_decay_rate();
 
         // Access boost: frequently read memories decay slower
@@ -70,11 +72,15 @@ impl DecayEngine {
     /// Check if an entry should be considered for pruning.
     ///
     /// An entry is a pruning candidate when:
-    /// - decay_score < threshold
+    /// - its *current* decay score (recomputed at `now`) < threshold
     /// - protection is None or Low
     /// - not pinned
     /// - not auto-protected type
-    pub fn is_prunable(&self, entry: &MemoryEntry, threshold: f32) -> bool {
+    ///
+    /// The decay is recomputed against `now` rather than reading the stale
+    /// persisted `entry.decay_score`, so an entry that has crossed the
+    /// threshold since the last Dream run is still detected.
+    pub fn is_prunable(&self, entry: &MemoryEntry, threshold: f32, now: DateTime<Utc>) -> bool {
         if entry.pinned {
             return false;
         }
@@ -84,7 +90,7 @@ impl DecayEngine {
         if entry.memory_type.is_auto_protected() {
             return false;
         }
-        entry.decay_score < threshold
+        self.compute_decay(entry, now) < threshold
     }
 }
 
@@ -224,15 +230,19 @@ mod tests {
     #[test]
     fn test_prunable() {
         let engine = DecayEngine::new(1.0);
-        let mut entry = make_entry(0);
-        entry.decay_score = 0.01;
-        assert!(engine.is_prunable(&entry, 0.05));
+        // 30 days old → recomputed decay well below the 0.05 threshold.
+        let now = Utc::now();
+        let mut entry = make_entry(720);
+        assert!(
+            engine.is_prunable(&entry, 0.05, now),
+            "old, unprotected, unpinned entry should be prunable"
+        );
 
         entry.pinned = true;
-        assert!(!engine.is_prunable(&entry, 0.05));
+        assert!(!engine.is_prunable(&entry, 0.05, now));
 
         entry.pinned = false;
         entry.protection = ProtectionLevel::Medium;
-        assert!(!engine.is_prunable(&entry, 0.05));
+        assert!(!engine.is_prunable(&entry, 0.05, now));
     }
 }

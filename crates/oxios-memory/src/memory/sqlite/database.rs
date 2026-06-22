@@ -240,23 +240,25 @@ impl MemoryDatabase {
     /// Simply copies the `.db` file (does not use VACUUM INTO to avoid
     /// compatibility issues with sqlite-vec virtual tables).
     pub fn backup(&self, backup_path: &Path) -> Result<()> {
-        // First, checkpoint WAL into the main database
-        {
-            let conn = self.conn();
-            conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
-        }
-
-        // Now copy the file
-        let db_path = {
-            let conn = self.conn();
-            conn.path()
-                .map(std::path::PathBuf::from)
-                .ok_or_else(|| anyhow::anyhow!("Cannot backup in-memory database"))?
-        };
+        // Hold the connection lock across checkpoint + path lookup + copy so a
+        // concurrent writer cannot mutate the DB (or append to the WAL) between
+        // the TRUNCATE checkpoint and the file copy, which would leave the
+        // backup image inconsistent with the live WAL. Copying the .db alone is
+        // safe because `wal_checkpoint(TRUNCATE)` flushes and zero-fills the WAL
+        // first. VACUUM INTO is avoided due to sqlite-vec virtual-table conflicts.
+        let conn = self.conn();
+        conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
+        let db_path = conn
+            .path()
+            .map(std::path::PathBuf::from)
+            .ok_or_else(|| anyhow::anyhow!("Cannot backup in-memory database"))?;
 
         std::fs::copy(&db_path, backup_path).with_context(|| {
             format!("Copying {} to {}", db_path.display(), backup_path.display())
         })?;
+        // Drop the connection guard only after the copy completes so writers
+        // remain blocked for the whole checkpoint+copy window.
+        drop(conn);
 
         tracing::info!(path = %backup_path.display(), "Memory database backed up");
         Ok(())

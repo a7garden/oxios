@@ -101,20 +101,6 @@ impl Seed {
     /// assert_eq!(seed.generation, 0);
     /// assert!(seed.parent_seed_id.is_none());
     /// ```
-    /// Creates a new seed with the given goal and auto-generated ID.
-    ///
-    /// Generation is set to 0 and parent_seed_id is None.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use oxios_ouroboros::Seed;
-    ///
-    /// let seed = Seed::new("Build a web server");
-    /// assert!(!seed.goal.is_empty());
-    /// assert_eq!(seed.generation, 0);
-    /// assert!(seed.parent_seed_id.is_none());
-    /// ```
     pub fn new(goal: impl Into<String>) -> Self {
         let goal = goal.into();
         Self {

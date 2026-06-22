@@ -152,16 +152,21 @@ impl AutoProtector {
         entry.access_count += 1;
         entry.accessed_at = Utc::now();
 
-        // Update session_appearances with dedup
+        // Update session_appearances with dedup. Cap the tracking list at 100
+        // WITHOUT evicting the oldest entry: evicting (remove(0)) meant that an
+        // early session, once pushed out, would be mistaken for a brand-new
+        // session on revisit and re-counted — inflating session_appearances and
+        // prematurely promoting protection to Permanent. Capping in place keeps
+        // the first 100 sessions sticky so they are never double-counted; beyond
+        // 100 we simply stop tracking new session ids (the entry is already
+        // clearly well-accessed).
         if !entry
             .seen_in_sessions
             .contains(&current_session_id.to_string())
         {
             entry.session_appearances += 1;
-            entry.seen_in_sessions.push(current_session_id.to_string());
-            // Cap at 100 entries
-            if entry.seen_in_sessions.len() > 100 {
-                entry.seen_in_sessions.remove(0);
+            if entry.seen_in_sessions.len() < 100 {
+                entry.seen_in_sessions.push(current_session_id.to_string());
             }
         }
 

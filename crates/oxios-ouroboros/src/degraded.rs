@@ -67,14 +67,13 @@ pub fn degraded_evaluation(seed: &Seed, output: &str, mechanical_pass: bool) -> 
     let mut matched = 0;
 
     for criterion in &seed.acceptance_criteria {
-        // Simple keyword matching: check if key nouns from criterion appear in output
-        let keywords: Vec<&str> = criterion
-            .split_whitespace()
-            .filter(|w| w.len() > 3 && !matches!(*w, "the" | "must" | "should" | "shall"))
-            .collect();
-        let keyword_match = keywords
-            .iter()
-            .any(|kw| output_lower.contains(&kw.to_lowercase()));
+        // Language-agnostic key-token matching (shared with the mechanical
+        // evaluator via `key_tokens`): lowercases first and uses a
+        // char-count threshold, so CJK text isn't dropped by a byte
+        // length filter and mixed-case stop-words ("The", "SHOULD")
+        // are filtered consistently.
+        let keywords = crate::evaluation::key_tokens(criterion);
+        let keyword_match = keywords.iter().any(|kw| output_lower.contains(kw.as_str()));
         if keyword_match {
             matched += 1;
         }

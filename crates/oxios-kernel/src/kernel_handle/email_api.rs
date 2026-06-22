@@ -171,25 +171,47 @@ impl EmailApi {
 
         for entry in std::fs::read_dir(&sent_dir)? {
             let entry = entry?;
-            if entry.path().extension().is_some_and(|ext| ext == "json") {
-                // Filename: 20260606_080012_abcd1234.json
-                let filename = entry.file_name().to_string_lossy().to_string();
-                // Parse YYYYMMDD_HHMMSS (first 15 chars)
-                let datetime_str = format!(
-                    "{}-{}-{}T{}:{}:{}",
-                    &filename[0..4],
-                    &filename[4..6],
-                    &filename[6..8],
-                    &filename[9..11],
-                    &filename[11..13],
-                    &filename[13..15]
+            if entry.path().extension().is_none_or(|ext| ext != "json") {
+                continue;
+            }
+            // Filename: 20260606_080012_abcd1234.json
+            // Validate the 15-byte timestamp prefix byte-wise before slicing,
+            // so an externally-written or legacy file with the wrong shape
+            // (shorter than 15 bytes, non-ASCII, missing `_`) is skipped
+            // instead of panicking the kernel during a rate-limit check.
+            let filename = entry.file_name().to_string_lossy().into_owned();
+            let stem = filename.strip_suffix(".json").unwrap_or(&filename);
+            let bytes = stem.as_bytes();
+            if bytes.len() < 15 || bytes[8] != b'_' {
+                tracing::debug!(
+                    filename = %filename,
+                    "email_sent: skipping file with unexpected name format"
                 );
-                if let Ok(dt) =
-                    chrono::NaiveDateTime::parse_from_str(&datetime_str, "%Y-%m-%dT%H:%M:%S")
-                    && dt.and_utc() > cutoff
-                {
-                    count += 1;
-                }
+                continue;
+            }
+            let digits_ok = bytes[0..8].iter().all(|b| b.is_ascii_digit())
+                && bytes[9..15].iter().all(|b| b.is_ascii_digit());
+            if !digits_ok {
+                continue;
+            }
+            // ASCII-only prefix → byte slicing is char-aligned.
+            let take = |range: std::ops::Range<usize>| -> &str {
+                std::str::from_utf8(&bytes[range]).expect("validated ASCII prefix")
+            };
+            let datetime_str = format!(
+                "{}-{}-{}T{}:{}:{}",
+                take(0..4),
+                take(4..6),
+                take(6..8),
+                take(9..11),
+                take(11..13),
+                take(13..15)
+            );
+            if let Ok(dt) =
+                chrono::NaiveDateTime::parse_from_str(&datetime_str, "%Y-%m-%dT%H:%M:%S")
+                && dt.and_utc() > cutoff
+            {
+                count += 1;
             }
         }
 

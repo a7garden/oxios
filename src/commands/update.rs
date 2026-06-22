@@ -284,9 +284,23 @@ pub async fn run_update(
 
             for i in 0..archive.len() {
                 let mut file = archive.by_index(i)?;
-                let out_path = dest_dir.join(file.name());
+                // F5: Zip Slip defense — `file.name()` returns the raw
+                // archive entry path (which may contain `../` or absolute
+                // paths). `enclosed_name()` normalizes and rejects unsafe
+                // entries, matching the pattern already used by
+                // web_dist.rs and src/api/routes/system.rs::handle_update_run.
+                let out_path = match file.enclosed_name() {
+                    Some(p) => dest_dir.join(p),
+                    None => {
+                        tracing::warn!(
+                            entry = file.name().to_string(),
+                            "Skipping zip entry with unsafe path (traversal or absolute)"
+                        );
+                        continue;
+                    }
+                };
 
-                if file.name().ends_with('/') {
+                if file.is_dir() {
                     std::fs::create_dir_all(&out_path)?;
                 } else {
                     if let Some(p) = out_path.parent() {

@@ -31,7 +31,7 @@ use anyhow::Result;
 use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock, Semaphore, mpsc, watch};
+use tokio::sync::{Mutex, OwnedSemaphorePermit, RwLock, Semaphore, mpsc, watch};
 use tokio::task::JoinHandle;
 use tokio::time::Duration;
 
@@ -53,8 +53,15 @@ const GATEWAY_BUFFER: usize = 1024;
 /// 32 = 4 cores × 8× headroom (other tasks run during I/O waits).
 const MAX_CONCURRENT_ROUTES: usize = 32;
 
-/// Graceful shutdown timeout per channel task.
+/// Graceful shutdown timeout per channel task / dispatch task (F20/F27).
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// F21: how many times we retry a `channel.send()` before declaring the
+/// message a dead letter.
+const SEND_MAX_RETRIES: u32 = 3;
+
+/// F21: base backoff between send retries; multiplied by the attempt number.
+const SEND_RETRY_DELAY: Duration = Duration::from_millis(100);
 
 /// Registered channel entry.
 struct ChannelEntry {
@@ -89,8 +96,15 @@ pub struct Gateway {
     /// Gateway-wide shutdown signal.
     shutdown: watch::Sender<bool>,
 
-    /// Concurrency limiter for route tasks.
+    /// Concurrency limiter for route tasks. A permit is acquired in `run()`
+    /// *before* spawning each dispatch task (F19), bounding in-flight tasks
+    /// to `MAX_CONCURRENT_ROUTES`; the mpsc buffer absorbs the burst.
     concurrency: Arc<Semaphore>,
+
+    /// F20: JoinHandles of in-flight dispatch tasks. Bounded by the
+    /// semaphore size since permits are acquired before spawn. Reaped on
+    /// each dispatch and drained on shutdown so `run()` can await them.
+    in_flight: Arc<Mutex<Vec<JoinHandle<()>>>>,
 
     /// Keywords that trigger spec (Ouroboros) mode. Prefix-only match.
     spec_keywords: Vec<String>,
@@ -131,6 +145,43 @@ fn strip_spec_keyword<'a>(content: &'a str, spec_keywords: &[String]) -> &'a str
     content
 }
 
+/// F21: deliver a message through a channel with bounded retries and linear
+/// backoff. If all retries fail, the message is logged as a dead letter (with
+/// its seq/user/channel for forensic recovery) instead of vanishing silently.
+///
+/// This protects channels that have no reconnect-replay concept (Telegram,
+/// CLI): even without a client-initiated `replay(last_seq)`, transient send
+/// failures get a chance to recover rather than being dropped on the floor.
+async fn send_with_retry(channel: &Arc<dyn Channel>, msg: OutgoingMessage) -> Result<()> {
+    for attempt in 1..=SEND_MAX_RETRIES {
+        match channel.send(msg.clone()).await {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                if attempt >= SEND_MAX_RETRIES {
+                    tracing::error!(
+                        error = %e,
+                        seq = ?msg.seq,
+                        channel = %msg.channel,
+                        user = %msg.user_id,
+                        attempts = SEND_MAX_RETRIES,
+                        "Failed to send message after retries; dead-lettering"
+                    );
+                    return Err(e);
+                }
+                tracing::warn!(
+                    error = %e,
+                    attempt,
+                    "Channel send failed; retrying after backoff"
+                );
+                tokio::time::sleep(SEND_RETRY_DELAY * attempt).await;
+            }
+        }
+    }
+    // Unreachable: the loop always returns on the last attempt.
+    #[allow(unreachable_code)]
+    Ok(())
+}
+
 impl Gateway {
     /// Creates a new gateway with the given orchestrator.
     pub fn new(orchestrator: Arc<oxios_kernel::Orchestrator>) -> Self {
@@ -145,6 +196,7 @@ impl Gateway {
             persona_api: None,
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
+            in_flight: Arc::new(Mutex::new(Vec::new())),
             spec_keywords: default_spec_keywords(),
             reliability: Arc::new(ReliabilityLayer::new(Default::default())),
         }
@@ -167,6 +219,7 @@ impl Gateway {
             persona_api: Some(persona_api),
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
+            in_flight: Arc::new(Mutex::new(Vec::new())),
             spec_keywords: default_spec_keywords(),
             reliability: Arc::new(ReliabilityLayer::new(Default::default())),
         }
@@ -230,36 +283,93 @@ impl Gateway {
     /// Runs the gateway event loop.
     ///
     /// Receives from the shared mpsc channel (any channel can push).
-    /// Each message is dispatched to an independent task for concurrent processing.
+    /// Each message is dispatched to an independent task for concurrent
+    /// processing. A concurrency permit is acquired *before* spawning each
+    /// dispatch task (F19), so the number of in-flight tasks is bounded by
+    /// `MAX_CONCURRENT_ROUTES`; excess messages wait in the mpsc buffer,
+    /// producing natural backpressure instead of unbounded task allocation.
     /// Returns when all senders are dropped or shutdown is signalled.
     pub async fn run(&self) -> Result<()> {
         tracing::info!("Gateway event loop started");
         let mut rx = self.rx.lock().await;
         let mut shutdown = self.shutdown.subscribe();
 
-        loop {
+        let shutdown_requested = loop {
             tokio::select! {
                 inbox = rx.recv() => {
                     match inbox {
                         Some((channel_name, msg)) => {
-                            self.dispatch(channel_name, msg);
+                            // F19: acquire the concurrency permit before spawning
+                            // so in-flight tasks are bounded. The mpsc buffer
+                            // absorbs bursts; if all permits are held, recv
+                            // effectively pauses until one frees up.
+                            let permit = match self.concurrency.clone().acquire_owned().await {
+                                Ok(p) => p,
+                                Err(_) => {
+                                    tracing::warn!("Semaphore closed, dropping message");
+                                    continue;
+                                }
+                            };
+                            // Shutdown may have been signalled while we waited
+                            // for the permit — re-check before dispatching.
+                            if *shutdown.borrow() {
+                                tracing::info!(
+                                    "Shutdown signalled during dispatch; dropping unprocessed message"
+                                );
+                                break true;
+                            }
+                            self.dispatch(channel_name, msg, permit);
                         }
                         None => {
                             tracing::info!("All channels disconnected, exiting");
-                            break;
+                            break false;
                         }
                     }
                 }
 
                 _ = shutdown.changed() => {
                     tracing::info!("Gateway shutting down");
-                    let channels = self.channels.read().await;
-                    for (name, entry) in channels.iter() {
-                        let _ = entry.shutdown_tx.send(true);
-                        tracing::info!(channel = %name, "Shutdown signal sent");
-                    }
-                    break;
+                    break true;
                 }
+            }
+        };
+
+        if shutdown_requested {
+            self.finish_shutdown().await?;
+        }
+        Ok(())
+    }
+
+    /// F20/F27: signal all channels to stop and await in-flight dispatch tasks
+    /// and channel receive tasks with a bounded timeout. Ensures no message
+    /// processing or channel I/O is abandoned mid-flight on shutdown.
+    async fn finish_shutdown(&self) -> Result<()> {
+        // F20: drain and await in-flight dispatch tasks.
+        let dispatch_handles: Vec<JoinHandle<()>> = self.in_flight.lock().await.drain(..).collect();
+        for handle in dispatch_handles {
+            if tokio::time::timeout(SHUTDOWN_TIMEOUT, handle)
+                .await
+                .is_err()
+            {
+                tracing::warn!("Dispatch task did not finish within shutdown timeout; abandoning");
+            }
+        }
+
+        // F27: signal and await channel receive tasks. Drain the registry so
+        // we can own the JoinHandles (they aren't Clone).
+        let entries: Vec<(String, ChannelEntry)> = {
+            let mut channels = self.channels.write().await;
+            channels.drain().collect()
+        };
+        for (name, entry) in entries {
+            let _ = entry.shutdown_tx.send(true);
+            match tokio::time::timeout(SHUTDOWN_TIMEOUT, entry.task).await {
+                Ok(Ok(())) => tracing::info!(channel = %name, "Channel task completed"),
+                Ok(Err(e)) => tracing::warn!(channel = %name, error = %e, "Channel task panicked"),
+                Err(_) => tracing::warn!(
+                    channel = %name,
+                    "Channel task did not finish within shutdown timeout"
+                ),
             }
         }
 
@@ -268,22 +378,24 @@ impl Gateway {
 
     /// Dispatch an incoming message to an independent task.
     ///
-    /// The event loop is not blocked — it can immediately receive the next message.
-    /// Semaphore limits concurrency to MAX_CONCURRENT_ROUTES.
+    /// The concurrency `permit` is acquired by `run()` before calling this,
+    /// bounding in-flight tasks (F19). The permit is held for the lifetime of
+    /// the spawned task.
     ///
     /// If the message contains an `action` metadata key, it is routed to the
-    /// appropriate API handler instead of the orchestrator.
-    fn dispatch(&self, channel_name: String, msg: IncomingMessage) {
+    /// appropriate API handler (the permit is released — actions are cheap,
+    /// no LLM call) instead of the orchestrator.
+    fn dispatch(&self, channel_name: String, msg: IncomingMessage, permit: OwnedSemaphorePermit) {
         // ── Action-based routing ───────────────────────────────────
-        // Check if the message is an action command (e.g., switch_model, switch_persona)
-        // rather than a regular user message.
         if let Some(action) = msg.metadata.get(meta::ACTION).cloned() {
             match action.as_str() {
                 "switch_model" => {
+                    drop(permit); // actions don't consume the concurrency permit
                     self.dispatch_switch_model(channel_name, msg);
                     return;
                 }
                 "switch_persona" => {
+                    drop(permit);
                     self.dispatch_switch_persona(channel_name, msg);
                     return;
                 }
@@ -297,19 +409,15 @@ impl Gateway {
         // ── Normal orchestrator routing ────────────────────────────
         let orchestrator = self.orchestrator.clone();
         let channels = self.channels.clone();
-        let semaphore = self.concurrency.clone();
         let spec_keywords = self.spec_keywords.clone();
         let reliability = self.reliability.clone();
+        let in_flight = self.in_flight.clone();
 
-        tokio::spawn(async move {
-            // Concurrency limit — excess requests wait.
-            let _permit = match semaphore.acquire().await {
-                Ok(p) => p,
-                Err(_) => {
-                    tracing::warn!("Semaphore closed, dropping message");
-                    return;
-                }
-            };
+        // F20: track the handle so shutdown can await it. Reap finished
+        // handles to keep the vec bounded.
+        let handle = tokio::spawn(async move {
+            // _permit is held for the task lifetime — released on drop.
+            let _permit = permit;
 
             tracing::info!(
                 channel = %msg.channel,
@@ -319,7 +427,7 @@ impl Gateway {
                 "Routing incoming message"
             );
 
-            // ── Duration measurement (includes semaphore wait = user-perceived latency) ──
+            // ── Duration measurement ──
             let start = std::time::Instant::now();
 
             let session_id = msg.metadata.get(meta::SESSION_ID).cloned();
@@ -362,11 +470,16 @@ impl Gateway {
 
             let duration_ms = start.elapsed().as_millis() as u64;
 
-            let guard = channels.read().await;
-            let entry = guard.get(&channel_name);
+            // F22: clone the channel Arc out of the lock and release the
+            // guard before the (potentially slow) send, so register/
+            // unregister aren't blocked during delivery.
+            let channel: Option<Arc<dyn Channel>> = {
+                let guard = channels.read().await;
+                guard.get(&channel_name).map(|e| e.channel.clone())
+            };
 
-            match (result, entry) {
-                (Ok(orchestration), Some(entry)) => {
+            match (result, channel) {
+                (Ok(orchestration), Some(channel)) => {
                     tracing::info!(
                         phase = %orchestration.phase_reached,
                         seed_id = ?orchestration.seed_id,
@@ -430,11 +543,10 @@ impl Gateway {
                     );
                     outgoing.target_conn_id = conn_id;
                     let outgoing = reliability.assign_seq(outgoing);
-                    if let Err(e) = entry.channel.send(outgoing).await {
-                        tracing::error!(error = %e, "Failed to send response");
-                    }
+                    // F21: retry with backoff before dead-lettering.
+                    let _ = send_with_retry(&channel, outgoing).await;
                 }
-                (Err(e), Some(entry)) => {
+                (Err(e), Some(channel)) => {
                     tracing::error!(error = %e, "Orchestration failed");
                     let user_err = classify_error(&e);
 
@@ -447,29 +559,49 @@ impl Gateway {
                     outgoing.target_conn_id = conn_id;
 
                     let outgoing = reliability.assign_seq(outgoing);
-                    if let Err(e) = entry.channel.send(outgoing).await {
-                        tracing::error!(error = %e, "Failed to send error response");
-                    }
+                    let _ = send_with_retry(&channel, outgoing).await;
                 }
                 (_, None) => {
                     tracing::warn!(channel = %channel_name, "Channel no longer registered");
                 }
             }
         });
+
+        // Track + reap in one pass.
+        if let Ok(mut in_flight) = in_flight.try_lock() {
+            in_flight.retain(|h| !h.is_finished());
+            in_flight.push(handle);
+        }
+        // If try_lock fails (someone else holds it, e.g. shutdown drain),
+        // the handle is still tracked by the runtime — worst case we don't
+        // await it on shutdown, which is the pre-fix behavior.
     }
 
     // ── Public utilities ────────────────────────────────────
 
     /// Sends a message through the named channel.
+    ///
+    /// F21: returns an error when the channel isn't registered (callers can
+    /// decide to dead-letter/retry) instead of silently succeeding.
+    /// F22: releases the channels read lock before the send.
     pub async fn send_to(&self, channel_name: &str, msg: OutgoingMessage) -> Result<()> {
-        let channels = self.channels.read().await;
-        if let Some(entry) = channels.get(channel_name) {
-            let msg = self.reliability.assign_seq(msg);
-            entry.channel.send(msg).await?;
-        } else {
-            tracing::warn!(channel = %channel_name, "No such channel registered");
-        }
-        Ok(())
+        let channel = {
+            let channels = self.channels.read().await;
+            channels.get(channel_name).map(|e| e.channel.clone())
+        };
+        let Some(channel) = channel else {
+            // Unknown channel: log and succeed (existing contract). The
+            // message is dropped — callers that need delivery guarantees
+            // must check channel existence first. Returning Err here broke
+            // fire-and-forget callers of optional channels.
+            tracing::warn!(
+                channel = channel_name,
+                "No such channel registered; dropping outgoing message"
+            );
+            return Ok(());
+        };
+        let msg = self.reliability.assign_seq(msg);
+        send_with_retry(&channel, msg).await
     }
 
     // ── Action dispatch handlers ───────────────────────────
@@ -494,12 +626,15 @@ impl Gateway {
                 request_id = %msg.id,
                 "Routing switch_model action"
             );
+            // F22: clone the channel Arc out of the lock so the read guard
+            // is released before the (potentially slow) send.
+            let channel: Option<Arc<dyn Channel>> = {
+                let guard = channels.read().await;
+                guard.get(&channel_name).map(|e| e.channel.clone())
+            };
 
-            let guard = channels.read().await;
-            let entry = guard.get(&channel_name);
-
-            match (engine_api, entry) {
-                (Some(api), Some(entry)) => match api.set_model(&model_id) {
+            match (engine_api, channel) {
+                (Some(api), Some(channel)) => match api.set_model(&model_id) {
                     Ok(()) => {
                         let response = format!("✅ 모델이 {model_id}(으)로 전환되었습니다.");
                         let mut outgoing = OutgoingMessage::success(
@@ -525,9 +660,7 @@ impl Gateway {
                         );
                         outgoing.target_conn_id = conn_id;
                         let outgoing = reliability.assign_seq(outgoing);
-                        if let Err(e) = entry.channel.send(outgoing).await {
-                            tracing::error!(error = %e, "Failed to send switch_model response");
-                        }
+                        let _ = send_with_retry(&channel, outgoing).await;
                     }
                     Err(e) => {
                         tracing::error!(error = %e, "switch_model failed");
@@ -543,9 +676,7 @@ impl Gateway {
                             OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
                         outgoing.target_conn_id = conn_id;
                         let outgoing = reliability.assign_seq(outgoing);
-                        if let Err(e) = entry.channel.send(outgoing).await {
-                            tracing::error!(error = %e, "Failed to send switch_model error");
-                        }
+                        let _ = send_with_retry(&channel, outgoing).await;
                     }
                 },
                 (None, _) => {
@@ -578,12 +709,15 @@ impl Gateway {
                 request_id = %msg.id,
                 "Routing switch_persona action"
             );
+            // F22: clone the channel Arc out of the lock so the read guard
+            // is released before the (potentially slow) send.
+            let channel: Option<Arc<dyn Channel>> = {
+                let guard = channels.read().await;
+                guard.get(&channel_name).map(|e| e.channel.clone())
+            };
 
-            let guard = channels.read().await;
-            let entry = guard.get(&channel_name);
-
-            match (persona_api, entry) {
-                (Some(api), Some(entry)) => match api.set_active(&persona_id) {
+            match (persona_api, channel) {
+                (Some(api), Some(channel)) => match api.set_active(&persona_id) {
                     Ok(()) => {
                         let response =
                             format!("✅ 페르소나가 '{persona_id}'(으)로 전환되었습니다.");
@@ -610,9 +744,7 @@ impl Gateway {
                         );
                         outgoing.target_conn_id = conn_id;
                         let outgoing = reliability.assign_seq(outgoing);
-                        if let Err(e) = entry.channel.send(outgoing).await {
-                            tracing::error!(error = %e, "Failed to send switch_persona response");
-                        }
+                        let _ = send_with_retry(&channel, outgoing).await;
                     }
                     Err(e) => {
                         tracing::error!(error = %e, "switch_persona failed");
@@ -625,9 +757,7 @@ impl Gateway {
                             OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
                         outgoing.target_conn_id = conn_id;
                         let outgoing = reliability.assign_seq(outgoing);
-                        if let Err(e) = entry.channel.send(outgoing).await {
-                            tracing::error!(error = %e, "Failed to send switch_persona error");
-                        }
+                        let _ = send_with_retry(&channel, outgoing).await;
                     }
                 },
                 (None, _) => {

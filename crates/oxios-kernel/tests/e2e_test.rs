@@ -29,9 +29,6 @@ fn make_config(max_iterations: u32) -> OrchestratorConfig {
     OrchestratorConfig {
         max_evolution_iterations: max_iterations,
         min_evaluation_score: 0.8,
-        eval_cache_enabled: true,
-        spec_keywords: vec!["#spec".into(), "#plan".into()],
-        default_mode: "spec".into(),
     }
 }
 
@@ -77,13 +74,6 @@ impl OuroborosProtocol for MockOuroboros {
         result.update_ambiguity(score);
         result.add_exchange("Goal confirmed", "User wants to proceed");
         Ok(result)
-    }
-
-    async fn interview_structured(
-        &self,
-        _user_input: &str,
-    ) -> Result<Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>> {
-        Ok(None)
     }
 
     async fn generate_seed(&self, _interview: &InterviewResult) -> Result<Seed> {

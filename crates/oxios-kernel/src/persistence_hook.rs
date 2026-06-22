@@ -304,16 +304,25 @@ impl PersistenceHook {
             .take(20)
             .map(|s| {
                 let out_preview = if s.output.len() > 100 {
-                    format!("{}...", &s.output[..100])
+                    // Char-boundary safe: multibyte UTF-8 (Korean, emoji)
+                    // would panic on a raw byte slice.
+                    let mut end = 100;
+                    while end > 0 && !s.output.is_char_boundary(end) {
+                        end -= 1;
+                    }
+                    format!("{}...", &s.output[..end])
                 } else {
                     s.output.clone()
                 };
                 format!("- {} → {}", s.input, out_preview)
             })
             .collect();
-
         let result_snippet = if output.len() > 500 {
-            format!("{}...", &output[..500])
+            let mut end = 500;
+            while end > 0 && !output.is_char_boundary(end) {
+                end -= 1;
+            }
+            format!("{}...", &output[..end])
         } else {
             output.to_string()
         };
@@ -428,7 +437,13 @@ fn auto_save_path(seed: &Seed, content: &str) -> String {
         .collect::<Vec<_>>()
         .join("-");
     let slug = if slug.len() > 60 {
-        slug[..60].to_string()
+        // Slug is ASCII-only (slugified above), but guard the slice for
+        // safety and consistency with the rest of the codebase.
+        let mut end = 60;
+        while end > 0 && !slug.is_char_boundary(end) {
+            end -= 1;
+        }
+        slug[..end].to_string()
     } else {
         slug
     };

@@ -19,6 +19,14 @@ const CORRECTION_PATTERNS: &[&str] = &[
     "i meant",
     "not that",
     "i was wrong",
+    // Korean corrections (정정/반박)
+    "아니라",
+    "실제로는",
+    "정정",
+    "틀렸",
+    "잘못 알고",
+    "내가 틀렸",
+    "고쳐",
 ];
 
 /// Patterns indicating a preference or taste.
@@ -32,6 +40,14 @@ const PREFERENCE_PATTERNS: &[&str] = &[
     "my preference",
     "please use",
     "make sure to use",
+    // Korean preferences (선호/취향)
+    "선호",
+    "좋아",
+    "내가 좋아하",
+    "항상 써",
+    "절대 쓰지",
+    "차라리",
+    "내 취향",
 ];
 
 /// Patterns indicating a decision.
@@ -43,6 +59,13 @@ const DECISION_PATTERNS: &[&str] = &[
     "i decided",
     "the decision is",
     "going with",
+    // Korean decisions (결정)
+    "결정했",
+    "결정했어",
+    "하기로 했",
+    "선택했",
+    "우리는",
+    "사용하기로",
 ];
 
 /// Patterns indicating a skill/procedure.
@@ -55,6 +78,14 @@ const SKILL_PATTERNS: &[&str] = &[
     "standard procedure",
     "first, then",
     "step by step",
+    // Korean skills/procedures (절차/방법)
+    "하는 방법",
+    "이렇게 하는",
+    "항상 실행",
+    "커밋하기 전",
+    "표준 절차",
+    "순서대로",
+    "먼저 그리고",
 ];
 
 /// Patterns indicating profile information.
@@ -67,6 +98,15 @@ const PROFILE_PATTERNS: &[&str] = &[
     "my job is",
     "i specialize",
     "my background",
+    // Korean profile (프로필/신상)
+    "내 이름은",
+    "제 이름은",
+    "나는 ",
+    "저는 ",
+    "직업은",
+    "일하고 있",
+    "전문",
+    "내 배경",
 ];
 
 /// Patterns indicating an episode/event.
@@ -163,22 +203,27 @@ impl AutoClassifier {
 
     /// Extract tags from content for search indexing.
     ///
-    /// Simple keyword extraction: split on whitespace, filter short words,
-    /// take top N unique terms.
+    /// Keyword extraction: split on whitespace, filter short/stop words, then
+    /// pick the top-N by frequency (ties broken alphabetically) so that the
+    /// most salient terms are retained instead of an arbitrary alphabetical
+    /// prefix.
     pub fn extract_tags(content: &str, max_tags: usize) -> Vec<String> {
-        let mut tags: Vec<String> = content
-            .split_whitespace()
-            .map(|w| {
-                w.trim_matches(|c: char| c.is_ascii_punctuation())
-                    .to_lowercase()
-            })
-            .filter(|w| w.len() > 3 && !Self::is_stop_word(w))
-            .collect();
+        use std::collections::HashMap;
 
-        tags.sort();
-        tags.dedup();
-        tags.truncate(max_tags);
-        tags
+        let mut counts: HashMap<String, u32> = HashMap::new();
+        for word in content.split_whitespace() {
+            let w = word
+                .trim_matches(|c: char| c.is_ascii_punctuation())
+                .to_lowercase();
+            if w.len() > 3 && !Self::is_stop_word(&w) {
+                *counts.entry(w).or_default() += 1;
+            }
+        }
+
+        let mut tags: Vec<(String, u32)> = counts.into_iter().collect();
+        // Sort by frequency descending, then alphabetically for determinism.
+        tags.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        tags.into_iter().take(max_tags).map(|(w, _)| w).collect()
     }
 
     fn is_stop_word(word: &str) -> bool {

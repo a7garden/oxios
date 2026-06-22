@@ -389,13 +389,47 @@ pub(crate) async fn handle_update_check(
     }))
 }
 
+/// Validate a user-supplied version string for the update flow.
+///
+/// F10: `body.version` is interpolated into the GitHub API URL and passed
+/// to `cargo install --version <v>`. While `Command::new` avoids shell
+/// injection, an attacker-controlled value could still probe arbitrary
+/// release tags or construct a malformed `cargo install` invocation. We
+/// accept only SemVer-shaped strings (digits, dots, alphanumerics, `-`),
+/// rejecting anything with path traversal, shell metacharacters, or
+/// control bytes.
+fn validate_update_version(v: &str) -> Result<(), AppError> {
+    if v.is_empty() || v.len() > 64 {
+        return Err(AppError::BadRequest(
+            "version must be 1..64 characters".into(),
+        ));
+    }
+    let ok = v
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+' || c == '_');
+    if !ok {
+        return Err(AppError::BadRequest(
+            "version contains invalid characters (allowed: alphanumeric, . - + _)".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Maximum download size for the web-dist.zip asset (200 MiB). Guards
+/// against a malicious or tampered release asset OOMing the server.
+const MAX_DOWNLOAD_BYTES: u64 = 200 * 1024 * 1024;
+
 /// POST /api/update/run — Execute the update (download + install binary/web).
 pub(crate) async fn handle_update_run(
     state: State<Arc<AppState>>,
     Json(body): Json<UpdateRunBody>,
 ) -> Result<Json<UpdateRunResponse>, AppError> {
     let current = env!("CARGO_PKG_VERSION");
-
+    // F10: validate user-supplied version before it reaches the GitHub API
+    // URL or `cargo install --version`. Empty (latest) is allowed.
+    if let Some(ref v) = body.version {
+        validate_update_version(v)?;
+    }
     let release = fetch_github_release(body.version.as_deref()).await?;
 
     let tag_name = release["tag_name"]
@@ -430,7 +464,7 @@ pub(crate) async fn handle_update_run(
     if body.web {
         if let Some((name, url, size)) = assets.iter().find(|(n, _, _)| n == "web-dist.zip") {
             tracing::info!(name, size, "Downloading web UI for update");
-            let bytes = download_bytes(&client, url).await?;
+            let bytes = download_bytes(&client, url, MAX_DOWNLOAD_BYTES).await?;
 
             // Extract into a fresh versioned staging dir — NEVER the active
             // dir. The active dir is published only after extraction succeeds
@@ -604,7 +638,11 @@ async fn fetch_github_release(version: Option<&str>) -> Result<serde_json::Value
         .map_err(|e| AppError::Internal(format!("Failed to parse GitHub response: {e}")))
 }
 
-async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, AppError> {
+async fn download_bytes(
+    client: &reqwest::Client,
+    url: &str,
+    max_bytes: u64,
+) -> Result<Vec<u8>, AppError> {
     let resp = client
         .get(url)
         .send()
@@ -616,10 +654,36 @@ async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, 
         return Err(AppError::Internal(format!("Download failed: {status}")));
     }
 
-    resp.bytes()
-        .await
-        .map(|b| b.to_vec())
-        .map_err(|e| AppError::Internal(format!("Failed to read download body: {e}")))
+    // F10: reject oversized payloads up front when the server advertises a
+    // Content-Length. This stops a zip-bomb / large-asset OOM before we
+    // allocate for it.
+    if let Some(cl) = resp.content_length()
+        && cl > max_bytes
+    {
+        return Err(AppError::PayloadTooLarge {
+            size: cl as usize,
+            limit: max_bytes as usize,
+        });
+    }
+
+    // Stream the body with a running byte counter so a server that omits
+    // Content-Length (chunked encoding) still cannot push us past the cap.
+    use futures::StreamExt;
+    let mut stream = resp.bytes_stream();
+    let mut buf = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk =
+            chunk.map_err(|e| AppError::Internal(format!("Failed to read download body: {e}")))?;
+        let new_len = buf.len().saturating_add(chunk.len());
+        if new_len > max_bytes as usize {
+            return Err(AppError::PayloadTooLarge {
+                size: new_len,
+                limit: max_bytes as usize,
+            });
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
 }
 
 /// Parse agent metrics from the Prometheus export text.
@@ -1099,6 +1163,20 @@ pub(crate) async fn handle_config_put(
 ) -> Result<Json<serde_json::Value>, AppError> {
     tracing::info!("Config update requested");
 
+    // Reject engine.* fields — same restriction as PATCH. The bulk PUT path
+    // does not encrypt or mask, so accepting `engine.api_key` here would
+    // write the key in plaintext to config.toml and bypass the typed
+    // `/api/engine/api-key` endpoint (which handles encryption/masking).
+    if let Some(forbidden) = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS) {
+        tracing::warn!(key = %forbidden, "PUT /api/config rejected forbidden key");
+        return Err(AppError::BadRequest(format!(
+            "PUT /api/config does not accept '{forbidden}' fields. \
+             Use the typed endpoint instead: \
+             /api/engine/api-key (POST), /api/engine/model (PUT), \
+             /api/engine/provider-options (PUT)."
+        )));
+    }
+
     // Deep-merge the patch into the current config so omitted fields are preserved.
     let mut current_value = {
         let cfg = state.config.read();
@@ -1107,7 +1185,7 @@ pub(crate) async fn handle_config_put(
             AppError::Internal("failed to serialize current config".into())
         })?
     };
-    deep_merge_json(&mut current_value, body.clone());
+    deep_merge_json(&mut current_value, body);
 
     // Validate the merged result by parsing as OxiosConfig.
     let updated: oxios_kernel::OxiosConfig = match serde_json::from_value(current_value.clone()) {
@@ -1172,7 +1250,21 @@ pub(crate) async fn handle_config_put(
         "Config hot-reloaded (web + kernel subsystems) from {}",
         state.config_path.display()
     );
-    Ok(Json(body))
+
+    // Return the merged, masked config (same shape as GET /api/config) so
+    // the caller never receives an echoed plaintext api_key from its own
+    // request body.
+    let mut response = current_value;
+    if let Some(engine) = response.get_mut("engine")
+        && let Some(api_key) = engine.get_mut("api_key")
+        && api_key.as_str().is_some_and(|k| !k.is_empty())
+    {
+        *api_key = serde_json::Value::String("***".to_string());
+    }
+    if let Some(engine) = response.get_mut("engine") {
+        engine["api_key_set"] = serde_json::Value::Bool(updated_config.engine.api_key.is_some());
+    }
+    Ok(Json(response))
 }
 
 // ---------------------------------------------------------------------------
@@ -1773,16 +1865,16 @@ pub(crate) async fn handle_doctor(state: State<Arc<AppState>>) -> Json<DoctorRes
     let provider = oxios_kernel::CredentialStore::provider_from_model(&default_model);
     match provider {
         Some(p) => match oxios_kernel::CredentialStore::resolve(p, api_key.as_deref()) {
-            Some((key, source)) => {
-                let preview = if key.len() > 8 {
-                    format!("{}...{}", &key[..4], &key[key.len() - 4..])
-                } else {
-                    "(set)".to_string()
-                };
+            Some((_key, source)) => {
+                // F11: do not echo any part of the API key — even a
+                // 4+4 char preview leaks most of a short key and helps
+                // brute-force. Report presence + source only. The
+                // `api_key_set` boolean from GET /api/config already
+                // tells the frontend whether a key is configured.
                 results.push(DoctorCheck {
                     name: "credentials".into(),
                     status: "pass".into(),
-                    message: format!("Credentials found ({preview}, via {source:?})"),
+                    message: format!("Credentials found (via {source:?})"),
                 });
             }
             None => {
@@ -2078,23 +2170,52 @@ pub(crate) async fn handle_log(state: State<Arc<AppState>>) -> Json<LogResponse>
         });
     }
 
-    // Read last N lines efficiently
-    let content = tokio::fs::read_to_string(&log_file)
-        .await
-        .unwrap_or_default();
-
-    let all_lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-    let total = all_lines.len();
-    let lines: Vec<String> = all_lines
-        .into_iter()
-        .rev()
-        .take(50)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect();
+    // F8: read only a bounded tail of the log so a multi-GB daemon log
+    // cannot OOM the server on a single request. We scan at most the last
+    // 256 KiB, drop the leading partial line if we seeked into the middle
+    // of the file, then take the last 50 lines.
+    let (lines, total) = read_log_tail(&log_file, 50, 256 * 1024);
 
     Json(LogResponse { lines, total })
+}
+
+/// Read the last `max_lines` lines from a file, loading at most
+/// `max_bytes` into memory. Returns the lines and the total number of
+/// lines within the scanned window (approximate for large files — exact
+/// only when the whole file fit in the window).
+fn read_log_tail(path: &std::path::Path, max_lines: usize, max_bytes: u64) -> (Vec<String>, usize) {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return (Vec::new(), 0);
+    };
+    let size = metadata.len();
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return (Vec::new(), 0);
+    };
+
+    let window = size.min(max_bytes);
+    if size > max_bytes && file.seek(SeekFrom::End(-(window as i64))).is_err() {
+        return (Vec::new(), 0);
+    }
+    let mut bytes = Vec::with_capacity(window as usize);
+    if file.read_to_end(&mut bytes).is_err() {
+        return (Vec::new(), 0);
+    }
+
+    // If we seeked into the middle of the file, drop the first partial
+    // line (it may begin mid-UTF-8-char and would be garbled).
+    if size > max_bytes
+        && let Some(nl) = bytes.iter().position(|&b| b == b'\n')
+    {
+        bytes.drain(..=nl);
+    }
+
+    let content = String::from_utf8_lossy(&bytes);
+    let all_lines: Vec<&str> = content.lines().collect();
+    let total = all_lines.len();
+    let start = all_lines.len().saturating_sub(max_lines);
+    let lines = all_lines[start..].iter().map(|s| s.to_string()).collect();
+    (lines, total)
 }
 
 fn format_size_helper(bytes: u64) -> String {

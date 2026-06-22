@@ -86,6 +86,26 @@ pub async fn restore_backup(
         .context("Backup missing manifest.json")?;
     let manifest: BackupManifest = serde_json::from_str(&manifest_data)?;
 
+    // Validate manifest version before touching state — restoring from an
+    // unsupported (potentially malicious or future) backup could inject
+    // incompatible state shapes. We currently only write version 1.
+    const SUPPORTED_MANIFEST_VERSION: u32 = 1;
+    if manifest.version != SUPPORTED_MANIFEST_VERSION {
+        anyhow::bail!(
+            "Unsupported backup manifest version {}: only version {} is supported",
+            manifest.version,
+            SUPPORTED_MANIFEST_VERSION
+        );
+    }
+
+    // Refuse to restore from a backup whose declared sections are empty — this
+    // is almost certainly an empty/corrupt directory and would wipe live state.
+    if manifest.sections.is_empty() {
+        anyhow::bail!(
+            "Backup manifest declares no sections — refusing to restore an empty backup over live state"
+        );
+    }
+
     // Copy backup into state directory
     copy_dir_recursive(backup_path, &state_store.base_path).await?;
 
@@ -103,7 +123,20 @@ fn copy_dir_recursive<'a>(
         while let Some(entry) = entries.next_entry().await? {
             let src_path = entry.path();
             let dest_path = dest.join(entry.file_name());
-            if src_path.is_dir() {
+            // Use symlink_metadata so we never follow symlinks during restore.
+            // A symlink inside a (possibly untrusted) backup could otherwise
+            // point anywhere on the filesystem and let restore write outside
+            // the state directory.
+            let meta = tokio::fs::symlink_metadata(&src_path).await?;
+            let ft = meta.file_type();
+            if ft.is_symlink() {
+                tracing::warn!(
+                    src = %src_path.display(),
+                    "backup: skipping symlink during copy (will not follow)"
+                );
+                continue;
+            }
+            if ft.is_dir() {
                 copy_dir_recursive(&src_path, &dest_path).await?;
             } else {
                 tokio::fs::copy(&src_path, &dest_path).await?;

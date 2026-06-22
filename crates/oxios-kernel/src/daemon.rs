@@ -274,9 +274,9 @@ impl DaemonManager {
 </dict>
 </plist>
 "#,
-                exe = exe.display(),
-                log = log_path.display(),
-                home = home.display(),
+                exe = escape_xml(&exe.display().to_string()),
+                log = escape_xml(&log_path.display().to_string()),
+                home = escape_xml(&home.display().to_string()),
             );
 
             std::fs::write(&plist_path, &plist)?;
@@ -293,6 +293,33 @@ impl DaemonManager {
             let unit_dir = PathBuf::from("/etc/systemd/system");
             let unit_path = unit_dir.join("oxiosd.service");
 
+            // Validate the binary path before embedding it in ExecStart. systemd
+            // ExecStart parsing has its own quoting rules; rather than implement
+            // full escaping, refuse paths containing shell/systemd metacharacters.
+            let exe_str = exe.display().to_string();
+            if exe_str.chars().any(|c| {
+                matches!(
+                    c,
+                    '"' | '\''
+                        | '\\'
+                        | '$'
+                        | '`'
+                        | ';'
+                        | '&'
+                        | '|'
+                        | '*'
+                        | '?'
+                        | '<'
+                        | '>'
+                        | '('
+                        | ')'
+                )
+            }) {
+                anyhow::bail!(
+                    "Refusing to install systemd unit: binary path '{exe_str}' contains shell/systemd metacharacters"
+                );
+            }
+
             let unit = format!(
                 r#"[Unit]
 Description=Oxios Agent Operating System
@@ -307,7 +334,7 @@ RestartSec=5s
 [Install]
 WantedBy=multi-user.target
 "#,
-                exe = exe.display(),
+                exe = exe_str,
             );
 
             // Try to write — may fail without sudo
@@ -411,6 +438,27 @@ WantedBy=multi-user.target
             false
         }
     }
+}
+
+/// Escape a string for safe inclusion in an XML plist text node.
+///
+/// Replaces the five XML-predefined entities (`&`, `<`, `>`, `"`, `'`). Paths
+/// inserted into the launchd plist are usually trusted system paths, but a
+/// HOME or install path containing `<`, `&`, etc. would produce malformed XML
+/// that launchd refuses to load — and would be a defense-in-depth gap.
+fn escape_xml(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 #[cfg(test)]

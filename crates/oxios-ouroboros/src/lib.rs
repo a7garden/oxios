@@ -13,14 +13,11 @@
 #![warn(missing_docs)]
 
 pub mod degraded;
-pub mod eval_cache;
 pub mod evaluation;
 pub mod interview;
-pub mod lateral;
 pub mod model_resolver;
 pub mod ouroboros_engine;
 pub mod protocol;
-pub mod regression;
 pub mod seed;
 
 pub use evaluation::EvaluationResult;

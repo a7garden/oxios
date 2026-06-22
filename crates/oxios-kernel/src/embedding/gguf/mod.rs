@@ -79,6 +79,9 @@ pub struct GgufEmbeddingProvider {
     dimension: EmbeddingDimension,
     /// Inner model state (None = not loaded).
     inner: Mutex<Option<LoadedModel>>,
+    /// Serializes the download+load phase so concurrent first-callers don't
+    /// each download and load the ~329MB model. Held only during loading.
+    load_lock: Mutex<()>,
     /// Time-to-live for the loaded model.
     model_ttl: Duration,
     /// Last time the model was used.
@@ -104,6 +107,7 @@ impl GgufEmbeddingProvider {
             model_dir,
             dimension,
             inner: Mutex::new(None),
+            load_lock: Mutex::new(()),
             model_ttl: Duration::from_secs(model_ttl_secs),
             last_used: Mutex::new(Instant::now()),
         }
@@ -116,6 +120,21 @@ impl GgufEmbeddingProvider {
 
     /// Ensure the model is loaded. Downloads + loads on first call.
     fn ensure_loaded(&self) -> Result<()> {
+        {
+            let inner = self.inner.lock();
+            if inner.is_some() {
+                return Ok(());
+            }
+        }
+
+        // Serialize the download+load phase. Without this guard, two threads
+        // hitting `embed()` for the first time would both pass the `is_none()`
+        // check above and each download + load the model, wasting bandwidth
+        // and memory.
+        let _load_guard = self.load_lock.lock();
+
+        // Re-check after acquiring the lock — another waiter may have completed
+        // the load while we were queued.
         {
             let inner = self.inner.lock();
             if inner.is_some() {

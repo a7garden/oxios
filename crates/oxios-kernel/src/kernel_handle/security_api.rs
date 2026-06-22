@@ -10,10 +10,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// A one-time ticket for WebSocket authentication.
-/// Valid for 30 seconds after creation, single-use.
 struct WsTicket {
     created_at: std::time::Instant,
 }
+
+/// How long a [`WsTicket`] is considered valid during `validate_ws_ticket`.
+/// Single-use: the ticket is removed from the map on first validation.
+const WS_TICKET_TTL_SECS: u64 = 30;
+/// Prune threshold used inside `generate_ws_ticket`. Slightly longer than
+/// [`WS_TICKET_TTL_SECS`] so an expired-but-not-yet-consumed ticket is
+/// cleared from memory on the next generate, rather than lingering until
+/// process exit.
+const WS_TICKET_PRUNE_AFTER_SECS: u64 = 60;
 
 /// Security system calls.
 pub struct SecurityApi {
@@ -41,13 +49,19 @@ impl SecurityApi {
         }
     }
 
-    /// Generate a one-time WebSocket ticket. Valid for 30 seconds, single-use.
+    /// Generate a one-time WebSocket ticket.
+    ///
+    /// The ticket is valid for [`WS_TICKET_TTL_SECS`] seconds (single-use).
+    /// Pruning removes entries older than [`WS_TICKET_PRUNE_AFTER_SECS`]
+    /// seconds — the prune window is intentionally a bit longer than the
+    /// validate window so a ticket that has just expired is still cleared
+    /// from memory on the next generate.
     pub fn generate_ws_ticket(&self) -> String {
         let bytes: [u8; 16] = *uuid::Uuid::new_v4().as_bytes();
         let ticket = format!("wst_{}", hex::encode(bytes));
         let mut tickets = self.ws_tickets.lock();
-        // Prune expired tickets (older than 60s)
-        tickets.retain(|_, t| t.created_at.elapsed().as_secs() < 60);
+        // Prune expired tickets.
+        tickets.retain(|_, t| t.created_at.elapsed().as_secs() < WS_TICKET_PRUNE_AFTER_SECS);
         tickets.insert(
             ticket.clone(),
             WsTicket {
@@ -57,15 +71,17 @@ impl SecurityApi {
         ticket
     }
 
-    /// Validate and consume a one-time WebSocket ticket. Returns false if invalid/expired/already used.
+    /// Validate and consume a one-time WebSocket ticket. Returns false if
+    /// invalid/expired/already-used.
     pub fn validate_ws_ticket(&self, ticket: &str) -> bool {
         let mut tickets = self.ws_tickets.lock();
         if let Some(t) = tickets.remove(ticket) {
-            t.created_at.elapsed().as_secs() < 30
+            t.created_at.elapsed().as_secs() < WS_TICKET_TTL_SECS
         } else {
             false
         }
     }
+
     /// Audit an action.
     pub fn audit(&self, actor: &str, action: AuditAction, resource: &str) -> String {
         self.audit_trail
@@ -84,9 +100,26 @@ impl SecurityApi {
         self.audit_trail.entries(from_seq, to_seq)
     }
 
-    /// Query audit by agent.
+    /// Query audit entries whose agent/subject matches `agent_id`.
+    /// Field access is serde-based so this is robust to `TrailEntry` field
+    /// renames in oxi-sdk.
     pub fn query_audit_by_agent(&self, agent_id: &str) -> Vec<TrailEntry> {
-        self.audit_trail.by_agent(agent_id)
+        self.audit_trail
+            .entries(0, u64::MAX)
+            .into_iter()
+            .filter(|e| {
+                serde_json::to_value(e)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("agent")
+                            .or_else(|| v.get("subject"))
+                            .or_else(|| v.get("agent_id"))
+                            .and_then(|s| s.as_str())
+                            .map(|s| s == agent_id)
+                    })
+                    .unwrap_or(false)
+            })
+            .collect()
     }
 
     /// Get audit entry count.
@@ -101,9 +134,12 @@ impl SecurityApi {
     pub fn flush(&self, git: &crate::git_layer::GitLayer) -> anyhow::Result<()> {
         // 1. Persist entries to state store via AuditPersistence trait
         self.audit_trail.flush_to(self.state_store.as_ref())?;
-        // 2. Commit to git
+        // 2. Commit to git. Unlike best-effort commits in save_and_commit
+        //    (where the on-disk save already succeeded), audit trail commits
+        //    are compliance-relevant: surface the failure so operators know
+        //    the audit record is not versioned.
         if git.is_enabled() {
-            let _ = git.commit_file("audit", "audit trail flush");
+            git.commit_file("audit", "audit trail flush")?;
         }
         Ok(())
     }

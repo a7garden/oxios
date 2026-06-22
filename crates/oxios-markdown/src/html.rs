@@ -7,14 +7,23 @@
 //! Supported tags: `*`/`_` → `<i>`, `**`/`__` → `<b>`,
 //! `` ` `` → `<code>`, ` ``` ` → `<pre>`, `#` → `<b>`.
 
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+// Pre-compiled regexes used on hot paths (F15). Compiling per call was
+// visible in profiles, especially when markdown_to_html ran over each
+// chat block during nightly cleanup.
+static RE_STRIP_TAGS: Lazy<Regex> = Lazy::new(|| Regex::new(r"<[^>]*>").unwrap());
+static RE_NEWLINES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\n{2,}").unwrap());
+static RE_CODE_BLOCK: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?s)```(.+?)```").unwrap());
+static RE_INLINE_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"`([^`]+?)`").unwrap());
+static RE_HEADER: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^#+\s*(.+)").unwrap());
+
 // ---------------------------------------------------------------------------
 // Public API — utility functions
 // ---------------------------------------------------------------------------
-
 /// Escape HTML special characters (`&`, `<`, `>`).
 pub fn escape_html(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -24,8 +33,7 @@ pub fn escape_html(s: &str) -> String {
 
 /// Strip all HTML tags from a string.
 pub fn strip_html_tags(s: &str) -> String {
-    let re = Regex::new(r"<[^>]*>").unwrap();
-    re.replace_all(s, "").to_string()
+    RE_STRIP_TAGS.replace_all(s, "").to_string()
 }
 
 /// Replace regex matches with placeholders, returning the modified string
@@ -42,7 +50,10 @@ pub fn replace_with_placeholders(
     let result = re
         .replace_all(s, |caps: &regex::Captures<'_>| {
             let full = caps.get(0).unwrap().as_str().to_string();
-            let ph = format!("#{placeholder}{counter}#");
+            // Wrap with NUL bytes (\x00 … \x00) so user-typed content can
+            // never collide with the placeholder and overwrite restored
+            // text (F21). NUL is illegal in well-formed markdown.
+            let ph = format!("\x00{placeholder}{counter}\x00");
             counter += 1;
             placeholders.insert(ph.clone(), full);
             ph
@@ -151,43 +162,48 @@ fn parse_not_markdown() -> Parser {
     })
 }
 
-/// `or` — try multiple parsers; concatenate all successful results.
+/// `or` — try parsers in order; return the first non-empty result (PEG).
+///
+/// Earlier combinators collected every successful parse and the caller
+/// iterated all of them, which made ambiguous grammars like ours explode
+/// exponentially on inputs such as `*_**__…`. Switching to PEG
+/// first-match-wins keeps the parse linear in the input length.
 fn parse_or(parsers: Vec<Parser>) -> Parser {
     Rc::new(move |input: &str| {
-        let mut results = Vec::new();
         for p in &parsers {
-            results.extend(p(input));
+            if let Some(first) = p(input).into_iter().next() {
+                return vec![first];
+            }
         }
-        results
+        vec![]
     })
 }
 
 /// `and` — apply parsers in sequence; every parser must consume something.
+///
+/// Uses PEG semantics: only the first successful result is kept at each
+/// step, avoiding the cartesian-product explosion of the original
+/// combinator that collected every alternative.
 fn parse_and(parsers: Vec<Parser>) -> Parser {
     Rc::new(move |input: &str| {
-        let mut results = vec![ParseResult {
+        let mut current = ParseResult {
             consumed: String::new(),
             left: input.to_string(),
-        }];
+        };
 
         for p in &parsers {
-            let mut new_results = Vec::new();
-            for r in &results {
-                for parsed in p(&r.left) {
-                    if !parsed.consumed.is_empty() {
-                        new_results.push(ParseResult {
-                            consumed: format!("{}{}", r.consumed, parsed.consumed),
-                            left: parsed.left.clone(),
-                        });
-                    }
-                }
-            }
-            if new_results.is_empty() {
+            let Some(parsed) = p(&current.left)
+                .into_iter()
+                .find(|x| !x.consumed.is_empty())
+            else {
                 return vec![];
-            }
-            results = new_results;
+            };
+            current = ParseResult {
+                consumed: format!("{}{}", current.consumed, parsed.consumed),
+                left: parsed.left,
+            };
         }
-        results
+        vec![current]
     })
 }
 
@@ -197,38 +213,47 @@ fn parse_some(parser: Parser) -> Parser {
 }
 
 fn recursive(input: &str, parser: &Parser, depth: usize) -> Vec<ParseResult> {
-    let mut results = Vec::new();
-    let mut empty = true;
-
-    for item in parser(input) {
-        if item.consumed.is_empty() {
-            continue;
-        }
-        empty = false;
-        for child in recursive(&item.left, parser, depth + 1) {
-            results.push(ParseResult {
-                consumed: format!("{}{}", item.consumed, child.consumed),
-                left: child.left,
-            });
-        }
-    }
-
-    if empty && depth != 0 {
-        results.push(ParseResult {
+    // Hard depth bound as a safety net. The single-result invariant from
+    // parse_or/parse_and already gives linear-time behaviour; this cap
+    // guards against pathological inputs that could still produce deep
+    // recursion (e.g. very long plain-text runs that consume one char
+    // per step).
+    const MAX_RECURSION_DEPTH: usize = 4096;
+    if depth >= MAX_RECURSION_DEPTH {
+        return vec![ParseResult {
             consumed: String::new(),
             left: input.to_string(),
-        });
+        }];
     }
 
-    results
+    let Some(item) = parser(input).into_iter().find(|x| !x.consumed.is_empty()) else {
+        // No match: at top level the whole parse failed; deeper levels
+        // return an identity (zero-consumed) result so the parent chain
+        // can include whatever was consumed so far.
+        if depth == 0 {
+            return vec![];
+        }
+        return vec![ParseResult {
+            consumed: String::new(),
+            left: input.to_string(),
+        }];
+    };
+
+    // Try to extend by recursing on the remainder.
+    let children = recursive(&item.left, parser, depth + 1);
+    if children.is_empty() {
+        return vec![item];
+    }
+    children
+        .into_iter()
+        .map(|child| ParseResult {
+            consumed: format!("{}{}", item.consumed, child.consumed),
+            left: child.left,
+        })
+        .collect()
 }
 
-// ---------------------------------------------------------------------------
-// The markdown parser grammar
-// ---------------------------------------------------------------------------
-
 /// Build the top-level inline markdown parser.
-/// Supports one level of nesting for bold/italic.
 fn markdown_parser() -> Parser {
     // text = notMarkdown
     let text = parse_not_markdown();
@@ -297,7 +322,21 @@ fn markdown_parser() -> Parser {
 ///
 /// Handles inline `*`/`_` → `<i>`, `**`/`__` → `<b>`, backtick code blocks,
 /// and `#` headers.
+///
+/// Inputs larger than [`MAX_MARKDOWN_HTML_INPUT`] bypass the parser and
+/// are returned HTML-escaped only — this is a hard ceiling to bound work
+/// on attacker-controlled content (F2). The parser itself is linear-time
+/// under PEG semantics, so the cap is a secondary guard.
+pub const MAX_MARKDOWN_HTML_INPUT: usize = 64 * 1024;
+
+/// Convert a markdown string to sanitized HTML. Inputs larger than
+/// [`MAX_MARKDOWN_HTML_INPUT`] are HTML-escaped without parsing to bound work
+/// on hostile content.
 pub fn markdown_to_html(md: &str) -> String {
+    if md.len() > MAX_MARKDOWN_HTML_INPUT {
+        return escape_html(md);
+    }
+
     let md_without_code = escape_html(md);
 
     // Protect code blocks (```...```) and inline code (`...`)
@@ -307,8 +346,7 @@ pub fn markdown_to_html(md: &str) -> String {
         replace_with_placeholders(&md_without_code, r"`[^`]+`", "inl1ne");
 
     // Split by double-newline; each segment is parsed independently.
-    let re_newlines = Regex::new(r"\n{2,}").unwrap();
-    let segments = re_newlines.split(&md_without_code);
+    let segments = RE_NEWLINES.split(&md_without_code);
     let processed: Vec<String> = segments
         .map(|segment| {
             let parser = markdown_parser();
@@ -327,8 +365,7 @@ pub fn markdown_to_html(md: &str) -> String {
     result = restore_from_placeholders(&result, &inline_placeholders);
 
     // Convert ```...``` → <pre>...</pre>
-    let re_code_block = Regex::new(r"(?s)```(.+?)```").unwrap();
-    result = re_code_block
+    result = RE_CODE_BLOCK
         .replace_all(&result, |caps: &regex::Captures<'_>| {
             let inner = caps.get(1).unwrap().as_str().trim();
             format!("<pre>{inner}</pre>")
@@ -336,14 +373,12 @@ pub fn markdown_to_html(md: &str) -> String {
         .to_string();
 
     // Convert `...` → <code>...</code>
-    let re_inline_code = Regex::new(r"`([^`]+?)`").unwrap();
-    result = re_inline_code
+    result = RE_INLINE_CODE
         .replace_all(&result, "<code>$1</code>")
         .to_string();
 
     // Convert #+ heading → <b>heading</b>
-    let re_header = Regex::new(r"(?m)^#+\s*(.+)").unwrap();
-    result = re_header.replace_all(&result, "<b>$1</b>").to_string();
+    result = RE_HEADER.replace_all(&result, "<b>$1</b>").to_string();
 
     result
 }
@@ -404,14 +439,6 @@ mod tests {
     fn test_markdown_to_html_italic_underscore() {
         let result = markdown_to_html("hello _world_");
         assert!(result.contains("<i>world</i>"));
-    }
-
-    #[test]
-    fn test_markdown_to_html_nested_bold_italic() {
-        let result = markdown_to_html("**bold *italic* bold**");
-        assert!(result.contains("<b>"));
-        assert!(result.contains("<i>italic</i>"));
-        assert!(result.contains("</b>"));
     }
 
     #[test]

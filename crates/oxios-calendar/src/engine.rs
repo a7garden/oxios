@@ -66,8 +66,17 @@ impl CalendarEngine {
         let path = self.dir.join(&filename);
         fs::write(&path, ics_content).await?;
 
-        // Check conflicts against existing events
-        let existing = self.load_all_events(&self.index.read().all_entries())?;
+        // Check conflicts against existing events. F15: collect filenames
+        // under the lock, release, then read asynchronously.
+        let existing_filenames: Vec<String> = {
+            let index = self.index.read();
+            index
+                .all_entries()
+                .into_iter()
+                .map(|e| e.file.clone())
+                .collect()
+        };
+        let existing = self.load_events_from_filenames(&existing_filenames).await;
         let conflicts = conflict::detect_conflicts(
             &existing.iter().collect::<Vec<_>>(),
             draft.start,
@@ -144,19 +153,40 @@ impl CalendarEngine {
 
         let mut ics_content = ical::build_ics(&event.uid, &draft)?;
 
-        // Append the original RRULE if it exists and patch didn't change it
+        // F16: append the original RRULE if it exists and the patch didn't
+        // change it. `build_ics` doesn't add RRULE since `repeat` is None, so
+        // we splice it in before the *structural* END:VEVENT. We locate the
+        // last occurrence of the line marker "\nEND:VEVENT" (reverse-find)
+        // rather than using `str::replace`, which would corrupt the file by
+        // also matching "END:VEVENT" embedded in a DESCRIPTION/SUMMARY value.
+        // iCalendar escapes newlines inside TEXT values as literal "\n", so
+        // a real newline before "END:VEVENT" can only be the block terminator.
         if let Some(ref rrule_str) = event.rrule {
-            // The build_ics won't add RRULE since repeat is None. Add it manually.
-            // Find the END:VEVENT line and insert RRULE before it.
-            ics_content =
-                ics_content.replace("END:VEVENT", &format!("RRULE:{rrule_str}\nEND:VEVENT"));
+            const MARKER: &str = "\nEND:VEVENT";
+            if let Some(idx) = ics_content.rfind(MARKER) {
+                ics_content.insert_str(idx + 1, &format!("RRULE:{rrule_str}\n"));
+            } else {
+                tracing::warn!(
+                    file = %event.filename,
+                    "Could not locate END:VEVENT marker to splice RRULE; skipping"
+                );
+            }
         }
 
         let path = self.dir.join(&event.filename);
         fs::write(&path, ics_content).await?;
 
-        // Check conflicts
-        let existing = self.load_all_events(&self.index.read().all_entries())?;
+        // Check conflicts. F15: collect filenames under the lock, release,
+        // then read asynchronously.
+        let existing_filenames: Vec<String> = {
+            let index = self.index.read();
+            index
+                .all_entries()
+                .into_iter()
+                .map(|e| e.file.clone())
+                .collect()
+        };
+        let existing = self.load_events_from_filenames(&existing_filenames).await;
         let conflicts = conflict::detect_conflicts(
             &existing.iter().collect::<Vec<_>>(),
             event.start,
@@ -201,51 +231,117 @@ impl CalendarEngine {
     }
 
     /// Get a single event by UID.
+    ///
+    /// F15: reads the .ics file asynchronously (`tokio::fs`) instead of
+    /// blocking the runtime worker on `std::fs`.
     pub async fn get(&self, uid: &str) -> anyhow::Result<Event> {
-        let index = self.index.read();
-        let entry = index
-            .get(uid)
-            .ok_or_else(|| anyhow::anyhow!("Event not found: {uid}"))?;
-        let path = self.dir.join(&entry.file);
-        let content = std::fs::read_to_string(&path)?;
-        ical::parse_ics(&content, &entry.file)
+        // Collect the needed owned data (path, filename) under the lock,
+        // then release before the async read — parking_lot guards are not
+        // `Send` and must not cross `.await`.
+        let (path, filename) = {
+            let index = self.index.read();
+            let entry = index
+                .get(uid)
+                .ok_or_else(|| anyhow::anyhow!("Event not found: {uid}"))?;
+            (self.dir.join(&entry.file), entry.file.clone())
+        };
+        let content = fs::read_to_string(&path).await?;
+        ical::parse_ics(&content, &filename)
+    }
+
+    /// Read and parse multiple `.ics` files by name. Lock-free async I/O —
+    /// callers collect filenames under the index lock, then release it before
+    /// invoking this (parking_lot guards are not `Send` across `.await`).
+    async fn load_events_from_filenames(&self, filenames: &[String]) -> Vec<Event> {
+        let mut events = Vec::with_capacity(filenames.len());
+        for filename in filenames {
+            let path = self.dir.join(filename);
+            match fs::read_to_string(&path).await {
+                Ok(content) => match ical::parse_ics(&content, filename) {
+                    Ok(event) => events.push(event),
+                    Err(e) => tracing::warn!(
+                        file = filename,
+                        error = %e,
+                        "failed to parse ics file"
+                    ),
+                },
+                Err(e) => tracing::warn!(
+                    file = filename,
+                    error = %e,
+                    "failed to read ics file"
+                ),
+            }
+        }
+        events
     }
 
     /// List all events in a time range `[from, to)`.
     ///
     /// For recurring events, the base event is included if it falls within
     /// range or its RRULE produces occurrences within range.
+    ///
+    /// F15: reads files asynchronously and releases the index lock before
+    /// any `.await`. Files that fail to read/parse are logged and skipped
+    /// rather than dropped silently (F11 secondary).
     pub async fn list(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> anyhow::Result<Vec<Event>> {
-        let index = self.index.read();
-        let base_entries = index.list_range(from, to);
+        // Snapshot the filenames we need to read, then release the index lock.
+        let files: Vec<String> = {
+            let index = self.index.read();
+            let base_entries = index.list_range(from, to);
 
-        // Also include recurring events whose base start is before `to`
-        // and whose RRULE might produce occurrences in range
-        let recurring_entries: Vec<&IndexEntry> = index
-            .all_entries()
-            .into_iter()
-            .filter(|e| e.rrule.is_some() && e.dtstart < to)
-            .filter(|e| !base_entries.iter().any(|b| b.file == e.file))
-            .collect();
+            // Also include recurring events whose base start is before `to`
+            // and whose RRULE might produce occurrences in range
+            let recurring_entries: Vec<&IndexEntry> = index
+                .all_entries()
+                .into_iter()
+                .filter(|e| e.rrule.is_some() && e.dtstart < to)
+                .filter(|e| !base_entries.iter().any(|b| b.file == e.file))
+                .collect();
 
-        let all_entries: Vec<&IndexEntry> =
-            base_entries.into_iter().chain(recurring_entries).collect();
+            let all_entries: Vec<&IndexEntry> =
+                base_entries.into_iter().chain(recurring_entries).collect();
+
+            all_entries.into_iter().map(|e| e.file.clone()).collect()
+        };
 
         let mut events = Vec::new();
-        for entry in &all_entries {
-            let path = self.dir.join(&entry.file);
-            if let Ok(content) = std::fs::read_to_string(&path)
-                && let Ok(event) = ical::parse_ics(&content, &entry.file)
-            {
-                // For recurring events, expand occurrences in range
-                if let Some(ref rrule_str) = event.rrule
-                    && let Ok(expanded) = self.expand_rrule_in_range(&event, rrule_str, from, to)
-                {
-                    events.extend(expanded);
+        for filename in &files {
+            let path = self.dir.join(filename);
+            let content = match fs::read_to_string(&path).await {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!(file = %filename, error = %e, "Failed to read calendar file");
                     continue;
                 }
-                events.push(event);
+            };
+            let event = match ical::parse_ics(&content, filename) {
+                Ok(ev) => ev,
+                Err(e) => {
+                    tracing::warn!(
+                        file = %filename,
+                        error = %e,
+                        "Failed to parse calendar file; skipping"
+                    );
+                    continue;
+                }
+            };
+            // For recurring events, expand occurrences in range
+            if let Some(ref rrule_str) = event.rrule {
+                match self.expand_rrule_in_range(&event, rrule_str, from, to) {
+                    Ok(expanded) => {
+                        events.extend(expanded);
+                        continue;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            file = %filename,
+                            error = %e,
+                            "RRULE expansion failed; falling back to base event"
+                        );
+                    }
+                }
             }
+            events.push(event);
         }
 
         // Sort by start time
@@ -254,16 +350,36 @@ impl CalendarEngine {
     }
 
     /// Search events by title (case-insensitive substring match).
+    ///
+    /// F15: async file read + lock released before `.await`. Failures are
+    /// logged instead of silently dropped.
     pub async fn search(&self, query: &str) -> anyhow::Result<Vec<Event>> {
-        let index = self.index.read();
-        let entries = index.search(query);
+        let files: Vec<String> = {
+            let index = self.index.read();
+            index
+                .search(query)
+                .into_iter()
+                .map(|e| e.file.clone())
+                .collect()
+        };
+
         let mut events = Vec::new();
-        for entry in entries {
-            let path = self.dir.join(&entry.file);
-            if let Ok(content) = std::fs::read_to_string(&path)
-                && let Ok(event) = ical::parse_ics(&content, &entry.file)
-            {
-                events.push(event);
+        for filename in &files {
+            let path = self.dir.join(filename);
+            match fs::read_to_string(&path).await {
+                Ok(content) => match ical::parse_ics(&content, filename) {
+                    Ok(event) => events.push(event),
+                    Err(e) => tracing::warn!(
+                        file = %filename,
+                        error = %e,
+                        "Failed to parse calendar file during search"
+                    ),
+                },
+                Err(e) => tracing::warn!(
+                    file = %filename,
+                    error = %e,
+                    "Failed to read calendar file during search"
+                ),
             }
         }
         events.sort_by_key(|e| e.start);
@@ -364,6 +480,15 @@ impl CalendarEngine {
     }
 
     /// Expand an RRULE into synthetic event occurrences within a time range.
+    ///
+    /// F9: the `rrule` crate's `all(limit)` silently truncates at `limit`;
+    /// we surface that by logging a warning when `result.limited` is set so
+    /// a partial result is never mistaken for a complete one.
+    ///
+    /// F10: an RRULE with a sub-hourly frequency and no COUNT/UNTIL over a
+    /// wide range can produce a huge number of occurrences. The cap below
+    /// bounds the work; a warning is also emitted for dangerous rule shapes
+    /// so misconfigured/imported rules are visible.
     fn expand_rrule_in_range(
         &self,
         event: &Event,
@@ -371,6 +496,22 @@ impl CalendarEngine {
         from: DateTime<Utc>,
         to: DateTime<Utc>,
     ) -> anyhow::Result<Vec<Event>> {
+        // F10: warn on high-frequency, unbounded rules — they're almost
+        // always a misconfiguration or a malicious .ics and will hit the cap.
+        let upper = rrule_str.to_ascii_uppercase();
+        let has_bound = upper.contains("COUNT=") || upper.contains("UNTIL=");
+        let high_freq = upper.contains("FREQ=SECONDLY")
+            || upper.contains("FREQ=MINUTELY")
+            || upper.contains("FREQ=HOURLY");
+        if high_freq && !has_bound {
+            tracing::warn!(
+                event_uid = %event.uid,
+                rrule = %rrule_str,
+                "RRULE has a sub-daily frequency with no COUNT/UNTIL; \
+                 expansion will be capped"
+            );
+        }
+
         let rrule_set_str = format!(
             "DTSTART:{}\nRRULE:{}",
             event.start.format("%Y%m%dT%H%M%SZ"),
@@ -388,10 +529,23 @@ impl CalendarEngine {
 
         let after = rrule_set.after(from_tz);
         let bounded = after.before(to_tz);
-        let result = bounded.all(1000);
+        let result = bounded.all(MAX_RRULE_OCCURRENCES);
+
+        // F9: don't swallow the truncation flag.
+        if result.limited {
+            tracing::warn!(
+                event_uid = %event.uid,
+                rrule = %rrule_str,
+                cap = MAX_RRULE_OCCURRENCES,
+                from = %from,
+                to = %to,
+                "RRULE expansion hit the occurrence cap; \
+                 results are truncated — narrow the range or add COUNT/UNTIL"
+            );
+        }
 
         let duration = event.end - event.start;
-        let mut expanded = Vec::new();
+        let mut expanded = Vec::with_capacity(result.dates.len());
 
         for dt in &result.dates {
             let start = dt.with_timezone(&Utc);
@@ -414,20 +568,6 @@ impl CalendarEngine {
         Ok(expanded)
     }
 
-    /// Load all events from a list of index entries.
-    fn load_all_events(&self, entries: &[&IndexEntry]) -> anyhow::Result<Vec<Event>> {
-        let mut events = Vec::new();
-        for entry in entries {
-            let path = self.dir.join(&entry.file);
-            if let Ok(content) = std::fs::read_to_string(&path)
-                && let Ok(event) = ical::parse_ics(&content, &entry.file)
-            {
-                events.push(event);
-            }
-        }
-        Ok(events)
-    }
-
     /// Remove an entry from the index (used by archive).
     pub(crate) async fn remove_from_index(&self, uid: &str) -> anyhow::Result<()> {
         self.index.write().remove(uid);
@@ -440,6 +580,11 @@ impl CalendarEngine {
         Ok(())
     }
 }
+
+/// Upper bound on RRULE occurrences generated for a single range query (F9/F10).
+/// 10_000 covers ~27 years of daily events while preventing unbounded CPU/memory
+/// use when an RRULE has no COUNT/UNTIL and the query range is wide.
+const MAX_RRULE_OCCURRENCES: u16 = 10_000;
 
 #[cfg(test)]
 mod tests {

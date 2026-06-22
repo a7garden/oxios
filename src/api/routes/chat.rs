@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use oxios_gateway::message::IncomingMessage;
 
+use crate::api::bridge::BridgeSendError;
 use crate::api::error::AppError;
 use crate::api::server::AppState;
 
@@ -95,8 +96,12 @@ pub(crate) async fn handle_chat(
             limit: MAX_CHAT_LENGTH,
         });
     }
-
-    tracing::info!(content = %body.content, user = %body.user_id, "Chat message received");
+    tracing::info!(
+        content_len = body.content.len(),
+        content_preview = %body.content.chars().take(50).collect::<String>(),
+        user = %body.user_id,
+        "Chat message received"
+    );
 
     // Build the incoming message.
     let mut msg = IncomingMessage::new("web", &body.user_id, &body.content);
@@ -305,12 +310,15 @@ pub(crate) async fn handle_chat(
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to get response from gateway");
-            // RFC-024 C1: distinguish timeout (504) from other failures
-            // (500) so callers can retry only what is safe to retry.
-            if e.to_string().contains("timeout") {
-                Err(AppError::GatewayTimeout(e.to_string()))
-            } else {
-                Err(AppError::Internal("gateway response failed".into()))
+            // RFC-024 C1 / F14: distinguish timeout (504) from other
+            // failures (500) by error variant, not by grepping the error
+            // message. A string-match classification would silently
+            // regress to 500 if the message is ever reworded or wrapped.
+            match e {
+                BridgeSendError::Timeout => Err(AppError::GatewayTimeout(e.to_string())),
+                BridgeSendError::SendFailed(_) | BridgeSendError::ChannelDropped => {
+                    Err(AppError::Internal("gateway response failed".into()))
+                }
             }
         }
     }
@@ -428,7 +436,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // RFC-015: also forward real-time kernel events (tool execution, token
     // usage, memory recall, reasoning fragments) as WS chunks so the
     // frontend can show live progress.
-    let recv_task = tokio::spawn(async move {
+    let mut recv_task = tokio::spawn(async move {
         // Track the active session so we only forward events tagged with it.
         // Multi-turn conversations keep the same session_id across messages.
         let mut active_session_id: Option<String> = None;
@@ -624,7 +632,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     //
     // Frontend sends JSON:
     //   `{ type: "message", content: "...", session_id?, project_id? }`
-    let send_task = tokio::spawn(async move {
+    let mut send_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = FuturesStreamExt::next(&mut ws_rx).await {
             match msg {
                 Message::Text(text) => {
@@ -805,12 +813,24 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
             }
         }
     });
-
-    // Wait for either side to finish
+    // F7: when one side finishes, abort the other so its broadcast
+    // subscribers and WebSocket half are released promptly. Without this,
+    // a client that stops reading but leaves the socket half-open lets
+    // the recv_task block forever on `ws_tx.send().await`, leaking a
+    // broadcast subscriber and its buffer per abandoned connection — a
+    // trivial memory/subscriber-exhaustion DoS.
     tokio::select! {
-        _ = recv_task => {}
-        _ = send_task => {}
+        _ = &mut recv_task => {
+            send_task.abort();
+        }
+        _ = &mut send_task => {
+            recv_task.abort();
+        }
     }
+    // Drain both handles (the aborted one resolves immediately with a
+    // JoinError; the finished one with Ok) so no task is leaked.
+    let _ = recv_task.await;
+    let _ = send_task.await;
 }
 
 /// User message awaiting a gateway response for session persistence.

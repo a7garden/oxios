@@ -180,7 +180,11 @@ impl MemoryManager {
 
     /// Retrieve a single memory by ID.
     ///
-    /// Records access for auto-protection tracking.
+    /// This is a pure read — it does NOT mutate access counters. Bumping
+    /// `access_count`/`accessed_at`/`seen_in_sessions` here polluted entries
+    /// returned to callers (notably `get_by_id`, which scans all 9 types) with
+    /// access-tracking side-effects that were never persisted anyway. Access
+    /// recording belongs to explicit recall/touch paths, not to reads.
     pub async fn get(
         &self,
         id: &str,
@@ -190,14 +194,7 @@ impl MemoryManager {
         if let Some(ref sqlite) = self.sqlite_store {
             return sqlite.get(id, memory_type);
         }
-        let result: Option<MemoryEntry> =
-            self.storage.load_json(memory_type.category(), id).await?;
-        if let Some(mut entry) = result {
-            AutoProtector::record_access(&mut entry, "");
-            Ok(Some(entry))
-        } else {
-            Ok(None)
-        }
+        self.storage.load_json(memory_type.category(), id).await
     }
 
     /// Delete a memory entry.

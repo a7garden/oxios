@@ -13,13 +13,13 @@ use async_trait::async_trait;
 use chrono::Utc;
 use futures::StreamExt;
 use oxi_sdk::{Context, Message, UserMessage};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::evaluation::EvaluationResult;
 use crate::interview::InterviewResult;
 use crate::model_resolver::ModelResolver;
-use crate::protocol::{ExecutionResult, OuroborosProtocol, Phase};
+use crate::protocol::{ExecutionResult, OuroborosProtocol};
 use crate::seed::{AmbiguityScore, Entity, Seed};
 
 // ---------------------------------------------------------------------------
@@ -82,48 +82,11 @@ struct SeedResponse {
     ontology: Vec<Entity>,
 }
 
-// ---------------------------------------------------------------------------
-// Structured interview questions (chat UI redesign — interactive interview)
-//
-// The interview LLM is asked to produce a parallel `structured_questions`
-// array alongside the plain `questions` strings. The frontend renders
-// structured questions as interactive UI (chips, yes/no buttons, etc.).
-// When the LLM omits `structured_questions` or returns malformed JSON,
-// the frontend falls back to the plain markdown response — graceful
-// degradation. The plain `questions: Vec<String>` field is kept
-// untouched so the Orchestrator's existing logic continues to work.
-// ---------------------------------------------------------------------------
-
-/// Single option for a structured interview question.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InterviewOptionOutput {
-    /// Stable identifier for the answer payload (e.g. "points", "ko").
-    pub value: String,
-    /// Human-readable label rendered as a chip/button.
-    pub label: String,
-    /// Optional longer description shown as a tooltip.
-    #[serde(default)]
-    pub description: String,
-}
-
-/// One structured question produced by the LLM.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InterviewQuestionOutput {
-    /// Short identifier used as the answer key (e.g. "q1", "q2").
-    pub id: String,
-    /// The question text (also present in the parallel `questions` array).
-    pub text: String,
-    /// Question kind — drives the frontend widget selection.
-    #[serde(default = "default_question_kind")]
-    pub kind: String,
-    /// Choice options (empty for free_text / yes_no).
-    #[serde(default)]
-    pub options: Vec<InterviewOptionOutput>,
-}
-
-fn default_question_kind() -> String {
-    "free_text".to_string()
-}
+// Backward-compat re-export: structured interview types now live in
+// `interview.rs` (so `InterviewResult::structured_questions` doesn't
+// create a circular module dep). Existing callers that imported them
+// from `ouroboros_engine` keep compiling.
+pub use crate::interview::{InterviewOptionOutput, InterviewQuestionOutput};
 
 /// Expected LLM response shape for the evaluation phase.
 #[derive(Debug, Deserialize)]
@@ -147,14 +110,55 @@ struct EvaluationResponse {
 /// the first phase call instead of silently at execute.
 pub struct OuroborosEngine {
     resolver: Arc<dyn ModelResolver>,
-    phase: parking_lot::Mutex<Phase>,
     /// Optional persona system prompt, prepended to every LLM call.
     persona_prompt: parking_lot::Mutex<Option<String>>,
-    /// Evaluation cache for avoiding redundant LLM calls.
-    eval_cache: crate::eval_cache::EvalCache,
-    /// Generation history for stagnation + regression detection.
-    /// Kept across evolve() calls within one Orchestrator session.
-    generation_history: parking_lot::RwLock<Vec<crate::regression::GenerationRecord>>,
+}
+
+/// Sanitize raw LLM-produced structured interview questions.
+///
+/// - Drops entries with empty id/text.
+/// - Unknown kinds → `free_text`.
+/// - `single_choice`/`multi_choice` with no options → `free_text`.
+/// - Empty option value/label dropped.
+/// - `yes_no` with no options gets the default Yes/No pair.
+fn sanitize_structured_questions(
+    structured: Vec<InterviewQuestionOutput>,
+) -> Vec<InterviewQuestionOutput> {
+    structured
+        .into_iter()
+        .filter_map(|mut q| {
+            if q.id.is_empty() || q.text.is_empty() {
+                return None;
+            }
+            match q.kind.as_str() {
+                "single_choice" | "multi_choice" | "yes_no" | "free_text" => {}
+                _ => {
+                    q.kind = "free_text".to_string();
+                    q.options.clear();
+                }
+            }
+            if matches!(q.kind.as_str(), "single_choice" | "multi_choice") && q.options.is_empty() {
+                q.kind = "free_text".to_string();
+            }
+            q.options
+                .retain(|o| !o.value.is_empty() && !o.label.is_empty());
+            if q.kind == "yes_no" && q.options.is_empty() {
+                q.options = vec![
+                    InterviewOptionOutput {
+                        value: "yes".to_string(),
+                        label: "Yes".to_string(),
+                        description: String::new(),
+                    },
+                    InterviewOptionOutput {
+                        value: "no".to_string(),
+                        label: "No".to_string(),
+                        description: String::new(),
+                    },
+                ];
+            }
+            Some(q)
+        })
+        .collect()
 }
 
 impl OuroborosEngine {
@@ -166,107 +170,8 @@ impl OuroborosEngine {
     pub fn new(resolver: Arc<dyn ModelResolver>) -> Self {
         Self {
             resolver,
-            phase: parking_lot::Mutex::new(Phase::Interview),
             persona_prompt: parking_lot::Mutex::new(None),
-            eval_cache: crate::eval_cache::EvalCache::new(256),
-            generation_history: parking_lot::RwLock::new(Vec::new()),
         }
-    }
-
-    /// Returns the current phase.
-    pub fn phase(&self) -> Phase {
-        *self.phase.lock()
-    }
-
-    /// Set the current phase.
-    fn set_phase(&self, phase: Phase) {
-        *self.phase.lock() = phase;
-    }
-
-    /// Record an evaluation result into generation history for
-    /// stagnation and regression detection.
-    pub fn record_evaluation(&self, seed: Seed, evaluation: &EvaluationResult) {
-        let ac_results: Vec<bool> = evaluation
-            .notes
-            .iter()
-            .filter_map(|note| {
-                if note.starts_with("✓ ") {
-                    Some(true)
-                } else if note.starts_with("✗ ") || note.starts_with("x ") {
-                    Some(false)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let record = crate::regression::GenerationRecord {
-            seed,
-            ac_results,
-            score: evaluation.score,
-        };
-
-        let mut history = self.generation_history.write();
-        history.push(record);
-        if history.len() > 10 {
-            history.remove(0);
-        }
-    }
-
-    /// Detect stagnation across the current generation history.
-    fn detect_stagnation(&self) -> Option<crate::lateral::StagnationPattern> {
-        let history = self.generation_history.read();
-        if history.len() < 2 {
-            return None;
-        }
-
-        let scores: Vec<f64> = history.iter().map(|r| r.score).collect();
-        let latest = *scores.last()?;
-        let prev = scores[scores.len() - 2];
-
-        let drift = (latest - prev).abs();
-        let improvement = latest - prev;
-
-        // No drift at all.
-        if drift < 0.01 {
-            return Some(crate::lateral::StagnationPattern::NoDrift);
-        }
-
-        // Oscillation: last two iterations went opposite directions.
-        if scores.len() >= 3 {
-            let prev2 = scores[scores.len() - 3];
-            if (latest > prev && prev < prev2) || (latest < prev && prev > prev2) {
-                return Some(crate::lateral::StagnationPattern::Oscillation);
-            }
-        }
-
-        // Diminishing returns: each improvement is smaller than the last.
-        if history.len() >= 3 && improvement > 0.0 {
-            let improvements: Vec<f64> = scores.windows(2).map(|w| w[1] - w[0]).collect();
-            if improvements.len() >= 2 {
-                let last = improvements[improvements.len() - 1];
-                let prev_imp = improvements[improvements.len() - 2];
-                if 0.0 < last && last < prev_imp * 0.5 {
-                    return Some(crate::lateral::StagnationPattern::DiminishingReturns);
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Detect which acceptance criteria regressed across generations.
-    fn detect_regressions(&self) -> Vec<crate::regression::Regression> {
-        let history = self.generation_history.read();
-        crate::regression::RegressionDetector::new()
-            .record_all(history.iter().cloned())
-            .detect()
-    }
-
-    /// Set or clear the persona system prompt.
-    #[allow(dead_code)]
-    fn set_persona_prompt(&self, prompt: Option<String>) {
-        *self.persona_prompt.lock() = prompt;
     }
 
     /// Run a non-tool LLM completion and return the text content.
@@ -324,7 +229,13 @@ impl OuroborosEngine {
         let trimmed = raw.trim();
         let json_str = if trimmed.starts_with("```") {
             let after_open = trimmed.find('\n').map(|i| i + 1).unwrap_or(0);
-            let before_close = trimmed.rfind("```").unwrap_or(trimmed.len());
+            // Only accept a closing fence *after* the opening one. Without
+            // this guard, rfind returns the opening fence (index 0) when no
+            // closer exists, making before_close < after_open → slice panic.
+            let before_close = trimmed
+                .rfind("```")
+                .filter(|&i| i >= after_open)
+                .unwrap_or(trimmed.len());
             &trimmed[after_open..before_close]
         } else if let Some(start) = trimmed.find('{') {
             if let Some(end) = trimmed.rfind('}') {
@@ -369,22 +280,15 @@ impl OuroborosEngine {
             }
         }
     }
+}
 
-    /// Returns structured question output for a given interview, if the
-    /// LLM produced one. Called by the Orchestrator right after
-    /// `interview()` for the same `user_input`. The two calls are
-    /// independent (no shared LLM call) — this keeps the trait stable
-    /// and avoids changing the InterviewResult shape that the existing
-    /// Orchestrator and persistence code depend on.
-    ///
-    /// Returns `Ok(None)` when:
-    /// - The LLM's `structured_questions` field was absent/null.
-    /// - JSON parsing failed for the structured sub-field.
-    /// - The interview was a non-task (chat) response.
-    pub async fn interview_structured(
-        &self,
-        user_input: &str,
-    ) -> Result<Option<Vec<InterviewQuestionOutput>>> {
+#[async_trait]
+impl OuroborosProtocol for OuroborosEngine {
+    fn set_persona_prompt(&self, prompt: Option<String>) {
+        *self.persona_prompt.lock() = prompt;
+    }
+
+    async fn interview(&self, user_input: &str) -> Result<InterviewResult> {
         let system_prompt = INTERVIEW_SYSTEM_PROMPT;
         let user_message = format!(
             "The user said:\n\"{user_input}\"\n\n\
@@ -404,129 +308,8 @@ impl OuroborosEngine {
         );
 
         let raw = self.llm_complete(system_prompt, &user_message).await?;
-        let parsed: InterviewResponse = match Self::parse_json(&raw) {
-            Ok(p) => p,
-            Err(e) => {
-                tracing::warn!(error = %e, "interview_structured: JSON parse failed");
-                return Ok(None);
-            }
-        };
-
-        if !parsed.is_task {
-            return Ok(None);
-        }
-
-        // Validate structured_questions: drop entries with empty id/text,
-        // and ensure single_choice / multi_choice / yes_no have valid
-        // options. Empty/missing options for choice kinds cause the
-        // question to be downgraded to free_text (forgiving — better
-        // than silently dropping the question).
-        let plain_questions = &parsed.questions;
-        let structured = match parsed.structured_questions {
-            Some(s) if !s.is_empty() => s,
-            _ => return Ok(None),
-        };
-
-        let sanitized: Vec<InterviewQuestionOutput> = structured
-            .into_iter()
-            .filter_map(|mut q| {
-                if q.id.is_empty() || q.text.is_empty() {
-                    return None;
-                }
-                match q.kind.as_str() {
-                    "single_choice" | "multi_choice" | "yes_no" | "free_text" => {}
-                    _ => {
-                        q.kind = "free_text".to_string();
-                        q.options.clear();
-                    }
-                }
-                if matches!(q.kind.as_str(), "single_choice" | "multi_choice")
-                    && q.options.is_empty()
-                {
-                    q.kind = "free_text".to_string();
-                }
-                q.options
-                    .retain(|o| !o.value.is_empty() && !o.label.is_empty());
-                if q.kind == "yes_no" && q.options.is_empty() {
-                    q.options = vec![
-                        InterviewOptionOutput {
-                            value: "yes".to_string(),
-                            label: "Yes".to_string(),
-                            description: String::new(),
-                        },
-                        InterviewOptionOutput {
-                            value: "no".to_string(),
-                            label: "No".to_string(),
-                            description: String::new(),
-                        },
-                    ];
-                }
-                Some(q)
-            })
-            .collect();
-
-        if sanitized.is_empty() {
-            return Ok(None);
-        }
-
-        // Sanity log: how many plain questions matched structured ones.
-        let match_count = sanitized
-            .iter()
-            .filter(|q| plain_questions.iter().any(|p| p == &q.text))
-            .count();
-        tracing::info!(
-            structured = sanitized.len(),
-            plain = plain_questions.len(),
-            matched = match_count,
-            "interview_structured produced questions"
-        );
-
-        Ok(Some(sanitized))
-    }
-}
-
-#[async_trait]
-impl OuroborosProtocol for OuroborosEngine {
-    fn set_persona_prompt(&self, prompt: Option<String>) {
-        *self.persona_prompt.lock() = prompt;
-    }
-
-    async fn interview_structured(
-        &self,
-        user_input: &str,
-    ) -> Result<Option<Vec<InterviewQuestionOutput>>> {
-        // Delegate to the inherent method on `OuroborosEngine` to keep
-        // the long implementation body in one place. Inherent methods
-        // are not visible through `Arc<dyn OuroborosProtocol>`, so
-        // callers (the Orchestrator) get to this point through the
-        // trait method.
-        OuroborosEngine::interview_structured(self, user_input).await
-    }
-
-    async fn interview(&self, user_input: &str) -> Result<InterviewResult> {
-        self.set_phase(Phase::Interview);
-
-        let system_prompt = INTERVIEW_SYSTEM_PROMPT;
-        let user_message = format!(
-            "The user said:\n\"{user_input}\"\n\n\
-             LANGUAGE: Write ALL text output (questions, chat_response) in the SAME language as the user's message above.\n\n\
-             Analyze this message and produce a JSON object with:\n\
-             - \"is_task\": true if the message requests a concrete action (create, read, write, run, find, fix, analyze, deploy, etc.) or describes something to build/execute. false for greetings, small talk, questions, gratitude, opinions, or conversational messages.\n\
-             - \"chat_response\": (only when is_task=false) A natural, friendly response in the user's language. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
-             - \"complexity\": (only when is_task=true) \"simple\" for clear single-action requests that need no clarification (check weather, set alarm, search, calculate, simple file read/write, echo). \"complex\" for ambiguous or multi-step tasks (modify code, write blog post, deploy, analyze). Default to \"complex\" when unsure.\n\
-             - \"questions\": (only when is_task=true) Up to 3 Socratic clarifying questions in the user's language. Empty array when is_task=false.\n\
-             - \"scores\": (only when is_task=true) {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}. Skip this field when is_task=false.\n\n\
-             IMPORTANT SCORING (when is_task=true):\n\
-             - Score GOAL_CLARITY 0.9+ ONLY if the request is immediately executable with no ambiguity\n\
-             - Score CONSTRAINT_CLARITY 0.8+ ONLY if specific filenames, paths, or content are provided\n\
-             - Score SUCCESS_CRITERIA 0.7+ ONLY if 'done' is clearly defined\n\
-             - Be HONEST with clarity scores. When in doubt, score LOWER."
-        );
-
-        let raw = self.llm_complete(system_prompt, &user_message).await?;
         let parsed: InterviewResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
             tracing::warn!(error = %e, "Failed to parse interview LLM response, using degraded fallback");
-            // Use context-aware fallback instead of generic defaults
             let degraded = crate::degraded::degraded_interview(user_input);
             InterviewResponse {
                 is_task: degraded.is_task,
@@ -537,18 +320,16 @@ impl OuroborosProtocol for OuroborosEngine {
                 } else {
                     vec!["Could you describe the goal in more detail?".into()]
                 },
-                // Degraded fallback never produces structured questions;
-                // the frontend renders the plain markdown response.
                 structured_questions: None,
                 scores: Some(AmbiguityScores {
-                    goal_clarity: 0.4,
-                    constraint_clarity: 0.3,
-                    success_criteria: 0.2,
+                    goal_clarity: degraded.ambiguity.goal_clarity,
+                    constraint_clarity: degraded.ambiguity.constraint_clarity,
+                    success_criteria: degraded.ambiguity.success_criteria,
                 }),
             }
         });
 
-        // Non-task message — return direct chat response
+        // Non-task message — return direct chat response.
         if !parsed.is_task {
             let mut result = InterviewResult::new();
             result.original_message = user_input.to_string();
@@ -559,27 +340,49 @@ impl OuroborosProtocol for OuroborosEngine {
                 parsed.chat_response
             };
             result.ready_for_seed = false;
-            result.complexity = "n/a".to_string(); // chat, not a task
-
+            result.complexity = "n/a".to_string();
             tracing::info!(is_task = false, "Interview phase complete (chat)");
-
             return Ok(result);
         }
 
-        // Task message — evaluate ambiguity
+        // Task message — evaluate ambiguity.
         let scores = parsed.scores.unwrap_or(AmbiguityScores {
             goal_clarity: 0.5,
             constraint_clarity: 0.5,
             success_criteria: 0.5,
         });
-
         let ambiguity = AmbiguityScore::new(
             scores.goal_clarity,
             scores.constraint_clarity,
             scores.success_criteria,
         );
 
-        let ambiguity_value = ambiguity.ambiguity();
+        // Sanitize structured questions (same single LLM call): drop
+        // entries with empty id/text, downgrade kinds with missing
+        // options to free_text, fill yes_no defaults.
+        let sanitized =
+            sanitize_structured_questions(parsed.structured_questions.unwrap_or_default());
+
+        // Fallback: if the LLM omitted structured questions but produced
+        // plain ones, synthesize free_text entries so the interactive
+        // Web UI still has something to render.
+        let structured: Vec<InterviewQuestionOutput> = if !sanitized.is_empty() {
+            sanitized
+        } else if !parsed.questions.is_empty() {
+            parsed
+                .questions
+                .iter()
+                .enumerate()
+                .map(|(i, q)| InterviewQuestionOutput {
+                    id: format!("q{}", i + 1),
+                    text: q.clone(),
+                    kind: "free_text".to_string(),
+                    options: vec![],
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         let mut result = InterviewResult::new();
         result.original_message = user_input.to_string();
@@ -588,12 +391,18 @@ impl OuroborosProtocol for OuroborosEngine {
             result.add_exchange(q, "");
         }
         result.update_ambiguity(ambiguity);
+        result.structured_questions = if structured.is_empty() {
+            None
+        } else {
+            Some(structured)
+        };
 
         tracing::info!(
-            ambiguity = ambiguity_value,
+            ambiguity = result.ambiguity.ambiguity(),
             ready = result.ready_for_seed,
             complexity = %parsed.complexity,
             questions = parsed.questions.len(),
+            structured = result.structured_questions.as_ref().map(|s| s.len()).unwrap_or(0),
             "Interview phase complete (task)"
         );
 
@@ -601,8 +410,6 @@ impl OuroborosProtocol for OuroborosEngine {
     }
 
     async fn generate_seed(&self, interview: &InterviewResult) -> Result<Seed> {
-        self.set_phase(Phase::Seed);
-
         // Build context: combine original user message with any Q&A
         let original_message = if interview.original_message.is_empty() {
             interview.questions.first().cloned().unwrap_or_default()
@@ -673,7 +480,6 @@ impl OuroborosProtocol for OuroborosEngine {
     }
 
     async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
-        self.set_phase(Phase::Execute);
         // Execution is delegated to the kernel's AgentRuntime via the Supervisor.
         // The OuroborosEngine itself does not run tools — it orchestrates.
         // The Orchestrator calls Supervisor::run_with_seed() directly.
@@ -692,14 +498,6 @@ impl OuroborosProtocol for OuroborosEngine {
     }
 
     async fn evaluate(&self, seed: &Seed, execution: &ExecutionResult) -> Result<EvaluationResult> {
-        self.set_phase(Phase::Evaluate);
-
-        // Check cache first
-        if let Some(cached) = self.eval_cache.get(seed, execution) {
-            tracing::info!(seed_id = %seed.id, "Evaluation cache hit");
-            return Ok(cached);
-        }
-
         // Stage 1: Enhanced mechanical evaluation (language-agnostic)
         let mechanical = crate::evaluation::MechanicalEvalResult::evaluate(
             &seed.acceptance_criteria,
@@ -719,7 +517,6 @@ impl OuroborosProtocol for OuroborosEngine {
                     .map(|r| format!("✓ {}", r.criterion))
                     .collect(),
             };
-            self.eval_cache.put(seed, execution, result.clone());
             tracing::info!(seed_id = %seed.id, score = 1.0, "Mechanical evaluation passed, skipping LLM");
             return Ok(result);
         }
@@ -760,15 +557,35 @@ impl OuroborosProtocol for OuroborosEngine {
             .await
         {
             Ok(parsed) => {
-                let r = EvaluationResult {
+                // The LLM is not required to use the ✓/✗ prefix convention
+                // in `notes`, so when it doesn't, rebuild notes from the
+                // mechanical criterion results (authoritative).
+                let llm_used_prefix = parsed
+                    .notes
+                    .iter()
+                    .any(|n| n.starts_with("✓ ") || n.starts_with("✗ "));
+                let notes = if llm_used_prefix {
+                    parsed.notes
+                } else {
+                    mechanical
+                        .criterion_results
+                        .iter()
+                        .map(|r| {
+                            if r.passed {
+                                format!("✓ {}", r.criterion)
+                            } else {
+                                format!("✗ {} ({})", r.criterion, r.reason)
+                            }
+                        })
+                        .collect()
+                };
+                EvaluationResult {
                     mechanical_pass: parsed.mechanical_pass,
                     semantic_pass: Some(parsed.semantic_pass),
                     consensus_pass: None,
                     score: parsed.score,
-                    notes: parsed.notes,
-                };
-                self.eval_cache.put(seed, execution, r.clone());
-                r
+                    notes,
+                }
             }
             Err(e) => {
                 tracing::warn!(error = %e, "Evaluation JSON parse failed after retry, using degraded fallback");
@@ -788,18 +605,13 @@ impl OuroborosProtocol for OuroborosEngine {
     }
 
     async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>> {
-        self.set_phase(Phase::Evolve);
-
         // If the evaluation passed, no need to evolve.
         if evaluation.all_passed() && evaluation.score >= 0.8 {
             tracing::info!(seed_id = %seed.id, "Evaluation passed, no evolution needed");
             return Ok(None);
         }
 
-        // ── Record generation for stagnation / regression detection ──
-        self.record_evaluation(seed.clone(), evaluation);
-
-        // ── Build evolution context (basic + lateral + regression) ──
+        // ── Build evolution context ──
         let base_context = format!(
             "## Original Seed\n\
              Goal: {}\n\
@@ -829,71 +641,40 @@ impl OuroborosProtocol for OuroborosEngine {
 
         let mut context_blocks = vec![base_context];
 
-        // Lateral thinking — only when stagnant (gen 2+).
+        // Stuck-recovery hint: by generation 2+ the seed has already
+        // been refined once and is still failing. Prompt the LLM to
+        // consider fundamentally different framings instead of making
+        // the same kind of tweak again.
         if seed.generation >= 2 {
-            if let Some(pattern) = self.detect_stagnation() {
-                tracing::info!(seed_id = %seed.id, pattern = ?pattern, "Stagnation detected, applying lateral thinking");
-
-                // Collect already-tried personas before dropping the read lock.
-                let tried: Vec<String> = {
-                    let history = self.generation_history.read();
-                    history
-                        .iter()
-                        .filter_map(|r| r.seed.cspace_hint.as_deref())
-                        .filter(|h| h.starts_with("lateral:"))
-                        .map(|h| h[8..].to_string())
-                        .collect()
-                };
-                let tried_refs: Vec<&str> = tried.iter().map(|s| s.as_str()).collect();
-
-                if let Some(persona) = crate::lateral::select_persona(pattern, &tried_refs) {
-                    let lateral = crate::lateral::build_lateral_prompt(
-                        persona,
-                        &seed.goal,
-                        &format!(
-                            "Score={:.2}, passed={}",
-                            evaluation.score,
-                            evaluation.all_passed()
-                        ),
-                        &evaluation.notes,
-                    );
-                    context_blocks.push(lateral);
-
-                    // Track the persona via cspace_hint.
-                    let mut guard = self.generation_history.write();
-                    if let Some(last) = guard.last_mut() {
-                        last.seed.cspace_hint = Some(format!("lateral:{}", persona.name));
-                    }
-                }
-            }
-
-            // Regression context — always on gen 2+.
-            let regressions = self.detect_regressions();
-            if !regressions.is_empty() {
-                let reg_text =
-                    crate::regression::RegressionDetector::format_for_prompt(&regressions);
-                context_blocks.push(reg_text);
-                tracing::info!(
-                    seed_id = %seed.id,
-                    count = regressions.len(),
-                    "Injecting regression context"
-                );
-            }
+            context_blocks.push(STUCK_RECOVERY_PROMPT.to_string());
+            tracing::info!(
+                seed_id = %seed.id,
+                generation = seed.generation,
+                "Injecting stuck-recovery context"
+            );
         }
 
         let user_message = context_blocks.join("\n\n---\n\n");
 
         let system_prompt = EVOLVE_SYSTEM_PROMPT;
-        let raw = self.llm_complete(system_prompt, &user_message).await?;
-        let parsed: SeedResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
-            tracing::warn!(error = %e, "Failed to parse evolve LLM response");
-            SeedResponse {
-                goal: seed.goal.clone(),
-                constraints: seed.constraints.clone(),
-                acceptance_criteria: seed.acceptance_criteria.clone(),
-                ontology: seed.ontology.clone(),
+        // Retry once on malformed JSON (matching evaluate()), and on
+        // hard failure return None rather than silently echoing the
+        // parent seed as a "successful" evolution — the Orchestrator
+        // treats None as "cannot evolve" and stops the loop instead of
+        // re-running an unchanged seed.
+        let parsed: SeedResponse = match self
+            .llm_json::<SeedResponse>(system_prompt, &user_message)
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Evolve LLM response unparseable after retry; aborting evolution"
+                );
+                return Ok(None);
             }
-        });
+        };
 
         let evolved = Seed::evolved_from(seed);
 
@@ -1062,10 +843,27 @@ If this is generation 3+ and the same issues persist:
 Always respond with valid JSON in the exact format requested. \
 Do not include any text outside the JSON object.";
 
+/// Injected at generation 2+ when the seed has already been refined
+/// once and is still failing evaluation. Replaces the previous lateral
+/// persona + regression detection apparatus, which was over-built for
+/// the default `max_evolution_iterations = 3` budget.
+const STUCK_RECOVERY_PROMPT: &str = "\
+## Stuck-Recovery Hint\n\
+This seed has already been evolved at least once and is still failing.\n\
+Before making another small tweak, consider whether one of these is true:\n\
+\n\
+- The goal itself is wrong or infeasible as stated — flag for human review.\n\
+- The task should be decomposed into smaller seeds.\n\
+- A constraint contradicts an acceptance criterion.\n\
+- The acceptance criteria are testing the wrong thing.\n\
+\n\
+If none of those apply, narrow scope: tighten vague criteria, add a guard\n\
+for the specific failure mode in the notes, and preserve what is already\n\
+passing. Do not add new features or expand the goal.";
+
 impl std::fmt::Debug for OuroborosEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OuroborosEngine")
-            .field("phase", &self.phase())
             .field("model", &"<resolved live via ModelResolver>")
             .finish()
     }

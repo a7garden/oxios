@@ -17,6 +17,16 @@ import type {
   TodayReport,
 } from '@/types/knowledge'
 
+
+// F7: encode a knowledge-base file path for safe interpolation into a URL.
+// Each path segment is encoded individually so '/' separators are preserved
+// while characters like '?', '#', spaces, and non-ASCII bytes are escaped.
+function encodeFilePath(path: string): string {
+  return path
+    .split('/')
+    .map((seg) => encodeURIComponent(seg))
+    .join('/')
+}
 // ── File I/O ──────────────────────────────────────────────────
 
 export function useKnowledgeTree(dir?: string) {
@@ -29,7 +39,7 @@ export function useKnowledgeTree(dir?: string) {
 export function useKnowledgeFile(path: string | null) {
   return useQuery({
     queryKey: ['knowledge', 'file', path],
-    queryFn: () => api.get<string>(`/api/knowledge/file/${path}`),
+    queryFn: () => api.get<string>(`/api/knowledge/file/${encodeFilePath(path!)}`),
     enabled: !!path,
     staleTime: 0,
   })
@@ -39,7 +49,7 @@ export function useWriteFile() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
-      api.put(`/api/knowledge/file/${path}`, content, true), // raw markdown, not JSON
+      api.put(`/api/knowledge/file/${encodeFilePath(path)}`, content, true), // raw markdown, not JSON
     onSuccess: (_, { path }) => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
       qc.invalidateQueries({ queryKey: ['knowledge', 'file', path] })
@@ -51,7 +61,7 @@ export function useWriteFile() {
 export function useDeleteFile() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (path: string) => api.delete(`/api/knowledge/file/${path}`),
+    mutationFn: (path: string) => api.delete(`/api/knowledge/file/${encodeFilePath(path)}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
     },
@@ -305,7 +315,7 @@ export function useAutoEmoji(text: string) {
 export function useKnowledgeFileHistory(path: string | null) {
   return useQuery({
     queryKey: ['knowledge', 'history', path],
-    queryFn: () => api.get<KnowledgeHistoryResponse>(`/api/knowledge/file/${path}/history`),
+    queryFn: () => api.get<KnowledgeHistoryResponse>(`/api/knowledge/file/${encodeFilePath(path!)}/history`),
     enabled: !!path,
   })
 }
@@ -314,7 +324,7 @@ export function useKnowledgeFileRestore() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ path, hash }: { path: string; hash: string }) =>
-      api.post(`/api/knowledge/file/${path}/restore`, { hash }),
+      api.post(`/api/knowledge/file/${encodeFilePath(path)}/restore`, { hash }),
     onSuccess: (_, { path }) => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'file', path] })
       qc.invalidateQueries({ queryKey: ['knowledge', 'history', path] })

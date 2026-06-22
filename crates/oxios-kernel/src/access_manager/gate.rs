@@ -13,7 +13,8 @@
 //! If any layer denies, the request is rejected immediately (no further checks).
 //! All decisions (allow and deny) are recorded via `AuditSink`.
 
-use std::path::Path;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -185,6 +186,44 @@ fn has_metacharacters(args: &[String]) -> bool {
     false
 }
 
+/// Resolve a path to its canonical form for consistent layer matching.
+///
+/// Symlinks and `..` segments are resolved so that the RBAC, permission, and
+/// workspace layers all see the same path — otherwise a path like
+/// `/workspace/../etc/passwd` slips through prefix/glob matches.
+///
+/// If the path does not yet exist (e.g. a file about to be written), the
+/// nearest existing ancestor is canonicalized and the remaining components are
+/// re-appended. If even the ancestor cannot be canonicalized the original path
+/// is returned unchanged (the workspace layer will then reject it).
+fn canonicalize_for_check(path: &Path) -> PathBuf {
+    if let Ok(canon) = path.canonicalize() {
+        return canon;
+    }
+    let mut ancestor = path.to_path_buf();
+    let mut tail: Vec<OsString> = Vec::new();
+    while !ancestor.exists() {
+        match ancestor.file_name() {
+            Some(name) => {
+                tail.push(name.to_os_string());
+                if !ancestor.pop() {
+                    break;
+                }
+            }
+            None => break,
+        }
+    }
+    match ancestor.canonicalize() {
+        Ok(mut base) => {
+            for name in tail.into_iter().rev() {
+                base.push(name);
+            }
+            base
+        }
+        Err(_) => path.to_path_buf(),
+    }
+}
+
 // ─── Access Gate ────────────────────────────────────────────────────────────
 
 /// Single entry point for all authorization decisions.
@@ -272,22 +311,11 @@ impl AccessGate {
             domain: tool.to_string(),
         };
         if !ctx.cspace.can(&resource, Rights::EXECUTE) {
-            // CSpace check is advisory for always-on tools — if the tool
-            // is in the default set (read/write/edit/grep/find/ls), skip CSpace.
-            let always_on = [
-                "read",
-                "write",
-                "edit",
-                "grep",
-                "find",
-                "ls",
-                "web_search",
-                "browse",
-                "browse_extract",
-                "browse_script",
-                "knowledge_save",
-                "knowledge_search",
-            ];
+            // CSpace check is advisory only for the always-on local file
+            // tools (read/write/edit/grep/find/ls). Network and script tools
+            // (web_search, browse*, knowledge_*) require an explicit EXECUTE
+            // capability in the agent's Seed — they must not bypass Layer 0.
+            let always_on = ["read", "write", "edit", "grep", "find", "ls"];
             if !always_on.contains(&tool) {
                 return Err(AccessDenied {
                     agent: ctx.agent_name.clone(),
@@ -328,9 +356,11 @@ impl AccessGate {
         path: &Path,
         mode: PathMode,
     ) -> Result<(), AccessDenied> {
-        // Resolve relative paths to absolute using CWD.
-        // Agents run in the workspace directory, so relative paths like
-        // "." or "AGENTS.md" resolve to /path/to/workspace/. or /path/to/workspace/AGENTS.md.
+        // Resolve relative paths to absolute using CWD, then canonicalize so
+        // that `..`, symlink prefixes, and case differences are resolved
+        // consistently across the RBAC, permission, and workspace layers.
+        // Without this, `/workspace/../etc/passwd` would pass a `/workspace/`
+        // prefix check. Agents run in the workspace directory.
         let resolved = if path.is_relative() {
             std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from("."))
@@ -338,6 +368,7 @@ impl AccessGate {
         } else {
             path.to_path_buf()
         };
+        let resolved = canonicalize_for_check(&resolved);
         let path_str = resolved.to_string_lossy();
 
         // Layer 0: CSpace (file system access)
@@ -437,21 +468,18 @@ impl AccessGate {
             }
         }
 
-        // Layer 1+2: Permissions — check if agent can use 'exec' tool
-        // (individual binary allowlisting is handled by Layer 3: ExecConfig)
+        // Layer 1+2: Permissions — agent must be allowed the 'exec' tool.
+        // Per-binary control is handled by Layer 3 (ExecConfig allowlist), so a
+        // single permission check avoids double audit-log entries.
         let mut access = self.access.lock();
         if !access.can_use_tool(&ctx.agent_name, "exec") {
-            // Also check by binary name for backward compat
-            let tool_name = if binary == "bash" { "bash" } else { binary };
-            if !access.can_use_tool(&ctx.agent_name, tool_name) {
-                return Err(AccessDenied {
-                    agent: ctx.agent_name.clone(),
-                    resource: binary.to_string(),
-                    layer: DenyLayer::Permission,
-                    reason: format!("에이전트가 '{binary}' 실행 권한 없음"),
-                    suggestion: None,
-                });
-            }
+            return Err(AccessDenied {
+                agent: ctx.agent_name.clone(),
+                resource: binary.to_string(),
+                layer: DenyLayer::Permission,
+                reason: format!("에이전트가 '{binary}' 실행 권한 없음"),
+                suggestion: None,
+            });
         }
 
         // Layer 3: ExecConfig — binary allowlist

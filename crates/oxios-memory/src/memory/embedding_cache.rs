@@ -16,7 +16,6 @@
 use lru::LruCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
 use std::time::{Duration, Instant};
 
 /// Cache entry with TTL tracking.
@@ -75,11 +74,11 @@ impl EmbeddingCache {
     }
 
     /// Hash content to cache key.
+    ///
+    /// Delegates to the stable FNV-1a `types::content_hash` so that in-memory
+    /// and persisted keys share the same version-independent algorithm.
     pub fn content_hash(content: &str) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        let mut hasher = DefaultHasher::new();
-        content.hash(&mut hasher);
-        hasher.finish()
+        crate::memory::types::content_hash(content)
     }
 
     /// Get cached embedding if exists and not expired.

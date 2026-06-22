@@ -17,6 +17,7 @@ import {
   Settings,
   Wrench,
 } from 'lucide-react'
+import DOMPurify from 'dompurify'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
@@ -764,7 +765,7 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
               <div
                 className="prose prose-sm dark:prose-invert max-w-none"
                 dangerouslySetInnerHTML={{
-                  __html: email.html_preview,
+                  __html: DOMPurify.sanitize(email.html_preview),
                 }}
               />
             </div>

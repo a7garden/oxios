@@ -3,9 +3,6 @@
 //! These types form the foundation of the memory subsystem and are
 //! shared across all memory modules.
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -14,10 +11,21 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 /// Compute a stable hash of content for deduplication.
+///
+/// Uses FNV-1a (64-bit) — a deterministic, version-independent hash — so that
+/// persisted hash values (in `memories.content_hash` and the embedding-cache
+/// primary key) remain stable across Rust releases. `DefaultHasher` is not
+/// guaranteed to be stable across std versions and is therefore unsuitable
+/// for persisted keys.
 pub fn content_hash(content: &str) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    content.hash(&mut hasher);
-    hasher.finish()
+    const FNV_OFFSET: u64 = 0xcbf_29ce_4842_2325;
+    const FNV_PRIME: u64 = 0x100_0000_01b3;
+    let mut hash = FNV_OFFSET;
+    for &byte in content.as_bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
 }
 
 // ---------------------------------------------------------------------------

@@ -19,3 +19,21 @@ pub use types::{
     SkillInstallSpec, SkillInvocationPolicy, SkillMeta, SkillMetadata, SkillRef, SkillSnapshot,
     SkillSource, SkillState, SkillStatus,
 };
+
+/// Returns true if `rel` is a safe relative path: no parent/root/prefix
+/// components that could escape a target directory (Zip Slip / path traversal).
+///
+/// Used by skill installers (ClawHub zip extraction, skills.sh file writes)
+/// to reject archive entries whose names contain `..`, absolute paths, or
+/// Windows drive prefixes.
+pub(crate) fn is_safe_relative_path(rel: &str) -> bool {
+    let p = std::path::Path::new(rel);
+    !p.components().any(|c| {
+        matches!(
+            c,
+            std::path::Component::ParentDir
+                | std::path::Component::RootDir
+                | std::path::Component::Prefix(_)
+        )
+    })
+}

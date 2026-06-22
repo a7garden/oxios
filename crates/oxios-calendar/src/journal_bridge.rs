@@ -42,20 +42,28 @@ impl JournalBridge {
     /// If there are no events, the section is removed.
     /// If the journal file doesn't exist, this is a no-op.
     pub async fn inject_events(&self, date: NaiveDate) -> anyhow::Result<()> {
-        // 1. Build UTC range for the date in the configured timezone
+        // 1. Build UTC range for the date in the configured timezone.
+        // F12: replace the `unwrap()` panic on `and_local_timezone().earliest()`
+        // with an explicit error. FixedOffset has no DST so this can't fail
+        // today, but the code accepts any FixedOffset and the defensive
+        // check keeps a future timezone-type change from panicking.
         let start_of_day = date
             .and_hms_opt(0, 0, 0)
-            .unwrap()
+            .ok_or_else(|| anyhow::anyhow!("Invalid midnight for date {date}"))?
             .and_local_timezone(self.timezone)
             .earliest()
-            .unwrap()
+            .ok_or_else(|| {
+                anyhow::anyhow!("Non-existent local midnight {date} in the configured timezone")
+            })?
             .to_utc();
         let end_of_day = date
             .and_hms_opt(23, 59, 59)
-            .unwrap()
+            .ok_or_else(|| anyhow::anyhow!("Invalid 23:59:59 for date {date}"))?
             .and_local_timezone(self.timezone)
             .earliest()
-            .unwrap()
+            .ok_or_else(|| {
+                anyhow::anyhow!("Non-existent local end-of-day {date} in the configured timezone")
+            })?
             .to_utc();
 
         // 2. Query events from calendar engine

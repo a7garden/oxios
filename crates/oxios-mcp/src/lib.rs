@@ -78,8 +78,23 @@ impl McpBridge {
     }
 
     /// Register an MCP server configuration (does not start the process).
+    ///
+    /// If a server with the same name is already registered, it is replaced
+    /// in-place (F7) rather than appended — `initialize_all()` would
+    /// otherwise spawn both and orphan the first child when the second
+    /// overwrites the entry in the clients map.
     pub fn register_server(&self, server: McpServer) {
-        self.servers.write().push(server);
+        let mut servers = self.servers.write();
+        let name = server.name.clone();
+        if let Some(existing) = servers.iter_mut().find(|s| s.name == name) {
+            tracing::warn!(
+                server = %name,
+                "Overwriting duplicate MCP server registration"
+            );
+            *existing = server;
+        } else {
+            servers.push(server);
+        }
     }
 
     /// Get all registered server configurations (names only).
@@ -154,11 +169,21 @@ impl McpBridge {
     /// List all available tools from all initialized MCP servers.
     ///
     /// Tools are collected from each server's cache (refreshed on demand).
+    ///
+    /// F6: clones the `Arc<McpClient>` handles out of the lock before issuing
+    /// remote calls so register/unregister/toggle aren't blocked for the
+    /// full round-trip duration.
     pub async fn list_tools(&self) -> Result<Vec<McpTool>> {
-        let clients = self.clients.read().await;
-        let mut all_tools = Vec::new();
+        let clients: Vec<(String, Arc<McpClient>)> = self
+            .clients
+            .read()
+            .await
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
 
-        for (name, client) in clients.iter() {
+        let mut all_tools = Vec::new();
+        for (name, client) in &clients {
             if let Ok(mcp_tools) = client.list_tools().await {
                 let start = all_tools.len();
                 all_tools.extend(mcp_tools);
@@ -180,16 +205,21 @@ impl McpBridge {
     }
 
     /// Call an MCP tool on a specific server.
+    ///
+    /// F6: releases the clients read lock before the remote `call_tool`.
     pub async fn call_tool(
         &self,
         server_name: &str,
         tool_name: &str,
         args: serde_json::Value,
     ) -> Result<McpToolCallResult> {
-        let clients = self.clients.read().await;
-        let client = clients
-            .get(server_name)
-            .ok_or_else(|| anyhow!("MCP server '{server_name}' not connected"))?;
+        let client = {
+            let clients = self.clients.read().await;
+            clients
+                .get(server_name)
+                .cloned()
+                .ok_or_else(|| anyhow!("MCP server '{server_name}' not connected"))?
+        };
 
         client.call_tool(tool_name, args).await
     }
@@ -209,11 +239,16 @@ impl McpBridge {
     }
 
     /// Refresh tools from a specific server.
+    ///
+    /// F6: releases the clients read lock before the remote `refresh_tools`.
     pub async fn refresh_tools(&self, server_name: &str) -> Result<Vec<McpTool>> {
-        let clients = self.clients.read().await;
-        let client = clients
-            .get(server_name)
-            .ok_or_else(|| anyhow!("MCP server '{server_name}' not connected"))?;
+        let client = {
+            let clients = self.clients.read().await;
+            clients
+                .get(server_name)
+                .cloned()
+                .ok_or_else(|| anyhow!("MCP server '{server_name}' not connected"))?
+        };
 
         let mcp_tools = client.refresh_tools().await?;
 

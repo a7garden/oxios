@@ -12,7 +12,9 @@ use std::time::SystemTime;
 
 use md5::{Digest as Md5Digest, Md5};
 
-use crate::types::{DIR_ARCHIVE, DIR_JOURNAL, DIR_MEDIA, DIR_USER_ROOT, FileEntry, FsError};
+use crate::types::{
+    DIR_ARCHIVE, DIR_JOURNAL, DIR_MEDIA, DIR_USER_ROOT, FileEntry, FsError, MAX_TEXT_SIZE,
+};
 
 /// Forbidden filename characters and their safe replacements.
 const FORBIDDEN_CHARS: &[(&str, &str)] = &[
@@ -38,6 +40,16 @@ pub const SYSTEM_FILES: &[&str] = &[
 
 /// Files/dirs to ignore during listing.
 const IGNORED_NAMES: &[&str] = &[".", "..", ".obsidian", ".gitignore", ".DS_Store", ".git"];
+
+/// Maximum size for a single read() / read_to_string() call. Protects
+/// against OOM when a huge file ends up inside the sandbox (F23). Text
+/// content syncs are also bounded by [`MAX_TEXT_SIZE`].
+pub const MAX_READ_SIZE: u64 = MAX_TEXT_SIZE as u64;
+
+/// Minimum number of hex chars required for `unhash()` lookups. Shorter
+/// prefixes match too many files and let callers resolve arbitrary
+/// handles (F18). 5 chars = short_hash width, ~10^6 collision space.
+const MIN_UNHASH_LEN: usize = 5;
 
 // ============================================================================
 // VirtualFs
@@ -80,11 +92,9 @@ impl VirtualFs {
         self.quota_kb
     }
 
-    // ── Path Safety ──────────────────────────────────────────
-
-    /// Build a safe absolute path from a directory and filename.
-    ///
-    /// Rejects path traversal attempts (e.g., `../../etc/passwd`).
+    /// Resolve a sandboxed path under `dir` for `filename`, verifying the
+    /// final location stays under the knowledge root (rejects `..`, absolute,
+    /// and symlink escapes).
     pub fn safe_path(&self, dir: &str, filename: &str) -> Result<PathBuf, FsError> {
         let dir_trimmed = dir.trim();
         if dir_trimmed.starts_with("..") {
@@ -116,7 +126,51 @@ impl VirtualFs {
             return Err(FsError::UnsafePath);
         }
 
-        Ok(self.root.join(&normalized))
+        let final_path = self.root.join(&normalized);
+        // Re-verify containment by resolving symlinks: a symlink planted
+        // inside the root (e.g. via archive restore or external mount)
+        // could otherwise point outside and let read/write/delete escape
+        // the sandbox (F4).
+        self.verify_under_root(&final_path)?;
+        Ok(final_path)
+    }
+
+    /// Resolve `target` (and its longest existing ancestor when the target
+    /// does not yet exist) via `canonicalize` and confirm the result still
+    /// lives under the canonicalized root. Rejects symlink escapes.
+    fn verify_under_root(&self, target: &Path) -> Result<(), FsError> {
+        let canonical_root = self.root.canonicalize().map_err(|_| FsError::UnsafePath)?;
+
+        let canonical_target = match target.canonicalize() {
+            Ok(p) => p,
+            Err(_) => {
+                // Target doesn't exist yet (typical for writes). Walk up
+                // to the nearest existing ancestor, canonicalize it, then
+                // re-append the non-existent tail components. Tail items
+                // can't be symlinks yet, so they don't change containment.
+                let mut existing = target.to_path_buf();
+                let mut tail: Vec<std::ffi::OsString> = Vec::new();
+                while std::fs::symlink_metadata(&existing).is_err() {
+                    let Some(name) = existing.file_name() else {
+                        return Err(FsError::UnsafePath);
+                    };
+                    tail.push(name.to_owned());
+                    if !existing.pop() {
+                        return Err(FsError::UnsafePath);
+                    }
+                }
+                let mut c = existing.canonicalize().map_err(|_| FsError::UnsafePath)?;
+                for name in tail.into_iter().rev() {
+                    c.push(name);
+                }
+                c
+            }
+        };
+
+        if !canonical_target.starts_with(&canonical_root) {
+            return Err(FsError::UnsafePath);
+        }
+        Ok(())
     }
 
     // ── POSIX Path API (단일 path 문자열) ────────────────────
@@ -168,8 +222,15 @@ impl VirtualFs {
     }
 
     /// Read file contents as a string.
+    ///
+    /// Refuses files larger than [`MAX_READ_SIZE`] so a giant file inside
+    /// the sandbox (or arriving via sync) cannot OOM the process (F23).
     pub fn read(&self, dir: &str, filename: &str) -> Result<String, FsError> {
         let path = self.safe_path(dir, filename)?;
+        let meta = std::fs::metadata(&path)?;
+        if meta.len() > MAX_READ_SIZE {
+            return Err(FsError::TooLarge);
+        }
         let mut file = std::fs::File::open(&path)?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
@@ -179,31 +240,16 @@ impl VirtualFs {
     /// Write content to a file, creating parent directories as needed.
     pub fn write(&self, dir: &str, filename: &str, content: &str) -> Result<(), FsError> {
         let path = self.safe_path(dir, filename)?;
-
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        if self.quota_kb > 0 {
-            let new_size = content.len() as i64;
-            let old_size = std::fs::metadata(&path)
-                .map(|m| m.len() as i64)
-                .unwrap_or(0);
-            let used = self.calculate_used_quota()?;
-            let available = (self.quota_kb * 1024) - used;
-            if (new_size - old_size) > available {
-                return Err(FsError::QuotaExceeded);
-            }
-        }
-
-        let mut file = std::fs::File::create(&path)?;
-        file.write_all(content.as_bytes())?;
-        Ok(())
+        self.atomic_write(&path, content.as_bytes())
     }
 
     /// Read a file as raw bytes.
     pub fn read_bytes(&self, dir: &str, filename: &str) -> Result<Vec<u8>, FsError> {
         let path = self.safe_path(dir, filename)?;
+        let meta = std::fs::metadata(&path)?;
+        if meta.len() > MAX_READ_SIZE {
+            return Err(FsError::TooLarge);
+        }
         Ok(std::fs::read(&path)?)
     }
 
@@ -211,25 +257,57 @@ impl VirtualFs {
     /// Respects the configured quota (same logic as `write()`).
     pub fn write_bytes(&self, dir: &str, filename: &str, data: &[u8]) -> Result<(), FsError> {
         let path = self.safe_path(dir, filename)?;
+        self.atomic_write(&path, data)
+    }
 
+    /// Atomic write: serialize to a sibling temp file, fsync, then rename.
+    ///
+    /// `std::fs::rename` is atomic on the same filesystem, so a crash
+    /// between truncate and write_all can no longer leave a 0-byte or
+    /// partial file at `path` (F5). The temp name carries a UUID so two
+    /// concurrent writers cannot stomp on each other's scratch file.
+    fn atomic_write(&self, path: &Path, data: &[u8]) -> Result<(), FsError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
 
         if self.quota_kb > 0 {
             let new_size = data.len() as i64;
-            let old_size = std::fs::metadata(&path)
-                .map(|m| m.len() as i64)
-                .unwrap_or(0);
-            let used = self.calculate_used_quota()?;
-            let available = (self.quota_kb * 1024) - used;
-            if (new_size - old_size) > available {
-                return Err(FsError::QuotaExceeded);
+            let old_size = std::fs::metadata(path).map(|m| m.len() as i64).unwrap_or(0);
+            // Skip the recursive quota walk when this write doesn't grow
+            // the total (F17) — overwriting with same/smaller content is
+            // always within quota.
+            if new_size > old_size {
+                let used = self.calculate_used_quota()?;
+                let available = (self.quota_kb * 1024) - used;
+                if (new_size - old_size) > available {
+                    return Err(FsError::QuotaExceeded);
+                }
             }
         }
 
-        std::fs::write(&path, data)?;
-        Ok(())
+        let dir = path.parent().unwrap_or_else(|| Path::new("."));
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+        // Hidden temp file kept inside the target directory so the rename
+        // stays on the same filesystem (required for atomicity).
+        let tmp_path = dir.join(format!(".{file_name}.{}.tmp", uuid::Uuid::new_v4()));
+
+        let result: Result<(), FsError> = (|| {
+            let mut file = std::fs::File::create(&tmp_path)?;
+            file.write_all(data)?;
+            // Durably flush before the rename so the renamed file isn't
+            // half-written after a crash.
+            file.sync_all()?;
+            drop(file);
+            std::fs::rename(&tmp_path, path)?;
+            Ok(())
+        })();
+
+        if result.is_err() {
+            // Best-effort cleanup; error is reported from the actual op.
+            let _ = std::fs::remove_file(&tmp_path);
+        }
+        result
     }
 
     /// Read a file by POSIX path as raw bytes.
@@ -378,20 +456,42 @@ impl VirtualFs {
     }
 
     /// Reverse a hash to find the original filename.
+    ///
+    /// Requires at least [`MIN_UNHASH_LEN`] hex chars so short prefixes
+    /// cannot resolve to arbitrary files (F18). Ambiguous matches (more
+    /// than one candidate) return [`FsError::CannotUnhash`] instead of
+    /// picking the first hit.
     pub fn unhash(&self, dir: &str, filename_hash: &str) -> Result<String, FsError> {
         if dir == DIR_USER_ROOT && filename_hash == DIR_USER_ROOT {
             return Ok(DIR_USER_ROOT.to_string());
         }
-        let files = self.files_and_dirs(dir)?;
-        for file in &files {
-            if hash_filename(&file.name).starts_with(filename_hash) {
-                return Ok(file.name.clone());
-            }
+        if filename_hash.len() < MIN_UNHASH_LEN {
+            return Err(FsError::CannotUnhash);
         }
-        for file in &files {
-            if file.name.starts_with(filename_hash) {
-                return Ok(file.name.clone());
-            }
+        let files = self.files_and_dirs(dir)?;
+
+        // Primary pass: hash_prefix match. Collect all matches and refuse
+        // to guess when more than one file qualifies.
+        let mut hash_matches: Vec<&FileEntry> = files
+            .iter()
+            .filter(|f| hash_filename(&f.name).starts_with(filename_hash))
+            .collect();
+        if hash_matches.len() == 1 {
+            return Ok(hash_matches.remove(0).name.clone());
+        }
+        if !hash_matches.is_empty() {
+            return Err(FsError::CannotUnhash);
+        }
+
+        // Secondary pass: exact filename-prefix match (callers passing a
+        // human-readable prefix, e.g. "Chat" for "Chat.md"). Same single-
+        // match rule to prevent handle hijacking.
+        let mut name_matches: Vec<&FileEntry> = files
+            .iter()
+            .filter(|f| f.name.starts_with(filename_hash))
+            .collect();
+        if name_matches.len() == 1 {
+            return Ok(name_matches.remove(0).name.clone());
         }
         Err(FsError::CannotUnhash)
     }
@@ -455,7 +555,18 @@ impl VirtualFs {
                 continue;
             }
 
-            if path.is_dir() {
+            // Use the entry's own metadata (symlink_metadata on Unix) so a
+            // symlink planted inside the root cannot redirect the walk to
+            // files outside the sandbox (F6).
+            let meta = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+
+            if meta.is_dir() {
                 self.walk_dir(root_path, &path, extensions, result)?;
             } else {
                 if !extensions.is_empty() {
@@ -482,7 +593,6 @@ impl VirtualFs {
                     display.to_string()
                 };
 
-                let meta = std::fs::metadata(&path)?;
                 result.insert(display_path, mtime_to_ms(meta.modified()?));
             }
         }
@@ -504,7 +614,18 @@ impl VirtualFs {
             let path = entry.path();
             let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
-            if path.is_dir() {
+            // entry.metadata() does not traverse the entry's own symlink,
+            // and we skip any symlink outright so the walk stays inside
+            // the sandbox (F6).
+            let meta = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+
+            if meta.is_dir() {
                 if filename.starts_with('.') {
                     continue;
                 }
@@ -514,7 +635,6 @@ impl VirtualFs {
                     continue;
                 }
 
-                let meta = std::fs::metadata(&path)?;
                 let rel = path
                     .strip_prefix(root_path)
                     .map_err(|_| FsError::UnsafePath)?;
@@ -564,10 +684,16 @@ impl VirtualFs {
             if filename.starts_with('.') {
                 continue;
             }
-            if path.is_dir() {
+            let meta = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+            if meta.is_dir() {
                 self.collect_md_paths(root_path, &path, result)?;
             } else if filename.ends_with(".md") {
-                let meta = std::fs::metadata(&path)?;
                 let rel = path
                     .strip_prefix(root_path)
                     .map_err(|_| FsError::UnsafePath)?;

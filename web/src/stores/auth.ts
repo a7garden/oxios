@@ -7,19 +7,41 @@ interface AuthState {
   logout: () => void
 }
 
+// F2: API token stored in sessionStorage (not localStorage) to limit XSS
+// exposure — the token is scoped to the tab and cleared on tab close rather
+// than persisting across browser restarts. A one-time migration moves any
+// pre-existing localStorage token so existing sessions survive the upgrade.
+const TOKEN_KEY = 'oxios-api-key'
+
+function readToken(): string | null {
+  const fromSession = sessionStorage.getItem(TOKEN_KEY)
+  if (fromSession) return fromSession
+  // Migrate legacy localStorage token → sessionStorage, then wipe localStorage.
+  const legacy = localStorage.getItem(TOKEN_KEY)
+  if (legacy) {
+    sessionStorage.setItem(TOKEN_KEY, legacy)
+    localStorage.removeItem(TOKEN_KEY)
+    return legacy
+  }
+  return null
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
-  token: localStorage.getItem('oxios-api-key') || null,
-  isAuthenticated: !!localStorage.getItem('oxios-api-key'),
+  token: readToken(),
+  isAuthenticated: readToken() !== null,
   setToken: (token) => {
     if (token) {
-      localStorage.setItem('oxios-api-key', token)
+      sessionStorage.setItem(TOKEN_KEY, token)
     } else {
-      localStorage.removeItem('oxios-api-key')
+      sessionStorage.removeItem(TOKEN_KEY)
     }
+    // Always wipe any legacy localStorage copy.
+    localStorage.removeItem(TOKEN_KEY)
     set({ token, isAuthenticated: !!token })
   },
   logout: () => {
-    localStorage.removeItem('oxios-api-key')
+    sessionStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(TOKEN_KEY)
     set({ token: null, isAuthenticated: false })
   },
 }))

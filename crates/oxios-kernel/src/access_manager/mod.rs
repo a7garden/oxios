@@ -137,11 +137,21 @@ impl AccessManager {
             let audit_path = path;
             let audit_handle = handle.spawn(async move {
                 while let Some(line) = rx.recv().await {
-                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                    #[cfg(unix)]
+                    let result = {
+                        use std::os::unix::fs::OpenOptionsExt;
+                        std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .mode(0o600)
+                            .open(&audit_path)
+                    };
+                    #[cfg(not(unix))]
+                    let result = std::fs::OpenOptions::new()
                         .create(true)
                         .append(true)
-                        .open(&audit_path)
-                    {
+                        .open(&audit_path);
+                    if let Ok(mut f) = result {
                         use std::io::Write;
                         let _ = writeln!(f, "{line}");
                     }
@@ -611,8 +621,18 @@ impl AccessManager {
     }
 
     /// Clears the audit log.
+    ///
+    /// The clear itself is recorded as an audit entry first, so the deletion is
+    /// visible in the trail rather than silently wiping history.
     pub fn clear_audit_log(&mut self) {
         let count = self.audit_log.len();
+        self.log_access(
+            "system",
+            "audit_clear",
+            &format!("{count} entries"),
+            true,
+            Some("audit log cleared by request".to_string()),
+        );
         self.audit_log.clear();
         tracing::info!(cleared = count, "Audit log cleared");
     }

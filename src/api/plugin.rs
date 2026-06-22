@@ -39,8 +39,27 @@ use oxios_gateway::ReliabilityLayer;
 /// Returns `None` if the file doesn't exist.
 fn fs_read(dist: &std::path::Path, path: &str) -> Option<Vec<u8>> {
     let clean = path.trim_start_matches('/');
+    // Reject path traversal (.., absolute, drive prefix) before joining.
+    let p = std::path::Path::new(clean);
+    if p.components().any(|c| {
+        matches!(
+            c,
+            std::path::Component::ParentDir
+                | std::path::Component::RootDir
+                | std::path::Component::Prefix(_)
+        )
+    }) {
+        return None;
+    }
     let file_path = dist.join(clean);
-    std::fs::read(&file_path).ok()
+    // Confirm the resolved path stays inside dist — defends against symlinks
+    // and any residual traversal the component filter missed.
+    let canon_file = file_path.canonicalize().ok()?;
+    let canon_dist = dist.canonicalize().ok()?;
+    if !canon_file.starts_with(&canon_dist) {
+        return None;
+    }
+    std::fs::read(&canon_file).ok()
 }
 
 /// Determines MIME type from file path.
@@ -73,6 +92,32 @@ fn read_active_version(dist: &std::path::Path) -> String {
         .and_then(|b| serde_json::from_slice::<VersionFile>(&b).ok())
         .and_then(|v| v.version)
         .unwrap_or_else(|| "dev".to_string())
+}
+
+/// Whether a gateway `host` string binds to a loopback interface.
+///
+/// Used by the F2 non-loopback + auth-disabled warning. Accepts the
+/// literal loopback addresses (127.0.0.0/8 spelled out as 127.0.0.1,
+/// the IPv6 loopback `::1`, and the `localhost` name) plus an empty
+/// host (axum binds to 127.0.0.1 by default when given an empty string).
+fn is_loopback_host(host: &str) -> bool {
+    let h = host.trim().to_ascii_lowercase();
+    if h.is_empty() || h == "localhost" {
+        return true;
+    }
+    // IPv6 loopback (strip optional brackets/zone).
+    let h = h.trim_start_matches('[').trim_end_matches(']');
+    if h == "::1" {
+        return true;
+    }
+    // IPv4 127.0.0.0/8.
+    if let Some(rest) = h.strip_prefix("127.")
+        && let Some(first) = rest.split('.').next()
+        && first.bytes().all(|b| b.is_ascii_digit())
+    {
+        return true;
+    }
+    false
 }
 
 /// Serve a static file.
@@ -191,6 +236,32 @@ impl Surface for WebSurface {
         let config = ctx.config.read().clone();
         let host = config.gateway.host.clone();
         let port = config.gateway.port;
+        // F2: surface the dangerous "non-loopback bind + auth disabled"
+        // combination. When auth_enabled is false the API has no defense
+        // for destructive endpoints (POST /api/mcp/servers, POST
+        // /api/update/run, PUT /api/config, POST /api/system/backup, …).
+        // Binding those to a public interface is remote code execution.
+        let auth_enabled = config.security.auth_enabled;
+        let is_loopback = is_loopback_host(&host);
+        if !auth_enabled && !is_loopback {
+            tracing::error!(
+                host = %host,
+                port,
+                "SECURITY: HTTP API is binding to a non-loopback interface \
+                 ({host}) with auth_enabled=false. Destructive endpoints \
+                 (MCP server spawn, update/run, config write, backup) will \
+                 be reachable WITHOUT authentication. Set \
+                 [security].auth_enabled=true, or bind to 127.0.0.1/::1/localhost."
+            );
+            // Also print to stderr so it is visible even when logs are not
+            // being tailed (e.g. systemd journalctl, container stdout).
+            eprintln!(
+                "⚠️  Oxios: HTTP API binding to {host}:{port} with auth_enabled=false.\n\
+                 ⚠️  Destructive endpoints are UNAUTHENTICATED. Set auth_enabled=true \
+                 or bind to a loopback address."
+            );
+        }
+
         let rate_limit = config.security.rate_limit_per_minute;
 
         // Use the pre-resolved web dist path from SurfaceContext.

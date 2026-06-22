@@ -320,6 +320,12 @@ impl ClawHubInstaller {
                 continue;
             }
 
+            // Zip Slip defense: reject entries whose relative path could
+            // escape `target` (absolute paths, `..`, drive prefixes).
+            if !crate::skill::is_safe_relative_path(&relative) {
+                tracing::warn!("clawhub: skipping zip entry with unsafe path: {relative}");
+                continue;
+            }
             let out_path = target.join(&relative);
 
             if file.is_dir() {

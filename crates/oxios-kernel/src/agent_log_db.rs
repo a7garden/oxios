@@ -649,13 +649,18 @@ impl AgentLogDb {
                 if count > config.max_entries as i64 {
                     let excess = count - config.max_entries as i64;
                     let to_delete = excess.min(config.prune_batch_size as i64);
-                    conn.execute(
-                        "DELETE FROM agents WHERE id IN (
+                    let deleted = conn
+                        .execute(
+                            "DELETE FROM agents WHERE id IN (
                             SELECT id FROM agents ORDER BY created_at ASC LIMIT ?1
                         )",
-                        rusqlite::params![to_delete],
-                    )?;
-                    pruned += to_delete as usize;
+                            rusqlite::params![to_delete],
+                        )
+                        .context("Failed to prune agents by count")?;
+                    // Report the rows actually deleted, not the estimate:
+                    // FK CASCADE or a concurrent prune can make the real
+                    // count differ from `to_delete`. (state-area F7.)
+                    pruned += deleted;
                 }
             }
         }
@@ -710,14 +715,24 @@ impl AgentLogDb {
         let created_at_str: String = row.get("created_at")?;
         let started_at_str: Option<String> = row.get("started_at")?;
         let completed_at_str: Option<String> = row.get("completed_at")?;
-
         Ok(AgentInfo {
-            id: uuid::Uuid::parse_str(&id_str).unwrap_or_default(),
+            id: uuid::Uuid::parse_str(&id_str).unwrap_or_else(|e| {
+                tracing::error!(agent_id = %id_str, error = %e, "Corrupt agent id in DB, substituting Nil");
+                uuid::Uuid::nil()
+            }),
             name: row.get("name")?,
             status: Self::parse_status(&row.get::<_, String>("status")?),
             created_at: DateTime::parse_from_rfc3339(&created_at_str)
                 .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(|_| Utc::now()),
+                .unwrap_or_else(|e| {
+                    tracing::error!(
+                        agent_id = %id_str,
+                        created_at = %created_at_str,
+                        error = %e,
+                        "Corrupt created_at in DB, substituting Utc::now()"
+                    );
+                    Utc::now()
+                }),
             seed_id: seed_id_str.and_then(|s| uuid::Uuid::parse_str(&s).ok()),
             project_id: project_id_str.and_then(|s| uuid::Uuid::parse_str(&s).ok()),
             started_at: started_at_str
@@ -902,11 +917,19 @@ impl AgentLogDb {
 
         if has_fts {
             if let Some(ref q) = filter.q {
-                let escaped = q.replace('\'', "''");
+                // Treat user input as an FTS5 *phrase* (double-quoted
+                // string) so FTS5 query syntax — `*` wildcards, `:`
+                // column qualifiers, `AND`/`OR`/`NEAR`, parentheses —
+                // is treated as literal text, not operators. Internal
+                // double-quotes are escaped by doubling (FTS5 rule).
+                // Bound as a parameter so it never reaches the SQL parser
+                // as code. (state-area F8.)
+                let phrase = format!("\"{}\"", q.replace('"', "\"\""));
+                let idx = params.len() + 1;
                 conditions.push(format!(
-                    "id IN (SELECT DISTINCT agent_id FROM agent_tool_calls_fts WHERE agent_tool_calls_fts MATCH '{}')",
-                    escaped
+                    "id IN (SELECT DISTINCT agent_id FROM agent_tool_calls_fts WHERE agent_tool_calls_fts MATCH ?{idx})"
                 ));
+                params.push(Box::new(phrase));
             }
         } else if let Some(ref q) = filter.q {
             match filter.search_field {

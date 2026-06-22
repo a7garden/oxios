@@ -200,12 +200,30 @@ impl AgentApi {
         if let Some(ref db) = self.agent_log_db {
             let mut result = db.query(filter).map_err(|e| anyhow::anyhow!("{e}"))?;
 
-            // Prepend running agents that match the filter
-            for agent in &running {
-                if filter_matches(agent, filter) {
-                    result.items.insert(0, agent.clone());
-                    result.total += 1;
+            // Only prepend running agents on the first page — otherwise we'd
+            // inject them into every requested page and break pagination.
+            if filter.page == 1 {
+                // Dedup against the SQLite items so a running agent that is
+                // also already persisted isn't shown twice.
+                let existing_ids: std::collections::HashSet<_> =
+                    result.items.iter().map(|a| a.id).collect();
+                let mut prepended = 0u64;
+                for agent in &running {
+                    if existing_ids.contains(&agent.id) {
+                        continue;
+                    }
+                    if filter_matches(agent, filter) {
+                        result.items.insert(0, agent.clone());
+                        prepended += 1;
+                    }
                 }
+                result.total = result.total.saturating_add(prepended);
+                // Recompute total_pages so callers see a consistent view.
+                result.total_pages = if result.total == 0 {
+                    1
+                } else {
+                    ((result.total as f64) / filter.per_page.max(1) as f64).ceil() as u32
+                };
             }
 
             return Ok(result);

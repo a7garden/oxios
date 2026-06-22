@@ -32,11 +32,49 @@ pub struct InterviewResult {
     /// Each exchange is a user message + agent response (questions or chat).
     #[serde(default)]
     pub conversation_history: Vec<Exchange>,
+    /// Structured form of the questions for the interactive Web UI.
+    /// Populated by the engine in the same LLM call as `questions`, then
+    /// sanitized (invalid kinds downgraded to `free_text`, yes_no options
+    /// filled). `None` for non-task messages; the frontend falls back to
+    /// plain markdown rendering of `questions`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured_questions: Option<Vec<InterviewQuestionOutput>>,
     /// Task complexity: "simple" for clear single-action requests,
     /// "complex" for ambiguous or multi-step tasks.
     /// Defaults to "complex" (safe default).
     #[serde(default = "default_complexity")]
     pub complexity: String,
+}
+
+/// Single option for a structured interview question.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InterviewOptionOutput {
+    /// Stable identifier for the answer payload (e.g. "points", "ko").
+    pub value: String,
+    /// Human-readable label rendered as a chip/button.
+    pub label: String,
+    /// Optional longer description shown as a tooltip.
+    #[serde(default)]
+    pub description: String,
+}
+
+/// One structured question produced by the LLM.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InterviewQuestionOutput {
+    /// Short identifier used as the answer key (e.g. "q1", "q2").
+    pub id: String,
+    /// The question text (also present in the parallel `questions` array).
+    pub text: String,
+    /// Question kind — drives the frontend widget selection.
+    #[serde(default = "default_question_kind")]
+    pub kind: String,
+    /// Choice options (empty for free_text / yes_no).
+    #[serde(default)]
+    pub options: Vec<InterviewOptionOutput>,
+}
+
+fn default_question_kind() -> String {
+    "free_text".to_string()
 }
 
 /// A single exchange in the conversation history.
@@ -68,10 +106,10 @@ impl InterviewResult {
             is_task: true,
             chat_response: String::new(),
             conversation_history: Vec::new(),
+            structured_questions: None,
             complexity: default_complexity(),
         }
     }
-
     /// Adds a question-answer pair to the interview.
     pub fn add_exchange(&mut self, question: impl Into<String>, answer: impl Into<String>) {
         self.questions.push(question.into());

@@ -267,6 +267,36 @@ impl GitLayer {
     fn head_id_detached_raw(repo: &gix::Repository) -> Option<ObjectId> {
         repo.head_id().ok().map(|id| id.detach())
     }
+    /// Validate that `rel_path` is a relative path that stays within the git root.
+    ///
+    /// `Path::join` replaces the base when given an absolute path on Unix
+    /// (`root.join("/etc/passwd") == "/etc/passwd"`) and `..` components escape
+    /// the root. This guards every public commit/restore entry point so an
+    /// attacker-controlled `rel_path` (e.g. from `infra_api::git_restore`,
+    /// `KernelHandle::save_and_commit`, or `knowledge_dream::commit_file`)
+    /// cannot read or write outside the repository.
+    ///
+    /// The check is lexical: it rejects `Component::ParentDir`, `RootDir`, and
+    /// `Prefix`, and any absolute input. A purely-Normal-component relative
+    /// path cannot escape `root.join(...)` on any platform.
+    fn ensure_within_root(&self, rel_path: &str) -> Result<std::path::PathBuf> {
+        use std::path::Component;
+        let p = Path::new(rel_path);
+        if p.is_absolute() {
+            bail!("path must be relative to git root: {rel_path}");
+        }
+        for comp in p.components() {
+            match comp {
+                Component::ParentDir => {
+                    bail!("parent-dir traversal not allowed: {rel_path}")
+                }
+                Component::RootDir => bail!("root-dir traversal not allowed: {rel_path}"),
+                Component::Prefix(_) => bail!("path prefix not allowed: {rel_path}"),
+                _ => {}
+            }
+        }
+        Ok(self.root.join(rel_path))
+    }
 
     fn create_initial_commit(repo: &Arc<Mutex<gix::Repository>>, root: &Path) -> Result<()> {
         let repo_lock = repo.lock();
@@ -363,7 +393,7 @@ impl GitLayer {
             return self.noop_commit(&ctx, message);
         }
         let repo = self.repo.lock();
-        let abs = self.root.join(rel_path);
+        let abs = self.ensure_within_root(rel_path)?;
         if !abs.exists() {
             bail!("File not found: {rel_path}");
         }
@@ -411,7 +441,7 @@ impl GitLayer {
         let mut editor = repo.edit_tree(head_tree)?;
 
         for path in rel_paths {
-            let abs = self.root.join(path);
+            let abs = self.ensure_within_root(path)?;
             if abs.exists() {
                 let content = std::fs::read(&abs)?;
                 let blob_id = repo.write_blob(&content)?;
@@ -441,6 +471,9 @@ impl GitLayer {
         if !self.enabled {
             return self.noop_commit(&CommitContext::default(), message);
         }
+        // Validate the tree key (defense-in-depth: remove() does not touch disk
+        // but the path is used to locate the blob in the commit tree).
+        self.ensure_within_root(rel_path)?;
         let repo = self.repo.lock();
         let head_tree = Self::head_tree_oid(&repo)?;
         let mut editor = repo.edit_tree(head_tree)?;
@@ -609,12 +642,15 @@ impl GitLayer {
     /// Supports nested paths like `audit/2024-05.audit` by traversing
     /// each path component through sub-trees.
     pub fn restore_file(&self, rel_path: &str, hash: &str) -> Result<()> {
+        // Validate the destination before resolving the blob — defense-in-depth
+        // against writing attacker-controlled content to an arbitrary path.
+        let dest = self.ensure_within_root(rel_path)?;
         let commit_id = self.resolve_partial_hash(hash)?;
         let repo = self.repo.lock();
         let commit_tree_id = Self::commit_tree_id(&repo, commit_id)?;
         let blob_id = Self::find_blob_in_tree(&repo, commit_tree_id, rel_path)?;
         let blob = repo.find_blob(blob_id)?;
-        std::fs::write(self.root.join(rel_path), &blob.data)?;
+        std::fs::write(dest, &blob.data)?;
         Ok(())
     }
 
@@ -690,6 +726,9 @@ impl GitLayer {
 
     /// Retrieve file content as it was at a specific commit.
     pub fn file_at_commit(&self, rel_path: &str, hash: &str) -> Result<Vec<u8>> {
+        // Defense-in-depth: the path is only used as a tree key here, but
+        // rejecting traversal early keeps the contract uniform with restore_file.
+        self.ensure_within_root(rel_path)?;
         let repo = self.repo.lock();
         let commit_id = self.resolve_hash_inner(&repo, hash)?;
         let tree_id = Self::commit_tree_id(&repo, commit_id)?;

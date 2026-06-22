@@ -47,6 +47,12 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
   })
 
   if (!res.ok) {
+    // F5: On 401 the token is expired/invalid — log out automatically so the
+    // user is routed back to authentication instead of seeing error states on
+    // every subsequent request.
+    if (res.status === 401) {
+      useAuthStore.getState().logout()
+    }
     const text = await res.text().catch(() => '')
     throw new ApiError(res.status, res.statusText, text)
   }

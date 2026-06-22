@@ -164,13 +164,30 @@ impl RbacPolicy {
                     || self.allowed_actions.contains(&Action::UseTool(tool_name.clone()))
             }
             Action::AccessPath(path) => {
-                // Check if policy has AccessPath("*") wildcard.
-                self.allowed_actions
+                // Wildcard or exact match in allowed_actions.
+                if self
+                    .allowed_actions
                     .iter()
                     .any(|a| matches!(a, Action::AccessPath(p) if p == "*"))
                     || self
                         .allowed_actions
                         .contains(&Action::AccessPath(path.clone()))
+                {
+                    return true;
+                }
+                // Enforce resource_patterns glob match (e.g. "/workspace/**").
+                // Previously this field was defined but never consulted.
+                for pattern in &self.resource_patterns {
+                    if pattern == "*" {
+                        return true;
+                    }
+                    if let Ok(p) = glob::Pattern::new(pattern)
+                        && p.matches(path)
+                    {
+                        return true;
+                    }
+                }
+                false
             }
             // Non-parameterized actions: exact match only (already checked above).
             _ => false,
@@ -289,6 +306,19 @@ impl RbacManager {
     /// Checks whether a subject has permission for the given action on a resource.
     pub fn check_permission(&mut self, subject: &Subject, action: &Action, resource: &str) -> bool {
         if matches!(subject, Subject::System) {
+            // System subject bypasses role checks, but the decision is still
+            // recorded in the audit trail so bypasses are visible (never silent).
+            self.audit_log.push(RbacAuditEntry::new(
+                subject.clone(),
+                action.clone(),
+                resource.to_string(),
+                true,
+                Some("system subject bypass".to_string()),
+            ));
+            if self.audit_log.len() > self.max_audit_entries {
+                self.audit_log
+                    .drain(0..self.audit_log.len() - self.max_audit_entries);
+            }
             return true;
         }
         let role = match self.subject_roles.get(subject) {

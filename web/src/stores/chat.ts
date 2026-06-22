@@ -113,9 +113,33 @@ export type ChatStore = PersistedState & ChatRuntimeState & ChatActions
 // Helpers
 // ---------------------------------------------------------------------------
 
+// F6: known StreamChunk type values. Unknown types are coerced to an error
+// chunk so downstream handlers never operate on an unrecognised shape (which
+// could produce undefined activity IDs and React key collisions).
+const KNOWN_CHUNK_TYPES = new Set<StreamChunk['type']>([
+  'token',
+  'tool_call',
+  'tool_result',
+  'done',
+  'error',
+  'phase',
+  'tool_start',
+  'tool_end',
+  'tool_progress',
+  'memory',
+  'reasoning',
+  'usage',
+  'interview',
+  'tool_approval',
+])
+
 function parseChunk(raw: unknown): StreamChunk {
   if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-    return raw as StreamChunk
+    const obj = raw as Record<string, unknown>
+    const t = obj.type
+    if (typeof t === 'string' && KNOWN_CHUNK_TYPES.has(t as StreamChunk['type'])) {
+      return obj as unknown as StreamChunk
+    }
   }
   return { type: 'error', error: 'Malformed chunk' }
 }
@@ -230,31 +254,103 @@ async function buildWsUrl(): Promise<string> {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const token = getToken()
 
-  if (token) {
-    try {
-      const res = await fetch('/api/chat/ticket', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.ticket) {
-          return `${protocol}//${window.location.host}/api/chat/stream?ticket=${encodeURIComponent(data.ticket)}`
-        }
-      }
-    } catch {
-      // Ticket endpoint not available, fall back to token
-    }
+  // F3: never attempt an unauthenticated WebSocket. Without a token the
+  // backend cannot verify the caller, so surface the error instead of
+  // silently connecting (which could bypass auth if the backend's Origin
+  // check is lax).
+  if (!token) {
+    throw new Error('Cannot open WebSocket: not authenticated')
   }
 
-  return `${protocol}//${window.location.host}/api/chat/stream`
+  const base = `${protocol}//${window.location.host}/api/chat/stream`
+
+  // Prefer a short-lived ticket so the token itself never appears in the URL
+  // (URLs are logged by proxies and may leak via Referer).
+  try {
+    const res = await fetch('/api/chat/ticket', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data.ticket) {
+        return `${base}?ticket=${encodeURIComponent(data.ticket)}`
+      }
+    }
+  } catch {
+    // Ticket endpoint not available — fall through to token query param.
+  }
+
+  // F3: WS cannot use custom headers, so the token must travel as a query
+  // parameter. This is strictly better than the previous behaviour which sent
+  // a completely unauthenticated request when the ticket endpoint failed.
+  return `${base}?token=${encodeURIComponent(token)}`
 }
 
 /** Max reconnect attempts before giving up. */
 const MAX_RECONNECT_ATTEMPTS = 5
+
+// ---------------------------------------------------------------------------
+// F9: Token-streaming batching
+// ---------------------------------------------------------------------------
+// Each incoming token chunk previously rebuilt the entire messages array
+// (O(n) per token → O(n×t) for a response of t tokens across n messages),
+// triggering a Zustand subscriber re-render on every token. We instead
+// accumulate token content in a module-scoped buffer and flush it at most once
+// per animation frame. Any non-token chunk flushes synchronously first so
+// streamed text is never lost when a tool/done/error event arrives mid-stream.
+let _pendingTokens = ''
+let _tokenRafId: number | null = null
+
+function flushPendingTokens(): void {
+  if (_tokenRafId !== null) {
+    cancelAnimationFrame(_tokenRafId)
+    _tokenRafId = null
+  }
+  if (!_pendingTokens) return
+  const content = _pendingTokens
+  _pendingTokens = ''
+  useChatStore.setState((s) => {
+    const msgs = s.messages
+    const last = msgs[msgs.length - 1]
+    if (last?.role === 'assistant') {
+      // Only the last element changes — copy once and replace in place.
+      const next = msgs.slice()
+      next[next.length - 1] = { ...last, content: last.content + content }
+      return { messages: next }
+    }
+    return {
+      messages: [
+        ...msgs,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant' as const,
+          content,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    }
+  })
+}
+
+function scheduleTokenFlush(): void {
+  if (_tokenRafId !== null) return
+  _tokenRafId = requestAnimationFrame(() => {
+    _tokenRafId = null
+    flushPendingTokens()
+  })
+}
+
+function discardPendingTokens(): void {
+  if (_tokenRafId !== null) {
+    cancelAnimationFrame(_tokenRafId)
+    _tokenRafId = null
+  }
+  _pendingTokens = ''
+}
 
 // ---------------------------------------------------------------------------
 // Store definition
@@ -320,7 +416,14 @@ export const useChatStore = create<ChatStore>()(
           set({ _reconnectTimer: null })
         }
 
-        const url = await buildWsUrl()
+        let url: string
+        try {
+          url = await buildWsUrl()
+        } catch {
+          // F3: not authenticated — abort the connection attempt gracefully
+          // instead of letting the rejection propagate unhandled.
+          return
+        }
         const ws = new WebSocket(url)
 
         // Store reference so stale-checks work.
@@ -396,6 +499,9 @@ export const useChatStore = create<ChatStore>()(
           _ws.close()
         }
 
+        // F9: flush any buffered tokens before tearing down the connection so
+        // the final streamed content is committed to the message.
+        flushPendingTokens()
         set({
           connected: false,
           isStreaming: false,
@@ -445,6 +551,8 @@ export const useChatStore = create<ChatStore>()(
 
       async loadSession(sessionId: string) {
         if (!sessionId) return
+        // F9: discard buffered tokens from any prior streaming session.
+        discardPendingTokens()
         try {
           const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
             headers: {
@@ -534,8 +642,10 @@ export const useChatStore = create<ChatStore>()(
           // Silently fail — network issues shouldn't break the UI
         }
       },
-
       newSession() {
+        // F9: discard any buffered tokens from the previous session so they
+        // don't leak into the new session via a late rAF callback.
+        discardPendingTokens()
         set(() => ({
           messages: [],
           isStreaming: false,
@@ -551,6 +661,8 @@ export const useChatStore = create<ChatStore>()(
       },
 
       setActiveProject(projectId: string | null) {
+        // F9: discard buffered tokens when switching projects (clears messages).
+        discardPendingTokens()
         set({
           activeProjectId: projectId,
           activeSessionId: null,
@@ -695,32 +807,19 @@ export const useChatStore = create<ChatStore>()(
       },
 
       handleChunk(chunk) {
+        // F9: flush any buffered token content before a non-token chunk so
+        // streamed text is committed to the message before a tool/done/error
+        // event reads or replaces the last assistant message.
+        if (chunk.type !== 'token') {
+          flushPendingTokens()
+        }
         switch (chunk.type) {
           case 'token': {
+            // F9: batch tokens into a single rAF flush instead of rebuilding
+            // the messages array on every token.
             if (!chunk.content) break
-            set((s) => {
-              const updated = [...s.messages]
-              const last = updated[updated.length - 1]
-              if (last?.role === 'assistant') {
-                return {
-                  messages: [
-                    ...updated.slice(0, -1),
-                    { ...last, content: last.content + chunk.content },
-                  ],
-                }
-              }
-              return {
-                messages: [
-                  ...updated,
-                  {
-                    id: crypto.randomUUID(),
-                    role: 'assistant' as const,
-                    content: chunk.content ?? '',
-                    timestamp: new Date().toISOString(),
-                  },
-                ],
-              }
-            })
+            _pendingTokens += chunk.content
+            scheduleTokenFlush()
             break
           }
 

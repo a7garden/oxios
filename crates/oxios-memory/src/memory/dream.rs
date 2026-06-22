@@ -43,6 +43,8 @@ pub struct DreamCheckpoint {
     pub cached_signals: Option<Vec<MemorySignal>>,
     /// Cached plan from Phase 3.
     pub cached_plan: Option<ConsolidationPlan>,
+    /// Cached Phase 1 (Orient) state, so resume can skip the full re-scan.
+    pub cached_state: Option<DreamState>,
 }
 
 impl DreamCheckpoint {
@@ -265,9 +267,7 @@ pub struct MergePlan {
 // ---------------------------------------------------------------------------
 // DreamState (Phase 1 output)
 // ---------------------------------------------------------------------------
-
-/// State snapshot from Phase 1 (Orient).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DreamState {
     pub total_entries: usize,
     pub hot_count: usize,
@@ -485,13 +485,20 @@ impl DreamProcess {
 
         let result = async {
             // Phase 1: Orient
-            let _state = if start_phase < 1 {
+            // On resume (start_phase >= 1), reuse the cached Phase 1 state
+            // instead of re-scanning every tier/type (the original code always
+            // re-ran dream_orient(), defeating the checkpoint). Fall back to a
+            // fresh scan only if no state was cached.
+            let state = if start_phase < 1 {
                 self.dream_orient().await?
             } else {
-                // Skip — use cached state (in a full impl, we'd cache this)
-                self.dream_orient().await?
+                match resumed.as_ref().and_then(|cp| cp.cached_state.clone()) {
+                    Some(s) => s,
+                    None => self.dream_orient().await?,
+                }
             };
-            self.save_checkpoint(&dream_id, 1, None, None).await?;
+            self.save_checkpoint(&dream_id, 1, None, None, Some(&state))
+                .await?;
 
             // Phase 2: Gather Signal
             let signals = if start_phase < 2 {
@@ -502,7 +509,7 @@ impl DreamProcess {
                     .and_then(|cp| cp.cached_signals.clone())
                     .unwrap_or_default()
             };
-            self.save_checkpoint(&dream_id, 2, Some(&signals), None)
+            self.save_checkpoint(&dream_id, 2, Some(&signals), None, Some(&state))
                 .await?;
 
             // Phase 3: Consolidate
@@ -514,7 +521,7 @@ impl DreamProcess {
                     .and_then(|cp| cp.cached_plan.clone())
                     .unwrap_or_default()
             };
-            self.save_checkpoint(&dream_id, 3, Some(&signals), Some(&plan))
+            self.save_checkpoint(&dream_id, 3, Some(&signals), Some(&plan), Some(&state))
                 .await?;
 
             // Phase 4: Prune & Index
@@ -738,7 +745,7 @@ impl DreamProcess {
             let decay = self.decay_engine.compute_decay(entry, now);
             if self
                 .decay_engine
-                .is_prunable(entry, self.config.decay_threshold)
+                .is_prunable(entry, self.config.decay_threshold, now)
             {
                 signals.push(MemorySignal::DecayCandidate(DecayCandidate {
                     id: entry.id.clone(),
@@ -912,16 +919,12 @@ impl DreamProcess {
         // 4. Apply merges
         for merge in &plan.merge {
             contradictions_resolved += 1;
-            // Remove the older/duplicate entry
-            let _ = self
-                .memory_manager
-                .get_by_id(&merge.remove_id)
-                .await
-                .ok()
-                .flatten()
-                .map(
-                    |e| async move { self.memory_manager.forget(&e.id, e.memory_type).await.ok() },
-                );
+            // Actually forget the merged-away entry. The previous code built a
+            // `forget()` future inside `Option::map` and discarded it without
+            // awaiting, so duplicate/contradictory entries were never removed.
+            if let Ok(Some(e)) = self.memory_manager.get_by_id(&merge.remove_id).await {
+                let _ = self.memory_manager.forget(&e.id, e.memory_type).await;
+            }
         }
 
         // 5. Apply PageRank importance updates (Phase 2)
@@ -1117,14 +1120,15 @@ impl DreamProcess {
         completed_phase: u8,
         signals: Option<&[MemorySignal]>,
         plan: Option<&ConsolidationPlan>,
+        state: Option<&DreamState>,
     ) -> Result<()> {
         let checkpoint = DreamCheckpoint {
             dream_id: dream_id.to_string(),
-
             started_at: Utc::now(),
             completed_phase,
             cached_signals: signals.map(|s| s.to_vec()),
             cached_plan: plan.cloned(),
+            cached_state: state.cloned(),
         };
         let path = DreamCheckpoint::path(&self.space_dir);
         if let Some(parent) = path.parent() {
@@ -1166,6 +1170,7 @@ mod tests {
             completed_phase: 2,
             cached_signals: None,
             cached_plan: None,
+            cached_state: None,
         };
         assert!(cp.is_stale());
     }
@@ -1179,6 +1184,7 @@ mod tests {
             completed_phase: 2,
             cached_signals: None,
             cached_plan: None,
+            cached_state: None,
         };
         assert!(!cp.is_stale());
     }

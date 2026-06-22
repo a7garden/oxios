@@ -136,10 +136,15 @@ impl MountApi {
     }
 
     /// Record that a Mount was used (touch activity timestamp).
-    pub fn touch_mount(&self, id: &str) {
-        if let Ok(mount_id) = Uuid::parse_str(id) {
-            self.mount_manager.touch(mount_id);
-        }
+    ///
+    /// Returns `Err` on an invalid mount ID — consistent with the other
+    /// mutation methods in this facade (update_enrichment, rename_mount,
+    /// remove_mount) which previously were the only ones that surfaced the
+    /// parse error.
+    pub fn touch_mount(&self, id: &str) -> Result<()> {
+        let mount_id: MountId = Uuid::parse_str(id).context("Invalid mount ID")?;
+        self.mount_manager.touch(mount_id);
+        Ok(())
     }
 
     /// Re-seed auto_meta from the filesystem (RFC-025 manual rescan).

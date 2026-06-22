@@ -19,7 +19,35 @@ impl AuditPersistence for StateStore {
             std::fs::create_dir_all(parent)?;
         }
         let json = serde_json::to_string_pretty(entries)?;
-        std::fs::write(&path, json)?;
+
+        // Durable write: write to a unique temp file, fsync it, atomically
+        // rename, then best-effort fsync the directory. Without the fsync
+        // steps, a crash (OOM/SIGKILL/power loss) between the write and the
+        // rename's metadata commit can leave trail.json truncated or empty,
+        // losing the entire hash-chained audit trail. (state-area F3.)
+        let temp_path = path
+            .parent()
+            .unwrap_or(std::path::Path::new("."))
+            .join(format!(
+                "trail.json.{}.{}.tmp",
+                std::process::id(),
+                uuid::Uuid::new_v4()
+            ));
+        {
+            use std::io::Write;
+            let mut file = std::fs::File::create(&temp_path)?;
+            file.write_all(json.as_bytes())?;
+            file.sync_all()?;
+        }
+        std::fs::rename(&temp_path, &path)?;
+        if let Some(parent) = path.parent()
+            && let Ok(dir) = std::fs::File::open(parent)
+        {
+            // Best-effort directory fsync so the rename is durable.
+            // Ignore errors: not all platforms/fs support dir fsync,
+            // and we've already done the file fsync + rename.
+            let _ = dir.sync_all();
+        }
         Ok(())
     }
 

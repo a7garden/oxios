@@ -80,16 +80,40 @@ pub struct WasmConfig {
     pub max_instructions: u64,
     /// Maximum module size in bytes (default: 10MB).
     pub max_module_size_bytes: u64,
+    /// Wall-clock timeout for a single tool execution (default: 30s).
+    pub max_exec_seconds: u64,
 }
 
-#[cfg(feature = "wasm-sandbox")]
 impl Default for WasmConfig {
     fn default() -> Self {
         Self {
             max_memory_bytes: 50 * 1024 * 1024,
             max_instructions: 10_000_000,
             max_module_size_bytes: 10 * 1024 * 1024,
+            max_exec_seconds: 30,
         }
+    }
+}
+
+/// Host-side resource limiter enforcing `WasmConfig::max_memory_bytes`.
+///
+/// Installed on every `Store` via `Store::limiter` so that a guest
+/// `memory.grow` beyond the configured ceiling fails instead of letting the
+/// module grow toward its declared maximum (up to 4GB on wasm32).
+#[cfg(feature = "wasm-sandbox")]
+struct StoreLimiter {
+    max_memory_bytes: u64,
+}
+
+#[cfg(feature = "wasm-sandbox")]
+impl wasmtime::ResourceLimiter for StoreLimiter {
+    fn memory_growing(
+        &mut self,
+        _current: usize,
+        desired: usize,
+        _maximum: Option<usize>,
+    ) -> std::result::Result<bool, anyhow::Error> {
+        Ok((desired as u64) <= self.max_memory_bytes)
     }
 }
 
@@ -99,8 +123,8 @@ impl Default for WasmConfig {
 #[cfg(feature = "wasm-sandbox")]
 struct WasiHostState {
     wasi: wasmtime_wasi::preview1::WasiP1Ctx,
+    limiter: StoreLimiter,
 }
-
 /// WASM sandbox for executing untrusted tool code.
 ///
 /// Provides isolation and resource limits for WASM modules.
@@ -161,7 +185,25 @@ impl WasmSandbox {
     }
 
     /// Load a WASM module from a file.
+    ///
+    /// `name` must be a bare identifier (used as the module-map key, so path
+    /// separators or `..` would let a caller shadow another module) and the
+    /// file `path` must not contain `..` traversal components.
     pub fn load_module_from_file(&self, name: &str, path: &Path) -> Result<(), WasmError> {
+        if !is_safe_module_name(name) {
+            return Err(WasmError::InstantiationFailed(format!(
+                "invalid module name '{name}': must be a bare identifier (no path separators)"
+            )));
+        }
+        if path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err(WasmError::InstantiationFailed(format!(
+                "module path must not contain parent-directory ('..') components: {}",
+                path.display()
+            )));
+        }
         let wasm_bytes = std::fs::read(path)
             .map_err(|e| WasmError::InstantiationFailed(format!("Failed to read file: {}", e)))?;
 
@@ -184,82 +226,122 @@ impl WasmSandbox {
                 .ok_or_else(|| WasmError::ModuleNotFound(module_name.to_string()))?
         };
 
-        // Create a new store with WASI state and fuel for instruction limiting.
-        // store T is our WasiHostState (holds WasiP1Ctx).
-        let wasi = wasmtime_wasi::WasiCtxBuilder::new().build_p1();
-        let mut store = wasmtime::Store::new(&self.engine, WasiHostState { wasi });
+        // WASM execution uses wasmtime's synchronous API, which blocks the
+        // calling thread for the full instruction budget. Run it on a blocking
+        // pool thread and apply a wall-clock timeout so a hostile or looping
+        // module can't pin a tokio worker (and starve other tasks) forever.
+        let engine = self.engine.clone();
+        let linker = self.linker.clone();
+        let config = self.config.clone();
+        let module_name = module_name.to_string();
+        let func_name = func_name.to_string();
+        let max_exec_seconds = config.max_exec_seconds;
+        let timeout = std::time::Duration::from_secs(max_exec_seconds.max(1));
 
-        // Set fuel limit (convert instructions to fuel units, 1 fuel = 1 instruction)
-        store
-            .set_fuel(self.config.max_instructions)
-            .map_err(|e| WasmError::InstantiationFailed(e.to_string()))?;
+        let join = tokio::task::spawn_blocking(move || -> Result<serde_json::Value, WasmError> {
+            let wasi = wasmtime_wasi::WasiCtxBuilder::new().build_p1();
+            let host_state = WasiHostState {
+                wasi,
+                limiter: StoreLimiter {
+                    max_memory_bytes: config.max_memory_bytes,
+                },
+            };
+            let mut store = wasmtime::Store::new(&engine, host_state);
+            // Enforce max_memory_bytes on guest `memory.grow`.
+            store.limiter(|state: &mut WasiHostState| &mut state.limiter);
 
-        // Instantiate the module (synchronous API).
-        let instance = self
-            .linker
-            .instantiate(&mut store, &module)
-            .map_err(|e| WasmError::InstantiationFailed(e.to_string()))?;
+            store
+                .set_fuel(config.max_instructions)
+                .map_err(|e| WasmError::InstantiationFailed(e.to_string()))?;
 
-        // Get the function
-        let func = instance
-            .get_typed_func::<(i32, i32), (i32, i32)>(&mut store, func_name)
-            .map_err(|_| {
-                WasmError::FunctionNotFound(module_name.to_string(), func_name.to_string())
+            let instance = linker
+                .instantiate(&mut store, &module)
+                .map_err(|e| WasmError::InstantiationFailed(e.to_string()))?;
+
+            let func = instance
+                .get_typed_func::<(i32, i32), (i32, i32)>(&mut store, &func_name)
+                .map_err(|_| WasmError::FunctionNotFound(module_name.clone(), func_name.clone()))?;
+
+            let input_bytes = serde_json::to_vec(&input_json).map_err(|e| {
+                WasmError::ExecutionFailed(format!("Failed to serialize input: {}", e))
             })?;
 
-        // Serialize input to JSON bytes
-        let input_bytes = serde_json::to_vec(&input_json)
-            .map_err(|e| WasmError::ExecutionFailed(format!("Failed to serialize input: {}", e)))?;
-
-        // Write input to memory (simplified - assumes module exports memory)
-        let memory = instance.get_memory(&mut store, "memory").ok_or_else(|| {
-            WasmError::ExecutionFailed("Module does not export 'memory'".to_string())
-        })?;
-
-        let input_ptr = 0i32;
-        memory
-            .write(&mut store, input_ptr as usize, &input_bytes)
-            .map_err(|e| {
-                WasmError::ExecutionFailed(format!("Failed to write input to memory: {}", e))
+            let memory = instance.get_memory(&mut store, "memory").ok_or_else(|| {
+                WasmError::ExecutionFailed("Module does not export 'memory'".to_string())
             })?;
 
-        // Execute the function (synchronous API).
-        let result = func
-            .call(&mut store, (input_ptr, input_bytes.len() as i32))
-            .map_err(|e| {
-                // Check for fuel exhaustion (get_fuel returns Result).
-                let fuel_err = store
-                    .get_fuel()
-                    .map(|remaining| remaining == 0)
-                    .unwrap_or(false);
+            let input_ptr = 0i32;
+            memory
+                .write(&mut store, input_ptr as usize, &input_bytes)
+                .map_err(|e| {
+                    WasmError::ExecutionFailed(format!("Failed to write input to memory: {}", e))
+                })?;
 
-                if fuel_err {
-                    WasmError::OutOfResources {
-                        kind: ResourceKind::Instructions,
-                        limit: self.config.max_instructions,
+            let result = func
+                .call(&mut store, (input_ptr, input_bytes.len() as i32))
+                .map_err(|e| {
+                    let fuel_err = store
+                        .get_fuel()
+                        .map(|remaining| remaining == 0)
+                        .unwrap_or(false);
+                    if fuel_err {
+                        WasmError::OutOfResources {
+                            kind: ResourceKind::Instructions,
+                            limit: config.max_instructions,
+                        }
+                    } else {
+                        WasmError::ExecutionFailed(e.to_string())
                     }
-                } else {
-                    WasmError::ExecutionFailed(e.to_string())
-                }
+                })?;
+
+            // The WASM module controls the returned (ptr, len); treat them
+            // as hostile and validate before allocating a host buffer.
+            let output_ptr = result.0 as usize;
+            if result.1 < 0 {
+                return Err(WasmError::ExecutionFailed(format!(
+                    "WASM returned negative output length: {}",
+                    result.1
+                )));
+            }
+            let output_len = result.1 as usize;
+            if output_len as u64 > config.max_memory_bytes {
+                return Err(WasmError::OutOfResources {
+                    kind: ResourceKind::Memory,
+                    limit: config.max_memory_bytes,
+                });
+            }
+            let mem_size = memory.data_size(&store);
+            let end = output_ptr.checked_add(output_len).ok_or_else(|| {
+                WasmError::ExecutionFailed("WASM output pointer+length overflow".into())
+            })?;
+            if output_ptr >= mem_size || end > mem_size {
+                return Err(WasmError::ExecutionFailed(format!(
+                    "WASM output {output_ptr}..{end} outside guest memory size {mem_size}"
+                )));
+            }
+            let mut output_bytes = vec![0u8; output_len];
+            memory
+                .read(&store, output_ptr, &mut output_bytes)
+                .map_err(|e| {
+                    WasmError::ExecutionFailed(format!("Failed to read output from memory: {}", e))
+                })?;
+
+            let output: serde_json::Value = serde_json::from_slice(&output_bytes).map_err(|e| {
+                WasmError::ExecutionFailed(format!("Failed to deserialize output: {}", e))
             })?;
 
-        // Read output from memory.
-        // `Memory::read` fills a caller-provided buffer instead of returning a
-        // new Vec.
-        let output_len = result.1 as usize;
-        let mut output_bytes = vec![0u8; output_len];
-        memory
-            .read(&store, result.0 as usize, &mut output_bytes)
-            .map_err(|e| {
-                WasmError::ExecutionFailed(format!("Failed to read output from memory: {}", e))
-            })?;
+            Ok(output)
+        });
 
-        // Deserialize output
-        let output: serde_json::Value = serde_json::from_slice(&output_bytes).map_err(|e| {
-            WasmError::ExecutionFailed(format!("Failed to deserialize output: {}", e))
-        })?;
-
-        Ok(output)
+        match tokio::time::timeout(timeout, join).await {
+            Ok(Ok(value)) => value,
+            Ok(Err(join_err)) => Err(WasmError::ExecutionFailed(format!(
+                "WASM execution task failed: {join_err}"
+            ))),
+            Err(_) => Err(WasmError::ExecutionFailed(format!(
+                "WASM execution timed out after {max_exec_seconds}s"
+            ))),
+        }
     }
 
     /// List all loaded module names.
@@ -274,6 +356,19 @@ impl WasmSandbox {
         let mut modules = self.modules.write();
         modules.remove(name).is_some()
     }
+}
+
+/// Check that a module name is a bare identifier (no path separators or `..`).
+///
+/// The name is used as the key in the module map, so allowing `/`, `\`, or
+/// `..` would let a caller shadow or collide with another loaded module.
+#[cfg(feature = "wasm-sandbox")]
+fn is_safe_module_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.contains('/')
+        && !name.contains('\\')
+        && !name.contains("..")
+        && !name.contains('\0')
 }
 
 #[cfg(feature = "wasm-sandbox")]

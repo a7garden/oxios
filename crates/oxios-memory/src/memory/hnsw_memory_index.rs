@@ -128,11 +128,21 @@ impl HnswMemoryIndex {
     }
 
     /// Add an entry to the HNSW index.
+    ///
+    /// `usearch` is configured with `multi: false`, so re-adding an existing
+    /// key has undefined behaviour (a stale vector may persist or the new one
+    /// may be silently dropped). Treat this as an upsert: drop any existing
+    /// vector for the key before inserting the (re-normalized) new one. The
+    /// `remove` is best-effort — a missing key is not an error here.
     pub fn add_entry(&self, id: &str, vector: &[f32]) -> Result<()> {
         let key = self.get_or_create_key(id);
         let mut normalized = vector.to_vec();
         l2_normalize_f32(&mut normalized);
-        self.index.write().add(key, &normalized)?;
+        let idx = self.index.write();
+        if idx.contains(key) {
+            let _ = idx.remove(key);
+        }
+        idx.add(key, &normalized)?;
         Ok(())
     }
 

@@ -44,7 +44,11 @@ impl CalendarIndex {
         Ok(Self { entries, path })
     }
 
-    /// Persist the index to disk.
+    /// Persist the index to disk atomically (F17).
+    ///
+    /// Writes to a sibling temporary file then renames it over the target,
+    /// so a crash mid-write can never leave a partially-written `index.json`
+    /// — readers always see either the previous or the new complete file.
     pub fn save(&self) -> anyhow::Result<()> {
         let file = IndexFile {
             entries: self.entries.clone(),
@@ -54,7 +58,9 @@ impl CalendarIndex {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(&self.path, data)?;
+        let tmp = self.path.with_extension("json.tmp");
+        std::fs::write(&tmp, &data)?;
+        std::fs::rename(&tmp, &self.path)?;
         Ok(())
     }
 

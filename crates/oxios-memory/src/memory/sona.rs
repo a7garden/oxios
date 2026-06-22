@@ -278,8 +278,12 @@ impl SonaEngine {
 
             // Combine strategies into a distilled pattern
             let combined = strategy_parts.join("; ");
-            let strategy = if combined.len() > 500 {
-                format!("{}...", &combined[..500])
+            let strategy = if combined.chars().count() > 500 {
+                // Truncate by chars, not bytes. `&combined[..500]` panics when
+                // byte index 500 falls inside a multi-byte UTF-8 sequence
+                // (Korean, emoji) — common for this Korean-first codebase.
+                let truncated: String = combined.chars().take(500).collect();
+                format!("{truncated}...")
             } else {
                 combined
             };

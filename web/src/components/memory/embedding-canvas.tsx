@@ -386,15 +386,19 @@ export function EmbeddingCanvas({
 
   // Drawing loop. We schedule a single rAF per state change.
   const drawScheduledRef = useRef(false)
+  // F8: store the latest draw in a ref so requestDraw always invokes the
+  // current closure. Previously requestDraw captured `draw` directly but did
+  // not list it (or size) in its deps, so after a resize the rAF callback
+  // kept calling the stale draw and rendered at the old dimensions.
+  const drawRef = useRef<() => void>(() => {})
   const requestDraw = useCallback(() => {
     if (drawScheduledRef.current) return
     drawScheduledRef.current = true
     requestAnimationFrame(() => {
       drawScheduledRef.current = false
-      draw()
+      drawRef.current()
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, hoverIdRef.current])
+  }, [])
 
   // Track the hover id in a ref so the next draw picks it up.
   useEffect(() => {
@@ -484,6 +488,9 @@ export function EmbeddingCanvas({
     }
     ctx.globalAlpha = 1
   }, [selectedId, size.width, size.height])
+  // F8: keep drawRef in sync every render so requestDraw always calls the
+  // latest draw (picks up new size/selectedId without stale closures).
+  drawRef.current = draw
 
   // Mouse → node hit-test. We re-use the same screen↔world transform
   // the draw loop uses (inverted) so accuracy stays exact.

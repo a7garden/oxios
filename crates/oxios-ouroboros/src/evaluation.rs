@@ -81,45 +81,29 @@ impl MechanicalEvalResult {
                         || output_lower.contains("exit status 0");
                     (has_zero, format!("exit_code_0={has_zero}"))
                 } else {
-                    // Extract key tokens from the criterion (words > 3 chars)
-                    // and check if most of them appear in the output
-                    let key_tokens: Vec<&str> = c_lower
-                        .split_whitespace()
-                        .filter(|w| {
-                            w.len() > 3
-                                && !matches!(
-                                    *w,
-                                    "must"
-                                        | "should"
-                                        | "shall"
-                                        | "where"
-                                        | "which"
-                                        | "that"
-                                        | "with"
-                                        | "from"
-                                        | "this"
-                                )
-                        })
-                        .collect();
-
-                    if key_tokens.is_empty() {
+                    // Extract language-agnostic key tokens via the shared
+                    // helper (chars().count(), not byte length, so CJK
+                    // text isn't silently dropped) and check if most of
+                    // them appear in the output.
+                    let tokens = key_tokens(criterion);
+                    if tokens.is_empty() {
                         // Fallback to full substring match
                         let contains = output_lower.contains(&c_lower);
                         (contains, format!("substring_match={contains}"))
                     } else {
                         // Check how many key tokens appear in the output
-                        let matched = key_tokens
+                        let matched = tokens
                             .iter()
-                            .filter(|t| output_lower.contains(*t))
+                            .filter(|t| output_lower.contains(t.as_str()))
                             .count();
-                        let ratio = matched as f64 / key_tokens.len() as f64;
+                        let ratio = matched as f64 / tokens.len() as f64;
                         let passed = ratio >= 0.5; // At least half the key tokens match
                         (
                             passed,
                             format!(
                                 "keyword_match={}/{} ({:.0}%)",
                                 matched,
-                                key_tokens.len(),
+                                tokens.len(),
                                 ratio * 100.0
                             ),
                         )
@@ -138,4 +122,40 @@ impl MechanicalEvalResult {
             all_passed,
         }
     }
+}
+
+/// Common English stop-words excluded from acceptance-criterion key tokens.
+const STOPWORDS: &[&str] = &[
+    "the", "must", "should", "shall", "where", "which", "that", "with", "from", "this",
+];
+
+/// Extract meaningful key tokens from an acceptance criterion.
+///
+/// Lowercases the criterion and splits on whitespace, keeping tokens that
+/// are either ASCII words longer than 3 characters or contain any
+/// non-ASCII characters. The non-ASCII branch is what makes this
+/// language-agnostic: `str::len()` counts UTF-8 bytes, so a single CJK
+/// glyph (3 bytes) was always rejected by the old `w.len() > 3` filter —
+/// here it is kept because one CJK character is a meaningful token.
+///
+/// Shared by [`MechanicalEvalResult::evaluate`] and the degraded
+/// evaluator ([`crate::degraded::degraded_evaluation`]) so both paths
+/// agree on tokenization and stop-words.
+pub fn key_tokens(criterion: &str) -> Vec<String> {
+    criterion
+        .to_lowercase()
+        .split_whitespace()
+        .filter(|w| {
+            let non_ascii = w.bytes().any(|b| b >= 0x80);
+            let meaningful = if non_ascii {
+                // Non-ASCII (e.g. CJK) — single glyphs are meaningful.
+                w.chars().count() >= 1
+            } else {
+                // ASCII — require > 3 chars to drop noise (a, the, is, of).
+                w.chars().count() > 3
+            };
+            meaningful && !STOPWORDS.contains(w)
+        })
+        .map(str::to_string)
+        .collect()
 }

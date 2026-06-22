@@ -131,10 +131,50 @@ struct LegacyEntry {
 /// Returns `Some(key)` if the provider entry exists in the legacy
 /// `{"type":"api_key","key":"..."}` format.
 fn try_load_legacy_key(provider: &str) -> Option<String> {
-    let raw = std::fs::read_to_string(auth_json_path().ok()?).ok()?;
-    let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&raw).ok()?;
+    // Returns `None` for the benign cases (no auth.json, provider absent).
+    // Read/parse failures are logged at warn — a corrupt auth.json may signal
+    // tampering and should not be silently indistinguishable from "absent".
+    let path = match auth_json_path() {
+        Ok(p) => p,
+        Err(_) => return None,
+    };
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => {
+            tracing::warn!(
+                provider = %provider,
+                path = %path.display(),
+                error = %e,
+                "auth.json exists but could not be read; skipping legacy key",
+            );
+            return None;
+        }
+    };
+    let map: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&raw) {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::warn!(
+                provider = %provider,
+                path = %path.display(),
+                error = %e,
+                "auth.json is not valid JSON; possible corruption or tampering",
+            );
+            return None;
+        }
+    };
     let entry = map.get(provider)?;
-    let legacy: LegacyEntry = serde_json::from_value(entry.clone()).ok()?;
+    let legacy: LegacyEntry = match serde_json::from_value(entry.clone()) {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::warn!(
+                provider = %provider,
+                error = %e,
+                "auth.json entry for provider is not the legacy format; skipping",
+            );
+            return None;
+        }
+    };
     if legacy.key.is_empty() {
         None
     } else {

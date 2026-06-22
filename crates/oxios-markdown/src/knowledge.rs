@@ -154,10 +154,15 @@ impl KnowledgeBase {
     /// Writes the `.md` file via VirtualFs, updates the backlink index,
     /// and notifies registered `on_file_change` callbacks.
     pub fn note_write(&self, path: &str, content: &str) -> Result<()> {
-        let fs = self.fs.read();
-        let is_new = fs.read_path(path).is_err();
-
-        fs.write_path(path, content)?;
+        // Hold the write lock across the read-check + write so concurrent
+        // writers cannot interleave their write_all calls (F1). Drop the
+        // lock before notifying callbacks to avoid reentrancy deadlocks.
+        let is_new = {
+            let fs = self.fs.write();
+            let is_new = fs.read_path(path).is_err();
+            fs.write_path(path, content)?;
+            is_new
+        };
 
         {
             let mut backlinks = self.backlinks.write();
@@ -246,11 +251,13 @@ impl KnowledgeBase {
 
         Ok(result)
     }
-
     /// Delete the note at `path`, removing it from the filesystem and
     /// dropping any recorded backlinks for that file.
     pub fn note_delete(&self, path: &str) -> Result<()> {
-        self.fs.read().delete_path(path)?;
+        {
+            let fs = self.fs.write();
+            fs.delete_path(path)?;
+        }
         self.backlinks.write().remove_file(path);
         self.notify_change(path, FileChange::Deleted(path.to_string()));
         Ok(())
@@ -263,7 +270,10 @@ impl KnowledgeBase {
     /// callbacks. This prevents an infinite loop where restore → write →
     /// callback → git commit → ... repeats.
     pub fn note_restore(&self, path: &str, content: &str) -> Result<()> {
-        self.fs.read().write_path(path, content)?;
+        {
+            let fs = self.fs.write();
+            fs.write_path(path, content)?;
+        }
         let mut backlinks = self.backlinks.write();
         backlinks.remove_file(path);
         backlinks.index_file(path, content);
@@ -273,10 +283,19 @@ impl KnowledgeBase {
 
     /// Move/rename a note.
     pub fn note_move(&self, old_path: &str, new_path: &str) -> Result<()> {
-        self.fs.read().rename_path(old_path, new_path)?;
-        self.backlinks.write().remove_file(old_path);
-        if let Some(content) = self.note_read(new_path)? {
-            self.backlinks.write().index_file(new_path, &content);
+        // Rename under the write lock, then read the destination's content
+        // before dropping the guard (note_read would re-acquire the lock).
+        let new_content = {
+            let fs = self.fs.write();
+            fs.rename_path(old_path, new_path)?;
+            fs.read_path(new_path).ok()
+        };
+        {
+            let mut backlinks = self.backlinks.write();
+            backlinks.remove_file(old_path);
+            if let Some(content) = new_content {
+                backlinks.index_file(new_path, &content);
+            }
         }
         self.notify_change(
             old_path,
@@ -448,7 +467,7 @@ impl KnowledgeBase {
 
     /// Add a timestamped record to today's journal entry.
     pub fn journal_add_record(&self, record: &str) -> Result<()> {
-        let fs = self.fs.read();
+        let fs = self.fs.write();
         let tz = chrono::Local::now().offset().to_owned();
         journal_add_record(&fs, record, tz)?;
         Ok(())
@@ -456,7 +475,7 @@ impl KnowledgeBase {
 
     /// Add an emoji to today's journal header.
     pub fn journal_add_emoji(&self, emoji: &str) -> Result<()> {
-        let fs = self.fs.read();
+        let fs = self.fs.write();
         let tz = chrono::Local::now().offset().to_owned();
         journal_add_emoji(&fs, emoji, tz)?;
         Ok(())
@@ -485,7 +504,7 @@ impl KnowledgeBase {
 
     /// Write habit data for a year.
     pub fn habits_write(&self, year: i32, habits: &Habits) -> Result<()> {
-        let fs = self.fs.read();
+        let fs = self.fs.write();
         write_habits(&fs, year, habits)?;
         Ok(())
     }
@@ -570,16 +589,23 @@ impl KnowledgeBase {
 
     /// Run nightly cleanup.
     pub fn run_nightly_cleanup(&self) -> Result<crate::worker::NightlyReport> {
-        let fs = self.fs.read();
+        // Read config before acquiring the write lock — config() takes
+        // a read lock and would otherwise deadlock against our write guard.
         let config = self.config()?;
+        let fs = self.fs.write();
         Ok(remove_completed_items(&fs, &config)?)
     }
 
     /// Move due scheduled tasks to Chat.
     pub fn run_scheduled_tasks(&self) -> Result<Vec<String>> {
-        let fs = self.fs.read();
+        // Read config first, take the write lock only for the worker pass,
+        // then release it before set_config() (which calls note_write and
+        // would re-acquire the lock).
         let mut config = self.config()?;
-        let moved = move_due_tasks(&fs, &mut config)?;
+        let moved = {
+            let fs = self.fs.write();
+            move_due_tasks(&fs, &mut config)?
+        };
         if !moved.is_empty() {
             self.set_config(&config)?;
         }

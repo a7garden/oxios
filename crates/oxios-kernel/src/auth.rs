@@ -46,6 +46,13 @@ pub struct AuthManager {
     valid_hashes: HashSet<String>,
     /// Path to persist keys (optional for in-memory-only mode).
     path: Option<std::path::PathBuf>,
+    /// When the key file was last flushed to disk (debounce for `last_used`).
+    ///
+    /// `last_used` is non-security-critical metadata; rewriting the whole key
+    /// file on every validation turns each authenticated request into a
+    /// serialised disk write under the manager Mutex. We update `last_used` in
+    /// memory on every validate() and only flush at most once per minute.
+    last_flush: Option<std::time::Instant>,
 }
 
 impl AuthManager {
@@ -55,9 +62,9 @@ impl AuthManager {
             entries: HashMap::new(),
             valid_hashes: HashSet::new(),
             path: None,
+            last_flush: None,
         }
     }
-
     /// Create an AuthManager that persists keys to a file.
     pub fn with_persistence(path: impl Into<std::path::PathBuf>) -> Result<Self> {
         let path = path.into();
@@ -65,6 +72,7 @@ impl AuthManager {
             entries: HashMap::new(),
             valid_hashes: HashSet::new(),
             path: Some(path.clone()),
+            last_flush: None,
         };
         if path.exists() {
             mgr.load_from_file(&path)?;
@@ -100,9 +108,11 @@ impl AuthManager {
                     .collect(),
             };
             let content = serde_json::to_string_pretty(&key_file)?;
-            // Write atomically via temp file
+            // Write atomically via temp file with owner-only permissions (0600).
+            // std::fs::write would create the file under the process umask
+            // (typically 022 → world-readable), exposing key hashes.
             let tmp_path = path.with_extension("tmp");
-            std::fs::write(&tmp_path, &content)?;
+            write_secret_file(&tmp_path, &content)?;
             std::fs::rename(&tmp_path, path)?;
         }
         Ok(())
@@ -128,13 +138,22 @@ impl AuthManager {
     }
 
     /// Validate a bearer token.
+    ///
+    /// `last_used` is refreshed in memory on every call, but the key file is
+    /// only rewritten at most once per minute — turning each authenticated
+    /// request from a serialised O(n) disk write into a cheap HashMap lookup.
     pub fn validate(&mut self, token: &str) -> bool {
         let hash = Self::hash_key(token);
         if self.valid_hashes.contains(&hash) {
-            // Update last_used
             if let Some(meta) = self.entries.get_mut(&hash) {
                 meta.last_used = Some(chrono::Utc::now().to_rfc3339());
-                let _ = self.save_to_file();
+                let should_flush = self
+                    .last_flush
+                    .map(|t| t.elapsed() >= std::time::Duration::from_secs(60))
+                    .unwrap_or(true);
+                if should_flush && self.save_to_file().is_ok() {
+                    self.last_flush = Some(std::time::Instant::now());
+                }
             }
             true
         } else {
@@ -173,6 +192,12 @@ impl AuthManager {
     }
 
     /// Hash an API key using SHA-256.
+    ///
+    /// Keys are 256-bit CSPRNG-generated (`random_key`) and the full key is
+    /// returned to the caller exactly once at generation time, so a single
+    /// unsalted SHA-256 is sufficient to protect the at-rest store: an offline
+    /// brute-force of a 32-byte random secret is infeasible. This is not a
+    /// password hash (low-entropy) scheme — do not reuse it for user passwords.
     fn hash_key(key: &str) -> String {
         let mut hasher = Sha256::new();
         hasher.update(key.as_bytes());
@@ -184,6 +209,31 @@ impl AuthManager {
         let mut bytes = [0u8; 32];
         getrandom::getrandom(&mut bytes).expect("failed to generate random bytes");
         bytes
+    }
+}
+
+/// Write a secret-bearing file with owner-only permissions (0600 on Unix).
+///
+/// Used for the persisted API key store so that the on-disk hash file is not
+/// world-readable under a typical 022 umask.
+fn write_secret_file(path: &std::path::Path, content: &str) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)?;
+        f.write_all(content.as_bytes())?;
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, content)?;
+        Ok(())
     }
 }
 

@@ -79,9 +79,13 @@ pub struct KnowledgeLens {
     memory: Arc<MemoryManager>,
     /// Tracks which files were written by agents.
     agent_writes: Arc<RwLock<HashSet<String>>>,
-    /// Callback handle for file-change events.
+    /// Holds the file-change channel sender. The field itself is never read;
+    /// its sole purpose is to keep the sender alive so the background
+    /// file-watcher task draining the receiver does not exit early. Drop this
+    /// and index sync silently stops. Named with a leading underscore to
+    /// signal "intentionally unused" to maintainers.
     #[allow(dead_code)]
-    callback_handle: Option<mpsc::Sender<oxios_markdown::knowledge::FileChange>>,
+    _callback_keepalive: Option<mpsc::Sender<oxios_markdown::knowledge::FileChange>>,
 }
 
 impl std::fmt::Debug for KnowledgeLens {
@@ -111,7 +115,7 @@ impl KnowledgeLens {
             kb,
             memory,
             agent_writes: Arc::new(RwLock::new(HashSet::new())),
-            callback_handle: Some(tx_for_cb),
+            _callback_keepalive: Some(tx_for_cb),
         };
 
         // Spawn background task to process file-change events
@@ -258,7 +262,6 @@ impl KnowledgeLens {
              - Only answer based on the context below. If the context doesn't contain\n\
                the answer, say \"I couldn't find relevant notes on that topic.\"\n\
              - Cite which notes you're referencing by name.\n\
-             - Be concise — the user is in an editor, not a chat room.\n\
              - Be concise — the user is in an editor, not a chat room.\n\n\
              ## Available Notes\n\n{}",
             context_parts.join("\n\n")

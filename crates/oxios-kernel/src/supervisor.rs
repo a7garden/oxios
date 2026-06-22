@@ -44,7 +44,7 @@ struct AgentHandle {
     /// Flag set on `kill()` to cooperatively signal cancellation.
     cancelled: Arc<AtomicBool>,
     /// The tokio task running the agent execution. Aborted on `kill()`.
-    task: JoinHandle<Result<ExecutionResult>>,
+    task: JoinHandle<()>,
 }
 
 /// Pool of live `Agent` instances, keyed by AgentId.
@@ -300,16 +300,17 @@ impl Supervisor for BasicSupervisor {
         let cancelled = Arc::new(AtomicBool::new(false));
         let runtime = Arc::clone(&self.runtime);
         let seed = seed.clone();
-        let cancelled_clone = cancelled.clone();
 
         // Share the session context so RecallTiming persists across Seeds.
         // Uses tokio::sync::RwLock so the guard is Send-safe across .await.
         let session_ctx = self.session_context.clone();
 
-        let handle: JoinHandle<Result<ExecutionResult>> = tokio::spawn(async move {
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel::<Result<ExecutionResult>>();
+        let cancelled_done = cancelled.clone();
+        let handle: JoinHandle<()> = tokio::spawn(async move {
             // Check for cancellation before starting.
-            if cancelled_clone.load(Ordering::Relaxed) {
-                return Ok(ExecutionResult {
+            let result = if cancelled_done.load(Ordering::Relaxed) {
+                Ok(ExecutionResult {
                     output: "Agent cancelled before execution".into(),
                     steps_completed: 0,
                     success: false,
@@ -317,13 +318,19 @@ impl Supervisor for BasicSupervisor {
                     tokens_input: 0,
                     tokens_output: 0,
                     model_id: String::new(),
-                });
-            }
-            let mut ctx = session_ctx.write().await;
-            runtime.execute(id, &seed, &mut ctx).await
+                })
+            } else {
+                let mut ctx = session_ctx.write().await;
+                runtime.execute(id, &seed, &mut ctx).await
+            };
+            // Receiver gone (run_with_seed returned early) → ignore error.
+            let _ = done_tx.send(result);
         });
 
-        // Store the handle so kill() can abort the task.
+        // Store the handle so kill() can abort the task. The handle STAYS in
+        // the map during await — the previous impl removed it before awaiting,
+        // so kill() could never find a live handle to abort (kill was a no-op
+        // for running agents).
         {
             let mut handles = self.handles.write();
             handles.insert(
@@ -335,34 +342,31 @@ impl Supervisor for BasicSupervisor {
             );
         }
 
-        // Await the spawned task.
-        let result = {
-            let agent_handle = {
+        // Await completion via the oneshot channel. If kill() aborts the task
+        // (or it panics), done_tx is dropped and this returns Err — treat as
+        // cancellation.
+        let result = match done_rx.await {
+            Ok(res) => res,
+            Err(_) => {
                 let mut handles = self.handles.write();
-                handles.remove(&id)
-            };
-            // Guard is dropped above, safe to await.
-
-            match agent_handle {
-                Some(ah) => match ah.task.await {
-                    Ok(res) => res,
-                    Err(join_err) => {
-                        // Task was aborted (e.g. kill()) or panicked.
-                        tracing::warn!(agent_id = %id, error = %join_err, "Agent task join error");
-                        Ok(ExecutionResult {
-                            output: format!("Agent task aborted: {join_err}"),
-                            steps_completed: 0,
-                            success: false,
-                            tool_calls: vec![],
-                            tokens_input: 0,
-                            tokens_output: 0,
-                            model_id: String::new(),
-                        })
-                    }
-                },
-                None => anyhow::bail!("Agent {id} handle disappeared"),
+                handles.remove(&id);
+                Ok(ExecutionResult {
+                    output: "Agent task aborted".into(),
+                    steps_completed: 0,
+                    success: false,
+                    tool_calls: vec![],
+                    tokens_input: 0,
+                    tokens_output: 0,
+                    model_id: String::new(),
+                })
             }
         };
+
+        // Natural completion — remove the handle.
+        {
+            let mut handles = self.handles.write();
+            handles.remove(&id);
+        }
 
         match result {
             Ok(result) => {

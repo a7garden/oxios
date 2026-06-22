@@ -163,6 +163,18 @@ impl CounterHandle {
             c.value.fetch_add(1, Ordering::Relaxed);
         }
     }
+
+    /// Increment the counter by `n`.
+    pub fn inc_by(&self, n: u64) {
+        if n == 0 {
+            return;
+        }
+        let r = registry();
+        let counters = r.counters.read();
+        if let Some(c) = counters.get(self.id) {
+            c.value.fetch_add(n, Ordering::Relaxed);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -274,6 +286,10 @@ pub struct MetricsHandles {
     /// LLM call metrics.
     pub llm_calls: CounterHandle,
     pub llm_errors: CounterHandle,
+    /// Audit trail events dropped because the bus subscriber lagged.
+    /// Non-zero indicates the audit pipeline can't keep up with the
+    /// event rate; investigate bus capacity or high-frequency publishers.
+    pub audit_lagged_events: CounterHandle,
 }
 
 impl MetricsHandles {
@@ -338,6 +354,11 @@ pub fn get_metrics() -> &'static MetricsHandles {
             ),
             llm_calls: r.counter("oxios_llm_calls_total", "LLM API calls", &[]),
             llm_errors: r.counter("oxios_llm_errors_total", "LLM API errors", &[]),
+            audit_lagged_events: r.counter(
+                "oxios_audit_lagged_events_total",
+                "Audit events dropped due to broadcast subscriber lag",
+                &[],
+            ),
         }
     })
 }
@@ -416,6 +437,13 @@ pub fn register_builtin_metrics() {
         vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0],
     );
     r.counter("oxios_llm_errors_total", "LLM API errors", &[]);
+    // Audit pipeline metric (state-area F4): events silently dropped when
+    // the audit trail subscriber falls behind the broadcast bus.
+    r.counter(
+        "oxios_audit_lagged_events_total",
+        "Audit events dropped due to broadcast subscriber lag",
+        &[],
+    );
 
     // Tool metrics
     r.counter("oxios_tool_calls_total", "Tool calls", &[]);

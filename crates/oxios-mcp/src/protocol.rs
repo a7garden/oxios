@@ -79,7 +79,14 @@ impl McpServer {
 pub struct McpRequest {
     /// JSON-RPC version (always "2.0")
     pub jsonrpc: String,
-    /// Request ID for correlation
+    /// Request ID for correlation. `Null` for JSON-RPC notifications
+    /// (no response expected); the field is omitted from the wire format
+    /// when null so notifications are serialized without an `id` member,
+    /// per the JSON-RPC 2.0 spec.
+    #[serde(
+        skip_serializing_if = "serde_json::Value::is_null",
+        default = "serde_json::Value::default"
+    )]
     pub id: serde_json::Value,
     /// Method name to invoke
     pub method: String,
@@ -99,6 +106,19 @@ impl McpRequest {
         Self {
             jsonrpc: "2.0".to_string(),
             id: serde_json::json!(id),
+            method: method.to_string(),
+            params: None,
+        }
+    }
+
+    /// Create a JSON-RPC notification (no ID, no response expected).
+    ///
+    /// Per the JSON-RPC 2.0 spec, a notification is a request without an
+    /// `id` member. The server must not reply.
+    pub fn notification(method: &str) -> Self {
+        Self {
+            jsonrpc: "2.0".to_string(),
+            id: serde_json::Value::Null,
             method: method.to_string(),
             params: None,
         }

@@ -13,7 +13,18 @@
 //! ```
 
 use std::sync::atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+/// Current wall-clock time in seconds since the UNIX epoch. Stored in the
+/// breaker's `AtomicU64` because `Instant` cannot be encoded as u64. The
+/// previous implementation stored `Instant::now().elapsed().as_secs()`, which
+/// is always 0 — so once Open the breaker never recovered.
+fn now_epoch_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
 
 /// Circuit breaker states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,8 +91,8 @@ impl A2ACircuitBreaker {
             CircuitState::Open => {
                 // Check if reset timeout has passed
                 let last_failure = self.last_failure_time.load(Ordering::Relaxed);
-                let now = Instant::now().elapsed().as_secs();
-                if now.saturating_sub(last_failure) > self.reset_timeout.as_secs() {
+                let elapsed = now_epoch_secs().saturating_sub(last_failure);
+                if elapsed > self.reset_timeout.as_secs() {
                     // Transition to half-open
                     self.state
                         .store(CircuitState::HalfOpen as u8, Ordering::Relaxed);
@@ -123,7 +134,7 @@ impl A2ACircuitBreaker {
     pub fn record_failure(&self) {
         let failures = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
         self.last_failure_time
-            .store(Instant::now().elapsed().as_secs(), Ordering::Relaxed);
+            .store(now_epoch_secs(), Ordering::Relaxed);
 
         if failures >= self.threshold && self.state() != CircuitState::Open {
             self.state

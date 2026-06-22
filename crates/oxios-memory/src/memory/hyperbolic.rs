@@ -137,7 +137,10 @@ pub fn hyperbolic_distance(a: &[f32], b: &[f32], curvature: f32) -> f32 {
         return 0.0;
     }
 
-    (1.0 / c.sqrt()) * arg.ln().max(0.0).sqrt()
+    // arcosh(arg) = ln(arg + sqrt(arg² − 1)). The previous formula computed
+    // sqrt(ln(arg)), which is wrong (e.g. arg=2 → 0.833 instead of arcosh(2)
+    // ≈ 1.317), corrupting depth/hierarchy estimates in Poincaré embeddings.
+    (1.0 / c.sqrt()) * (arg + (arg * arg - 1.0).sqrt()).ln()
 }
 
 /// Möbius addition: the hyperbolic analog of vector addition.

@@ -322,21 +322,33 @@ impl Channel for TelegramChannel {
                                         continue;
                                     }
 
-                                    // Permission check
-                                    if let Some(uid) = user_id
-                                        && !this.is_user_allowed(uid) {
-                                            tracing::warn!(user_id = uid, "Unauthorized Telegram user");
-                                            if let Some(cid) = chat_id {
-                                                let _ = this
-                                                    .send_text(
-                                                        cid,
-                                                        "Unauthorized. Your user ID is not in the allowed list.",
-                                                        None,
-                                                    )
-                                                    .await;
-                                            }
-                                            continue;
+                                    // Permission check. When an allowlist is
+                                    // configured (non-empty), a message with no
+                                    // recognizable `from` user_id (e.g. some
+                                    // channel posts) is rejected outright —
+                                    // treating it as "unknown user" would let it
+                                    // bypass the whitelist.
+                                    let user_unauthorized = match user_id {
+                                        Some(uid) => !this.is_user_allowed(uid),
+                                        None => !this.allowed_users.is_empty(),
+                                    };
+                                    if user_unauthorized {
+                                        tracing::warn!(
+                                            user_id = ?user_id,
+                                            "Unauthorized Telegram user"
+                                        );
+                                        if let Some(cid) = chat_id {
+                                            let _ = this
+                                                .send_text(
+                                                    cid,
+                                                    "Unauthorized. Your user ID is not in the allowed list.",
+                                                    None,
+                                                )
+                                                .await;
                                         }
+                                        continue;
+                                    }
+
 
                                     let Some(cid) = chat_id else { continue };
                                     let user_id_str = user_id
@@ -350,7 +362,7 @@ impl Channel for TelegramChannel {
                                         let _ = this
                                             .send_text(
                                                 cid,
-                                                &format!("🔄 새 세션을 시작합니다.\\n`{}`", &new_session_id[..8]),
+                                                &format!("🔄 새 세션을 시작합니다.\\n`{}`", new_session_id.chars().take(8).collect::<String>()),
                                                 Some(message_id),
                                             )
                                             .await;
@@ -363,7 +375,7 @@ impl Channel for TelegramChannel {
                                         if let Some(session) = sessions.get(&cid) {
                                             let info = format!(
                                                 "📋 현재 세션\\n• ID: `{}`\\n• 메시지: {}개\\n• 시작: {}\\n• 마지막 활동: {}",
-                                                &session.session_id[..8],
+                                                session.session_id.chars().take(8).collect::<String>(),
                                                 session.message_count,
                                                 session.created_at.format("%m/%d %H:%M"),
                                                 session.last_active_at.format("%m/%d %H:%M"),

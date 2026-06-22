@@ -88,10 +88,16 @@ pub fn search(
     let fused = reciprocal_rank_fusion(tier_results, 60.0);
 
     // ── Load memory entries by rowid ──
+    // Apply the optional memory_type filter BEFORE truncating to `limit`: the
+    // previous code did `.take(limit)` first, then dropped non-matching rows, so
+    // a type filter could return far fewer than `limit` (even zero) when the
+    // top-ranked rows were all of a different type.
     let mut results = Vec::new();
-    for (rowid, score) in fused.into_iter().take(limit) {
+    for (rowid, score) in fused {
+        if results.len() >= limit {
+            break;
+        }
         if let Some(entry) = load_memory_by_rowid(db, rowid)? {
-            // Apply type filter if specified
             if let Some(ref mt) = memory_type
                 && entry.memory_type != *mt
             {

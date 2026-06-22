@@ -1,4 +1,4 @@
-//! Kernel facade — 13 domain Facades composing the System Call API.
+//! Kernel facade — domain Facades composing the System Call API.
 
 pub mod a2a_api;
 pub mod agent_api;
@@ -48,7 +48,7 @@ use crate::readiness::ReadinessGate;
 use serde::Serialize;
 use std::sync::Arc;
 
-/// Oxios kernel System Call API — composed of 13 domain Facades.
+/// Oxios kernel System Call API — composed of domain Facades.
 ///
 /// Each Facade groups related system calls:
 /// - [`StateApi`]     — data persistence, sessions
@@ -171,6 +171,12 @@ impl KernelHandle {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Save data and commit to git (State + Infra).
+    ///
+    /// The state save is the source of truth and is fully propagated. The git
+    /// commit is best-effort observability: if it fails (full disk, lock
+    /// contention, missing committer identity) we log a warning rather than
+    /// failing the save — the data is already persisted on disk and failing
+    /// here would mislead callers into thinking the save itself failed.
     pub async fn save_and_commit<T: Serialize>(
         &self,
         category: &str,
@@ -181,12 +187,19 @@ impl KernelHandle {
         let git = self.infra.git();
         if git.is_enabled() {
             let rel_path = format!("{category}/{name}.json");
-            let _ = git.commit_file(&rel_path, &format!("save {category}/{name}"));
+            if let Err(e) = git.commit_file(&rel_path, &format!("save {category}/{name}")) {
+                tracing::warn!(
+                    error = %e, rel_path = %rel_path,
+                    "save_and_commit: git commit failed (data was still saved)"
+                );
+            }
         }
         Ok(())
     }
 
     /// Save markdown and commit to git (State + Infra).
+    ///
+    /// See [`Self::save_and_commit`] for the git-failure policy.
     pub async fn save_markdown_and_commit(
         &self,
         category: &str,
@@ -197,19 +210,31 @@ impl KernelHandle {
         let git = self.infra.git();
         if git.is_enabled() {
             let rel_path = format!("{category}/{name}.md");
-            let _ = git.commit_file(&rel_path, &format!("save {category}/{name}"));
+            if let Err(e) = git.commit_file(&rel_path, &format!("save {category}/{name}")) {
+                tracing::warn!(
+                    error = %e, rel_path = %rel_path,
+                    "save_markdown_and_commit: git commit failed (data was still saved)"
+                );
+            }
         }
         Ok(())
     }
 
     /// Delete a file and commit the removal to git (State + Infra).
+    ///
+    /// See [`Self::save_and_commit`] for the git-failure policy.
     pub async fn delete_and_commit(&self, category: &str, name: &str) -> anyhow::Result<bool> {
         let deleted = self.state.delete(category, name).await?;
         if deleted {
             let git = self.infra.git();
             if git.is_enabled() {
                 let rel_path = format!("{category}/{name}.json");
-                let _ = git.remove_file(&rel_path, &format!("delete {category}/{name}"));
+                if let Err(e) = git.remove_file(&rel_path, &format!("delete {category}/{name}")) {
+                    tracing::warn!(
+                        error = %e, rel_path = %rel_path,
+                        "delete_and_commit: git remove failed (file was still deleted)"
+                    );
+                }
             }
         }
         Ok(deleted)
@@ -226,13 +251,27 @@ impl KernelHandle {
     }
 
     /// Schedule a cron job by expression (convenience wrapper).
+    ///
+    /// **Note:** the `persona` argument is currently NOT wired into the cron
+    /// executor — `CronJob` has no persona field yet. Passing a non-default
+    /// value logs a warning so callers are not silently surprised. The
+    /// parameter is retained for forward compatibility with multi-persona
+    /// scheduling (RFC tracking).
     pub async fn schedule(
         &self,
         cron_expr: &str,
         task: &str,
         persona: Option<&str>,
     ) -> anyhow::Result<String> {
-        let _persona = persona.unwrap_or("default");
+        if let Some(p) = persona
+            && !p.is_empty()
+            && p != "default"
+        {
+            tracing::warn!(
+                persona = p,
+                "schedule: persona argument is not yet honored by the cron executor; job will run with the default persona"
+            );
+        }
         let job = crate::cron::CronJob::new(
             format!("job_{}", uuid::Uuid::new_v4()),
             cron_expr.to_string(),
@@ -243,16 +282,28 @@ impl KernelHandle {
     }
 
     /// Unschedule a cron job by string ID (convenience wrapper).
+    ///
+    /// Returns `Ok(true)` when the job existed and was removed, `Ok(false)`
+    /// when no job with that ID was registered, and `Err(...)` when the
+    /// scheduler itself fails (DB corruption, lock poisoning). The previous
+    /// implementation collapsed scheduler errors into `Ok(false)`, hiding
+    /// real failures from callers.
     pub async fn unschedule(&self, job_id: &str) -> anyhow::Result<bool> {
         let uuid =
             uuid::Uuid::parse_str(job_id).map_err(|e| anyhow::anyhow!("invalid job id: {e}"))?;
         match self.infra.remove_cron(uuid).await {
             Ok(()) => Ok(true),
-            Err(_) => Ok(false),
+            Err(e) => {
+                let msg = format!("{e}");
+                if msg.to_lowercase().contains("not found") {
+                    // Legitimate "already removed" case — not an error.
+                    Ok(false)
+                } else {
+                    Err(anyhow::anyhow!("failed to remove cron job {job_id}: {e}"))
+                }
+            }
         }
     }
-
-    /// List cron jobs (convenience wrapper).
     pub fn list_schedules(&self) -> Vec<crate::cron::CronJob> {
         self.infra.list_crons()
     }
@@ -278,16 +329,13 @@ impl KernelHandle {
 
     /// Get a [`MemoryApi`] facade for memory operations.
     ///
-    /// Constructs (lazily, on first call) a `MemoryApi` that wraps the
-    /// `MemoryManager` from `AgentApi`. This is the 14th typed API in
-    /// `KernelHandle` (alongside `A2aApi`, `AgentApi`, etc.).
-    ///
-    /// The MemoryApi is cached — multiple calls return the same instance.
+    /// Returns a fresh `MemoryApi` each call. It shares the same underlying
+    /// `Arc<MemoryManager>` and `Arc<HnswMemoryIndex>` (when attached) as
+    /// `AgentApi`, so semantic search and index rebuilds route through the
+    /// real index rather than the keyword-only fallback.
     pub fn memory(&self) -> MemoryApi {
-        // We construct from AgentApi's memory_manager via the
-        // public accessor (returns &Arc<MemoryManager>).
-        // Clone the Arc to get an owned reference.
         let mm = self.agents.memory_manager().clone();
-        MemoryApi::new(mm)
+        let hnsw = self.agents.hnsw_index.clone();
+        MemoryApi::new(mm, hnsw)
     }
 }

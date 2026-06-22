@@ -74,6 +74,12 @@ impl StateApi {
     }
 
     /// Commit all changes to git via the provided GitLayer.
+    ///
+    /// Returns:
+    /// - `Ok(None)` when git is disabled (no-op).
+    /// - `Ok(Some(info))` on a successful commit.
+    /// - `Err(...)` when the commit fails — callers must not conflate this
+    ///   with "git disabled", or a broken repo will silently look healthy.
     pub fn commit_all(
         &self,
         git: &crate::git_layer::GitLayer,
@@ -82,9 +88,8 @@ impl StateApi {
         if !git.is_enabled() {
             return Ok(None);
         }
-        git.commit_file(".", message)
-            .ok()
-            .map_or(Ok(None), |info| Ok(Some(info)))
+        let info = git.commit_file(".", message)?;
+        Ok(Some(info))
     }
 
     /// Save session.

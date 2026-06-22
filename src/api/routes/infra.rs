@@ -322,6 +322,71 @@ pub(crate) struct McpServerRegisterRequest {
     args: Vec<String>,
 }
 
+/// Shell interpreters that must never be spawned as an MCP server.
+/// Spawning any of these lets a caller run arbitrary commands via
+/// `args = ["-c", "<cmd>"]`, which defeats the purpose of the MCP
+/// command surface (RCE by design of the report's F4 scenario).
+const BLOCKED_MCP_SHELLS: &[&str] = &[
+    "sh",
+    "bash",
+    "dash",
+    "zsh",
+    "ksh",
+    "csh",
+    "tcsh",
+    "fish",
+    "ash",
+    "busybox",
+    "cmd",
+    "cmd.exe",
+    "powershell",
+    "powershell.exe",
+    "pwsh",
+    "pwsh.exe",
+];
+
+/// Validate an MCP server command before spawning it.
+///
+/// Rejects shell interpreters (which would allow `args = ["-c", ...]`
+/// arbitrary code execution) and commands containing shell metacharacters
+/// or path-traversal sequences. Returns the (possibly canonicalized)
+/// command basename for allowlist checks.
+fn validate_mcp_command(command: &str) -> Result<(), String> {
+    if command.is_empty() {
+        return Err("command must not be empty".into());
+    }
+    // Reject control / NUL bytes outright.
+    if command.chars().any(|c| c.is_control() || c == '\u{0}') {
+        return Err("command contains control characters".into());
+    }
+    // Reject shell metacharacters and whitespace — MCP commands are a
+    // single token (e.g. `npx`, `python`, `node`). Any of these would
+    // indicate an attempt to chain or inject.
+    const FORBIDDEN: &[char] = &[
+        ' ', '\t', ';', '|', '&', '>', '<', '`', '$', '(', ')', '{', '}', '\n', '\r', '*', '?',
+        '\\', '"', '\'',
+    ];
+    if command.contains(FORBIDDEN) {
+        return Err(format!(
+            "command contains forbidden characters (shell metacharacters or whitespace): {command:?}"
+        ));
+    }
+    // Reject path traversal in case the command is a path.
+    if command.contains("..") {
+        return Err("command must not contain path traversal (..)".into());
+    }
+    // Basename of the command for the shell blocklist check.
+    let basename = command.rsplit('/').next().unwrap_or(command);
+    let basename_lower = basename.to_ascii_lowercase();
+    if BLOCKED_MCP_SHELLS.iter().any(|s| *s == basename_lower) {
+        return Err(format!(
+            "refusing to spawn shell interpreter '{basename}' as an MCP server \
+             (would allow arbitrary command execution)"
+        ));
+    }
+    Ok(())
+}
+
 /// POST /api/mcp/servers — Register a new MCP server and start it.
 pub(crate) async fn handle_mcp_server_register(
     state: State<Arc<AppState>>,
@@ -329,14 +394,44 @@ pub(crate) async fn handle_mcp_server_register(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let name = body.name.clone();
     let command = body.command.clone();
+
+    // F4: validate the command before we spawn anything. Refuses shell
+    // interpreters and commands with shell metacharacters / traversal.
+    if let Err(reason) = validate_mcp_command(&command) {
+        tracing::warn!(
+            server = %name,
+            command = %command,
+            reason = %reason,
+            "Rejected MCP server registration (unsafe command)"
+        );
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("Invalid command: {reason}"),
+        ));
+    }
+
+    // Audit log: record what is being spawned and from where, before spawn.
+    tracing::info!(
+        server = %name,
+        command = %command,
+        args = ?body.args,
+        auth_enabled = state.config.read().security.auth_enabled,
+        "MCP server registration accepted (spawning)"
+    );
+
     let mut server = oxios_kernel::McpServer::new(&name, &command);
     server.args = body.args;
     server.enabled = true;
     state.kernel.mcp.register_server(server);
-    state.kernel.mcp.init_server(&name).await.map_err(|e| {
-        tracing::error!(server = %name, error = %e, "Failed to start MCP server");
-        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-    })?;
+    if let Err(e) = state.kernel.mcp.init_server(&name).await {
+        tracing::error!(server = %name, error = %e, "Failed to start MCP server; rolling back registration");
+        // Rollback the registration so a failed spawn does not leave a
+        // phantom entry in the server list.
+        if let Err(rb) = state.kernel.mcp.remove_server(&name).await {
+            tracing::warn!(server = %name, error = %rb, "Failed to roll back MCP server registration");
+        }
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
     tracing::info!(server = %name, command = %command, "MCP server registered and started");
     Ok(Json(serde_json::json!({
         "status": "registered",

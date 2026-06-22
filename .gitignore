@@ -29,3 +29,7 @@ fix-*.md
 *-audit.txt
 calculation_result.md
 page_snapshot.md
+
+# Subagent fallback temp reports at the repo root
+local:
+report-*.json

@@ -239,20 +239,92 @@ pub struct TracingAuditSink;
 
 impl AuditSink for TracingAuditSink {
     fn record(&self, event: AuditEvent) {
-        if let AuditEvent::ToolAccess {
-            agent,
-            tool,
-            allowed: false,
-            layer,
-            ..
-        } = &event
-        {
-            tracing::warn!(
-                agent = %agent,
-                tool = %tool,
-                layer = ?layer,
-                "Access denied (no persistent audit sink configured)"
-            );
+        // With no persistent sink configured we still surface every decision
+        // via tracing so allowed/denied activity is observable post-incident.
+        match &event {
+            AuditEvent::ToolAccess {
+                agent,
+                tool,
+                allowed,
+                layer,
+                ..
+            } => {
+                if *allowed {
+                    tracing::debug!(
+                        agent = %agent, tool = %tool, layer = ?layer,
+                        "Tool access allowed (no persistent audit sink configured)"
+                    );
+                } else {
+                    tracing::warn!(
+                        agent = %agent, tool = %tool, layer = ?layer,
+                        "Access denied (no persistent audit sink configured)"
+                    );
+                }
+            }
+            AuditEvent::PathAccess {
+                agent,
+                path,
+                allowed,
+                ..
+            } => {
+                tracing::debug!(
+                    agent = %agent, path = %path, allowed = allowed,
+                    "Path access decision"
+                );
+            }
+            AuditEvent::ExecAccess {
+                agent,
+                binary,
+                allowed,
+                ..
+            } => {
+                if *allowed {
+                    tracing::info!(
+                        agent = %agent, binary = %binary,
+                        "Exec access allowed"
+                    );
+                } else {
+                    tracing::warn!(
+                        agent = %agent, binary = %binary,
+                        "Exec access denied"
+                    );
+                }
+            }
+            AuditEvent::RbacDecision {
+                subject,
+                action,
+                allowed,
+                ..
+            } => {
+                tracing::debug!(
+                    subject = %subject, action = %action, allowed = allowed,
+                    "RBAC decision"
+                );
+            }
+            AuditEvent::SandboxViolation {
+                agent,
+                path,
+                workspace,
+                ..
+            } => {
+                tracing::warn!(
+                    agent = %agent, path = %path, workspace = %workspace,
+                    "Sandbox boundary violation"
+                );
+            }
+            AuditEvent::Approval {
+                subject,
+                approval_id,
+                status,
+                ..
+            } => {
+                tracing::info!(
+                    subject = %subject,
+                    approval_id = %approval_id,
+                    status = ?status,
+                    "Approval decision"
+                );
+            }
         }
     }
 }

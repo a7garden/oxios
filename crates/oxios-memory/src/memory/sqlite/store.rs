@@ -94,6 +94,23 @@ impl SqliteMemoryStore {
         // Insert into SQLite (scoped lock — guard dropped before any await)
         let rowid: i64 = {
             let conn = self.db.conn();
+            // INSERT OR REPLACE deletes then re-inserts the row, which assigns a
+            // NEW rowid. The vec0 table (`memory_vectors`) is keyed by rowid and
+            // is NOT covered by the FTS sync triggers, so the vector for the old
+            // rowid would otherwise linger forever and grow the KNN index with
+            // dead entries. Delete it before the replace (inline, since we
+            // already hold the connection lock and parking_lot::Mutex is
+            // non-reentrant).
+            if let Ok(old_rowid) = conn.query_row::<i64, _, _>(
+                "SELECT rowid FROM memories WHERE id = ?1",
+                rusqlite::params![id],
+                |row| row.get(0),
+            ) {
+                let _ = conn.execute(
+                    "DELETE FROM memory_vectors WHERE rowid = ?1",
+                    rusqlite::params![old_rowid],
+                );
+            }
             conn.execute(
                 "INSERT OR REPLACE INTO memories
                  (id, memory_type, content, importance, tier, protection, source,

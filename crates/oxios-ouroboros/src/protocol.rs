@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::seed::Seed;
-use crate::{EvaluationResult, InterviewResult, ouroboros_engine::InterviewQuestionOutput};
+use crate::{EvaluationResult, InterviewResult};
 
 /// The phases of the Ouroboros lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,16 +90,6 @@ pub struct ExecutionResult {
 pub trait OuroborosProtocol: Send + Sync {
     /// Conduct an interview to clarify user intent.
     async fn interview(&self, user_input: &str) -> Result<InterviewResult>;
-
-    /// Produce a parallel structured form of the interview questions
-    /// for the interactive Web UI. Returns `Ok(None)` when the LLM did
-    /// not produce structured output (e.g. the request was chat) or
-    /// the JSON was malformed — the frontend falls back to markdown
-    /// rendering of the plain `questions`.
-    async fn interview_structured(
-        &self,
-        user_input: &str,
-    ) -> Result<Option<Vec<InterviewQuestionOutput>>>;
 
     /// Generate an immutable seed from interview results.
     async fn generate_seed(&self, interview: &InterviewResult) -> Result<Seed>;

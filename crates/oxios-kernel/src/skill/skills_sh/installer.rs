@@ -107,6 +107,12 @@ impl SkillsShInstaller {
         // Write all files
         let mut file_count = 0usize;
         for file in files {
+            // Path-traversal defense: skills.sh is a remote, untrusted source.
+            // Reject file.path values that would escape target_dir.
+            if !crate::skill::is_safe_relative_path(&file.path) {
+                tracing::warn!("skills_sh: skipping file with unsafe path: {}", file.path);
+                continue;
+            }
             let file_path = target_dir.join(&file.path);
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent).context("create parent dir for skill file")?;

@@ -28,20 +28,20 @@ pub struct CalendarApi {
 }
 
 impl CalendarApi {
-    /// Create a new CalendarApi wrapping the given engine.
-    pub fn new(engine: Arc<CalendarEngine>) -> Self {
-        Self {
-            engine,
-            event_bus: None,
-        }
+    /// Create a new CalendarApi.
+    ///
+    /// Pass `Some(event_bus)` to publish `CalendarEventCreated/Updated/Deleted`
+    /// events; pass `None` for a silent engine-only API. This signature
+    /// mirrors `EmailApi::new` so the facade constructors stay symmetric —
+    /// callers should not have to remember which facades take an Option and
+    /// which split into `new` vs `with_event_bus`.
+    pub fn new(engine: Arc<CalendarEngine>, event_bus: Option<EventBus>) -> Self {
+        Self { engine, event_bus }
     }
 
-    /// Create a new CalendarApi with event bus support.
+    /// Convenience: same as [`Self::new`] with `Some(event_bus)`.
     pub fn with_event_bus(engine: Arc<CalendarEngine>, event_bus: EventBus) -> Self {
-        Self {
-            engine,
-            event_bus: Some(event_bus),
-        }
+        Self::new(engine, Some(event_bus))
     }
 
     /// Create a new event and publish a `CalendarEventCreated` event.

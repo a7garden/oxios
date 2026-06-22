@@ -46,19 +46,27 @@ pub struct CronSyntheticEvent {
 
 /// Normalize a cron expression to 7-field format (sec min hour dom month dow year).
 ///
-/// The `cron` crate requires 7 fields. Users commonly provide 5-field Linux-style
-/// expressions (`min hour dom month dow`). This function prepends `"0 "` (run at second 0)
-/// and appends `" *"` (any year) to convert 5-field expressions.
+/// The `cron` crate (0.16) requires exactly 7 fields. Users commonly provide:
+/// - 5-field Linux-style (`min hour dom month dow`) → prepend `"0 "` (sec) and
+///   append `" *"` (year).
+/// - 6-field expressions with seconds (`sec min hour dom month dow`) → append
+///   `" *"` (year) only. F13: previously these were passed through unchanged
+///   and rejected by `cron::Schedule::from_str`, silently dropping the job.
 ///
-/// Expressions that already have 6 or 7 fields are returned unchanged.
+/// 7-field expressions are returned unchanged. Any other arity is also
+/// returned unchanged and will fail at parse time with a clear warning.
 fn normalize_cron_expr(expr: &str) -> String {
     let field_count = expr.split_whitespace().count();
-    if field_count == 5 {
-        format!("0 {expr} *")
-    } else {
-        expr.to_string()
+    match field_count {
+        5 => format!("0 {expr} *"),
+        6 => format!("{expr} *"),
+        _ => expr.to_string(),
     }
 }
+
+/// Upper bound on synthetic events generated per cron job per call (F14).
+/// Prevents OOM when a sub-minute cron meets a wide query range.
+const MAX_EVENTS_PER_JOB: usize = 1_000;
 
 /// Expand cron jobs into synthetic events within a time range.
 ///
@@ -68,6 +76,10 @@ fn normalize_cron_expr(expr: &str) -> String {
 ///
 /// Disabled jobs are skipped. Jobs with invalid cron expressions
 /// are logged as warnings and skipped.
+///
+/// F14: each job is capped at [`MAX_EVENTS_PER_JOB`] fire times so a
+/// pathological schedule (e.g. a per-second cron over a year range) can't
+/// exhaust memory; a warning is logged when the cap is hit.
 ///
 /// # Example
 ///
@@ -111,8 +123,18 @@ pub fn expand_cron_events(
             }
         };
 
-        for fire in schedule.after(&from) {
+        // F14: cap per-job expansion to bound memory for high-frequency
+        // schedules over wide ranges.
+        for (job_count, fire) in schedule.after(&from).enumerate() {
             if fire >= to {
+                break;
+            }
+            if job_count >= MAX_EVENTS_PER_JOB {
+                tracing::warn!(
+                    job_id = %job.id,
+                    cap = MAX_EVENTS_PER_JOB,
+                    "Cron expansion hit per-job cap; results truncated"
+                );
                 break;
             }
             events.push(CronSyntheticEvent {

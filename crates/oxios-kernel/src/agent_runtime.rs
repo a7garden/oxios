@@ -450,7 +450,14 @@ impl AgentRuntime {
                 .enumerate()
                 .map(|(i, step)| {
                     let truncated = if step.output.len() > 800 {
-                        format!("{}...", &step.output[..800])
+                        // Char-boundary safe truncation: roll back to the
+                        // nearest UTF-8 boundary so multibyte sequences
+                        // (Korean, CJK, emoji) don't panic on byte slicing.
+                        let mut end = 800;
+                        while end > 0 && !step.output.is_char_boundary(end) {
+                            end -= 1;
+                        }
+                        format!("{}...", &step.output[..end])
                     } else {
                         step.output.clone()
                     };
@@ -1230,19 +1237,26 @@ fn summarize_tool_result(result: &str, max_len: usize) -> String {
     if first_line.chars().count() <= max_len {
         first_line.to_string()
     } else {
-        let truncated: String = first_line.chars().take(max_len - 3).collect();
+        let take = max_len.saturating_sub(3);
+        let truncated: String = if take == 0 {
+            first_line.chars().take(max_len).collect()
+        } else {
+            first_line.chars().take(take).collect()
+        };
         format!("{truncated}...")
     }
 }
-
-/// Truncate a JSON string representation to `max_len` chars for storage
-/// in tool call records. Returns the original string if short enough,
-/// otherwise truncates and appends "...".
 fn truncate_json_str(json_str: &str, max_len: usize) -> String {
     if json_str.len() <= max_len {
         return json_str.to_string();
     }
-    let truncated: String = json_str.chars().take(max_len - 3).collect();
+    // Saturating sub avoids underflow panic when max_len < 3; if there
+    // isn't room for an ellipsis, return as many chars as fit.
+    let take = max_len.saturating_sub(3);
+    if take == 0 {
+        return json_str.chars().take(max_len).collect();
+    }
+    let truncated: String = json_str.chars().take(take).collect();
     format!("{truncated}...")
 }
 

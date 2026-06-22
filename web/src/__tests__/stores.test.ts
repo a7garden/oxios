@@ -6,6 +6,7 @@ import { useSidebarStore } from '@/stores/sidebar'
 describe('useAuthStore', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
   })
 
   it('starts unauthenticated when no token', () => {
@@ -19,7 +20,7 @@ describe('useAuthStore', () => {
     const state = useAuthStore.getState()
     expect(state.isAuthenticated).toBe(true)
     expect(state.token).toBe('test-key')
-    expect(localStorage.getItem('oxios-api-key')).toBe('test-key')
+    expect(sessionStorage.getItem('oxios-api-key')).toBe('test-key')
   })
 
   it('logout clears token', () => {
@@ -28,7 +29,7 @@ describe('useAuthStore', () => {
     const state = useAuthStore.getState()
     expect(state.isAuthenticated).toBe(false)
     expect(state.token).toBeNull()
-    expect(localStorage.getItem('oxios-api-key')).toBeNull()
+    expect(sessionStorage.getItem('oxios-api-key')).toBeNull()
   })
 
   it('setToken(null) clears authentication', () => {
@@ -292,8 +293,10 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     })
   })
 
-  it('token chunk does not add an activity', () => {
+  it('token chunk does not add an activity', async () => {
     useChatStore.getState().handleChunk({ type: 'token', content: 'hello' })
+    // F9: tokens are batched via requestAnimationFrame; wait one frame for flush.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     const last = useChatStore.getState().messages.at(-1)!
     expect(last.content).toBe('hello')
     expect(last.activities ?? []).toEqual([])

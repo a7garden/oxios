@@ -696,10 +696,23 @@ impl A2AProtocol {
             .push(PendingMessage::new(request.clone()));
         queue.notify.notify_one();
 
-        self.event_bus.publish(KernelEvent::MessageReceived {
+        // The event bus is an auxiliary observability/coordination channel;
+        // `append_log` above already records the message durably. If publish
+        // fails we must NOT return Err — the message has already been pushed
+        // to the recipient's queue, so propagating would cause the caller to
+        // retry and produce a duplicate delivery.
+        if let Err(e) = self.event_bus.publish(KernelEvent::MessageReceived {
             from,
             content: format!("[{msg_type}] {request_id:?}"),
-        })?;
+        }) {
+            tracing::warn!(
+                error = %e,
+                from = %from,
+                to = %to,
+                request_id = %request_id,
+                "a2a: failed to publish MessageReceived event (message was still delivered)"
+            );
+        }
 
         tracing::debug!(
             from = %from,

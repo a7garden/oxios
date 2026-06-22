@@ -190,8 +190,18 @@ impl CronScheduler {
     }
 
     /// Set the maximum concurrent cron job executions.
+    ///
+    /// A value of `0` is rejected — it would silently disable every cron tick
+    /// (`current_running(0) >= max(0)` is always true). We clamp to `1` and
+    /// warn so the caller can correct their configuration instead of losing
+    /// all scheduled jobs without any signal.
     pub fn set_max_concurrent_jobs(&mut self, max: usize) {
-        self.max_concurrent_jobs = max;
+        if max == 0 {
+            tracing::warn!("set_max_concurrent_jobs(0) would disable all cron jobs; clamping to 1");
+            self.max_concurrent_jobs = 1;
+        } else {
+            self.max_concurrent_jobs = max;
+        }
     }
 
     /// Set the timeout for individual cron job execution in seconds.

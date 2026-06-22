@@ -195,6 +195,20 @@ fn load_sent_records(
     records
 }
 
+/// Count sent email records by counting `.json` files in the `email_sent/`
+/// directory. Does NOT read file contents — O(entries) time, O(1) memory,
+/// safe for directories with tens of thousands of records.
+fn count_sent_records(state_store: &oxios_kernel::state_store::StateStore) -> usize {
+    let sent_dir = state_store.base_path.join("email_sent");
+    let Ok(entries) = std::fs::read_dir(&sent_dir) else {
+        return 0;
+    };
+    entries
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+        .count()
+}
+
 /// Load a single sent record by exact ID match.
 fn load_sent_record(
     state_store: &oxios_kernel::state_store::StateStore,
@@ -250,7 +264,7 @@ pub(crate) async fn handle_email_status(
         (None, None, 0)
     };
 
-    let total_sent = load_sent_records(state.kernel.state.store(), usize::MAX, false).len();
+    let total_sent = count_sent_records(state.kernel.state.store());
 
     Ok(Json(EmailStatusResponse {
         configured,

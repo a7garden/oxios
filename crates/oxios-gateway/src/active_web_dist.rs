@@ -63,14 +63,19 @@ impl ActiveWebDist {
     /// in-flight requests reading from the old inode complete successfully.
     ///
     /// No-op cleanup if there was no previous directory.
+    ///
+    /// F25: the removal runs inside `spawn_blocking` so the synchronous
+    /// `remove_dir_all` doesn't occupy an async worker thread.
     pub fn swap_and_clean_previous(&self, new_path: PathBuf, grace: std::time::Duration) {
         let prev = self.swap(new_path);
         if let Some(old) = prev {
             tokio::spawn(async move {
                 tokio::time::sleep(grace).await;
                 // Best-effort removal; ignore errors (already gone, permissions, …).
+                // F25: offload the blocking remove_dir_all to the blocking pool.
                 if old.is_dir() {
-                    let _ = std::fs::remove_dir_all(&old);
+                    let _ =
+                        tokio::task::spawn_blocking(move || std::fs::remove_dir_all(&old)).await;
                 }
             });
         }
@@ -83,14 +88,39 @@ impl ActiveWebDist {
     /// generation — never at a half-extracted directory.
     ///
     /// `new_dir` must already be fully extracted and validated by the caller.
+    ///
+    /// F26: the marker write is now logged on failure (previously silently
+    /// dropped) and performed via a temp-file rename so a crash can't leave a
+    /// truncated marker. The signature stays `()` for compatibility with
+    /// existing callers; a divergence between the in-memory pointer and the
+    /// persisted marker is surfaced via `tracing::error!`.
     pub fn publish(&self, new_dir: PathBuf, marker: &std::path::Path) {
         // swap_and_clean_previous schedules removal of the *previous* dir.
         // The new dir is never moved or deleted after this.
         self.swap_and_clean_previous(new_dir.clone(), std::time::Duration::from_secs(300));
-        if let Some(parent) = marker.parent() {
-            let _ = std::fs::create_dir_all(parent);
+        if let Some(parent) = marker.parent()
+            && let Err(e) = std::fs::create_dir_all(parent)
+        {
+            tracing::error!(
+                marker = %marker.display(),
+                error = %e,
+                "Failed to create marker parent directory; \
+                 in-memory pointer and persisted marker will diverge on restart"
+            );
+            return;
         }
-        let _ = std::fs::write(marker, new_dir.to_string_lossy().as_bytes());
+        // F26: atomic marker write via tmp+rename.
+        let tmp = marker.with_extension("marker.tmp");
+        if let Err(e) = std::fs::write(&tmp, new_dir.to_string_lossy().as_bytes())
+            .and_then(|()| std::fs::rename(&tmp, marker))
+        {
+            tracing::error!(
+                marker = %marker.display(),
+                error = %e,
+                "Failed to persist web-dist marker; \
+                 in-memory pointer and persisted marker will diverge on restart"
+            );
+        }
     }
 
     /// Resolve the active directory at process start.

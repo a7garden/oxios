@@ -6,8 +6,11 @@
 use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs;
+use tokio::io::AsyncWriteExt;
 
 /// Unique identifier for a session.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -269,6 +272,12 @@ impl Session {
 pub struct StateStore {
     /// Root directory for all state files.
     pub base_path: PathBuf,
+    /// Per-session write locks used by [`StateStore::update_session_with`]
+    /// to serialize concurrent load-modify-save cycles on the same session
+    /// (state-area F1). Legacy callers that do their own
+    /// `load_session` → `save_session` without this primitive remain racy
+    /// and should migrate.
+    session_locks: Arc<parking_lot::RwLock<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
 }
 
 impl StateStore {
@@ -283,7 +292,10 @@ impl StateStore {
     /// let store = StateStore::new(PathBuf::from("/tmp/oxios-state")).unwrap();
     /// ```
     pub fn new(base_path: PathBuf) -> Result<Self> {
-        Ok(Self { base_path })
+        Ok(Self {
+            base_path,
+            session_locks: Arc::new(parking_lot::RwLock::new(HashMap::new())),
+        })
     }
 
     /// Validate that a category name does not contain path traversal.
@@ -309,23 +321,50 @@ impl StateStore {
         Ok(())
     }
 
-    /// Save a markdown file under the given category.
+    /// Durable atomic write: temp file → fsync(file) → rename → fsync(dir).
+    ///
+    /// `rename(2)` only guarantees *metadata* atomicity, not data
+    /// durability: if the data pages haven't been flushed before the
+    /// rename's metadata commit, a crash can surface the new filename
+    /// with stale or zero contents. fsyncing the temp file before the
+    /// rename, and the parent directory after, closes that window. This
+    /// matters because StateStore is the source of truth for sessions,
+    /// agents, and project metadata. (state-area F9.)
+    async fn durable_write(
+        dir: &std::path::Path,
+        target: &std::path::Path,
+        content: &[u8],
+    ) -> Result<()> {
+        let file_name = target
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("state");
+        let temp_path = dir.join(format!(
+            "{file_name}.{}.{}.tmp",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        {
+            let mut file = fs::File::create(&temp_path).await?;
+            file.write_all(content).await?;
+            file.sync_all().await?;
+        }
+        tokio::fs::rename(&temp_path, target).await?;
+        // Best-effort directory fsync; ignore errors (not all platforms
+        // support it, and the file fsync + rename already did the work).
+        if let Ok(dir_file) = fs::File::open(dir).await {
+            let _ = dir_file.sync_all().await;
+        }
+        Ok(())
+    }
+
     pub async fn save_markdown(&self, category: &str, name: &str, content: &str) -> Result<()> {
         Self::validate_category(category)?;
         Self::validate_name(name)?;
         let dir = self.base_path.join(category);
         fs::create_dir_all(&dir).await?;
         let path = dir.join(format!("{name}.md"));
-
-        // Write to temp file first, then atomic rename
-        let temp_path = dir.join(format!(
-            "{name}.{}.{}.tmp",
-            std::process::id(),
-            uuid::Uuid::new_v4()
-        ));
-        fs::write(&temp_path, content).await?;
-        tokio::fs::rename(&temp_path, &path).await?;
-
+        Self::durable_write(&dir, &path, content.as_bytes()).await?;
         Ok(())
     }
 
@@ -375,18 +414,8 @@ impl StateStore {
         let dir = self.base_path.join(category);
         fs::create_dir_all(&dir).await?;
         let path = dir.join(format!("{name}.json"));
-
         let content = serde_json::to_string_pretty(data)?;
-
-        // Write to temp file first, then atomic rename
-        let temp_path = dir.join(format!(
-            "{name}.{}.{}.tmp",
-            std::process::id(),
-            uuid::Uuid::new_v4()
-        ));
-        fs::write(&temp_path, &content).await?;
-        tokio::fs::rename(&temp_path, &path).await?;
-
+        Self::durable_write(&dir, &path, content.as_bytes()).await?;
         Ok(())
     }
 
@@ -438,6 +467,54 @@ impl StateStore {
     /// Saves a session to the sessions category.
     pub async fn save_session(&self, session: &Session) -> Result<()> {
         self.save_json("sessions", &session.id.0, session).await
+    }
+
+    /// Atomically load, mutate, and save a session under a per-session lock.
+    ///
+    /// This is the safe primitive for read-modify-write on a session: it
+    /// serializes concurrent modifications to the same session, preventing
+    /// the lost-update race that plain `load_session` → `save_session`
+    /// sequences suffer when two callers read the same starting copy and
+    /// the later save clobbers the earlier one (state-area F1).
+    ///
+    /// Returns `Ok(Some(session))` after the mutation+save, or `Ok(None)`
+    /// if the session did not exist.
+    pub async fn update_session_with<F>(
+        &self,
+        session_id: &SessionId,
+        f: F,
+    ) -> Result<Option<Session>>
+    where
+        F: FnOnce(&mut Session) -> Result<()>,
+    {
+        let lock = Self::session_lock(&self.session_locks, &session_id.0);
+        let _guard = lock.lock().await;
+        let mut session = match self.load_session(session_id).await? {
+            Some(s) => s,
+            None => return Ok(None),
+        };
+        f(&mut session)?;
+        self.save_session(&session).await?;
+        Ok(Some(session))
+    }
+
+    /// Get (or lazily create) the per-session mutex. Double-checked under
+    /// the map's read/write guards so concurrent callers for the same
+    /// session share one `Arc<Mutex<()>>`.
+    fn session_lock(
+        map: &parking_lot::RwLock<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
+        session_id: &str,
+    ) -> Arc<tokio::sync::Mutex<()>> {
+        // Fast path: shared read.
+        if let Some(lock) = map.read().get(session_id) {
+            return Arc::clone(lock);
+        }
+        // Slow path: exclusive write, insert if absent.
+        Arc::clone(
+            map.write()
+                .entry(session_id.to_string())
+                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(()))),
+        )
     }
 
     /// Saves a session and then runs pruning if auto_prune is enabled.
@@ -620,15 +697,17 @@ impl StateStore {
         session_id: &SessionId,
         project_id: Option<&str>,
     ) -> Result<bool> {
-        match self.load_session(session_id).await? {
-            Some(mut session) => {
-                session.project_id = project_id.map(String::from);
+        // Use update_session_with so concurrent modifications to the same
+        // session can't lose this project reassignment (state-area F1).
+        let project_id_owned = project_id.map(String::from);
+        let updated = self
+            .update_session_with(session_id, |session| {
+                session.project_id = project_id_owned;
                 session.updated_at = Utc::now();
-                self.save_session(&session).await?;
-                Ok(true)
-            }
-            None => Ok(false),
-        }
+                Ok(())
+            })
+            .await?;
+        Ok(updated.is_some())
     }
 
     /// Prune sessions based on configuration.
@@ -642,7 +721,7 @@ impl StateStore {
         // TTL-based pruning: remove sessions older than ttl_hours
         if config.ttl_hours > 0 {
             let cutoff = Utc::now() - chrono::Duration::hours(config.ttl_hours as i64);
-            let to_prune_ttl: Vec<String> = sessions
+            let to_prune_ttl: std::collections::HashSet<String> = sessions
                 .iter()
                 .filter(|s| s.updated_at < cutoff)
                 .map(|s| s.id.clone())
@@ -815,8 +894,8 @@ impl PruneThrottle {
     /// Check if enough time has elapsed since the last prune.
     /// Returns `true` if prune should proceed.
     pub fn should_prune(&self) -> bool {
-        // SAFETY: parking_lot::Mutex never poisons, but std::sync::Mutex does.
-        // Recover from poison by taking the inner value so pruning continues.
+        // std::sync::Mutex can poison if a holder panics; recover here by
+        // taking the inner value so pruning continues.
         let mut guard = self.last_prune.lock().unwrap_or_else(|e| {
             tracing::warn!("PruneThrottle mutex poisoned, recovering: {e}");
             e.into_inner()
@@ -842,7 +921,6 @@ impl PruneThrottle {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_session_creation_and_persistence() {
         let temp_dir = tempfile::tempdir().unwrap();

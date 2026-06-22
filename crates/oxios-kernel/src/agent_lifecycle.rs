@@ -135,7 +135,16 @@ impl AgentLifecycleManager {
                 }
                 Err(_) => {
                     let secs = exec_timeout.as_secs();
-                    tracing::warn!(agent_id = %agent_id, secs, "Agent execution timed out after {}s", secs);
+                    tracing::warn!(
+                        agent_id = %agent_id,
+                        secs,
+                        "Agent execution timed out after {}s",
+                        secs
+                    );
+                    // Abort the detached execution body. Previously the
+                    // timeout only dropped the awaiting future while the
+                    // spawned task kept running — leaking tokens/resources.
+                    let _ = self.supervisor.kill(agent_id).await;
                     self.cleanup_on_failure(agent_id, task_id).await;
                     bail!("Agent execution timed out after {secs} seconds");
                 }

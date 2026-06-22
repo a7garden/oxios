@@ -80,14 +80,6 @@ impl OuroborosProtocol for MockOuroboros {
         Ok(result)
     }
 
-    async fn interview_structured(
-        &self,
-        _user_input: &str,
-    ) -> anyhow::Result<Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>>
-    {
-        Ok(None)
-    }
-
     async fn generate_seed(&self, _interview: &InterviewResult) -> anyhow::Result<Seed> {
         self.generate_seed_called.fetch_add(1, Ordering::SeqCst);
         let mut seed = Seed::new("Test goal");
@@ -442,9 +434,6 @@ fn make_evolution_config(max_iterations: u32) -> OrchestratorConfig {
     OrchestratorConfig {
         max_evolution_iterations: max_iterations,
         min_evaluation_score: 0.8,
-        eval_cache_enabled: true,
-        spec_keywords: vec!["#spec".into(), "#plan".into()],
-        default_mode: "spec".into(),
     }
 }
 

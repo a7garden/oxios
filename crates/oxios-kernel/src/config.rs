@@ -1404,26 +1404,6 @@ pub struct OrchestratorConfig {
     /// Default: 0.8.
     #[serde(default = "default_min_evaluation_score")]
     pub min_evaluation_score: f64,
-
-    /// Enable evaluation result caching.
-    #[serde(default = "default_true")]
-    pub eval_cache_enabled: bool,
-
-    /// Keywords that trigger spec (Ouroboros) mode. Prefix-only match.
-    #[serde(default = "default_spec_keywords")]
-    pub spec_keywords: Vec<String>,
-
-    /// Default execution mode: "chat" (agent) or "spec" (Ouroboros pipeline).
-    #[serde(default = "default_mode")]
-    pub default_mode: String,
-}
-
-fn default_spec_keywords() -> Vec<String> {
-    vec!["#spec".into(), "#plan".into()]
-}
-
-fn default_mode() -> String {
-    "spec".into() // v1: backward compat
 }
 
 fn default_max_evolution_iterations() -> u32 {
@@ -1439,9 +1419,6 @@ impl Default for OrchestratorConfig {
         Self {
             max_evolution_iterations: default_max_evolution_iterations(),
             min_evaluation_score: default_min_evaluation_score(),
-            eval_cache_enabled: true,
-            spec_keywords: default_spec_keywords(),
-            default_mode: default_mode(),
         }
     }
 }
@@ -1985,6 +1962,27 @@ impl OxiosConfig {
             warnings.push("budget.default_window_secs is 0 — no time window".into());
         }
 
+        // Gateway field-level validation
+        if self.gateway.response_timeout_secs == 0 {
+            errors.push("gateway.response_timeout_secs must be > 0".into());
+        }
+
+        // Engine: warn when an API key is committed to config in plaintext.
+        // The auth store and env-var fallback are preferred for secret hygiene.
+        if self.engine.api_key.as_ref().is_some_and(|k| !k.is_empty()) {
+            warnings.push(
+                "engine.api_key is set in config — prefer the oxi auth store or env var to avoid storing a secret on disk"
+                    .into(),
+            );
+        }
+
+        // MCP server validation: reject empty commands (would spawn a no-op).
+        for (name, server) in &self.mcp.servers {
+            if server.command.trim().is_empty() {
+                errors.push(format!("mcp.servers.{name}: command must not be empty"));
+            }
+        }
+
         // Session validation
         if self.session.max_sessions == 0 && self.session.ttl_hours == 0 && self.session.auto_prune
         {
@@ -2042,11 +2040,22 @@ impl OxiosConfig {
 /// Expand `~/` in paths to the user's home directory.
 ///
 /// Shared utility for path expansion across the binary and kernel.
+///
+/// Resolution order for the home directory:
+/// 1. `$HOME` environment variable (preserves existing behavior).
+/// 2. `dirs::home_dir()` (works in environments where HOME is unset, e.g.
+///    systemd units, containers, cron jobs).
+/// 3. If neither is available, the literal path is returned unchanged so the
+///    caller still gets a usable `PathBuf` rather than a panic — the failure
+///    will surface as a normal "path not found" downstream.
 pub fn expand_home(path: &str) -> std::path::PathBuf {
-    if let Some(rest) = path.strip_prefix("~/")
-        && let Ok(home) = std::env::var("HOME")
-    {
-        return std::path::PathBuf::from(format!("{home}/{rest}"));
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            return std::path::PathBuf::from(format!("{home}/{rest}"));
+        }
+        if let Some(home) = dirs::home_dir() {
+            return home.join(rest);
+        }
     }
     std::path::PathBuf::from(path)
 }

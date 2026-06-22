@@ -271,12 +271,23 @@ impl BudgetManager {
                         .signed_duration_since(entry.window_start)
                         .to_std()
                         .unwrap_or(Duration::ZERO);
+                    let window_expired = elapsed.as_secs() >= limit.window_secs;
                     let window_remaining = Duration::from_secs(limit.window_secs)
                         .saturating_sub(elapsed)
                         .as_secs();
 
-                    let tokens_remaining = limit.token_budget.saturating_sub(entry.tokens_used);
-                    let calls_remaining = limit.calls_budget.saturating_sub(entry.calls_used);
+                    // If the sliding window has expired, the next reserve/track_call
+                    // would reset usage to zero. Report the refreshed budget here so
+                    // `can_schedule`/`remaining` agree with the write path instead of
+                    // reporting a stale `exhausted` state until the next write.
+                    let (tokens_remaining, calls_remaining) = if window_expired {
+                        (limit.token_budget, limit.calls_budget)
+                    } else {
+                        (
+                            limit.token_budget.saturating_sub(entry.tokens_used),
+                            limit.calls_budget.saturating_sub(entry.calls_used),
+                        )
+                    };
                     let is_exhausted = tokens_remaining == 0 || calls_remaining == 0;
 
                     BudgetInfo {

@@ -70,8 +70,11 @@ pub struct ResourceMonitor {
     active_agents: AtomicUsize,
     pending_tasks: AtomicUsize,
     overload_threshold: RwLock<OverloadThreshold>,
-    /// Shared `sysinfo::System` instance to avoid recreating on every snapshot.
     sys: parking_lot::Mutex<System>,
+    /// Cached disk-usage estimate (GB) with a TTL, so `snapshot()` does not
+    /// walk the filesystem on every call. Disk usage is an approximation
+    /// anyway and does not change meaningfully within the TTL window.
+    disk_cache: parking_lot::Mutex<Option<(std::time::Instant, f64)>>,
 }
 
 impl Default for ResourceMonitor {
@@ -92,6 +95,7 @@ impl ResourceMonitor {
             pending_tasks: AtomicUsize::new(0),
             overload_threshold: RwLock::new(OverloadThreshold::default()),
             sys: parking_lot::Mutex::new(System::new_all()),
+            disk_cache: parking_lot::Mutex::new(None),
         }
     }
 
@@ -114,7 +118,7 @@ impl ResourceMonitor {
 
         let load_avg_1m = System::load_average().one as f32;
 
-        let disk_used_gb = estimate_disk_usage();
+        let disk_used_gb = self.cached_disk_usage();
 
         ResourceSnapshot {
             timestamp: Utc::now(),
@@ -127,6 +131,27 @@ impl ResourceMonitor {
             disk_used_gb,
             load_avg_1m,
         }
+    }
+
+    /// Return the cached disk-usage estimate, refreshing it only after the TTL
+    /// expires. Walking the working directory is bounded (see `walk_dir_size`)
+    /// and never follows symlinks, so it cannot loop or run away on a large
+    /// monorepo, but it is still far too expensive to repeat on every snapshot.
+    fn cached_disk_usage(&self) -> f64 {
+        const DISK_CACHE_TTL_SECS: u64 = 300;
+        let now = std::time::Instant::now();
+        {
+            let cache = self.disk_cache.lock();
+            if let Some((ts, val)) = *cache
+                && now.duration_since(ts).as_secs() < DISK_CACHE_TTL_SECS
+            {
+                return val;
+            }
+        }
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let gb = walk_dir_size(&cwd) as f64 / (1024.0 * 1024.0 * 1024.0);
+        *self.disk_cache.lock() = Some((now, gb));
+        gb
     }
 
     /// Record a snapshot into the history buffer.
@@ -207,29 +232,47 @@ impl ResourceMonitor {
     }
 }
 
-/// Estimate disk usage by walking the current working directory.
-/// Returns size in gigabytes.
-fn estimate_disk_usage() -> f64 {
-    let cwd = std::env::current_dir().unwrap_or_default();
-    walk_dir_size(&cwd) as f64 / (1024.0 * 1024.0 * 1024.0)
-}
+/// Maximum directory depth for the disk-usage walk. Bounds stack usage and
+/// traversal time on deeply-nested trees.
+const DISK_WALK_MAX_DEPTH: u8 = 10;
+/// Maximum number of directory entries visited per walk. Bounds the total work
+/// on directories with millions of entries (e.g. `node_modules`).
+const DISK_WALK_MAX_ENTRIES: usize = 200_000;
 
 /// Recursively compute the size of a directory in bytes.
+///
+/// Safety properties:
+/// - Uses `symlink_metadata` so symlinks are never followed — this prevents
+///   cycles and prevents the walk from escaping the workspace via a symlink.
+/// - Bounded by `DISK_WALK_MAX_DEPTH` (stack-depth limit) and
+///   `DISK_WALK_MAX_ENTRIES` (per-directory entry cap) so the traversal cannot
+///   explode on huge or pathological trees.
 fn walk_dir_size(path: &std::path::Path) -> u64 {
-    let mut total = 0u64;
-    if let Ok(entries) = std::fs::read_dir(path) {
-        for entry in entries.flatten() {
-            let meta = entry.metadata();
-            if let Ok(m) = meta {
-                if m.is_file() {
-                    total += m.len();
-                } else if m.is_dir() {
-                    total += walk_dir_size(&entry.path());
-                }
+    fn walk(path: &std::path::Path, depth: u8) -> u64 {
+        if depth >= DISK_WALK_MAX_DEPTH {
+            return 0;
+        }
+        let mut total = 0u64;
+        let Ok(entries) = std::fs::read_dir(path) else {
+            return 0;
+        };
+        for (visited, entry) in entries.flatten().enumerate() {
+            if visited >= DISK_WALK_MAX_ENTRIES {
+                break;
+            }
+            // symlink_metadata so we never follow symlinks (no cycles, no escape).
+            let Ok(m) = std::fs::symlink_metadata(entry.path()) else {
+                continue;
+            };
+            if m.is_file() {
+                total += m.len();
+            } else if m.is_dir() {
+                total += walk(&entry.path(), depth + 1);
             }
         }
+        total
     }
-    total
+    walk(path, 0)
 }
 
 #[cfg(test)]

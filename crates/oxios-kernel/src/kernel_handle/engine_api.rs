@@ -80,7 +80,7 @@ pub struct RoutingStats {
     calls: RwLock<HashMap<String, u64>>,
     costs: RwLock<HashMap<String, f64>>,
     /// Circular buffer of recent fallback events (max 200).
-    fallbacks: RwLock<Vec<FallbackEvent>>,
+    fallbacks: RwLock<std::collections::VecDeque<FallbackEvent>>,
 }
 
 impl Default for RoutingStats {
@@ -88,7 +88,7 @@ impl Default for RoutingStats {
         Self {
             calls: RwLock::new(HashMap::new()),
             costs: RwLock::new(HashMap::new()),
-            fallbacks: RwLock::new(Vec::new()),
+            fallbacks: RwLock::new(std::collections::VecDeque::new()),
         }
     }
 }
@@ -110,12 +110,14 @@ impl RoutingStats {
     }
 
     /// Record a fallback event.
+    ///
+    /// Uses `VecDeque` so trimming is O(1) (`pop_front`) instead of the O(n)
+    /// memmove that `Vec::drain(0..keep)` performs under the write lock.
     pub fn record_fallback(&self, event: FallbackEvent) {
         let mut fb = self.fallbacks.write();
-        fb.push(event);
-        let keep = fb.len().saturating_sub(200);
-        if keep > 0 {
-            fb.drain(0..keep);
+        fb.push_back(event);
+        while fb.len() > 200 {
+            fb.pop_front();
         }
     }
 
@@ -778,6 +780,17 @@ impl EngineApi {
                 .collect()
         };
 
+        // Hoist the read-lock out of the per-provider closure: the previous
+        // implementation took the lock once per provider (~30 times) and
+        // re-read the same api_key each time. One read + clone is enough.
+        let api_key_override = {
+            let cfg = self.config.read();
+            cfg.engine
+                .api_key
+                .as_deref()
+                .filter(|k| !k.is_empty())
+                .map(str::to_owned)
+        };
         all.into_iter()
             .filter(|p| provider_meta(p).map(|m| !m.hidden).unwrap_or(true))
             .map(|p| {
@@ -786,15 +799,7 @@ impl EngineApi {
                 } else {
                     oxi_sdk::get_provider_models(&p).len()
                 };
-                let has_key = CredentialStore::has_credential(
-                    &p,
-                    self.config
-                        .read()
-                        .engine
-                        .api_key
-                        .as_deref()
-                        .filter(|k| !k.is_empty()),
-                );
+                let has_key = CredentialStore::has_credential(&p, api_key_override.as_deref());
                 let meta = provider_meta(&p);
                 ProviderInfo {
                     id: p.clone(),
@@ -926,11 +931,14 @@ impl EngineApi {
                 )
             })?;
         }
-        {
+        let snapshot = {
             let mut cfg = self.config.write();
             cfg.engine.default_model = model_id.to_string();
-            self.persist(&cfg)?;
-        }
+            cfg.clone()
+        };
+        // Persist outside the write lock — synchronous fs::write under the
+        // lock would serialize every reader (providers/config/routing_stats).
+        self.persist(&snapshot)?;
         tracing::info!(model = %model_id, "Default model updated in config");
         self.rebuild_and_swap();
         Ok(())
@@ -944,16 +952,25 @@ impl EngineApi {
     pub fn set_api_key(&self, provider: &str, key: &str) -> anyhow::Result<()> {
         CredentialStore::store(provider, key)?;
 
-        // If the provider matches the current default model, also set in config
-        let cfg = self.config.read();
-        if let Some(current_provider) =
-            CredentialStore::provider_from_model(&cfg.engine.default_model)
-            && current_provider == provider
-        {
-            drop(cfg);
+        // Acquire the write lock up-front and do the provider-match check and
+        // the assignment atomically. The previous read-lock-then-write-lock
+        // sequence was a TOCTOU: another writer could change `default_model`
+        // between the check and the assignment, leaving an api_key stored
+        // against the wrong provider.
+        let snapshot = {
             let mut cfg = self.config.write();
-            cfg.engine.api_key = Some(key.to_string());
-            self.persist(&cfg)?;
+            let matches = CredentialStore::provider_from_model(&cfg.engine.default_model)
+                .is_some_and(|current_provider| current_provider == provider);
+            if matches {
+                cfg.engine.api_key = Some(key.to_string());
+                Some(cfg.clone())
+            } else {
+                None
+            }
+        };
+        if let Some(snap) = snapshot {
+            // Persist outside the lock (see set_model).
+            self.persist(&snap)?;
         }
         tracing::info!(provider = %provider, "API key stored");
         self.rebuild_and_swap();
@@ -965,11 +982,12 @@ impl EngineApi {
     /// Persists the options and makes them available for the next agent run.
     /// They are passed through to `AgentLoopConfig::provider_options`.
     pub fn set_provider_options(&self, opts: &oxi_sdk::ProviderOptions) -> anyhow::Result<()> {
-        {
+        let snapshot = {
             let mut cfg = self.config.write();
             cfg.engine.provider_options = Some(opts.clone());
-            self.persist(&cfg)?;
-        }
+            cfg.clone()
+        };
+        self.persist(&snapshot)?;
         tracing::info!("Provider options updated and persisted");
         // No engine rebuild needed — provider_options are per-request,
         // picked up from config on the next agent run.
@@ -981,7 +999,7 @@ impl EngineApi {
     /// Only the fields provided in `update` are changed; others are left untouched.
     /// Changes are persisted to disk immediately.
     pub fn set_routing(&self, update: RoutingUpdate) -> anyhow::Result<()> {
-        {
+        let snapshot = {
             let mut cfg = self.config.write();
             if let Some(v) = update.routing_enabled {
                 cfg.engine.routing_enabled = v;
@@ -995,8 +1013,9 @@ impl EngineApi {
             if let Some(v) = update.excluded_models {
                 cfg.engine.excluded_models = v;
             }
-            self.persist(&cfg)?;
-        }
+            cfg.clone()
+        };
+        self.persist(&snapshot)?;
         tracing::info!("Routing configuration updated via API");
         self.rebuild_and_swap();
         Ok(())
@@ -1083,16 +1102,19 @@ impl EngineApi {
     /// change would just reload the same data). No network calls beyond
     /// what `CredentialStore` already caches in memory.
     fn rebuild_and_swap(&self) {
-        let cfg = self.config.read();
-        let model_id = &cfg.engine.default_model;
-        // The catalog Arc is cheap to clone and shared across hot-swaps.
-        let catalog = self.engine_handle.get().oxi().catalog().clone();
+        // Narrow the read-lock window: clone the small fields we need, then
+        // build the engine outside the lock so concurrent readers/writers are
+        // not blocked by `OxiosEngine::from_config_with_catalog` work.
+        let (model_id, api_key, catalog) = {
+            let cfg = self.config.read();
+            let catalog = self.engine_handle.get().oxi().catalog().clone();
+            (cfg.engine.default_model.clone(), cfg.api_key(), catalog)
+        };
         let new_engine = crate::engine::OxiosEngine::from_config_with_catalog(
-            model_id,
-            cfg.api_key().as_deref(),
+            &model_id,
+            api_key.as_deref(),
             catalog,
         );
-        drop(cfg);
         self.engine_handle.swap(new_engine);
     }
 }

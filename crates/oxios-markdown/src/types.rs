@@ -113,6 +113,9 @@ pub enum FsError {
     /// Cannot reverse a hash to find the original filename.
     #[error("cannot unhash, maybe the file is missing")]
     CannotUnhash,
+    /// File too large to read or write in one operation.
+    #[error("file too large")]
+    TooLarge,
     /// IO error.
     #[error("{0}")]
     Io(#[from] std::io::Error),

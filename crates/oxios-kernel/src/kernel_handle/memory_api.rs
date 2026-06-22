@@ -23,10 +23,18 @@ pub struct MemoryApi {
 
 impl MemoryApi {
     /// Create a new MemoryApi.
-    pub fn new(memory_manager: Arc<MemoryManager>) -> Self {
+    ///
+    /// The optional HNSW index, when present, is used by `search_semantic`
+    /// and `rebuild_hnsw_index`. Callers that have an attached index (e.g.
+    /// `KernelHandle::memory`) should pass it here so this facade agrees with
+    /// `AgentApi`'s memory operations.
+    pub fn new(
+        memory_manager: Arc<MemoryManager>,
+        hnsw_index: Option<Arc<HnswMemoryIndex>>,
+    ) -> Self {
         Self {
             memory_manager,
-            hnsw_index: None,
+            hnsw_index,
         }
     }
 
@@ -78,34 +86,30 @@ impl MemoryApi {
         self.memory_manager.list(memory_type, limit).await
     }
 
-    /// Search memory using semantic similarity (returns SemanticHits).
-    /// Falls back to keyword search if no HNSW index.
+    /// Search memory using semantic similarity (returns `SemanticHit`s ranked
+    /// by cosine similarity).
+    ///
+    /// Uses the attached HNSW index when available; otherwise falls back to
+    /// keyword search. In the fallback case `similarity` is `0.0` (unknown),
+    /// never a fabricated `1.0`.
     pub async fn search_semantic(
         &self,
         query: &str,
         limit: usize,
     ) -> anyhow::Result<Vec<SemanticHit>> {
         if let Some(hnsw) = &self.hnsw_index {
-            let _ = hnsw; // hnsw available, would use it here
-            // For now, delegate to regular search and convert
-            let entries = self.memory_manager.search(query, None, limit).await?;
-            Ok(entries
-                .into_iter()
-                .map(|e| SemanticHit {
-                    entry: e,
-                    distance: 0.0,
-                    similarity: 1.0,
-                })
-                .collect())
+            self.memory_manager
+                .semantic_search(query, None, limit, hnsw)
+                .await
         } else {
-            // Fallback: use keyword search
+            // Fallback: keyword search. similarity/distance are unknown.
             let entries = self.memory_manager.search(query, None, limit).await?;
             Ok(entries
                 .into_iter()
                 .map(|e| SemanticHit {
                     entry: e,
                     distance: 0.0,
-                    similarity: 1.0,
+                    similarity: 0.0,
                 })
                 .collect())
         }
@@ -120,14 +124,14 @@ impl MemoryApi {
     }
 
     /// Rebuild the HNSW index from current memory state.
-    /// Returns the number of vectors indexed.
+    ///
+    /// Returns the number of vectors indexed. Errors if no HNSW index is
+    /// attached (matching `AgentApi::rebuild_hnsw_index`).
     pub async fn rebuild_hnsw_index(&self) -> anyhow::Result<usize> {
         if let Some(hnsw) = &self.hnsw_index {
-            // Try to rebuild
-            self.memory_manager.rebuild_index().await?;
-            Ok(hnsw.len())
+            self.memory_manager.rebuild_hnsw_index(hnsw).await
         } else {
-            Ok(0)
+            Err(anyhow::anyhow!("HNSW index not initialized"))
         }
     }
 
