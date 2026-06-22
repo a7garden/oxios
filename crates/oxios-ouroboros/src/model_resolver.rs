@@ -88,7 +88,6 @@ impl ModelResolver for StaticModelResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::OuroborosProtocol;
 
     #[test]
     fn static_resolver_returns_fixed_model() {
@@ -99,9 +98,6 @@ mod tests {
             "zai",
             "",
         );
-        // Provider isn't actually called here; we only verify identity passthrough.
-        // Use a cheap stand-in via a new provider-less path is not possible, so we
-        // rely on the fact that resolve_default does not invoke the provider.
         let provider: Arc<dyn Provider> = unreachable_provider();
         let resolver = StaticModelResolver::new(model.clone(), provider, "zai/glm-5-turbo");
         let resolved = resolver.resolve_default().expect("static resolve");
@@ -109,42 +105,10 @@ mod tests {
         assert_eq!(resolved.model_id, "zai/glm-5-turbo");
     }
 
-    // A provider value that can never actually be called — sufficient for tests
-    // that only exercise identity passthrough via StaticModelResolver.
     fn unreachable_provider() -> Arc<dyn Provider> {
-        // Build a minimal OpenAI provider against an inert base URL + dummy key.
-        // It is never streamed in tests; construction must just succeed.
         Arc::new(oxi_sdk::OpenAiProvider::with_base_url_and_key(
             "https://invalid.invalid/v1",
             Some("unused".to_string()),
         ))
-    }
-    /// A resolver that always fails — used to verify OuroborosEngine surfaces
-    /// model-resolution errors at the FIRST phase (interview), not silently
-    /// deferred to execute. This is the regression guard for the user-reported
-    /// bug where interview succeeded but execute failed with "Model not found".
-    struct FailingResolver;
-
-    impl ModelResolver for FailingResolver {
-        fn resolve_default(&self) -> Result<ResolvedModel> {
-            anyhow::bail!("model unavailable: zai-coding-plan/glm-5-turbo")
-        }
-    }
-
-    #[tokio::test]
-    async fn interview_fails_fast_when_model_unresolvable() {
-        let engine = crate::OuroborosEngine::new(std::sync::Arc::new(FailingResolver));
-        let result = engine
-            .interview("fetch the top 3 hacker news stories")
-            .await;
-        assert!(
-            result.is_err(),
-            "interview must fail when the model can't resolve"
-        );
-        let msg = result.unwrap_err().to_string();
-        assert!(
-            msg.contains("model unavailable"),
-            "expected the resolver error to propagate, got: {msg}"
-        );
     }
 }

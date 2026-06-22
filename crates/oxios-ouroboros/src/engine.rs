@@ -15,12 +15,12 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::assessment::{Assessment, Question, QuestionKind, QuestionOption, Scope};
-use crate::degraded;
 use crate::directive::{Directive, Verdict};
-use crate::evaluation::MechanicalEvalResult;
+use crate::fallback;
+use crate::fallback::MechanicalEvalResult;
 use crate::model_resolver::{ModelResolver, ResolvedModel};
 use crate::prompts::{ASSESS_SYSTEM_PROMPT, CRYSTALLIZE_SYSTEM_PROMPT, REVIEW_SYSTEM_PROMPT};
-use crate::protocol::ExecutionResult;
+use crate::types::ExecutionResult;
 
 // ---------------------------------------------------------------------------
 // JSON response shapes
@@ -281,7 +281,7 @@ impl IntentEngine {
             Ok(p) => p,
             Err(e) => {
                 tracing::warn!(error = %e, "assess JSON parse failed after retry, using degraded fallback");
-                return Ok(degraded::degraded_assessment(msg));
+                return Ok(fallback::degraded_assessment(msg));
             }
         };
 
@@ -307,7 +307,7 @@ impl IntentEngine {
             Ok(p) => p,
             Err(e) => {
                 tracing::warn!(error = %e, "crystallize JSON parse failed after retry, using degraded fallback");
-                return Ok(degraded::degraded_directive(msg));
+                return Ok(fallback::degraded_directive(msg));
             }
         };
 
@@ -340,7 +340,7 @@ impl IntentEngine {
             Ok(p) => p,
             Err(e) => {
                 tracing::warn!(error = %e, "review JSON parse failed after retry, using degraded fallback");
-                return Ok(degraded::degraded_verdict(all_mechanical));
+                return Ok(fallback::degraded_verdict(all_mechanical));
             }
         };
 

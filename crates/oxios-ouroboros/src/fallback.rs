@@ -1,46 +1,55 @@
-//! Three-stage evaluation of execution results.
+//! Fallback helpers for LLM parsing failures and mechanical evaluation.
 //!
-//! Evaluation proceeds through three stages:
-//! 1. **Mechanical** — Does the output satisfy acceptance criteria literally?
-//! 2. **Semantic** — Does the output actually solve the user's intent?
-//! 3. **Consensus** — Would multiple evaluators agree?
+//! Used by [`crate::engine::IntentEngine`] when an LLM response can't be
+//! parsed — provides safe defaults that preserve user intent.
 
 use serde::{Deserialize, Serialize};
 
-/// Result of evaluating an execution against its seed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvaluationResult {
-    /// Stage 1: mechanical acceptance criteria check.
-    pub mechanical_pass: bool,
-    /// Stage 2: semantic correctness check (None if not yet evaluated).
-    pub semantic_pass: Option<bool>,
-    /// Stage 3: consensus check (None if not yet evaluated).
-    pub consensus_pass: Option<bool>,
-    /// Overall score (0.0 to 1.0).
-    pub score: f64,
-    /// Notes from each evaluation stage.
-    pub notes: Vec<String>,
-}
+use crate::assessment::{Assessment, Scope};
+use crate::directive::{Directive, Verdict};
 
-impl EvaluationResult {
-    /// Creates a new evaluation result with only the mechanical stage completed.
-    pub fn mechanical_only(pass: bool, score: f64) -> Self {
-        Self {
-            mechanical_pass: pass,
-            semantic_pass: None,
-            consensus_pass: None,
-            score,
-            notes: Vec::new(),
-        }
-    }
+// ---------------------------------------------------------------------------
+// Degraded fallbacks (LLM parse failure)
+// ---------------------------------------------------------------------------
 
-    /// Returns true if all completed evaluation stages have passed.
-    pub fn all_passed(&self) -> bool {
-        self.mechanical_pass
-            && self.semantic_pass.unwrap_or(true)
-            && self.consensus_pass.unwrap_or(true)
+/// Produce a degraded [`Assessment`] when the assess LLM call fails.
+///
+/// Falls back to Conversation for non-action messages, or Task(Substantial)
+/// when the message looks like a task (contains action verbs).
+pub fn degraded_assessment(msg: &str) -> Assessment {
+    if contains_action_verb(msg) {
+        Assessment::Task(Scope::Substantial)
+    } else {
+        Assessment::Conversation("Hello! How can I help you today?".to_string())
     }
 }
+
+/// Produce a degraded [`Directive`] when the crystallize LLM call fails.
+///
+/// Uses the user message verbatim as both goal and original_request.
+pub fn degraded_directive(msg: &str) -> Directive {
+    Directive::from_message(msg)
+}
+
+/// Produce a degraded [`Verdict`] when the review LLM call fails.
+///
+/// Reports the mechanical check result with no semantic analysis.
+pub fn degraded_verdict(passed: bool) -> Verdict {
+    Verdict {
+        passed,
+        score: if passed { 1.0 } else { 0.0 },
+        notes: Vec::new(),
+        gaps: if passed {
+            Vec::new()
+        } else {
+            vec!["Mechanical check failed".to_string()]
+        },
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mechanical evaluation (no LLM)
+// ---------------------------------------------------------------------------
 
 /// Result of mechanical (non-LLM) evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,23 +90,17 @@ impl MechanicalEvalResult {
                         || output_lower.contains("exit status 0");
                     (has_zero, format!("exit_code_0={has_zero}"))
                 } else {
-                    // Extract language-agnostic key tokens via the shared
-                    // helper (chars().count(), not byte length, so CJK
-                    // text isn't silently dropped) and check if most of
-                    // them appear in the output.
                     let tokens = key_tokens(criterion);
                     if tokens.is_empty() {
-                        // Fallback to full substring match
                         let contains = output_lower.contains(&c_lower);
                         (contains, format!("substring_match={contains}"))
                     } else {
-                        // Check how many key tokens appear in the output
                         let matched = tokens
                             .iter()
                             .filter(|t| output_lower.contains(t.as_str()))
                             .count();
                         let ratio = matched as f64 / tokens.len() as f64;
-                        let passed = ratio >= 0.5; // At least half the key tokens match
+                        let passed = ratio >= 0.5;
                         (
                             passed,
                             format!(
@@ -133,14 +136,7 @@ const STOPWORDS: &[&str] = &[
 ///
 /// Lowercases the criterion and splits on whitespace, keeping tokens that
 /// are either ASCII words longer than 3 characters or contain any
-/// non-ASCII characters. The non-ASCII branch is what makes this
-/// language-agnostic: `str::len()` counts UTF-8 bytes, so a single CJK
-/// glyph (3 bytes) was always rejected by the old `w.len() > 3` filter —
-/// here it is kept because one CJK character is a meaningful token.
-///
-/// Shared by [`MechanicalEvalResult::evaluate`] and the degraded
-/// evaluator ([`crate::degraded::degraded_evaluation`]) so both paths
-/// agree on tokenization and stop-words.
+/// non-ASCII characters (language-agnostic: CJK glyphs are meaningful).
 pub fn key_tokens(criterion: &str) -> Vec<String> {
     criterion
         .to_lowercase()
@@ -148,14 +144,47 @@ pub fn key_tokens(criterion: &str) -> Vec<String> {
         .filter(|w| {
             let non_ascii = w.bytes().any(|b| b >= 0x80);
             let meaningful = if non_ascii {
-                // Non-ASCII (e.g. CJK) — single glyphs are meaningful.
                 w.chars().count() >= 1
             } else {
-                // ASCII — require > 3 chars to drop noise (a, the, is, of).
                 w.chars().count() > 3
             };
             meaningful && !STOPWORDS.contains(w)
         })
         .map(str::to_string)
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Check if the message contains action verbs indicating a task.
+fn contains_action_verb(text: &str) -> bool {
+    let verbs = [
+        "create",
+        "make",
+        "build",
+        "fix",
+        "find",
+        "deploy",
+        "analyze",
+        "review",
+        "write",
+        "read",
+        "run",
+        "execute",
+        "delete",
+        "update",
+        "move",
+        "copy",
+        "implement",
+        "refactor",
+        "debug",
+        "test",
+        "install",
+        "configure",
+        "setup",
+    ];
+    let lower = text.to_lowercase();
+    verbs.iter().any(|v| lower.contains(v))
 }
