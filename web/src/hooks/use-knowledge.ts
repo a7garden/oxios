@@ -17,7 +17,6 @@ import type {
   TodayReport,
 } from '@/types/knowledge'
 
-
 // F7: encode a knowledge-base file path for safe interpolation into a URL.
 // Each path segment is encoded individually so '/' separators are preserved
 // while characters like '?', '#', spaces, and non-ASCII bytes are escaped.
@@ -315,7 +314,8 @@ export function useAutoEmoji(text: string) {
 export function useKnowledgeFileHistory(path: string | null) {
   return useQuery({
     queryKey: ['knowledge', 'history', path],
-    queryFn: () => api.get<KnowledgeHistoryResponse>(`/api/knowledge/file/${encodeFilePath(path!)}/history`),
+    queryFn: () =>
+      api.get<KnowledgeHistoryResponse>(`/api/knowledge/file/${encodeFilePath(path!)}/history`),
     enabled: !!path,
   })
 }

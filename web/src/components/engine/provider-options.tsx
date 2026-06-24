@@ -116,8 +116,8 @@ export function ProviderOptions({ provider, values, onChange, className }: Provi
           // Compute disabled state for thinking-budget fields
           // that depend on their parent thinking-type/thinking-level select.
           const isDisabled =
-            (opt.key === 'thinking_budget_tokens' && values['thinking_type'] === 'disabled') ||
-            (opt.key === 'thinking_budget' && values['thinking_level'] === 'none')
+            (opt.key === 'thinking_budget_tokens' && values.thinking_type === 'disabled') ||
+            (opt.key === 'thinking_budget' && values.thinking_level === 'none')
 
           return (
             <div key={opt.key}>

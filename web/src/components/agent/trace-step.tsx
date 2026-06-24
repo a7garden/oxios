@@ -1,11 +1,4 @@
-import {
-  Brain,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Lightbulb,
-  Wrench,
-} from 'lucide-react'
+import { Brain, ChevronDown, ChevronRight, Clock, Lightbulb, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'

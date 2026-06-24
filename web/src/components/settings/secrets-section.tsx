@@ -10,10 +10,10 @@ import { CheckCircle2, Eye, EyeOff, KeyRound, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { api } from '@/lib/api-client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { api } from '@/lib/api-client'
 import { SectionCard } from './section-card'
 
 interface SecretInfo {
@@ -67,10 +67,7 @@ function sourceBadgeClass(source: string): string {
   }
 }
 
-function sourceLabel(
-  source: string,
-  t: ReturnType<typeof useTranslation>['t'],
-): string {
+function sourceLabel(source: string, t: ReturnType<typeof useTranslation>['t']): string {
   switch (source) {
     case 'env':
       return t('settings.secretSourceEnv', 'Env Var')
@@ -147,11 +144,12 @@ export function SecretsSectionCard() {
             <div key={secret.key} className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium">
-                    {t(labels.labelKey, secret.key)}
-                  </label>
+                  <label className="text-sm font-medium">{t(labels.labelKey, secret.key)}</label>
                   {secret.has_value && (
-                    <Badge variant="outline" className={`text-2xs ${sourceBadgeClass(secret.source)}`}>
+                    <Badge
+                      variant="outline"
+                      className={`text-2xs ${sourceBadgeClass(secret.source)}`}
+                    >
                       {sourceLabel(secret.source, t)}
                     </Badge>
                   )}
@@ -212,9 +210,7 @@ export function SecretsSectionCard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      setEditValues((prev) => ({ ...prev, [secret.key]: '' }))
-                    }
+                    onClick={() => setEditValues((prev) => ({ ...prev, [secret.key]: '' }))}
                   >
                     {secret.has_value
                       ? t('settings.secretUpdate', 'Update')

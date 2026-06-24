@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import DOMPurify from 'dompurify'
 import {
   ArrowRight,
   CheckCircle2,
@@ -17,7 +18,6 @@ import {
   Settings,
   Wrench,
 } from 'lucide-react'
-import DOMPurify from 'dompurify'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'

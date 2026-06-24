@@ -25,10 +25,10 @@ function isNotificationPrefs(value: unknown): value is NotificationPrefs {
   if (!value || typeof value !== 'object') return false
   const obj = value as Record<string, unknown>
   return (
-    typeof obj['desktop_notifications_enabled'] === 'boolean' &&
-    typeof obj['sound_enabled'] === 'boolean' &&
-    typeof obj['complete_sound_enabled'] === 'boolean' &&
-    typeof obj['error_sound_enabled'] === 'boolean'
+    typeof obj.desktop_notifications_enabled === 'boolean' &&
+    typeof obj.sound_enabled === 'boolean' &&
+    typeof obj.complete_sound_enabled === 'boolean' &&
+    typeof obj.error_sound_enabled === 'boolean'
   )
 }
 

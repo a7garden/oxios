@@ -11,8 +11,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   loadNotificationPrefs,
-  saveNotificationPrefs,
   type NotificationPrefs,
+  saveNotificationPrefs,
 } from '@/lib/notification-prefs'
 import { SectionCard } from './section-card'
 

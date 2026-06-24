@@ -5,8 +5,8 @@ import { api } from '@/lib/api-client'
 import { showDesktopNotification } from '@/lib/desktop-notify'
 import { loadNotificationPrefs } from '@/lib/notification-prefs'
 import { playNotificationSound } from '@/lib/sound'
-import { useNotificationStore } from '@/stores/notifications'
 import type { NotificationSeverity } from '@/stores/notifications'
+import { useNotificationStore } from '@/stores/notifications'
 import type { OxiosEvent } from '@/types'
 
 // RFC-024 SP2 (C2 resync): key under which the events store broadcasts a
@@ -30,7 +30,7 @@ const RESYNC_EVENT = 'oxios:resync'
  *   for the same agent within 30s is suppressed (the failure was already
  *   reported via the error notification).
  */
- export function useGlobalEvents() {
+export function useGlobalEvents() {
   const add = useNotificationStore((s) => s.add)
   const { events } = useEvents()
   const seen = useRef<Map<string, number>>(new Map())
@@ -152,8 +152,8 @@ export function useApprovalWatcher() {
  * Defaults to `true` when absent (backward compat with older backends).
  */
 function agentStoppedSuccess(e: OxiosEvent): boolean {
-  if (e.data && typeof e.data['success'] === 'boolean') {
-    return e.data['success']
+  if (e.data && typeof e.data.success === 'boolean') {
+    return e.data.success
   }
   return true
 }

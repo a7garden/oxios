@@ -18,8 +18,7 @@ function getCtx(): AudioContext | null {
   if (!ctx) {
     const Ctor =
       window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) return null
     ctx = new Ctor()
   }
@@ -47,7 +46,7 @@ function noteToFreq(note: string, octave: number): number {
     b: 11,
   }
   const midi = (octave + 1) * 12 + (semitones[note.toLowerCase()] ?? 9)
-  return 440 * Math.pow(2, (midi - 69) / 12)
+  return 440 * 2 ** ((midi - 69) / 12)
 }
 
 function tone(
