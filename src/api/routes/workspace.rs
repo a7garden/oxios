@@ -11,6 +11,8 @@ use oxios_kernel::{SkillEntry, SkillSource, SkillStatus};
 
 use crate::api::error::AppError;
 use crate::api::routes::PageParams;
+#[cfg(test)]
+use crate::api::routes::paginate;
 use crate::api::server::AppState;
 
 // ---------------------------------------------------------------------------
