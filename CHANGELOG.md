@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-06-24
+
+### Added
+- **RFC-027: single-path intent pipeline** — Ouroboros type reorg consolidating the intent (assess → crystallize → execute → review) flow into a single path; orchestrator/agent-runtime/gateway migrated to root-level ouroboros types.
+- **RFC-024: web↔daemon reliability** — full SP1–SP4 close: message ordering + replay buffer, atomic web-dist swap (no 404 window), subsystem readiness gate (503 until warm, Degraded counts as ready), and client-side WS keepalive/resume.
+
+### Fixed
+- **Chat WebSocket connects when auth is disabled** — v1.8.1's F3 token hardening blocked the WS in the default no-auth config (no login UI exists to set a token), leaving chat stuck on "재연결 중". The frontend now reads `auth_enabled` from `/api/status` (newly exposed) and connects without credentials when auth is off.
+- **Auth-enabled browser WebSocket** — `/api/chat/stream` no longer fails the upgrade under `require_auth` (browsers cannot attach a Bearer header to a WebSocket); authentication is enforced by the handler via the `?ticket=` query param.
+- **Memory HTTP API wired to the MemoryManager** — list/get/stats/pin/delete previously read the legacy category state-store while `create` wrote to the SQLite MemoryManager, so the memory page was always empty and mutations 404'd. All five handlers now use the MemoryManager (via four new `AgentApi` methods), and four missing routes are registered (`dream/status`, `dream/reports`, `{id}/pin`, `DELETE {name}`). Response shapes match the frontend `MemoryDetail`/`MemoryStats` types.
+- **Memory overview renders in production builds** — recharts 3.x `BarChart`/`PieChart` threw `TypeError: t is not a function` when bundled by rolldown (vite v8); replaced with a dependency-free CSS bar.
+- **Web lint** — auto-fixed pre-existing biome violations (`useLiteralKeys`, `organizeImports`) that failed the v1.8.1 release CI.
+
+### Changed
+- Kernel/orchestrator/gateway refactored to root-level ouroboros types; legacy five-phase integration tests dropped.
+
 ## [1.7.1] - 2026-06-22
 
 ### Changed
