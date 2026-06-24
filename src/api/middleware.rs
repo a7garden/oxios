@@ -106,6 +106,14 @@ pub async fn require_auth(
     if path == "/health" {
         return Ok(next.run(request).await);
     }
+    // The WebSocket upgrade cannot carry a Bearer header (browsers forbid
+    // custom headers on `new WebSocket()`). Authentication for the chat stream
+    // is enforced by the handler via a short-lived `?ticket=` query param
+    // (see `handle_chat_stream` in routes/chat.rs), so exempt it from the
+    // header-based middleware check here.
+    if path == "/api/chat/stream" {
+        return Ok(next.run(request).await);
+    }
 
     // Allow only actual static asset paths (prefix-based, not suffix)
     let static_prefixes = ["/assets/", "/favicon", "/knowledge/"];
