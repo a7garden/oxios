@@ -1,23 +1,52 @@
 import { Activity, Brain, Hash, Pin } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useMemoryStats } from '@/hooks/use-memory'
 
-const TIER_COLORS = { hot: '#ef4444', warm: '#eab308', cold: '#3b82f6' }
+const TIER_COLORS: Record<string, string> = {
+  hot: '#ef4444',
+  warm: '#eab308',
+  cold: '#3b82f6',
+}
+
+/**
+ * One horizontal distribution row: label · bar (scaled to `max`) · count.
+ *
+ * NOTE: this replaces recharts `<BarChart>`/`<PieChart>` here. recharts 3.x's
+ * Bar/Pie components are mis-bundled by rolldown (vite v8) — they render fine in
+ * dev but throw `TypeError: t is not a function` in the production bundle.
+ * AreaChart (used elsewhere) is unaffected; only Bar/Pie break. A dependency-
+ * free bar avoids the defective code path and renders identically in every build.
+ */
+function DistBar({
+  label,
+  value,
+  max,
+  color,
+}: {
+  label: string
+  value: number
+  max: number
+  color: string
+}) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <span className="w-20 shrink-0 truncate text-muted-foreground" title={label}>
+        {label}
+      </span>
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
+      </div>
+      <span className="w-8 shrink-0 text-right font-medium tabular-nums">{value}</span>
+    </div>
+  )
+}
 
 export function MemoryOverview() {
   const { t } = useTranslation()
@@ -27,17 +56,14 @@ export function MemoryOverview() {
   if (isError) return <ErrorState onRetry={() => refetch()} />
   if (!stats) return null
 
-  const tierData = Object.entries(stats.by_tier || {})
+  const tierEntries = Object.entries(stats.by_tier || {})
     .filter(([, v]) => v > 0)
-    .map(([name, value]) => ({
-      name: t(`memory.${name}`, name),
-      value,
-      fill: TIER_COLORS[name as keyof typeof TIER_COLORS] || '#888',
-    }))
-
-  const typeData = Object.entries(stats.by_type || {})
+    .map(([name, value]) => [name, value] as [string, number])
+  const typeEntries = Object.entries(stats.by_type || {})
     .filter(([, v]) => v > 0)
-    .map(([name, value]) => ({ name: t(`memory.${name}`, name), value }))
+    .map(([name, value]) => [name, value] as [string, number])
+  const tierMax = Math.max(1, ...tierEntries.map(([, v]) => v))
+  const typeMax = Math.max(1, ...typeEntries.map(([, v]) => v))
 
   const statCards = [
     { label: t('memory.totalEntries'), value: stats.total, icon: Brain },
@@ -47,11 +73,7 @@ export function MemoryOverview() {
       icon: Hash,
     },
     { label: t('memory.pinnedEntries'), value: 0, icon: Pin },
-    {
-      label: t('memory.dreamStatus'),
-      value: 'idle',
-      icon: Activity,
-    },
+    { label: t('memory.dreamStatus'), value: 'idle', icon: Activity },
   ]
 
   return (
@@ -74,27 +96,17 @@ export function MemoryOverview() {
           <CardHeader>
             <CardTitle>{t('memory.tierDistribution')}</CardTitle>
           </CardHeader>
-          <CardContent>
-            {tierData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={tierData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label
-                  >
-                    {tierData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+          <CardContent className="space-y-3">
+            {tierEntries.length > 0 ? (
+              tierEntries.map(([name, value]) => (
+                <DistBar
+                  key={name}
+                  label={t(`memory.${name}`, name)}
+                  value={value}
+                  max={tierMax}
+                  color={TIER_COLORS[name] ?? '#888'}
+                />
+              ))
             ) : (
               <p className="text-sm text-muted-foreground">{t('memory.noData')}</p>
             )}
@@ -104,16 +116,17 @@ export function MemoryOverview() {
           <CardHeader>
             <CardTitle>{t('memory.typeDistribution')}</CardTitle>
           </CardHeader>
-          <CardContent>
-            {typeData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={typeData}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis />
-                  <RechartsTooltip />
-                  <Bar dataKey="value" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
+          <CardContent className="space-y-3">
+            {typeEntries.length > 0 ? (
+              typeEntries.map(([name, value]) => (
+                <DistBar
+                  key={name}
+                  label={t(`memory.${name}`, name)}
+                  value={value}
+                  max={typeMax}
+                  color="#8884d8"
+                />
+              ))
             ) : (
               <p className="text-sm text-muted-foreground">{t('memory.noData')}</p>
             )}
