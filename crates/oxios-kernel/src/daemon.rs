@@ -440,6 +440,7 @@ WantedBy=multi-user.target
     }
 }
 
+#[cfg(target_os = "macos")]
 /// Escape a string for safe inclusion in an XML plist text node.
 ///
 /// Replaces the five XML-predefined entities (`&`, `<`, `>`, `"`, `'`). Paths
