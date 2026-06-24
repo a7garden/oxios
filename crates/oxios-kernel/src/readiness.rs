@@ -268,6 +268,10 @@ mod tests {
     #[test]
     fn readiness_gauge_tracks_gate_state() {
         // Snapshot the gauge before mutating.
+        // Ensure the readiness gauge is registered. This test must not rely on
+        // another test (or a linked binary) having called get_metrics() first,
+        // because partitioned CI runs isolate tests into separate processes.
+        crate::metrics::get_metrics();
         let before = current_readiness_gauge();
 
         let g = ReadinessGate::new(0);
