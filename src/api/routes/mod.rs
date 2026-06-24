@@ -134,11 +134,13 @@ pub(crate) use system::{
 };
 pub(crate) use tools::handle_tools_registry;
 pub(crate) use workspace::{
-    MemoryMapCache, handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_map,
-    handle_memory_search, handle_memory_semantic_search, handle_skill_content, handle_skill_create,
-    handle_skill_delete, handle_skill_disable, handle_skill_enable, handle_skill_get,
-    handle_skills_list, handle_workspace_file_create, handle_workspace_file_delete,
-    handle_workspace_file_get, handle_workspace_file_put, handle_workspace_tree,
+    MemoryMapCache, handle_dream_reports, handle_dream_status, handle_memory_create,
+    handle_memory_delete, handle_memory_get, handle_memory_list, handle_memory_map,
+    handle_memory_pin, handle_memory_search, handle_memory_semantic_search, handle_memory_stats,
+    handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
+    handle_skill_enable, handle_skill_get, handle_skills_list, handle_workspace_file_create,
+    handle_workspace_file_delete, handle_workspace_file_get, handle_workspace_file_put,
+    handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -318,7 +320,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/memory/search", post(handle_memory_search))
         .route("/api/memory/semantic", post(handle_memory_semantic_search))
         .route("/api/memory/map", get(handle_memory_map))
-        .route("/api/memory/{name}", get(handle_memory_get))
+        .route("/api/memory/stats", get(handle_memory_stats))
+        .route("/api/memory/dream/status", get(handle_dream_status))
+        .route("/api/memory/dream/reports", get(handle_dream_reports))
+        .route("/api/memory/{id}/pin", put(handle_memory_pin))
+        .route(
+            "/api/memory/{name}",
+            get(handle_memory_get).delete(handle_memory_delete),
+        )
         // Scheduler stats & tasks
         .route("/api/scheduler/stats", get(handle_scheduler_stats))
         .route("/api/scheduler/tasks", get(handle_scheduler_tasks))

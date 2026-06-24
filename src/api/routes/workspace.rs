@@ -6,11 +6,11 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 
-use oxios_kernel::memory::{MemoryEntry, MemoryType};
+use oxios_kernel::memory::{MemoryEntry, MemoryTier, MemoryType, ProtectionLevel};
 use oxios_kernel::{SkillEntry, SkillSource, SkillStatus};
 
 use crate::api::error::AppError;
-use crate::api::routes::{PageParams, paginate};
+use crate::api::routes::PageParams;
 use crate::api::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -591,86 +591,92 @@ pub(crate) async fn handle_skill_delete(
 // Memory
 // ---------------------------------------------------------------------------
 
-/// Memory entry summary.
-#[derive(Debug, Serialize, Clone)]
-pub(crate) struct MemorySummary {
-    /// Entry name.
-    name: String,
-    /// Category (memory type).
-    category: String,
+/// Label for a memory tier, matching the frontend's tier keys.
+fn tier_label(t: &MemoryTier) -> &'static str {
+    match t {
+        MemoryTier::Hot => "hot",
+        MemoryTier::Warm => "warm",
+        MemoryTier::Cold => "cold",
+    }
 }
 
-/// GET /api/memory — List memory entries.
+/// Map a stored entry to the `MemoryDetail` shape consumed by the web UI.
+fn memory_entry_to_detail(e: &MemoryEntry) -> serde_json::Value {
+    serde_json::json!({
+        "id": e.id,
+        "key": e.id,
+        "tier": tier_label(&e.tier),
+        "memory_type": e.memory_type.label(),
+        "content": e.content,
+        "summary": null,
+        "project_ids": [],
+        "created_at": e.created_at.to_rfc3339(),
+        "updated_at": e.modified_at.to_rfc3339(),
+        "last_accessed": e.accessed_at.to_rfc3339(),
+        "access_count": e.access_count,
+        "pinned": e.pinned,
+        "protected": !matches!(e.protection, ProtectionLevel::None),
+        "protection_reason": null,
+        "tags": e.tags,
+        "importance": e.importance,
+    })
+}
+
+/// Query params for `GET /api/memory`.
+#[derive(Debug, Deserialize)]
+pub(crate) struct MemoryListQuery {
+    #[serde(default)]
+    pub tier: Option<String>,
+    #[serde(default)]
+    pub r#type: Option<String>,
+    #[serde(default)]
+    pub page: Option<usize>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+/// GET /api/memory — List memory entries (optionally filtered by tier/type).
 pub(crate) async fn handle_memory_list(
     state: State<Arc<AppState>>,
-    Query(params): Query<PageParams>,
+    Query(q): Query<MemoryListQuery>,
 ) -> Json<serde_json::Value> {
-    let mut entries = Vec::new();
+    let limit = q.limit.unwrap_or(50).clamp(1, 500);
+    let mut entries = state.kernel.agents.list_all_memories(500).await;
 
-    // List all memory categories
-    for category in [
-        "memory/facts",
-        "memory/episodes",
-        "memory/knowledge",
-        "memory/sessions",
-    ] {
-        if let Ok(names) = state.kernel.state.list_category(category).await {
-            let cat = category.split('/').nth(1).unwrap_or("fact");
-            for name in names {
-                entries.push(MemorySummary {
-                    name,
-                    category: cat.into(),
-                });
-            }
-        }
+    if let Some(t) = &q.r#type {
+        entries.retain(|e| e.memory_type.label() == t.as_str());
+    }
+    if let Some(tier) = &q.tier {
+        entries.retain(|e| tier_label(&e.tier) == tier.as_str());
     }
 
-    Json(paginate(&entries, &params))
+    let total = entries.len();
+    let page = q.page.unwrap_or(1).max(1);
+    let start = (page - 1) * limit;
+    let items: Vec<_> = entries
+        .iter()
+        .skip(start)
+        .take(limit)
+        .map(memory_entry_to_detail)
+        .collect();
+
+    Json(serde_json::json!({
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+    }))
 }
 
-/// All memory categories the web UI may need to look up. Kept in sync
-/// with the iteration order used by `handle_memory_map` and the
-/// `MemoryType::category()` map in the kernel.
-const MEMORY_CATEGORIES: &[&str] = &[
-    "memory/facts",
-    "memory/episodes",
-    "memory/knowledge",
-    "memory/sessions",
-    "memory/conversations",
-    "memory/skills",
-    "memory/preferences",
-    "memory/decisions",
-    "memory/profiles",
-];
-
-/// GET /api/memory/:name — Get a specific memory entry.
+/// GET /api/memory/:name — Get a specific memory entry by ID.
 pub(crate) async fn handle_memory_get(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    // Memory entries are stored as JSON, not markdown.
-    // Try all known memory categories to find the entry.
-    for category in MEMORY_CATEGORIES {
-        if let Ok(Some(entry)) = state
-            .kernel
-            .state
-            .load::<oxios_kernel::memory::MemoryEntry>(category, &name)
-            .await
-        {
-            return Ok(Json(serde_json::json!({
-                "id": entry.id,
-                "name": entry.id,
-                "category": entry.memory_type.label(),
-                "content": entry.content,
-                "tags": entry.tags,
-                "importance": entry.importance,
-                "created_at": entry.created_at.to_rfc3339(),
-            }))
-            .into_response());
-        }
+    match state.kernel.agents.get_memory(&name).await {
+        Some(entry) => Ok(Json(memory_entry_to_detail(&entry)).into_response()),
+        None => Err(AppError::NotFound("memory entry not found".into())),
     }
-
-    Err(AppError::NotFound("memory entry not found".into()))
 }
 
 // ---------------------------------------------------------------------------
@@ -1193,41 +1199,41 @@ pub(crate) async fn handle_memory_semantic_search(
 // ---------------------------------------------------------------------------
 
 /// GET /api/memory/stats — Aggregate memory statistics.
-#[allow(dead_code)]
 pub(crate) async fn handle_memory_stats(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let (_index_size, _total) = state.kernel.agents.memory_stats().await;
+    let entries = state.kernel.agents.list_all_memories(10_000).await;
 
-    // Count by category
-    let mut by_type = serde_json::Map::new();
-    let mut count = 0usize;
-    for category in [
-        "memory/facts",
-        "memory/episodes",
-        "memory/knowledge",
-        "memory/sessions",
-    ] {
-        if let Ok(names) = state.kernel.state.list_category(category).await {
-            let cat = category.split('/').nth(1).unwrap_or("unknown");
-            by_type.insert(
-                cat.to_string(),
-                serde_json::Value::Number(names.len().into()),
-            );
-            count += names.len();
-        }
+    let mut by_tier: std::collections::BTreeMap<&str, u64> = std::collections::BTreeMap::new();
+    let mut by_type: std::collections::BTreeMap<&str, u64> = std::collections::BTreeMap::new();
+    let mut total_size_bytes = 0usize;
+    let mut oldest: Option<chrono::DateTime<chrono::Utc>> = None;
+    let mut newest: Option<chrono::DateTime<chrono::Utc>> = None;
+
+    for e in &entries {
+        *by_tier.entry(tier_label(&e.tier)).or_default() += 1;
+        *by_type.entry(e.memory_type.label()).or_default() += 1;
+        total_size_bytes += e.content.len();
+        oldest = Some(oldest.map_or(e.created_at, |o| o.min(e.created_at)));
+        newest = Some(newest.map_or(e.created_at, |n| n.max(e.created_at)));
     }
 
+    let by_tier_json: serde_json::Map<String, serde_json::Value> = by_tier
+        .into_iter()
+        .map(|(k, v)| (k.into(), serde_json::Value::from(v)))
+        .collect();
+    let by_type_json: serde_json::Map<String, serde_json::Value> = by_type
+        .into_iter()
+        .map(|(k, v)| (k.into(), serde_json::Value::from(v)))
+        .collect();
+
     Ok(Json(serde_json::json!({
-        "total": count,
-        "by_tier": { "hot": 0, "warm": count, "cold": 0 },
-        "by_type": by_type,
-        "by_protection": { "none": count, "low": 0, "medium": 0, "high": 0, "permanent": 0 },
-        "dream": {
-            "status": "idle",
-            "last_run": null,
-            "last_report_id": null,
-        }
+        "total": entries.len(),
+        "by_tier": by_tier_json,
+        "by_type": by_type_json,
+        "total_size_bytes": total_size_bytes,
+        "oldest_created": oldest.map(|d| d.to_rfc3339()),
+        "newest_created": newest.map(|d| d.to_rfc3339()),
     })))
 }
 
@@ -1238,71 +1244,42 @@ pub(crate) struct PinRequest {
 }
 
 /// PUT /api/memory/{id}/pin — Toggle pin status on a memory entry.
-#[allow(dead_code)]
 pub(crate) async fn handle_memory_pin(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(body): Json<PinRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    for category in [
-        "memory/facts",
-        "memory/episodes",
-        "memory/knowledge",
-        "memory/sessions",
-    ] {
-        if let Ok(Some(mut entry)) = state.kernel.state.load::<MemoryEntry>(category, &id).await {
-            entry.pinned = body.pinned;
-            state
-                .kernel
-                .state
-                .save(category, &id, &entry)
-                .await
-                .map_err(|e| AppError::Internal(e.to_string()))?;
-            return Ok(Json(serde_json::json!({ "id": id, "pinned": body.pinned })));
-        }
+    if state
+        .kernel
+        .agents
+        .set_memory_pinned(&id, body.pinned)
+        .await
+    {
+        Ok(Json(serde_json::json!({ "id": id, "pinned": body.pinned })))
+    } else {
+        Err(AppError::NotFound("memory entry not found".into()))
     }
-    Err(AppError::NotFound("memory entry not found".into()))
 }
 
 /// DELETE /api/memory/{id} — Delete a memory entry.
-#[allow(dead_code)]
 pub(crate) async fn handle_memory_delete(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    for category in [
-        "memory/facts",
-        "memory/episodes",
-        "memory/knowledge",
-        "memory/sessions",
-    ] {
-        if let Ok(Some(_)) = state
-            .kernel
-            .state
-            .load::<serde_json::Value>(category, &id)
-            .await
-        {
-            state
-                .kernel
-                .state
-                .delete(category, &id)
-                .await
-                .map_err(|e| AppError::Internal(e.to_string()))?;
-            return Ok(Json(serde_json::json!({ "id": id, "deleted": true })));
-        }
+    if state.kernel.agents.forget_memory(&id).await {
+        Ok(Json(serde_json::json!({ "id": id, "deleted": true })))
+    } else {
+        Err(AppError::NotFound("memory entry not found".into()))
     }
-    Err(AppError::NotFound("memory entry not found".into()))
 }
 
 /// GET /api/memory/dream/reports — List dream reports.
-#[allow(dead_code)]
 pub(crate) async fn handle_dream_reports(_state: State<Arc<AppState>>) -> Json<serde_json::Value> {
     // Placeholder — return empty list until dream persistence is implemented
     Json(serde_json::json!({ "reports": [] }))
 }
 
 /// GET /api/memory/dream/status — Dream status.
-#[allow(dead_code)]
 pub(crate) async fn handle_dream_status(_state: State<Arc<AppState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "idle",

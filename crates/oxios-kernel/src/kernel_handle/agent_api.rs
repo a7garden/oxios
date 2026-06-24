@@ -147,6 +147,56 @@ impl AgentApi {
         Ok(id)
     }
 
+    /// List memories across all types, most-recent-first, capped at `limit`.
+    pub async fn list_all_memories(&self, limit: usize) -> Vec<MemoryEntry> {
+        let mut all = Vec::new();
+        for mt in MemoryType::all() {
+            if let Ok(entries) = self.memory_manager.list(*mt, limit).await {
+                all.extend(entries);
+            }
+        }
+        all.sort_by_key(|e| std::cmp::Reverse(e.created_at));
+        all.into_iter().take(limit).collect()
+    }
+
+    /// Get a memory entry by ID, searching all types.
+    pub async fn get_memory(&self, id: &str) -> Option<MemoryEntry> {
+        self.memory_manager.get_by_id(id).await.ok().flatten()
+    }
+
+    /// Pin or unpin a memory entry. Returns `false` if no entry has this ID.
+    pub async fn set_memory_pinned(&self, id: &str, pinned: bool) -> bool {
+        if self
+            .memory_manager
+            .get_by_id(id)
+            .await
+            .ok()
+            .flatten()
+            .is_none()
+        {
+            return false;
+        }
+        let res = if pinned {
+            self.memory_manager.pin(id).await
+        } else {
+            self.memory_manager.unpin(id).await
+        };
+        res.is_ok()
+    }
+
+    /// Delete a memory entry by ID. Returns `false` if not found.
+    pub async fn forget_memory(&self, id: &str) -> bool {
+        // `forget` is keyed by (id, type); resolve the type via a lookup first.
+        let memory_type = match self.memory_manager.get_by_id(id).await {
+            Ok(Some(entry)) => entry.memory_type,
+            _ => return false,
+        };
+        self.memory_manager
+            .forget(id, memory_type)
+            .await
+            .unwrap_or(false)
+    }
+
     /// Search memory entries.
     pub async fn search_memory(
         &self,
