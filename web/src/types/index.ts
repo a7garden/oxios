@@ -491,6 +491,8 @@ export interface SystemStatus {
   status: string
   version: string
   web_version?: string
+  /** Whether the backend requires auth. When false, the WebSocket connects without a token. */
+  auth_enabled?: boolean
   channels: string[]
   uptime: string // formatted "1h 30m 5s"
   components?: {

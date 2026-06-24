@@ -136,6 +136,10 @@ pub(crate) struct StatusResponse {
     /// Web UI frontend version (read from `<web_dist>/version.json` written
     /// by the Vite build, or `"dev"` when not present — e.g. `bun dev`).
     web_version: String,
+    /// Whether the HTTP API requires authentication. The frontend uses this
+    /// to decide whether the WebSocket needs a token — when false (the
+    /// default for local deployments), the WS connects without credentials.
+    auth_enabled: bool,
     /// Registered channels.
     channels: Vec<String>,
     /// Uptime info.
@@ -256,6 +260,7 @@ pub(crate) async fn handle_status(state: State<Arc<AppState>>) -> Json<StatusRes
         status: "running".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         web_version,
+        auth_enabled: state.config.read().security.auth_enabled,
         channels: vec!["web".into()],
         uptime: uptime_str,
         components,

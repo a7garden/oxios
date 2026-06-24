@@ -275,19 +275,63 @@ function getToken(): string {
   return useAuthStore.getState().token || ''
 }
 
+/**
+ * Whether the backend has authentication enabled.
+ *
+ * Learned from `GET /api/status`, which is reachable without a token exactly
+ * when auth is disabled (`require_auth` skips when `auth_enabled=false`). The
+ * result is cached: `auth_enabled` only changes across a daemon restart, so a
+ * single probe per page session is sufficient.
+ */
+let authEnabledCached: boolean | null = null
+
+async function isAuthEnabled(): Promise<boolean> {
+  if (authEnabledCached !== null) return authEnabledCached
+  try {
+    const res = await fetch('/api/status', { headers: { Accept: 'application/json' } })
+    // 401/403 means the endpoint demands auth → auth is on.
+    if (res.status === 401 || res.status === 403) {
+      authEnabledCached = true
+      return true
+    }
+    if (res.ok) {
+      const data = (await res.json().catch(() => null)) as { auth_enabled?: boolean } | null
+      authEnabledCached = data?.auth_enabled === true
+      return authEnabledCached
+    }
+    // 503 = subsystems still warming up (the readiness gate returns 503 until
+    // the engine/state-store reach Ready/Degraded). That is not an auth signal,
+    // so default to auth-off (the common case) and leave the cache unset so the
+    // next connect attempt re-probes once the server is ready.
+    if (res.status === 503) return false
+  } catch {
+    // Network error — fall through to the conservative default below.
+  }
+  // Could not determine: default to auth-enabled so a protected deployment is
+  // never silently bypassed. The common auth-off case resolves via the 200
+  // path above; this only governs genuine request failures.
+  return true
+}
+
 async function buildWsUrl(): Promise<string> {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const base = `${protocol}//${window.location.host}/api/chat/stream`
+
+  // When auth is disabled (the default for local single-user deployments),
+  // connect without credentials. The backend skips ticket/token validation,
+  // and a browser WebSocket cannot carry a Bearer header anyway — so blocking
+  // the connection on a missing token only stranded deployments that have no
+  // login UI to set one.
+  if (!(await isAuthEnabled())) {
+    return base
+  }
+
   const token = getToken()
 
-  // F3: never attempt an unauthenticated WebSocket. Without a token the
-  // backend cannot verify the caller, so surface the error instead of
-  // silently connecting (which could bypass auth if the backend's Origin
-  // check is lax).
+  // Auth is enabled — a token is mandatory.
   if (!token) {
     throw new Error('Cannot open WebSocket: not authenticated')
   }
-
-  const base = `${protocol}//${window.location.host}/api/chat/stream`
 
   // Prefer a short-lived ticket so the token itself never appears in the URL
   // (URLs are logged by proxies and may leak via Referer).
