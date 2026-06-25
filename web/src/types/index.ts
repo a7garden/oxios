@@ -344,8 +344,6 @@ export interface StreamChunk {
   ambiguity?: number
   // ── Tool approval (RFC-017) ──
   id?: string
-  /// Execution mode returned in 'done' chunk: "chat" | "spec" | "ouroboros".
-  mode?: string
   reason?: string
 }
 

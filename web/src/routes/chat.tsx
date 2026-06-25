@@ -30,8 +30,6 @@ function ChatPage() {
     activeInterview,
     interviewRound,
     interviewAmbiguity,
-    specMode,
-    toggleSpecMode,
     sendMessage,
     setActiveProject,
     dismissDetection,
@@ -63,10 +61,6 @@ function ChatPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'm') {
-        e.preventDefault()
-        toggleSpecMode()
-      }
       if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault()
         newSession()
@@ -74,7 +68,7 @@ function ChatPage() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleSpecMode, newSession])
+  }, [newSession])
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
@@ -202,7 +196,6 @@ function ChatPage() {
               disabled={isStreaming}
               isStreaming={isStreaming}
               connected={connected}
-              specMode={specMode}
             />
           </div>
         )}

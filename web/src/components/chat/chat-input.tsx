@@ -37,8 +37,6 @@ interface ChatInputProps {
   disabled?: boolean
   isStreaming?: boolean
   connected?: boolean
-  /** Whether spec (Ouroboros) mode is active for this session. */
-  specMode?: boolean
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -49,7 +47,6 @@ interface ChatInputProps {
  * - Auto-grows 1 → 10 lines
  * - Shift+Enter for new line, Enter to send
  * - @ triggers context search (knowledge base + memory)
- * - Mode badge (read-only) shown when session is active
  */
 export function ChatInput({
   value,
@@ -59,7 +56,6 @@ export function ChatInput({
   disabled,
   isStreaming,
   connected,
-  specMode,
 }: ChatInputProps) {
   const { t } = useTranslation()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -337,7 +333,6 @@ export function ChatInput({
         className={cn(
           'relative rounded-2xl border bg-background shadow-sm transition-all',
           'focus-within:shadow-md focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-ring/30',
-          specMode && 'border-primary/30',
           !connected && 'opacity-60',
           isStreaming && 'border-destructive/30',
         )}
@@ -351,9 +346,7 @@ export function ChatInput({
           onCompositionEnd={() => setIsComposing(false)}
           placeholder={
             connected
-              ? specMode
-                ? t('chat.inputPlaceholderSpec', 'Describe your task in detail...')
-                : t('chat.inputPlaceholder', 'Type a message... (@ to add context)')
+              ? t('chat.inputPlaceholder', 'Type a message... (@ to add context)')
               : t('chat.waitingForConnection', 'Waiting for connection...')
           }
           disabled={disabled || !connected}
@@ -411,10 +404,6 @@ export function ChatInput({
           Shift+Enter
         </kbd>
         {' new line · '}
-        <kbd className="rounded border bg-muted/60 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground">
-          ⌘⇧M
-        </kbd>
-        {' mode · '}
         <kbd className="rounded border bg-muted/60 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground">
           ⌘⇧N
         </kbd>

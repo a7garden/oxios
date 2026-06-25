@@ -63,10 +63,6 @@ interface ChatRuntimeState {
   interviewRound: number
   /** Interview ambiguity score. */
   interviewAmbiguity: number
-  /** Per-session spec mode map: sessionId → true (ouroboros) / false (chat). */
-  specModes: Record<string, boolean>
-  /** Effective spec mode for the current active session. */
-  specMode: boolean
 
   // ── WebSocket lifecycle (encapsulated, not persisted) ──
   /** WebSocket instance managed by the store. */
@@ -128,8 +124,6 @@ interface ChatActions {
   resolveToolApproval: (id: string, approved: boolean) => Promise<void>
   /** Handle an incoming WS chunk. */
   handleChunk: (chunk: StreamChunk) => void
-  /** Toggle spec (Ouroboros) mode for the current session. */
-  toggleSpecMode: () => void
 }
 
 export type ChatStore = PersistedState & ChatRuntimeState & ChatActions
@@ -515,8 +509,6 @@ export const useChatStore = create<ChatStore>()(
       interviewRound: 0,
       interviewAmbiguity: 0,
       activeToolApproval: null,
-      specModes: {},
-      specMode: false,
       // WebSocket lifecycle
       _ws: null,
       _reconnectTimer: null,
@@ -745,7 +737,7 @@ export const useChatStore = create<ChatStore>()(
         }
         set((s) => ({ messages: [...s.messages, userMsg], isStreaming: true }))
 
-        // Send via WebSocket with session context and mode
+        // Send via WebSocket with session context.
         const payload: Record<string, unknown> = {
           type: 'message',
           content,
@@ -753,10 +745,6 @@ export const useChatStore = create<ChatStore>()(
           // Web-C2: backend WS handler reads singular `project_id`
           project_id: activeProjectId ?? '',
           mount_ids: activeMountIds ?? '',
-        }
-        const effectiveSpecMode = get().specMode
-        if (effectiveSpecMode) {
-          payload.mode = 'spec'
         }
         _ws.send(JSON.stringify(payload))
       },
@@ -837,18 +825,12 @@ export const useChatStore = create<ChatStore>()(
 
           const projectId =
             data.project_id ?? data.metadata?.project_id ?? data.metadata?.project_ids ?? null
-          // Restore spec mode from session metadata (persisted by backend)
-          const storedMode = data.metadata?.mode
-          const isSpec = storedMode === 'spec' || storedMode === 'ouroboros'
-          const updatedSpecModes = { ...get().specModes, [sessionId]: isSpec }
 
           set({
             messages,
             activeSessionId: sessionId,
             activeProjectId: projectId,
             isStreaming: false,
-            specMode: isSpec,
-            specModes: updatedSpecModes,
           })
         } catch {
           // Silently fail — network issues shouldn't break the UI
@@ -867,8 +849,6 @@ export const useChatStore = create<ChatStore>()(
           activeInterview: null,
           interviewRound: 0,
           interviewAmbiguity: 0,
-          specMode: false,
-          // Keep specModes for other sessions, just reset active display
         }))
       },
 
@@ -880,7 +860,6 @@ export const useChatStore = create<ChatStore>()(
           activeSessionId: null,
           messages: [],
           detectedProject: null,
-          specMode: false,
         })
       },
 
@@ -919,8 +898,6 @@ export const useChatStore = create<ChatStore>()(
           interviewRound: 0,
           interviewAmbiguity: 0,
           activeToolApproval: null,
-          specModes: {},
-          specMode: false,
           detectedMountTag: null,
           detectedMountIds: [],
         })
@@ -1006,16 +983,6 @@ export const useChatStore = create<ChatStore>()(
           set({ activeToolApproval, isStreaming: false })
           throw e
         }
-      },
-
-      toggleSpecMode() {
-        set((s) => {
-          const next = !s.specMode
-          const sid = s.activeSessionId
-          // Persist to per-session map if we have a session ID
-          const nextModes = sid ? { ...s.specModes, [sid]: next } : s.specModes
-          return { specMode: next, specModes: nextModes }
-        })
       },
 
       handleChunk(chunk) {
@@ -1203,8 +1170,8 @@ export const useChatStore = create<ChatStore>()(
               }))
 
               // Find the last assistant message to attach metadata.
-              // If none exists yet (Ouroboros mode: execution completes
-              // without any prior token chunk), create one so the
+              // If none exists yet (e.g. a task that only ran tools with
+              // no token stream), create one so the
               // completion metadata has a home.
               const lastAssistantIdx = [...updated]
                 .reverse()
@@ -1267,16 +1234,10 @@ export const useChatStore = create<ChatStore>()(
             })
 
             if (sid) {
-              // Track the mode returned by the backend for this session
-              const doneMode = chunk.mode
-              const isSpec = doneMode === 'spec' || doneMode === 'ouroboros'
-              set((s) => ({
+              set({
                 _lastDoneSessionId: sid,
                 activeSessionId: sid,
-                specModes: { ...s.specModes, [sid]: isSpec },
-                // Only update effective specMode if this is the active session
-                ...(s.activeSessionId === sid || !s.activeSessionId ? { specMode: isSpec } : {}),
-              }))
+              })
             }
             if (vid) {
               set({ activeProjectId: vid, _lastDoneProjectId: vid })
