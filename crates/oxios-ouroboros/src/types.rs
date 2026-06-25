@@ -45,6 +45,24 @@ pub struct ExecutionResult {
     /// Model ID used for this execution.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub model_id: String,
+    /// Failure classification (RFC-029). `Some` when the run failed with a
+    /// classifiable provider/infra error; `None` on success, cancellation,
+    /// abort, or unclassified failure. P2's RecoveryCoordinator reads this
+    /// to choose the recovery strategy.
+    ///
+    /// `#[serde(default, skip_serializing_if)]` keeps existing JSON payloads
+    /// (without the field) round-tripping cleanly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure_class: Option<crate::resilience::FailureClass>,
+    /// Agent conversation state captured at the point of failure (RFC-029
+    /// P2b). `Some` when the agent had accumulated state before a provider
+    /// failure — allows the RecoveryCoordinator to restore into a new
+    /// agent (with a different model) and continue rather than restarting.
+    ///
+    /// Serialized from `Agent::export_state()`. `None` on success, or when
+    /// the failure occurred before any state was accumulated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restore_state: Option<serde_json::Value>,
 }
 
 /// Single option for a structured interview question.

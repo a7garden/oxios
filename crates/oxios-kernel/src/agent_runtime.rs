@@ -261,6 +261,8 @@ impl AgentRuntime {
             session_ctx,
             session_id,
             Some(directive),
+            env.model_override.as_deref(),
+            env.restore_state.as_ref(),
         )
         .await
     }
@@ -285,6 +287,8 @@ impl AgentRuntime {
         session_ctx: &mut SessionContext,
         session_id: Option<String>,
         persistence_directive: Option<&Directive>,
+        model_override: Option<&str>,
+        restore_state: Option<&serde_json::Value>,
     ) -> Result<ExecutionResult> {
         let prompt = build_user_prompt_inner(goal, acceptance_criteria);
 
@@ -429,10 +433,14 @@ impl AgentRuntime {
             Err(e) => tracing::warn!(error = %e, "Failed to recall knowledge context"),
         }
 
-        // Resolve the LIVE default model (post-hot-swap). This is the single
-        // source of truth for model resolution across all phases.
+        // Resolve the model. RFC-029 P2: honor a model_override from the
+        // ExecEnv (set by RecoveryCoordinator for fallback retries) before
+        // falling back to the LIVE default model (post-hot-swap). This is
+        // the single source of truth for model resolution across all phases.
         let engine = self.engine_handle.get();
-        let model_id = engine.default_model_id().to_string();
+        let model_id = model_override
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| engine.default_model_id().to_string());
         // Validates fail-fast: a bad model ID is rejected here at execute entry.
         engine.resolve_model(&model_id)?;
         // Synthetic per-execution ID for tracing.
@@ -477,6 +485,7 @@ impl AgentRuntime {
                 self.routing_stats.clone(),
                 session_id.clone(),
                 mount_paths,
+                restore_state,
             )
             .await?
         };
@@ -573,6 +582,8 @@ impl AgentRuntime {
             steps_completed,
             success,
             tool_calls,
+            failure_class: None,
+            restore_state: None,
             tokens_input: total_input_tokens,
             tokens_output: total_output_tokens,
             model_id: self.engine_handle.get().default_model_id().to_string(),
@@ -651,6 +662,7 @@ async fn run_agent(
     routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
     session_id: Option<String>,
     mount_paths: &[std::path::PathBuf],
+    restore_state: Option<&serde_json::Value>,
 ) -> Result<(
     String,
     usize,
@@ -969,6 +981,15 @@ async fn run_agent(
         agent
     };
 
+    // RFC-029 P2b: restore conversation state from a prior failed run
+    // so the new agent (with a fallback model) continues from the
+    // checkpoint rather than restarting from scratch.
+    if let Some(state) = restore_state {
+        agent.import_state(state.clone()).unwrap_or_else(|e| {
+            tracing::warn!(agent_id = %agent_id, error = %e, "Failed to restore agent state");
+        });
+    }
+
     // Shared mutable state for the event callback.
     let exec_state = Arc::new(Mutex::new(ExecuteState::default()));
     let exec_state_cb = Arc::clone(&exec_state);
@@ -1209,20 +1230,12 @@ async fn run_agent(
 
     if let Err(e) = result {
         tracing::error!(seed_id = %seed_id, error = %e, "Agent failed");
-        let s = exec_state.lock();
-        return Ok((
-            format!("Agent failed: {e}"),
-            s.steps_completed,
-            false,
-            s.trajectory_steps.clone(),
-            agent,
-            s.tool_call_ids.clone(),
-            s.tool_args_map.clone(),
-            s.tool_error_map.clone(),
-            s.tool_timestamps.clone(),
-            s.total_input_tokens,
-            s.total_output_tokens,
-        ));
+        // RFC-029 P2b: capture the agent's accumulated conversation state
+        // before returning. The supervisor's Err arm unwraps AgentRunError
+        // and populates ExecutionResult.restore_state so the coordinator
+        // can inject it into a retry with a different model (snapshot→restore).
+        let restore_state = agent.export_state().ok();
+        return Err(crate::resilience::AgentRunError::wrap(e, restore_state).into());
     }
 
     let s = exec_state.lock();

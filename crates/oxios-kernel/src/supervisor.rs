@@ -30,10 +30,12 @@ use tokio::task::JoinHandle;
 use crate::agent_runtime::AgentRuntime;
 use crate::config::AgentLogConfig;
 use crate::event_bus::EventBus;
+use crate::resilience::classify;
 use crate::resource_monitor::ResourceMonitor;
 use crate::session_context::SessionContext;
 use crate::state_store::StateStore;
 use crate::types::{AgentId, AgentInfo, AgentStatus};
+
 use oxios_ouroboros::ExecutionResult;
 
 #[cfg(feature = "sqlite-memory")]
@@ -337,6 +339,8 @@ impl Supervisor for BasicSupervisor {
                     tokens_input: 0,
                     tokens_output: 0,
                     model_id: String::new(),
+                    failure_class: None, // cancellation, not a provider failure
+                    restore_state: None,
                 })
             } else {
                 let mut ctx = session_ctx.write().await;
@@ -376,6 +380,8 @@ impl Supervisor for BasicSupervisor {
                     tokens_input: 0,
                     tokens_output: 0,
                     model_id: String::new(),
+                    failure_class: None, // abort (kill/panic), not a provider failure
+                    restore_state: None,
                 })
             }
         };
@@ -480,6 +486,20 @@ impl Supervisor for BasicSupervisor {
                     tokens_input: 0,
                     tokens_output: 0,
                     model_id: String::new(),
+                    // RFC-029 P0: classify the error so downstream
+                    // (P2 RecoveryCoordinator, gateway user-facing
+                    // messages) can see whether this is a transient
+                    // retry, a quota/auth that needs provider swap,
+                    // context overflow, etc. Conservative: Unknown
+                    // when no pattern matches.
+                    failure_class: Some(classify(&e)),
+                    // RFC-029 P2b: extract the agent's exported state if
+                    // the error was wrapped by run_agent (AgentRunError).
+                    // This allows the RecoveryCoordinator to snapshot→
+                    // restore into a new model rather than restarting.
+                    restore_state: e
+                        .downcast_ref::<crate::resilience::AgentRunError>()
+                        .and_then(|err| err.restore_state.clone()),
                 })
             }
         }

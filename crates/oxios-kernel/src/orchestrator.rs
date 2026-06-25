@@ -99,6 +99,10 @@ pub struct Orchestrator {
     a2a_breaker: Arc<crate::a2a::circuit_breaker::A2ACircuitBreaker>,
     /// RFC-027 intent config (retry settings, etc).
     intent_config: RwLock<crate::config::IntentConfig>,
+    /// RFC-029 recovery coordinator. When `Some`, the orchestrator's
+    /// execute path routes through it (L1 backoff / L2 model swap)
+    /// instead of calling lifecycle directly.
+    recovery: RwLock<Option<Arc<crate::resilience::RecoveryCoordinator>>>,
 }
 
 /// Configuration for A2A delegation retries.
@@ -170,6 +174,7 @@ impl Orchestrator {
             delegation_config: DelegationConfig::default(),
             intent_config: RwLock::new(crate::config::IntentConfig::default()),
             a2a_breaker: Arc::new(crate::a2a::circuit_breaker::A2ACircuitBreaker::new(5, 30)),
+            recovery: RwLock::new(None),
         }
     }
 
@@ -177,6 +182,13 @@ impl Orchestrator {
     /// Called by the kernel assembler after construction.
     pub fn set_intent_engine(&self, engine: Arc<dyn oxios_ouroboros::IntentEngineOps>) {
         *self.intent_engine.write() = Some(engine);
+    }
+
+    /// Wire the RFC-029 recovery coordinator. Called by the kernel
+    /// assembler after construction (shares `RoutingStats` with
+    /// `EngineApi` / `AgentRuntime`).
+    pub fn set_recovery(&self, coordinator: Arc<crate::resilience::RecoveryCoordinator>) {
+        *self.recovery.write() = Some(coordinator);
     }
 
     /// Whether the IntentEngine is wired (unified path available).
@@ -497,7 +509,7 @@ impl Orchestrator {
                 Ok(HandleResponse::Task {
                     scope,
                     directive: Box::new(directive),
-                    env,
+                    env: Box::new(env),
                     result: Box::new(result),
                     verdict,
                     evaluation_passed,
@@ -727,6 +739,8 @@ impl Orchestrator {
             mount_paths,
             project_id,
             cspace_hint: None,
+            model_override: None,
+            restore_state: None,
         }
     }
 
@@ -744,9 +758,21 @@ impl Orchestrator {
         directive: &oxios_ouroboros::Directive,
         env: &oxios_ouroboros::ExecEnv,
     ) -> Result<ExecutionResult> {
-        self.lifecycle
-            .execute_directive(directive, env, Priority::Normal)
-            .await
+        // RFC-029: route through the recovery coordinator when wired
+        // (L1 backoff / L2 model swap on provider failure). Falls back
+        // to a direct lifecycle call when no coordinator is set.
+        //
+        // Clone the Arc out of the read guard so the parking_lot guard
+        // (which is !Send) is dropped before the .await — otherwise the
+        // future is !Send and breaks tokio::spawn in the gateway.
+        let coordinator = self.recovery.read().as_ref().cloned();
+        if let Some(coordinator) = coordinator {
+            coordinator.execute(&self.lifecycle, directive, env).await
+        } else {
+            self.lifecycle
+                .execute_directive(directive, env, Priority::Normal)
+                .await
+        }
     }
 
     /// Review the result against the directive's criteria; on failure,
@@ -845,7 +871,7 @@ pub enum HandleResponse {
         /// The directive that was executed (post-retry if a retry ran).
         directive: Box<oxios_ouroboros::Directive>,
         /// The execution environment resolved for this message.
-        env: oxios_ouroboros::ExecEnv,
+        env: Box<oxios_ouroboros::ExecEnv>,
         /// The execution result.
         result: Box<ExecutionResult>,
         /// The review verdict — `None` for `Scope::Trivial`.

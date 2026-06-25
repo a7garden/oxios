@@ -25,6 +25,9 @@ pub mod budget;
 pub mod cron;
 pub mod orchestrator;
 pub mod scheduler;
+// ─── Resilience (RFC-029) ──────────────────────────────────────────────
+// Failure classification + (P2) recovery coordination.
+pub mod resilience;
 
 // ─── Security ───────────────────────────────────────────────────────
 // 접근 제어, 인증, 권한, 감사.

@@ -9,6 +9,8 @@
 
 #![warn(missing_docs)]
 
+pub mod resilience;
+
 pub mod assessment;
 pub mod directive;
 pub mod engine;
@@ -22,4 +24,5 @@ pub use directive::{Directive, Exchange, ExecEnv, MsgCtx, Verdict};
 pub use engine::{IntentEngine, IntentEngineOps};
 pub use model_resolver::{ModelResolver, ResolvedModel, StaticModelResolver};
 pub use prompts::{ASSESS_SYSTEM_PROMPT, CRYSTALLIZE_SYSTEM_PROMPT, REVIEW_SYSTEM_PROMPT};
+pub use resilience::FailureClass;
 pub use types::{ExecutionResult, InterviewOptionOutput, InterviewQuestionOutput, ToolCallRecord};

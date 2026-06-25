@@ -1343,6 +1343,19 @@ impl KernelBuilder {
         if let Some(mm) = mount_manager.clone() {
             orchestrator.set_mount_manager(mm);
         }
+        // RFC-029: wire the recovery coordinator (L1 backoff / L2 model
+        // swap). Shares RoutingStats with EngineApi/AgentRuntime so
+        // fallback events surface in the Web UI. Reads the configured
+        // fallback-model list (live-updatable via set_routing).
+        {
+            let coordinator = Arc::new(oxios_kernel::resilience::RecoveryCoordinator::new(
+                Arc::clone(&routing_stats),
+                oxios_kernel::resilience::ResilienceConfig::default(),
+            ));
+            coordinator.set_fallback_models(config.engine.fallback_models.clone());
+            orchestrator.set_recovery(coordinator);
+        }
+
         let orchestrator = Arc::new(orchestrator);
 
         let gateway = Arc::new(Gateway::with_apis(

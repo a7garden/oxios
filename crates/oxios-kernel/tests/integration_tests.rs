@@ -127,6 +127,8 @@ impl Supervisor for MockSupervisor {
             tokens_input: 0,
             tokens_output: 0,
             model_id: String::new(),
+            failure_class: None,
+            restore_state: None,
         })
     }
 
@@ -663,6 +665,8 @@ impl Supervisor for SchedulerAwareSupervisor {
             tokens_input: 0,
             tokens_output: 0,
             model_id: String::new(),
+            failure_class: None,
+            restore_state: None,
         })
     }
 

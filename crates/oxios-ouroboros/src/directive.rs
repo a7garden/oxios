@@ -74,6 +74,23 @@ pub struct ExecEnv {
     /// Hint for the capability system (CSpace template name).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cspace_hint: Option<String>,
+
+    /// Model override for resilience recovery (RFC-029 P2).
+    ///
+    /// When `Some`, the agent runtime uses this model instead of the
+    /// engine default. Set by the `RecoveryCoordinator` when retrying a
+    /// failed directive with a fallback model. `None` for normal runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_override: Option<String>,
+
+    /// Agent conversation state to restore on retry (RFC-029 P2b).
+    ///
+    /// When `Some`, the recovery coordinator captured the previous run's
+    /// `Agent::export_state()` and injects it here so the new (fallback
+    /// model) agent continues from the checkpoint rather than restarting.
+    /// `None` on initial runs or when no state was accumulated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restore_state: Option<serde_json::Value>,
 }
 
 /// The result of reviewing an execution against a directive's criteria.
