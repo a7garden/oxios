@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-06-25
+
+### Added
+- **RFC-030: runtime task supervision** — A single-process task supervisor now owns a root `CancellationToken` for cooperative shutdown, replacing the standalone `scheduler` module. Gateway/web surfaces wire their graceful-shutdown path to the supervisor token instead of listening to `ctrl_c` independently, giving a single shutdown signal source. Adds a `tokio-util` `CancellationToken`, drops the `[scheduler]` config section, and threads shutdown through the infra/system routes and metrics.
+- **Web notification center** — Slide-over notification panel backed by a dedicated store, surfaced from the header bell.
+- **Calendar UI refresh** — A mini-calendar popover trigger in the header replaces the standalone `/calendar` and `/scheduler` routes; sidebar nav and i18n (en/ko) updated.
+
 ## [1.11.0] - 2026-06-25
 
 ### Changed
