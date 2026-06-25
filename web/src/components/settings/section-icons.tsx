@@ -18,7 +18,6 @@ import {
   Shield,
   Sparkles,
   Terminal,
-  Timer,
   Wallet,
   Zap,
 } from 'lucide-react'
@@ -29,7 +28,6 @@ const ICON_MAP: Record<SectionIconKey, React.ComponentType<{ className?: string 
   kernel: Cpu,
   exec: Terminal,
   security: Shield,
-  scheduler: Timer,
   orchestrator: Zap,
   context: Brain,
   gateway: Globe,

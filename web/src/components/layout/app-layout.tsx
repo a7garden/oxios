@@ -11,6 +11,7 @@ import { useEventStore } from '@/stores/events'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useSidebarStore } from '@/stores/sidebar'
 import { Header } from './header'
+import { NotificationCenter } from './notification-center'
 import { Sidebar } from './sidebar'
 
 /**
@@ -114,6 +115,8 @@ export function AppLayout() {
           <MoveModal />
         </>
       )}
+      {/* Global Notification Center slide-over (schedule + notifications) */}
+      <NotificationCenter />
     </div>
   )
 }

@@ -1,159 +1,37 @@
-import { useNavigate } from '@tanstack/react-router'
-import { Bell, Check, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Bell } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { cn } from '@/lib/utils'
-import {
-  type Notification,
-  type NotificationSeverity,
-  useNotificationStore,
-} from '@/stores/notifications'
-
-/** Color map for severity. */
-const severityDot: Record<NotificationSeverity, string> = {
-  info: 'bg-info',
-  warning: 'bg-warning',
-  error: 'bg-error',
-  success: 'bg-success',
-}
+import { useNotificationCenter } from '@/stores/notification-center'
+import { useNotificationStore } from '@/stores/notifications'
 
 /**
- * i18n-aware relative time formatter.
- * Defined outside the component to avoid re-creation, but requires `t`.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function timeAgo(iso: string, t: (...args: any[]) => any): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  if (diff < 60_000) return t('common.justNow', 'just now')
-  if (diff < 3_600_000) return t('common.minutesAgo', { count: Math.floor(diff / 60_000) })
-  if (diff < 86_400_000) return t('common.hoursAgo', { count: Math.floor(diff / 3_600_000) })
-  return t('common.daysAgo', { count: Math.floor(diff / 86_400_000) })
-}
-
-/**
- * Global notification bell displayed in the header.
- * Shows unread count badge and a dropdown panel with recent notifications.
+ * Global notification bell — header trigger for the Notification Center.
+ *
+ * Opens the slide-over on the notifications tab. The unread badge stays on
+ * the bell; the full notification list lives inside the center panel.
  */
 export function NotificationBell() {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const navigate = useNavigate()
-
-  const notifications = useNotificationStore((s) => s.notifications)
+  const toggleCenter = useNotificationCenter((s) => s.toggleCenter)
+  const open = useNotificationCenter((s) => s.open)
+  const activeTab = useNotificationCenter((s) => s.activeTab)
   const unreadCount = useNotificationStore((s) => s.unreadCount)
-  const markRead = useNotificationStore((s) => s.markRead)
-  const markAllRead = useNotificationStore((s) => s.markAllRead)
-  const dismiss = useNotificationStore((s) => s.dismiss)
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  const handleClick = (n: Notification) => {
-    markRead(n.id)
-    setOpen(false)
-    if (n.link) {
-      navigate({ to: n.link })
-    }
-  }
+  const isActive = open && activeTab === 'notifications'
 
   return (
-    <div className="relative" ref={panelRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="relative rounded-md p-2 hover:bg-accent/50 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        aria-label={`${t('notifications.openNotifications')}${unreadCount > 0 ? t('common.unreadCount', { count: unreadCount }) : ''}`}
-      >
-        <Bell className="h-4 w-4" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-bold text-destructive-foreground animate-scale-in">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-[var(--z-popover,200)] w-80 max-w-[calc(100vw-2rem)] rounded-xl border bg-popover text-popover-foreground shadow-xl animate-scale-in">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b px-3 py-2">
-            <span className="text-sm font-medium">{t('notifications.title')}</span>
-            {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={markAllRead}>
-                <Check className="h-3 w-3 mr-1" /> {t('notifications.markAllRead')}
-              </Button>
-            )}
-          </div>
-
-          {/* Body */}
-          <ScrollArea className="max-h-80">
-            {notifications.length === 0 ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                {t('notifications.noNotifications')}
-              </div>
-            ) : (
-              <div className="divide-y">
-                {notifications.map((n) => (
-                  // biome-ignore lint/a11y/useSemanticElements: contains nested dismiss button; div is correct
-                  <div
-                    key={n.id}
-                    className={cn(
-                      'group flex gap-2 px-3 py-2.5 transition-all cursor-pointer hover:bg-accent/50',
-                      !n.read && 'bg-accent/20',
-                    )}
-                    onClick={() => handleClick(n)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleClick(n)
-                    }}
-                  >
-                    <div
-                      className={cn(
-                        'mt-0.5 h-2 w-2 shrink-0 rounded-full',
-                        severityDot[n.severity],
-                      )}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-tight truncate">{n.title}</p>
-                      {n.message && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                          {n.message}
-                        </p>
-                      )}
-                      <p className="text-2xs text-muted-foreground/60 mt-1">
-                        {timeAgo(n.timestamp, t)}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        dismiss(n.id)
-                      }}
-                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 hover:bg-muted"
-                      aria-label={t('common.dismiss')}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </div>
+    <button
+      type="button"
+      onClick={() => toggleCenter('notifications')}
+      className="relative rounded-md p-2 hover:bg-accent/50 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      aria-label={`${t('notifications.openNotifications')}${unreadCount > 0 ? t('notifications.unreadCount', { count: unreadCount }) : ''}`}
+      aria-pressed={isActive}
+    >
+      <Bell className="h-4 w-4" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-bold text-destructive-foreground animate-scale-in">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
       )}
-    </div>
+    </button>
   )
 }

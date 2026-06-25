@@ -790,7 +790,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     sectionKeys: [
       'kernel',
       'exec',
-      'scheduler',
       'orchestrator',
       'context',
       'gateway',
@@ -856,7 +855,7 @@ export const pathLabelMap: Map<string, string> = (() => {
 // ---------------------------------------------------------------------------
 //
 // `NEW_SECTIONS` covers the sections with the new declarative
-// field-rendering model. Older sections (`engine`, `kernel`, `scheduler`,
+// field-rendering model. Older sections (`engine`, `kernel`,
 // `orchestrator`, `context`, `gateway`, `session`, `logging`, `update`)
 // are still rendered with their custom components. To build the left
 // rail and section tabs from a single source of truth, we list their
@@ -867,7 +866,6 @@ export type SectionIconKey =
   | 'kernel'
   | 'exec'
   | 'security'
-  | 'scheduler'
   | 'orchestrator'
   | 'context'
   | 'gateway'
@@ -926,14 +924,6 @@ export const SECTION_META: SectionMeta[] = [
     descriptionKey: 'settings.executionDescription',
     groupId: 'system',
     iconKey: 'exec',
-    custom: false,
-  },
-  {
-    id: 'scheduler',
-    labelKey: 'settings.sectionScheduler',
-    descriptionKey: 'settings.schedulerDescription',
-    groupId: 'system',
-    iconKey: 'scheduler',
     custom: false,
   },
   {

@@ -62,8 +62,38 @@ function generateVersionJson(): Plugin {
   }
 }
 
+/**
+ * Rewrites `es-toolkit/compat/<name>` imports to re-export from the ESM compat
+ * index.
+ *
+ * Why: es-toolkit's `./compat/<name>` subpath exports map ONLY to CommonJS (no
+ * ESM condition). recharts pulls these in via default imports
+ * (`import get from 'es-toolkit/compat/get'`). Vite 8 / Rolldown 1.0.3 wraps
+ * that CJS with `__commonJSMin` and mishandles the internal circular requires,
+ * emitting a self-referential `var require_get = require_get()` that crashes at
+ * runtime with "t is not a function" on any route that renders a recharts chart
+ * (e.g. /resources). Re-exporting from the ESM compat index — which ships a
+ * real ESM entry — sidesteps the CJS interop entirely.
+ */
+function fixEsToolkitCompat(): Plugin {
+  const PREFIX = '\0estk-compat:'
+  return {
+    name: 'ox-fix-es-toolkit-compat',
+    enforce: 'pre',
+    resolveId(source) {
+      const m = source.match(/^es-toolkit\/compat\/([^/]+)$/)
+      if (m) return PREFIX + m[1]
+    },
+    load(id) {
+      if (!id.startsWith(PREFIX)) return null
+      const name = id.slice(PREFIX.length)
+      return `export { ${name} as default, ${name} } from "es-toolkit/compat";`
+    },
+  }
+}
 export default defineConfig({
   plugins: [
+    fixEsToolkitCompat(),
     TanStackRouterVite({ autoCodeSplitting: true }),
     react(),
     tailwindcss(),

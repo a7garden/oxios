@@ -6,8 +6,6 @@ import {
   BookOpen,
   Bot,
   Brain,
-  Calendar,
-  CalendarDays,
   CheckSquare,
   FilePlus,
   FolderKanban,
@@ -139,12 +137,6 @@ const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: 'common.operations',
     items: [
-      { labelKey: 'common.scheduler', href: '/scheduler', icon: <Calendar className="h-4 w-4" /> },
-      {
-        labelKey: 'common.calendar',
-        href: '/calendar',
-        icon: <CalendarDays className="h-4 w-4" />,
-      },
       { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
       { labelKey: 'common.budget', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
     ],

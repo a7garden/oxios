@@ -34,7 +34,6 @@ const RENDERABLE_SECTION_IDS = new Set<string>([
   ...NEW_SECTIONS.map((s) => s.key),
   // Legacy field-based sections (legacyFieldsBySection)
   'kernel',
-  'scheduler',
   'orchestrator',
   'context',
   'gateway',

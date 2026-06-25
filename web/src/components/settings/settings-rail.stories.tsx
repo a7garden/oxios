@@ -10,7 +10,6 @@ const groups: RailGroup[] = [
     items: [
       { id: 'kernel', labelKey: 'settings.sectionKernel', badge: 2, status: 'modified' },
       { id: 'exec', labelKey: 'settings.sectionExec', badge: 5, status: 'modified' },
-      { id: 'scheduler', labelKey: 'settings.sectionScheduler' },
       { id: 'orchestrator', labelKey: 'settings.sectionOrchestrator' },
       { id: 'gateway', labelKey: 'settings.sectionGateway' },
     ],

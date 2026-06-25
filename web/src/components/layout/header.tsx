@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useThemeStore } from '@/stores/theme'
+import { CalendarTrigger } from './calendar-trigger'
 import { LanguageSelector } from './language-selector'
 import { ModeTabs } from './mode-tabs'
 import { NotificationBell } from './notification-bell'
@@ -42,10 +43,10 @@ export function Header() {
           theme/language/settings collapse into the dropdown on narrow
           screens. */}
       <div className="flex items-center gap-1">
-        {/* NotificationBell stays visible at every breakpoint — the
-            badge + quick access must not disappear on mobile. */}
+        {/* Calendar + NotificationBell stay visible at every breakpoint —
+            global quick-access that must not disappear on mobile. */}
+        <CalendarTrigger />
         <NotificationBell />
-
         {/* Desktop: theme + language + settings as individual icons. */}
         <div className="hidden lg:flex items-center gap-1">
           <ThemeToggle />

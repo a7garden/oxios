@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SecurityRouteImport } from './routes/security'
-import { Route as SchedulerRouteImport } from './routes/scheduler'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as PersonasRouteImport } from './routes/personas'
 import { Route as MemoryRouteImport } from './routes/memory'
@@ -23,7 +22,6 @@ import { Route as EventsRouteImport } from './routes/events'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as CronJobsRouteImport } from './routes/cron-jobs'
 import { Route as ChatRouteImport } from './routes/chat'
-import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as A2aRouteImport } from './routes/a2a'
@@ -57,11 +55,6 @@ const SettingsRoute = SettingsRouteImport.update({
 const SecurityRoute = SecurityRouteImport.update({
   id: '/security',
   path: '/security',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SchedulerRoute = SchedulerRouteImport.update({
-  id: '/scheduler',
-  path: '/scheduler',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResourcesRoute = ResourcesRouteImport.update({
@@ -112,11 +105,6 @@ const CronJobsRoute = CronJobsRouteImport.update({
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CalendarRoute = CalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BudgetRoute = BudgetRouteImport.update({
@@ -220,7 +208,6 @@ export interface FileRoutesByFullPath {
   '/a2a': typeof A2aRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
-  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/email': typeof EmailRoute
@@ -231,7 +218,6 @@ export interface FileRoutesByFullPath {
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
   '/resources': typeof ResourcesRoute
-  '/scheduler': typeof SchedulerRoute
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -256,7 +242,6 @@ export interface FileRoutesByTo {
   '/a2a': typeof A2aRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
-  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/email': typeof EmailRoute
@@ -267,7 +252,6 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
   '/resources': typeof ResourcesRoute
-  '/scheduler': typeof SchedulerRoute
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -293,7 +277,6 @@ export interface FileRoutesById {
   '/a2a': typeof A2aRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
-  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/email': typeof EmailRoute
@@ -304,7 +287,6 @@ export interface FileRoutesById {
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
   '/resources': typeof ResourcesRoute
-  '/scheduler': typeof SchedulerRoute
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -331,7 +313,6 @@ export interface FileRouteTypes {
     | '/a2a'
     | '/approvals'
     | '/budget'
-    | '/calendar'
     | '/chat'
     | '/cron-jobs'
     | '/email'
@@ -342,7 +323,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/personas'
     | '/resources'
-    | '/scheduler'
     | '/security'
     | '/settings'
     | '/skills'
@@ -367,7 +347,6 @@ export interface FileRouteTypes {
     | '/a2a'
     | '/approvals'
     | '/budget'
-    | '/calendar'
     | '/chat'
     | '/cron-jobs'
     | '/email'
@@ -378,7 +357,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/personas'
     | '/resources'
-    | '/scheduler'
     | '/security'
     | '/settings'
     | '/skills'
@@ -403,7 +381,6 @@ export interface FileRouteTypes {
     | '/a2a'
     | '/approvals'
     | '/budget'
-    | '/calendar'
     | '/chat'
     | '/cron-jobs'
     | '/email'
@@ -414,7 +391,6 @@ export interface FileRouteTypes {
     | '/memory'
     | '/personas'
     | '/resources'
-    | '/scheduler'
     | '/security'
     | '/settings'
     | '/skills'
@@ -440,7 +416,6 @@ export interface RootRouteChildren {
   A2aRoute: typeof A2aRoute
   ApprovalsRoute: typeof ApprovalsRoute
   BudgetRoute: typeof BudgetRoute
-  CalendarRoute: typeof CalendarRoute
   ChatRoute: typeof ChatRoute
   CronJobsRoute: typeof CronJobsRoute
   EmailRoute: typeof EmailRoute
@@ -451,7 +426,6 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   PersonasRoute: typeof PersonasRoute
   ResourcesRoute: typeof ResourcesRoute
-  SchedulerRoute: typeof SchedulerRoute
   SecurityRoute: typeof SecurityRoute
   SettingsRoute: typeof SettingsRoute
   SkillsRoute: typeof SkillsRoute
@@ -492,13 +466,6 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/security'
       preLoaderRoute: typeof SecurityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/scheduler': {
-      id: '/scheduler'
-      path: '/scheduler'
-      fullPath: '/scheduler'
-      preLoaderRoute: typeof SchedulerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/resources': {
@@ -569,13 +536,6 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof ChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/calendar': {
-      id: '/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof CalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/budget': {
@@ -731,7 +691,6 @@ const rootRouteChildren: RootRouteChildren = {
   A2aRoute: A2aRoute,
   ApprovalsRoute: ApprovalsRoute,
   BudgetRoute: BudgetRoute,
-  CalendarRoute: CalendarRoute,
   ChatRoute: ChatRoute,
   CronJobsRoute: CronJobsRoute,
   EmailRoute: EmailRoute,
@@ -742,7 +701,6 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   PersonasRoute: PersonasRoute,
   ResourcesRoute: ResourcesRoute,
-  SchedulerRoute: SchedulerRoute,
   SecurityRoute: SecurityRoute,
   SettingsRoute: SettingsRoute,
   SkillsRoute: SkillsRoute,
