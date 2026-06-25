@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-06-25
+
+### Changed
+- **Removed explicit chat/ouroboros mode toggle** — The web UI no longer exposes a manual chat/spec (Ouroboros) mode toggle. Intent detection is now automatic: the orchestrator interviews when intent is unclear, instead of requiring the user to switch modes. Removes the specMode store state, toggle button, ⌘⇧M shortcut, placeholder variants, the stream-chunk mode field, and the backend MODE meta constant.
+
 ## [1.10.1] - 2026-06-25
 
 ### Security
