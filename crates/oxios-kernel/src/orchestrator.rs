@@ -21,7 +21,6 @@ use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
 use crate::mount::{MountId, MountManager};
 use crate::project::{ConversationBuffer, ProjectManager};
-use crate::scheduler::Priority;
 use crate::state_store::StateStore;
 use crate::types::AgentId;
 
@@ -504,8 +503,6 @@ impl Orchestrator {
                     }
                 };
 
-                self.lifecycle.reap_zombies();
-
                 Ok(HandleResponse::Task {
                     scope,
                     directive: Box::new(directive),
@@ -746,13 +743,6 @@ impl Orchestrator {
 
     /// Execute a [`Directive`] under an [`ExecEnv`].
     ///
-    /// **Phase 5 stub:** builds a legacy [`Seed`] from the directive and
-    /// delegates to the existing [`AgentLifecycleManager::spawn_and_run`]
-    /// pipeline. Phase 6 will replace this with
-    /// `lifecycle.execute_directive(&directive, &env)` once
-    /// AgentRuntime/Supervisor/AgentLifecycleManager have their
-    /// Directive-based methods (see sibling subagents Runtime and
-    /// RuntimeDirective).
     async fn execute_directive(
         &self,
         directive: &oxios_ouroboros::Directive,
@@ -769,9 +759,7 @@ impl Orchestrator {
         if let Some(coordinator) = coordinator {
             coordinator.execute(&self.lifecycle, directive, env).await
         } else {
-            self.lifecycle
-                .execute_directive(directive, env, Priority::Normal)
-                .await
+            self.lifecycle.execute_directive(directive, env).await
         }
     }
 
@@ -815,13 +803,7 @@ impl Orchestrator {
         // Execute with feedback: previous output + gaps injected.
         let retry_result = self
             .lifecycle
-            .execute_with_feedback(
-                directive,
-                env,
-                &initial_result,
-                &verdict.gaps,
-                Priority::Normal,
-            )
+            .execute_with_feedback(directive, env, &initial_result, &verdict.gaps)
             .await?;
 
         // Re-review.

@@ -38,7 +38,6 @@ use crate::agent_lifecycle::AgentLifecycleManager;
 use crate::resilience::ProviderHealthRegistry;
 
 use crate::kernel_handle::{FallbackEvent, RoutingStats};
-use crate::scheduler::Priority;
 
 use super::budget::AttemptBudget;
 
@@ -139,17 +138,13 @@ impl RecoveryCoordinator {
         let config = self.config.read().clone();
         if !config.enabled {
             // Passthrough — no recovery.
-            return lifecycle
-                .execute_directive(directive, env, Priority::Normal)
-                .await;
+            return lifecycle.execute_directive(directive, env).await;
         }
 
         let budget = AttemptBudget::new(config.max_total_attempts);
         // L0 — initial attempt.
         budget.try_consume();
-        let result = lifecycle
-            .execute_directive(directive, env, Priority::Normal)
-            .await?;
+        let result = lifecycle.execute_directive(directive, env).await?;
 
         // Decide whether to escalate based on the failure signal.
         let class = match (result.success, result.failure_class) {
@@ -196,10 +191,7 @@ impl RecoveryCoordinator {
                     "L1: same-model backoff retry"
                 );
                 tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-                match lifecycle
-                    .execute_directive(directive, env, Priority::Normal)
-                    .await
-                {
+                match lifecycle.execute_directive(directive, env).await {
                     Ok(r) => {
                         if r.success {
                             return Ok(r);
@@ -272,10 +264,7 @@ impl RecoveryCoordinator {
             env2.restore_state.clone_from(&best.restore_state);
 
             info!(from = %primary, to = %alt, class = %class, "L2: model swap retry");
-            match lifecycle
-                .execute_directive(directive, &env2, Priority::Normal)
-                .await
-            {
+            match lifecycle.execute_directive(directive, &env2).await {
                 Ok(r) => {
                     let success = r.success;
                     // Record the fallback event (wires the dead record_fallback).

@@ -16,7 +16,6 @@ use oxios_kernel::access_manager::AccessManager;
 use oxios_kernel::agent_lifecycle::AgentLifecycleManager;
 use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::resilience::{RecoveryCoordinator, ResilienceConfig};
-use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_kernel::{AgentId, AgentInfo, AgentStatus, RoutingStats};
 use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult, FailureClass};
@@ -134,12 +133,10 @@ fn build_parts(
     let tmp = tempfile::tempdir().unwrap();
     let _state_store = Arc::new(oxios_kernel::StateStore::new(tmp.path().to_path_buf()).unwrap());
     let supervisor = Arc::new(FailingUntilOverrideSupervisor::new(fail_class));
-    let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let lifecycle = AgentLifecycleManager::new(
         supervisor.clone(),
-        scheduler,
         access_manager,
         a2a,
         event_bus,

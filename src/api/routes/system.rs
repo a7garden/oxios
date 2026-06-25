@@ -1293,13 +1293,6 @@ pub(crate) async fn handle_config_put(
     // ExecApi — allowlist, shell mode, timeouts
     *state.kernel.exec.shared_config().write() = updated_config.exec.clone();
 
-    // AgentScheduler — concurrency, rate limit, zombie timeout
-    state.kernel.infra.scheduler().update_config(
-        updated_config.scheduler.max_concurrent,
-        updated_config.scheduler.rate_limit_per_minute,
-        updated_config.scheduler.zombie_timeout_secs,
-    );
-
     // ResourceMonitor — CPU/memory/load thresholds
     use oxios_kernel::resource_monitor::OverloadThreshold;
     state
@@ -1353,7 +1346,6 @@ pub(crate) async fn handle_config_put(
 /// to the user about whether the change took effect.
 const HOT_RELOADABLE_SECTIONS: &[(&str, &str)] = &[
     ("exec", "exec_api"),
-    ("scheduler", "scheduler"),
     ("resource_monitor", "resource_monitor"),
 ];
 
@@ -1589,11 +1581,6 @@ pub(crate) async fn handle_config_patch(
 
     // Propagate hot-reloadable slices to kernel subsystems.
     *state.kernel.exec.shared_config().write() = updated.exec.clone();
-    state.kernel.infra.scheduler().update_config(
-        updated.scheduler.max_concurrent,
-        updated.scheduler.rate_limit_per_minute,
-        updated.scheduler.zombie_timeout_secs,
-    );
     use oxios_kernel::resource_monitor::OverloadThreshold;
     state
         .kernel
@@ -1713,7 +1700,6 @@ mod patch_tests {
         // audit, etc. are NOT propagated (subsystem constructed at
         // boot) so they must be classified as restart-required.
         assert!(!is_restart_required("exec.allowed_commands"));
-        assert!(!is_restart_required("scheduler.max_concurrent"));
         assert!(!is_restart_required("resource_monitor.cpu_threshold"));
     }
 
@@ -1799,7 +1785,6 @@ mod patch_rejection_tests {
     fn accepts_non_engine_sections() {
         let body = json!({
             "exec": {"allowlist_mode": "enforced"},
-            "scheduler": {"max_concurrent": 5},
         });
         let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
         assert!(found.is_none());

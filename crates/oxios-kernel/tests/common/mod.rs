@@ -104,14 +104,12 @@ pub fn build_test_orchestrator(
     state_store: Arc<oxios_kernel::state_store::StateStore>,
     event_bus: oxios_kernel::event_bus::EventBus,
 ) -> (Arc<oxios_kernel::Orchestrator>, Arc<MockIntentEngine>) {
-    let scheduler = Arc::new(oxios_kernel::scheduler::AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(
         oxios_kernel::access_manager::AccessManager::new(),
     ));
     let a2a = Arc::new(oxios_kernel::a2a::A2AProtocol::new(event_bus.clone()));
     let lifecycle = oxios_kernel::agent_lifecycle::AgentLifecycleManager::new(
         supervisor,
-        scheduler,
         access_manager,
         a2a,
         event_bus.clone(),

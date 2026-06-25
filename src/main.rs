@@ -17,7 +17,9 @@ mod api;
 // RFC-026: in-process channels (merged from channels/oxios-cli, channels/oxios-telegram)
 // Individual sub-modules are feature-gated internally.
 mod channels;
+mod supervisor;
 
+use crate::supervisor::{RestartConfig, ShutdownOutcome, TaskSupervisor, WebSurfaceRestarter};
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{Shell, generate};
@@ -25,6 +27,7 @@ use console::style;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 use kernel::Kernel;
 use oxios_kernel::onboarding::WORKSPACE_SUBDIRS;
@@ -2825,23 +2828,71 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         }
     }
 
-    // Activate channels
+    // ── Supervisor: runtime task liveness (RFC-030) ──────────────────────
+    // The supervisor owns the single shutdown signal (CancellationToken) and
+    // observes every critical task handle so an unexpected exit is never
+    // silent. Before this, cmd_serve awaited only ctrl_c and treated all
+    // handles as fire-and-forget — a crashed web server left the daemon
+    // half-dead while `oxios status` still reported "Running".
+    let root = CancellationToken::new();
     let active_web_dist = oxios_gateway::ActiveWebDist::new(web_dist_path);
-    let surface_tasks =
-        surface::activate_surfaces(kernel, config_path, active_web_dist.clone()).await?;
+
+    // The web-surface restarter captures everything needed to re-invoke
+    // WebSurface::start after a crash (scoped restart, bounded backoff).
+    let web_restarter = Arc::new(WebSurfaceRestarter::new(
+        kernel,
+        Arc::new(parking_lot::RwLock::new(kernel.config().clone())),
+        config_path.to_path_buf(),
+        active_web_dist.clone(),
+    ));
+
+    // Activate surfaces — the web surface is tracked as restartable, every
+    // other surface as fail-fast. The root token is threaded in so the web
+    // server wires its graceful-shutdown path to a single signal source
+    // instead of an independent ctrl_c consumer.
+    let surfaces =
+        surface::activate_surfaces(kernel, config_path, active_web_dist.clone(), root.clone())
+            .await?;
     let channel_tasks = activate_channels(kernel, config_path).await?;
 
     // Start guardian (RFC-024 SP3: hands the atomic web-dist handle to the
     // daily health check so auto-updates publish atomically — no 404 window).
     kernel.start_guardian(active_web_dist);
 
-    // Run gateway event loop on the main tokio runtime.
-    // Event-driven architecture: each channel runs its own background task,
-    // pushing messages into a shared mpsc. The gateway dispatches concurrently.
+    // Run the gateway event loop. Propagate the Result (no `.expect`): the
+    // supervisor observes the handle and treats any exit as fatal. Under
+    // panic=abort a panic aborts the process directly, so the non-panic Err
+    // path is what the supervisor actually intercepts here.
     let gateway = kernel.gateway();
+    let gateway_for_stop = gateway.clone();
     let gateway_task = tokio::spawn(async move {
-        gateway.run().await.expect("gateway run error");
+        if let Err(e) = gateway.run().await {
+            tracing::error!(error = %e, "Gateway run error");
+        }
     });
+
+    // Build the supervisor and register every task.
+    let mut supervisor = TaskSupervisor::new(root.clone(), RestartConfig::default());
+    supervisor.with_gateway_stop(move || gateway_for_stop.signal_shutdown());
+    supervisor.track_critical("gateway", gateway_task);
+    for task in channel_tasks {
+        supervisor.track_critical("channel", task);
+    }
+    for s in surfaces {
+        if s.name == "web" {
+            supervisor.track_web(
+                s.tasks
+                    .into_iter()
+                    .next()
+                    .expect("web surface spawns a task"),
+                web_restarter.clone(),
+            );
+        } else {
+            for task in s.tasks {
+                supervisor.track_critical(s.name.clone(), task);
+            }
+        }
+    }
 
     let config = kernel.config();
     println!();
@@ -2866,31 +2917,23 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         config.gateway.port
     );
 
-    // Wait for ctrl+c
-    tokio::signal::ctrl_c().await.ok();
-    tracing::info!("Received shutdown signal, starting graceful shutdown...");
-
-    // Phase 1: Signal gateway to stop accepting new messages
-    kernel.gateway().signal_shutdown();
-
-    // Phase 2: Cancel surface and channel tasks
-    for task in surface_tasks {
-        task.abort();
-    }
-    for task in channel_tasks {
-        task.abort();
-    }
-
-    // Phase 3: Wait for gateway task with timeout
-    let gateway_result =
-        tokio::time::timeout(std::time::Duration::from_secs(10), gateway_task).await;
-    match gateway_result {
-        Ok(Ok(())) => tracing::info!("Gateway stopped cleanly"),
-        Ok(Err(e)) => tracing::warn!(error = %e, "Gateway task error"),
-        Err(_) => tracing::warn!("Gateway shutdown timed out"),
+    // ── Supervised run: blocks until graceful (ctrl_c) or fatal ──────────
+    // The supervisor drains all tracked tasks before returning — for BOTH
+    // outcomes (RFC-030 A6): it cancels the root token (so the web surface
+    // drains in-flight requests instead of being aborted mid-request), stops
+    // the gateway, and awaits every handle with a timeout. Only the exit code
+    // differs.
+    let outcome = supervisor.run().await;
+    match &outcome {
+        ShutdownOutcome::Graceful => tracing::info!("Graceful shutdown requested"),
+        ShutdownOutcome::Fatal { name, reason } => {
+            tracing::error!(task = %name, %reason, "Fatal task failure; shutting down");
+        }
     }
 
-    // Phase 4: Terminate running agents (parallel)
+    // ── Kernel-level cleanup (runs for both outcomes) ────────────────────
+    // Task handles were already drained by the supervisor above. Here we stop
+    // the kernel's own resources: running agents, MCP servers, audit trail.
     let handle = kernel.handle();
     if let Ok(agents) = handle.agents.list().await
         && !agents.is_empty()
@@ -2921,8 +2964,17 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         tracing::warn!(error = %e, "Audit trail flush error");
     }
 
-    tracing::info!("Oxios shut down gracefully");
-    Ok(())
+    match outcome {
+        ShutdownOutcome::Graceful => {
+            tracing::info!("Oxios shut down gracefully");
+            Ok(())
+        }
+        ShutdownOutcome::Fatal { name, reason } => {
+            // Non-zero exit → the OS supervisor (systemd/launchd) restarts
+            // the daemon to a known-good state (RFC-030 C7).
+            Err(anyhow::anyhow!("critical task '{name}' exited: {reason}"))
+        }
+    }
 }
 
 // ─── Channel plugin helpers ───────────────────────────────────────────────

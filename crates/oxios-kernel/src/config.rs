@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 use crate::email::{SmtpProvider, SmtpTls};
-use crate::scheduler::Priority;
+use crate::types::Priority;
 
 /// Cron scheduler configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -872,9 +872,6 @@ pub struct OxiosConfig {
     /// Gateway settings.
     #[serde(default)]
     pub gateway: GatewayConfig,
-    /// Scheduler settings (AIOS-inspired task scheduling).
-    #[serde(default)]
-    pub scheduler: SchedulerConfig,
     /// Orchestrator settings (Ouroboros protocol execution).
     #[serde(default)]
     pub orchestrator: OrchestratorConfig,
@@ -1352,42 +1349,6 @@ impl Default for ExecConfig {
             allowlist_mode: AllowlistMode::default(),
             default_timeout_secs: default_exec_timeout(),
             max_timeout_secs: default_exec_max_timeout(),
-        }
-    }
-}
-
-/// Scheduler configuration (inspired by AIOS / AgentRM).
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SchedulerConfig {
-    /// Maximum number of concurrent agent tasks.
-    #[serde(default = "default_max_concurrent")]
-    pub max_concurrent: usize,
-    /// Maximum LLM API calls per minute (rate limiting).
-    #[serde(default = "default_rate_limit")]
-    pub rate_limit_per_minute: u32,
-    /// Timeout in seconds before a running task is considered a zombie.
-    #[serde(default = "default_zombie_timeout")]
-    pub zombie_timeout_secs: u64,
-}
-
-fn default_max_concurrent() -> usize {
-    5
-}
-
-fn default_rate_limit() -> u32 {
-    60
-}
-
-fn default_zombie_timeout() -> u64 {
-    300
-}
-
-impl Default for SchedulerConfig {
-    fn default() -> Self {
-        Self {
-            max_concurrent: default_max_concurrent(),
-            rate_limit_per_minute: default_rate_limit(),
-            zombie_timeout_secs: default_zombie_timeout(),
         }
     }
 }
@@ -1979,14 +1940,6 @@ impl OxiosConfig {
             warnings.push("Running on port <1024 as 0.0.0.0 may require root".into());
         }
 
-        // Scheduler validation
-        if self.scheduler.max_concurrent == 0 {
-            warnings.push("scheduler.max_concurrent is 0 — no tasks will run".into());
-        }
-        if self.scheduler.zombie_timeout_secs == 0 {
-            errors.push("scheduler.zombie_timeout_secs must be > 0".into());
-        }
-
         // Cron validation
         for (name, job) in &self.cron.jobs {
             if job.schedule.is_empty() {
@@ -2303,10 +2256,6 @@ mod tests {
         assert_eq!(
             from_rust.kernel.event_bus_capacity, from_toml.kernel.event_bus_capacity,
             "kernel.event_bus_capacity 불일치"
-        );
-        assert_eq!(
-            from_rust.scheduler.max_concurrent, from_toml.scheduler.max_concurrent,
-            "scheduler.max_concurrent 불일치"
         );
         assert_eq!(
             from_rust.memory.consolidation.preset, from_toml.memory.consolidation.preset,

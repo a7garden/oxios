@@ -24,7 +24,6 @@ use oxios_kernel::agent_lifecycle::AgentLifecycleManager;
 use oxios_kernel::config::OrchestratorConfig;
 use oxios_kernel::event_bus::{EventBus, KernelEvent};
 use oxios_kernel::orchestrator::Orchestrator;
-use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
@@ -485,12 +484,10 @@ async fn test_gateway_routes_message_through_orchestrator() {
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
     let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Arc::new({
         let lifecycle = AgentLifecycleManager::new(
             supervisor,
-            scheduler.clone(),
             access_manager.clone(),
             a2a.clone(),
             event_bus.clone(),
@@ -532,12 +529,10 @@ async fn test_gateway_unknown_channel() {
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
     let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Arc::new({
         let lifecycle = AgentLifecycleManager::new(
             supervisor,
-            scheduler.clone(),
             access_manager.clone(),
             a2a.clone(),
             event_bus.clone(),
@@ -564,33 +559,30 @@ async fn test_gateway_unknown_channel() {
 }
 
 // ===========================================================================
-// Scheduler + Orchestrator Integration
+// Orchestrator Integration
 // ===========================================================================
 
-use oxios_kernel::scheduler::{Priority, ScheduledTask};
 use std::sync::atomic::AtomicU32;
 
-/// Mock Supervisor that integrates with the scheduler.
-struct SchedulerAwareSupervisor {
-    scheduler: Arc<AgentScheduler>,
+/// Mock supervisor with agent tracking for orchestrator integration tests.
+struct TrackingSupervisor {
     agents: parking_lot::RwLock<HashMap<AgentId, AgentInfo>>,
     event_bus: EventBus,
-    tasks_claimed: AtomicU32,
+    runs: AtomicU32,
 }
 
-impl SchedulerAwareSupervisor {
-    fn new(scheduler: Arc<AgentScheduler>, event_bus: EventBus) -> Self {
+impl TrackingSupervisor {
+    fn new(event_bus: EventBus) -> Self {
         Self {
-            scheduler,
             agents: parking_lot::RwLock::new(HashMap::new()),
             event_bus,
-            tasks_claimed: AtomicU32::new(0),
+            runs: AtomicU32::new(0),
         }
     }
 }
 
 #[async_trait]
-impl Supervisor for SchedulerAwareSupervisor {
+impl Supervisor for TrackingSupervisor {
     async fn exec(&self, id: AgentId) -> anyhow::Result<()> {
         let mut agents = self.agents.write();
         if let Some(a) = agents.get_mut(&id) {
@@ -641,11 +633,7 @@ impl Supervisor for SchedulerAwareSupervisor {
         _directive: &Directive,
         _env: &ExecEnv,
     ) -> anyhow::Result<ExecutionResult> {
-        // Submit to the scheduler before running.
-        let task = ScheduledTask::for_agent(id, format!("Agent {id} execution"), Priority::Normal);
-        self.scheduler.submit(task)?;
-
-        self.tasks_claimed.fetch_add(1, Ordering::SeqCst);
+        self.runs.fetch_add(1, Ordering::SeqCst);
 
         {
             let mut agents = self.agents.write();
@@ -693,16 +681,12 @@ impl Supervisor for SchedulerAwareSupervisor {
 }
 
 #[tokio::test]
-async fn test_scheduler_orchestrator_integration() {
+async fn test_orchestrator_routes_to_supervisor() {
     let event_bus = EventBus::new(64);
     let tmp = tempfile::tempdir().unwrap();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
-    let scheduler = Arc::new(AgentScheduler::new(3, 100, 60));
-    let supervisor = Arc::new(SchedulerAwareSupervisor::new(
-        scheduler.clone(),
-        event_bus.clone(),
-    ));
+    let supervisor = Arc::new(TrackingSupervisor::new(event_bus.clone()));
 
     let (orchestrator, _mock) =
         common::build_test_orchestrator(supervisor, state_store, event_bus.clone());
@@ -721,84 +705,6 @@ async fn test_scheduler_orchestrator_integration() {
 
     assert!(result.session_id.is_some());
     assert_eq!(result.phase_reached, "execute");
-
-    // Scheduler received at least one task.
-    let stats = scheduler.stats();
-    assert!(
-        stats.queued + stats.running >= 1,
-        "Expected at least one task"
-    );
-}
-
-#[tokio::test]
-async fn test_scheduler_priority_ordering_in_orchestration() {
-    let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
-    let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
-
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let scheduler = Arc::new(AgentScheduler::new(10, 10_000, 60));
-
-    // Submit tasks of varying priorities.
-    scheduler
-        .submit(ScheduledTask::new(
-            "Low priority task".into(),
-            Priority::Low,
-        ))
-        .unwrap();
-    scheduler
-        .submit(ScheduledTask::new(
-            "High priority task".into(),
-            Priority::High,
-        ))
-        .unwrap();
-    scheduler
-        .submit(ScheduledTask::new(
-            "Normal priority task".into(),
-            Priority::Normal,
-        ))
-        .unwrap();
-    scheduler
-        .submit(ScheduledTask::new(
-            "Critical task".into(),
-            Priority::Critical,
-        ))
-        .unwrap();
-
-    // Drain in priority order.
-    let task1 = scheduler.next_task().unwrap();
-    assert_eq!(task1.priority, Priority::Critical);
-
-    let task2 = scheduler.next_task().unwrap();
-    assert_eq!(task2.priority, Priority::High);
-
-    let task3 = scheduler.next_task().unwrap();
-    assert_eq!(task3.priority, Priority::Normal);
-
-    let task4 = scheduler.next_task().unwrap();
-    assert_eq!(task4.priority, Priority::Low);
-
-    // Verify the scheduler and orchestrator can coexist.
-    let supervisor = Arc::new(SchedulerAwareSupervisor::new(
-        scheduler.clone(),
-        event_bus.clone(),
-    ));
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-
-    let lifecycle = AgentLifecycleManager::new(
-        supervisor,
-        scheduler.clone(),
-        access_manager.clone(),
-        a2a.clone(),
-        event_bus.clone(),
-        300,
-        vec![],
-        true,
-        "/tmp/oxios-test-workspace".to_string(),
-    );
-    let _orchestrator =
-        Orchestrator::with_config(event_bus, state_store, lifecycle, make_evolution_config(0));
-    // Orchestrator is created successfully — shared state is fine.
 }
 
 // ===========================================================================

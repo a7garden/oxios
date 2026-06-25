@@ -37,6 +37,19 @@ impl std::fmt::Display for AgentStatus {
         }
     }
 }
+/// Priority levels for tasks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+pub enum Priority {
+    /// Low priority, good for background work.
+    Low = 0,
+    /// Normal priority, default for most tasks.
+    #[default]
+    Normal = 1,
+    /// High priority, important tasks.
+    High = 2,
+    /// Critical priority, must execute immediately.
+    Critical = 3,
+}
 
 /// Metadata about an agent instance.
 #[derive(Debug, Clone, Serialize, Deserialize)]

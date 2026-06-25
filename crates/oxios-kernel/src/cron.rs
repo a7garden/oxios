@@ -5,8 +5,8 @@
 
 use crate::config::CronConfig;
 use crate::git_layer::GitLayer;
-use crate::scheduler::Priority;
 use crate::state_store::StateStore;
+use crate::types::Priority;
 use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
 use cron::Schedule;

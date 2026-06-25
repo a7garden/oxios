@@ -15,10 +15,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use anyhow::Result;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
-use oxios_kernel::{
-    A2AProtocol, AccessManager, AgentLifecycleManager, EventBus, KernelEvent, Orchestrator,
-    StateStore, config::OrchestratorConfig,
-};
+use oxios_kernel::{EventBus, KernelEvent, Orchestrator, StateStore, config::OrchestratorConfig};
 use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 
 // ---------------------------------------------------------------------------
@@ -164,27 +161,6 @@ fn build_rfc027_orchestrator(
     event_bus: EventBus,
 ) -> (Arc<Orchestrator>, Arc<common::MockIntentEngine>) {
     common::build_test_orchestrator(supervisor, state_store, event_bus)
-}
-
-#[expect(dead_code)]
-fn make_lifecycle(
-    supervisor: Arc<MockSupervisor>,
-    scheduler: Arc<oxios_kernel::scheduler::AgentScheduler>,
-    event_bus: &EventBus,
-) -> AgentLifecycleManager {
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    AgentLifecycleManager::new(
-        supervisor,
-        scheduler,
-        access_manager,
-        a2a,
-        event_bus.clone(),
-        300,
-        vec![],
-        true,
-        "/tmp/oxios-test-workspace".to_string(),
-    )
 }
 
 // ---------------------------------------------------------------------------

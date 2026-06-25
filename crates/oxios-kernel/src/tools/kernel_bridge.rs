@@ -127,7 +127,6 @@ mod tests {
             crate::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
             crate::InfraApi::new(
                 Arc::new(crate::git_layer::GitLayer::new(base.join("git"), false).unwrap()),
-                Arc::new(crate::scheduler::AgentScheduler::new(5, 60, 300)),
                 Arc::new(crate::cron::CronScheduler::new(state_store.clone(), 60)),
                 Arc::new(crate::resource_monitor::ResourceMonitor::new(60, 60)),
                 crate::event_bus::EventBus::new(256),

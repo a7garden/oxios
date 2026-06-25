@@ -418,6 +418,8 @@ pub struct MetricsHandles {
 
     /// Atomic web-dist swaps (RFC-024 SP3).
     pub web_dist_swaps: CounterHandle,
+    /// Web surface scoped restarts (RFC-030).
+    pub supervisor_restarts: CounterHandle,
 
     /// 0 = warming up, 1 = ready (RFC-024 SP4). Updated from
     /// `ReadinessGate` when a subsystem changes state.
@@ -443,6 +445,10 @@ impl MetricsHandles {
     /// Increment messages counter.
     pub fn inc_messages(&self) {
         self.messages.inc();
+    }
+    /// Increment the supervisor scoped-restart counter (RFC-030).
+    pub fn inc_supervisor_restart(&self) {
+        self.supervisor_restarts.inc();
     }
 
     /// Observe orchestration duration.
@@ -590,6 +596,11 @@ pub fn get_metrics() -> &'static MetricsHandles {
             web_dist_swaps: r.counter(
                 "oxios_web_dist_swaps_total",
                 "Atomic web-dist swaps (RFC-024 SP3)",
+                &[],
+            ),
+            supervisor_restarts: r.counter(
+                "oxios_supervisor_restarts_total",
+                "Web surface scoped restarts (RFC-030)",
                 &[],
             ),
             readiness_state: r.gauge(

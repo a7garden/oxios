@@ -346,12 +346,22 @@ impl Surface for WebSurface {
         let listener = tokio::net::TcpListener::bind(&addr).await?;
         tracing::info!(addr = %addr, "Web server listening");
 
-        // Spawn server
+        // RFC-030 A5: use the shared shutdown token rather than an independent
+        // ctrl_c consumer. The supervisor owns the single shutdown signal; on
+        // graceful shutdown it cancels the root token, which cascades here so
+        // axum drains in-flight requests before stopping (no task.abort()).
+        let shutdown = ctx.shutdown.clone();
+
+        // Spawn server. Returns () — the supervisor observes the JoinHandle's
+        // completion and applies its policy (scoped restart on unexpected exit).
+        // Under panic=abort in release, a panic aborts the process directly and
+        // the OS supervisor restarts; the non-panic Err path is what the
+        // supervisor intercepts here.
         let handle = tokio::spawn(async move {
             if let Err(e) = axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    tokio::signal::ctrl_c().await.ok();
-                    tracing::info!("Web server shutting down");
+                .with_graceful_shutdown(async move {
+                    shutdown.cancelled().await;
+                    tracing::info!("Web server shutting down (graceful)");
                 })
                 .await
             {

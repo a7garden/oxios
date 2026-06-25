@@ -9,7 +9,6 @@ use oxios_kernel::ArgumentDef;
 use oxios_kernel::access_manager::AuditEntry;
 use oxios_kernel::metrics::registry;
 
-use crate::api::routes::PageParams;
 use crate::api::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -24,82 +23,6 @@ pub(crate) async fn handle_metrics() -> Result<String, StatusCode> {
 // ---------------------------------------------------------------------------
 // Scheduler (AIOS-inspired task scheduling)
 // ---------------------------------------------------------------------------
-
-/// Scheduler statistics response.
-#[derive(Debug, Serialize)]
-pub(crate) struct SchedulerStatsResponse {
-    queued: usize,
-    running: usize,
-    max_concurrent: usize,
-    rate_limit_per_minute: u32,
-    rate_remaining: u32,
-}
-
-/// GET /api/scheduler/stats — Get scheduler statistics.
-pub(crate) async fn handle_scheduler_stats(
-    state: State<Arc<AppState>>,
-) -> Json<SchedulerStatsResponse> {
-    let stats = state.kernel.infra.scheduler_stats();
-    Json(SchedulerStatsResponse {
-        queued: stats.queued,
-        running: stats.running,
-        max_concurrent: stats.max_concurrent,
-        rate_limit_per_minute: stats.rate_limit_per_minute,
-        rate_remaining: stats.rate_remaining,
-    })
-}
-
-/// Task summary for listing.
-#[derive(Debug, Serialize, Clone)]
-pub(crate) struct TaskSummary {
-    id: String,
-    description: String,
-    priority: String,
-    status: String,
-    created_at: String,
-    error: Option<String>,
-}
-
-/// GET /api/scheduler/tasks — List queued and running tasks.
-pub(crate) async fn handle_scheduler_tasks(
-    state: State<Arc<AppState>>,
-    _params: Query<PageParams>,
-) -> Json<serde_json::Value> {
-    let queued: Vec<TaskSummary> = state
-        .kernel
-        .infra
-        .queued_tasks()
-        .into_iter()
-        .map(|t| TaskSummary {
-            id: t.id.to_string(),
-            description: t.description,
-            priority: format!("{:?}", t.priority).to_lowercase(),
-            status: format!("{:?}", t.status).to_lowercase(),
-            created_at: t.created_at.to_rfc3339(),
-            error: t.error,
-        })
-        .collect();
-
-    let running: Vec<TaskSummary> = state
-        .kernel
-        .infra
-        .running_tasks()
-        .into_iter()
-        .map(|t| TaskSummary {
-            id: t.id.to_string(),
-            description: t.description,
-            priority: format!("{:?}", t.priority).to_lowercase(),
-            status: format!("{:?}", t.status).to_lowercase(),
-            created_at: t.created_at.to_rfc3339(),
-            error: t.error,
-        })
-        .collect();
-
-    Json(serde_json::json!({
-        "queued": queued,
-        "running": running,
-    }))
-}
 
 // ---------------------------------------------------------------------------
 // Audit & Permissions

@@ -1,4 +1,4 @@
-//! Infra API — Git, scheduler, cron, resources, events, system.
+//! Infra API — Git, cron, resources, events, system.
 
 use crate::ToolMeta;
 use crate::config::OxiosConfig;
@@ -6,7 +6,6 @@ use crate::cron::{CronJob, CronJobUpdate, CronScheduler};
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::{GitLayer, LogEntry};
 use crate::resource_monitor::{ResourceMonitor, ResourceSnapshot};
-use crate::scheduler::{AgentScheduler, ScheduledTask, SchedulerStats};
 use crate::tools::{PendingAskUser, PendingToolApprovals, known_tools};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -14,7 +13,6 @@ use std::time::{Duration, Instant};
 /// Infrastructure system calls.
 pub struct InfraApi {
     pub(crate) git_layer: Arc<GitLayer>,
-    pub(crate) scheduler: Arc<AgentScheduler>,
     pub(crate) cron_scheduler: Arc<CronScheduler>,
     pub(crate) resource_monitor: Arc<ResourceMonitor>,
     pub(crate) event_bus: EventBus,
@@ -32,7 +30,6 @@ impl InfraApi {
     /// Create a new InfraApi.
     pub fn new(
         git_layer: Arc<GitLayer>,
-        scheduler: Arc<AgentScheduler>,
         cron_scheduler: Arc<CronScheduler>,
         resource_monitor: Arc<ResourceMonitor>,
         event_bus: EventBus,
@@ -41,7 +38,6 @@ impl InfraApi {
     ) -> Self {
         Self {
             git_layer,
-            scheduler,
             cron_scheduler,
             resource_monitor,
             event_bus,
@@ -82,21 +78,6 @@ impl InfraApi {
     /// List git tags.
     pub fn git_tags(&self) -> anyhow::Result<Vec<String>> {
         self.git_layer.list_tags()
-    }
-
-    /// Get scheduler stats.
-    pub fn scheduler_stats(&self) -> SchedulerStats {
-        self.scheduler.stats()
-    }
-
-    /// Get queued tasks.
-    pub fn queued_tasks(&self) -> Vec<ScheduledTask> {
-        self.scheduler.queued_tasks()
-    }
-
-    /// Get running tasks.
-    pub fn running_tasks(&self) -> Vec<ScheduledTask> {
-        self.scheduler.running_tasks()
     }
 
     /// Add a cron job.
@@ -166,11 +147,6 @@ impl InfraApi {
     /// Get config reference.
     pub fn config(&self) -> &OxiosConfig {
         &self.config
-    }
-
-    /// Scheduler reference — for hot-reload config propagation.
-    pub fn scheduler(&self) -> &Arc<AgentScheduler> {
-        &self.scheduler
     }
 
     /// Resource monitor reference — for hot-reload config propagation.

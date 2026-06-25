@@ -13,7 +13,6 @@ use crate::a2a::{A2AProtocol, AgentCard};
 use crate::access_manager::{AccessManager, Role, Subject};
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::metrics::get_metrics;
-use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
 use crate::supervisor::Supervisor;
 use crate::types::{AgentId, AgentStatus};
 use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
@@ -21,7 +20,6 @@ use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 /// Manages the full lifecycle of a single agent from fork to cleanup.
 pub struct AgentLifecycleManager {
     supervisor: Arc<dyn Supervisor>,
-    scheduler: Arc<AgentScheduler>,
     access_manager: Arc<parking_lot::Mutex<AccessManager>>,
     a2a: Arc<A2AProtocol>,
     event_bus: EventBus,
@@ -39,7 +37,6 @@ impl Clone for AgentLifecycleManager {
     fn clone(&self) -> Self {
         Self {
             supervisor: self.supervisor.clone(),
-            scheduler: self.scheduler.clone(),
             access_manager: self.access_manager.clone(),
             a2a: self.a2a.clone(),
             event_bus: self.event_bus.clone(),
@@ -59,7 +56,6 @@ impl AgentLifecycleManager {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         supervisor: Arc<dyn Supervisor>,
-        scheduler: Arc<AgentScheduler>,
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
         a2a: Arc<A2AProtocol>,
         event_bus: EventBus,
@@ -70,7 +66,6 @@ impl AgentLifecycleManager {
     ) -> Self {
         Self {
             supervisor,
-            scheduler,
             access_manager,
             a2a,
             event_bus,
@@ -97,7 +92,6 @@ impl AgentLifecycleManager {
         &self,
         directive: &Directive,
         env: &ExecEnv,
-        priority: Priority,
     ) -> Result<ExecutionResult> {
         // 1. Fork
         let agent_id = self.supervisor.fork_directive(directive, env).await?;
@@ -118,15 +112,7 @@ impl AgentLifecycleManager {
         // 3. Ensure access permissions
         self.ensure_permissions(&agent_name);
 
-        // 4. Submit and start task
         get_metrics().agents_forked.inc();
-        let task = ScheduledTask::for_agent(
-            agent_id,
-            format!("Execute directive '{}'", directive.goal),
-            priority,
-        );
-        let task_id = self.scheduler.submit(task)?;
-        self.scheduler.start_task(task_id)?;
 
         // 5. Run — always cleanup even on failure
         let max_secs = self
@@ -143,7 +129,7 @@ impl AgentLifecycleManager {
                 Ok(Ok(r)) => r,
                 Ok(Err(e)) => {
                     tracing::warn!(agent_id = %agent_id, error = %e, "Agent execution failed, cleaning up");
-                    self.cleanup_on_failure(agent_id, task_id).await;
+                    self.cleanup_on_failure(agent_id).await;
                     return Err(e);
                 }
                 Err(_) => {
@@ -157,8 +143,7 @@ impl AgentLifecycleManager {
                     // Abort the detached execution body. Previously the
                     // timeout only dropped the awaiting future while the
                     // spawned task kept running — leaking tokens/resources.
-                    let _ = self.supervisor.kill(agent_id).await;
-                    self.cleanup_on_failure(agent_id, task_id).await;
+                    self.cleanup_on_failure(agent_id).await;
                     bail!("Agent execution timed out after {secs} seconds");
                 }
             }
@@ -171,14 +156,14 @@ impl AgentLifecycleManager {
                 Ok(r) => r,
                 Err(e) => {
                     tracing::warn!(agent_id = %agent_id, error = %e, "Agent execution failed, cleaning up");
-                    self.cleanup_on_failure(agent_id, task_id).await;
+                    self.cleanup_on_failure(agent_id).await;
                     return Err(e);
                 }
             }
         };
 
         // 6. Cleanup on success
-        self.cleanup(agent_id, task_id, &result).await;
+        self.cleanup(agent_id, &result).await;
 
         Ok(result)
     }
@@ -193,7 +178,6 @@ impl AgentLifecycleManager {
         env: &ExecEnv,
         prev_result: &ExecutionResult,
         gaps: &[String],
-        priority: Priority,
     ) -> Result<ExecutionResult> {
         // Augment the directive with feedback from the previous attempt.
         let mut augmented = directive.clone();
@@ -209,7 +193,7 @@ impl AgentLifecycleManager {
         );
         augmented.constraints.push(feedback);
 
-        self.execute_directive(&augmented, env, priority).await
+        self.execute_directive(&augmented, env).await
     }
 
     /// Kill an agent and clean up all registered state.
@@ -316,36 +300,17 @@ impl AgentLifecycleManager {
             .assign_role(subject, Role::Superuser);
     }
 
-    /// Unregister A2A, complete/fail scheduler task.
-    async fn cleanup(&self, agent_id: AgentId, task_id: uuid::Uuid, result: &ExecutionResult) {
+    /// Unregister A2A card on completion.
+    async fn cleanup(&self, agent_id: AgentId, _result: &ExecutionResult) {
         if let Err(e) = self.a2a.registry().unregister_agent(agent_id).await {
             tracing::warn!(agent_id = %agent_id, error = %e, "Failed to unregister A2A card");
         }
-        if result.success {
-            let _ = self.scheduler.complete_task(task_id);
-        } else {
-            let _ = self.scheduler.fail_task(task_id, &result.output);
-        }
-    }
-
-    /// Reap finished zombie tasks and log the cleanup.
-    pub fn reap_zombies(&self) -> Vec<uuid::Uuid> {
-        let reaped = self.scheduler.reap_zombies();
-        if !reaped.is_empty() {
-            tracing::warn!(count = reaped.len(), "Zombie tasks reaped");
-            let mut access = self.access_manager.lock();
-            for task_id in &reaped {
-                access.log_access("scheduler", "zombie_reap", &task_id.to_string(), true, None);
-            }
-        }
-        reaped
     }
 
     /// Cleanup when agent execution fails (no ExecutionResult available).
-    async fn cleanup_on_failure(&self, agent_id: AgentId, task_id: uuid::Uuid) {
+    async fn cleanup_on_failure(&self, agent_id: AgentId) {
         if let Err(e) = self.a2a.registry().unregister_agent(agent_id).await {
             tracing::warn!(agent_id = %agent_id, error = %e, "Failed to unregister A2A card");
         }
-        let _ = self.scheduler.fail_task(task_id, "execution failed");
     }
 }

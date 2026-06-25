@@ -707,7 +707,6 @@ mod tests {
                 Arc::new(
                     crate::git_layer::GitLayer::new(tmp.join("git"), false).expect("git layer"),
                 ),
-                Arc::new(crate::scheduler::AgentScheduler::new(4, 60, 300)),
                 Arc::new(crate::cron::CronScheduler::new(
                     Arc::new(
                         crate::state_store::StateStore::new(tmp.join("cron")).expect("cron state"),

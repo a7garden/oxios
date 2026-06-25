@@ -1,0 +1,457 @@
+//! Runtime task supervision (RFC-030).
+//!
+//! Observes the daemon's critical background tasks (gateway, surfaces,
+//! channels) so that an unexpected exit is *never silent*. On a web-surface
+//! crash it restarts the surface in-process (bounded backoff); on a
+//! critical-task death (gateway, channels) it escalates to a fatal process
+//! exit so the OS supervisor (systemd / launchd) restarts to a known-good
+//! state. Before this module, `cmd_serve` awaited only `ctrl_c` and treated
+//! every task handle as fire-and-forget — a crashed web server left the daemon
+//! half-dead and `oxios status` still reporting "Running".
+//!
+//! # `panic = "abort"` interaction
+//!
+//! Oxios compiles release builds with `panic = "abort"` (see root `Cargo.toml`
+//! `[profile.release]`). A panicking task therefore *aborts the whole process*
+//! before its `JoinHandle` can complete — the supervisor never observes the
+//! panic. Production panic recovery is consequently "process abort → OS
+//! supervisor restart", which already achieves fail-fast for free. The
+//! supervisor intercepts the **non-panic** failure path: a task finishing with
+//! an error (e.g. `axum::serve` returning `Err`) or completing when it should
+//! run forever. That is the realistic, high-value failure mode this module
+//! exists to recover from.
+//!
+//! # Non-blocking supervision (R7)
+//!
+//! The run loop is purely `select!`-driven. Backoff is modelled as a recorded
+//! deadline fired by a dedicated timer branch, never an inline `sleep` — so
+//! `ctrl_c` and a critical-task death stay observable throughout every backoff
+//! window (a web restart backoff of up to 30s never blinds the loop to a
+//! dying gateway).
+
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use futures::stream::{FuturesUnordered, StreamExt};
+use parking_lot::RwLock;
+use tokio::task::{JoinError, JoinHandle};
+use tokio_util::sync::CancellationToken;
+
+use oxios_gateway::{ActiveWebDist, Gateway, Surface, SurfaceContext};
+
+use crate::kernel::Kernel;
+
+/// Outcome of the supervisor's run loop.
+pub enum ShutdownOutcome {
+    /// `ctrl_c` (or root-token cancel) received — clean shutdown requested.
+    Graceful,
+    /// A critical task exited unexpectedly — the process should exit non-zero
+    /// so the OS supervisor restarts to a known-good state.
+    Fatal {
+        /// Name of the task that died.
+        name: String,
+        /// Human-readable reason.
+        reason: String,
+    },
+}
+
+/// Which task a tracked handle belongs to.
+#[derive(Clone)]
+enum Tag {
+    /// Named critical task (gateway, channels, non-web surfaces). Fail-fast.
+    Critical(String),
+    /// The web surface — scoped-restart policy.
+    Web,
+}
+
+/// Bounded exponential-backoff configuration for scoped restarts.
+pub struct RestartConfig {
+    /// Max restart attempts before escalating to fatal.
+    pub max_retries: u32,
+    /// Reset the retry counter after the surface runs stably this long.
+    pub reset_after: Duration,
+    /// First backoff duration.
+    pub initial_backoff: Duration,
+    /// Backoff cap.
+    pub max_backoff: Duration,
+}
+
+impl Default for RestartConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 5,
+            reset_after: Duration::from_secs(300),
+            initial_backoff: Duration::from_millis(500),
+            max_backoff: Duration::from_secs(30),
+        }
+    }
+}
+
+/// A tagged completion future: yields `(Tag, result)` so the loop knows *which*
+/// task completed without a parallel index array.
+type TaggedFut = std::pin::Pin<Box<dyn Future<Output = (Tag, Result<(), JoinError>)> + Send>>;
+
+fn tagged(tag: Tag, handle: JoinHandle<()>) -> TaggedFut {
+    Box::pin(async move { (tag, handle.await) })
+}
+
+/// (Re)starts the web surface. Held by the supervisor to perform scoped
+/// restarts after a crash.
+pub struct WebSurfaceRestarter {
+    gateway: Arc<Gateway>,
+    kernel_handle: Arc<oxios_kernel::KernelHandle>,
+    config: Arc<RwLock<oxios_kernel::OxiosConfig>>,
+    config_path: std::path::PathBuf,
+    web_dist: ActiveWebDist,
+}
+
+impl WebSurfaceRestarter {
+    /// Build from the running kernel plus the paths/dist resolved at boot.
+    pub fn new(
+        kernel: &Kernel,
+        config: Arc<RwLock<oxios_kernel::OxiosConfig>>,
+        config_path: std::path::PathBuf,
+        web_dist: ActiveWebDist,
+    ) -> Self {
+        Self {
+            gateway: kernel.gateway(),
+            kernel_handle: kernel.handle(),
+            config,
+            config_path,
+            web_dist,
+        }
+    }
+
+    /// (Re)start the web surface with a fresh shutdown child-token.
+    ///
+    /// Unregisters any stale `"web"` channel first (the previous instance is
+    /// already dead, so there is nothing to drain — RFC-030 A5), then re-invokes
+    /// `WebSurface::start` and registers the new channel. Returns the spawned
+    /// server task handle.
+    async fn start(&self, shutdown: CancellationToken) -> Result<JoinHandle<()>, anyhow::Error> {
+        // Stale channel from the crashed instance — remove it and stop its
+        // gateway receive task. Ignore "not registered" errors.
+        let _ = self.gateway.unregister("web").await;
+
+        let surface = crate::api::WebSurface::new();
+        let ctx = SurfaceContext {
+            kernel: self.kernel_handle.clone(),
+            config: self.config.clone(),
+            config_path: self.config_path.clone(),
+            web_dist: self.web_dist.clone(),
+            shutdown,
+        };
+        let handle = surface.start(ctx).await?;
+        if let Some(channel) = handle.channel {
+            self.gateway.register(channel).await?;
+        }
+        // WebSurface::start always spawns exactly one server task.
+        Ok(handle
+            .tasks
+            .into_iter()
+            .next()
+            .expect("web surface spawns a server task"))
+    }
+}
+
+struct WebState {
+    restarter: Arc<WebSurfaceRestarter>,
+    retries: u32,
+    last_start: Instant,
+}
+
+/// A scheduled restart awaiting its backoff deadline.
+struct PendingRestart {
+    deadline: Instant,
+}
+
+/// Runtime supervisor: observes critical tasks, restarts the web surface on
+/// crash, escalates to fatal exit for critical-task deaths.
+pub struct TaskSupervisor {
+    root: CancellationToken,
+    restart: RestartConfig,
+    tasks: FuturesUnordered<TaggedFut>,
+    web: Option<WebState>,
+    pending: Option<PendingRestart>,
+    /// Callback to stop the gateway event loop during shutdown drain.
+    stop_gateway: Option<Box<dyn FnOnce() + Send>>,
+}
+
+impl TaskSupervisor {
+    /// Construct with the root shutdown token (owned by the supervisor) and a
+    /// restart policy for the web surface.
+    pub fn new(root: CancellationToken, restart: RestartConfig) -> Self {
+        Self {
+            root,
+            restart,
+            tasks: FuturesUnordered::new(),
+            web: None,
+            pending: None,
+            stop_gateway: None,
+        }
+    }
+
+    /// Track a critical (fail-fast) task by name. Any exit → fatal.
+    pub fn track_critical(&mut self, name: impl Into<String>, handle: JoinHandle<()>) {
+        self.tasks.push(tagged(Tag::Critical(name.into()), handle));
+    }
+
+    /// Track the web surface as scoped-restart, together with its restarter.
+    pub fn track_web(&mut self, handle: JoinHandle<()>, restarter: Arc<WebSurfaceRestarter>) {
+        self.web = Some(WebState {
+            restarter,
+            retries: 0,
+            last_start: Instant::now(),
+        });
+        self.tasks.push(tagged(Tag::Web, handle));
+    }
+
+    /// Set the callback used to stop the gateway during shutdown drain. The
+    /// gateway task is tracked separately (fail-fast); this stops its own
+    /// event loop so it drains in-flight dispatches before the process exits.
+    pub fn with_gateway_stop(&mut self, stop: impl FnOnce() + Send + 'static) {
+        self.stop_gateway = Some(Box::new(stop));
+    }
+
+    /// Run the supervision loop until graceful or fatal exit, then drain all
+    /// tracked tasks. For BOTH outcomes the live tasks are drained (RFC-030
+    /// A6): a fatal exit still cancels the root token and waits so the process
+    /// doesn't leave in-flight requests half-served — only the exit code
+    /// differs (non-zero on fatal, so the OS supervisor restarts).
+    pub async fn run(mut self) -> ShutdownOutcome {
+        let outcome = self.watch().await;
+        let drain_timeout = match &outcome {
+            ShutdownOutcome::Graceful => Duration::from_secs(10),
+            ShutdownOutcome::Fatal { .. } => Duration::from_secs(3),
+        };
+        self.drain(drain_timeout).await;
+        outcome
+    }
+
+    /// The non-blocking supervision loop (R7): always inside `select!`, never
+    /// blocks inline. ctrl_c and critical-task deaths stay observable
+    /// throughout every backoff window.
+    async fn watch(&mut self) -> ShutdownOutcome {
+        loop {
+            // Snapshot the pending deadline into a local so the timer branch
+            // owns no borrow of `self` (lets the arm body borrow `self` mutably).
+            let timer = self
+                .pending
+                .as_ref()
+                .map(|p| tokio::time::sleep_until(p.deadline.into()));
+
+            tokio::select! {
+                biased;
+                _ = tokio::signal::ctrl_c() => return ShutdownOutcome::Graceful,
+                _ = self.root.cancelled() => return ShutdownOutcome::Graceful,
+                // Any tracked task completed. FuturesUnordered auto-removes
+                // the finished future; we push a fresh one on restart.
+                Some((tag, result)) = self.tasks.next() => {
+                    if let Some(outcome) = self.on_completion(tag, result).await {
+                        return outcome;
+                    }
+                }
+                // Backoff deadline elapsed → fire the pending web restart.
+                _ = async {
+                    match timer {
+                        Some(sleep) => sleep.await,
+                        None => std::future::pending::<()>().await,
+                    }
+                } => {
+                    if let Some(outcome) = self.fire_web_restart().await {
+                        return outcome;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Drain all tracked tasks on shutdown: cancel the root token (web
+    /// surfaces drain in-flight requests), stop the gateway, then await every
+    /// remaining task up to `timeout`. Tasks that don't finish in time are
+    /// detached — the process is exiting regardless.
+    async fn drain(&mut self, timeout: Duration) {
+        tracing::info!(
+            timeout_secs = timeout.as_secs(),
+            "Supervisor draining tracked tasks"
+        );
+        self.root.cancel();
+        if let Some(stop) = self.stop_gateway.take() {
+            stop();
+        }
+        let _ = tokio::time::timeout(timeout, async {
+            while self.tasks.next().await.is_some() {}
+        })
+        .await;
+    }
+
+    /// Process one completed task. Returns `Some(outcome)` to exit the loop.
+    async fn on_completion(
+        &mut self,
+        tag: Tag,
+        result: Result<(), JoinError>,
+    ) -> Option<ShutdownOutcome> {
+        match tag {
+            Tag::Critical(name) => {
+                let reason = describe_exit(&name, result);
+                tracing::error!(task = %name, %reason, "Critical task exited unexpectedly");
+                Some(ShutdownOutcome::Fatal { name, reason })
+            }
+            Tag::Web => {
+                let reason = describe_exit("web", result);
+                let ws = self.web.as_mut().expect("web state present while tracked");
+                // Reset the retry budget if the surface ran stably long enough.
+                if ws.last_start.elapsed() >= self.restart.reset_after {
+                    ws.retries = 0;
+                }
+                ws.retries += 1;
+                if ws.retries > self.restart.max_retries {
+                    tracing::error!(
+                        task = "web",
+                        retries = ws.retries,
+                        %reason,
+                        "Web surface restart budget exhausted; escalating to fatal"
+                    );
+                    return Some(ShutdownOutcome::Fatal {
+                        name: "web".to_string(),
+                        reason: format!("{reason} (retries exhausted: {})", ws.retries),
+                    });
+                }
+                let backoff = compute_backoff(&self.restart, ws.retries);
+                tracing::warn!(
+                    task = "web",
+                    retry = ws.retries,
+                    max = self.restart.max_retries,
+                    backoff_ms = backoff.as_millis() as u64,
+                    %reason,
+                    "Web surface exited; scheduling restart"
+                );
+                self.pending = Some(PendingRestart {
+                    deadline: Instant::now() + backoff,
+                });
+                None
+            }
+        }
+    }
+
+    /// Fire the pending web restart once its backoff elapsed.
+    async fn fire_web_restart(&mut self) -> Option<ShutdownOutcome> {
+        let _pending = self.pending.take()?;
+        let ws = self.web.as_mut().expect("web state present while tracked");
+        // Fresh child token for the new instance (root cancel still cascades).
+        let child = self.root.child_token();
+        match ws.restarter.start(child).await {
+            Ok(handle) => {
+                ws.last_start = Instant::now();
+                self.tasks.push(tagged(Tag::Web, handle));
+                tracing::info!(task = "web", "Web surface restarted");
+                oxios_kernel::metrics::get_metrics().inc_supervisor_restart();
+                None
+            }
+            Err(e) => {
+                // Re-bind / start failure — reschedule with the next backoff,
+                // or escalate if the budget is spent.
+                ws.retries += 1;
+                if ws.retries > self.restart.max_retries {
+                    tracing::error!(task = "web", error = %e, "Web restart failed; budget exhausted");
+                    return Some(ShutdownOutcome::Fatal {
+                        name: "web".to_string(),
+                        reason: format!("restart failed: {e}"),
+                    });
+                }
+                let backoff = compute_backoff(&self.restart, ws.retries);
+                tracing::warn!(
+                    task = "web",
+                    retry = ws.retries,
+                    backoff_ms = backoff.as_millis() as u64,
+                    error = %e,
+                    "Web restart failed; rescheduling"
+                );
+                self.pending = Some(PendingRestart {
+                    deadline: Instant::now() + backoff,
+                });
+                None
+            }
+        }
+    }
+}
+
+/// Exponential backoff: `initial * 2^(attempt-1)`, capped at `max_backoff`.
+fn compute_backoff(cfg: &RestartConfig, attempt: u32) -> Duration {
+    let exp = cfg
+        .initial_backoff
+        .saturating_mul(2u32.saturating_pow(attempt.saturating_sub(1)));
+    exp.min(cfg.max_backoff)
+}
+
+/// Render a `JoinHandle` result as a human-readable exit reason.
+fn describe_exit(name: &str, result: Result<(), JoinError>) -> String {
+    match result {
+        Ok(()) => format!("'{name}' task completed unexpectedly"),
+        Err(e) if e.is_cancelled() => format!("'{name}' task was cancelled"),
+        Err(e) if e.is_panic() => format!("'{name}' task panicked"),
+        Err(e) => format!("'{name}' task error: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn backoff_is_exponential_and_capped() {
+        let cfg = RestartConfig {
+            max_retries: 5,
+            reset_after: Duration::from_secs(300),
+            initial_backoff: Duration::from_millis(500),
+            max_backoff: Duration::from_secs(30),
+        };
+        assert_eq!(compute_backoff(&cfg, 1), Duration::from_millis(500));
+        assert_eq!(compute_backoff(&cfg, 2), Duration::from_secs(1));
+        assert_eq!(compute_backoff(&cfg, 3), Duration::from_secs(2));
+        assert_eq!(compute_backoff(&cfg, 4), Duration::from_secs(4));
+        // Capped at max_backoff (30s) for large attempts.
+        assert_eq!(compute_backoff(&cfg, 100), Duration::from_secs(30));
+    }
+
+    #[test]
+    fn backoff_attempt_zero_is_initial() {
+        let cfg = RestartConfig::default();
+        // saturating_sub clamps the exponent base to 2^0 = 1 → initial_backoff.
+        assert_eq!(compute_backoff(&cfg, 0), cfg.initial_backoff);
+    }
+
+    #[tokio::test]
+    async fn failfast_task_exit_is_fatal() {
+        let root = CancellationToken::new();
+        let mut sup = TaskSupervisor::new(root.clone(), RestartConfig::default());
+        // A task that immediately finishes (unexpected for a critical task).
+        sup.track_critical("gateway", tokio::spawn(async {}));
+        let outcome = sup.run().await;
+        match outcome {
+            ShutdownOutcome::Fatal { name, .. } => assert_eq!(name, "gateway"),
+            _ => panic!("expected Fatal for critical task exit"),
+        }
+    }
+
+    #[tokio::test]
+    async fn ctrl_c_is_graceful() {
+        // We can't easily send a real ctrl_c in a test, but root cancellation
+        // is an equivalent graceful signal the supervisor honours.
+        let root = CancellationToken::new();
+        let mut sup = TaskSupervisor::new(root.clone(), RestartConfig::default());
+        // A task that stays alive until cancelled, so the post-watch drain()
+        // completes instantly when the root token is cancelled instead of
+        // waiting out the full drain timeout.
+        let task_token = root.clone();
+        sup.track_critical(
+            "gateway",
+            tokio::spawn(async move {
+                task_token.cancelled().await;
+            }),
+        );
+        root.cancel();
+        let outcome = sup.run().await;
+        assert!(matches!(outcome, ShutdownOutcome::Graceful));
+    }
+}

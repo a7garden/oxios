@@ -7,9 +7,9 @@
 use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
-    A2AProtocol, AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor,
-    BudgetManager, ClawHubClient, ClawHubInstaller, CronScheduler, EngineHandle, EventBus,
-    GitLayer, HnswMemoryIndex, MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator,
+    A2AProtocol, AgentRuntime, AuditPersistence, AuditTrail, BasicSupervisor, BudgetManager,
+    ClawHubClient, ClawHubInstaller, CronScheduler, EngineHandle, EventBus, GitLayer,
+    HnswMemoryIndex, MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator,
     OxiosConfig, OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, SkillManager,
     SkillsShClient, SkillsShInstaller, SubsystemState, Supervisor, access_manager::AccessManager,
     auth::AuthManager, config::load_config,
@@ -33,7 +33,6 @@ pub struct Kernel {
     config: OxiosConfig,
     skill_manager: Arc<SkillManager>,
     supervisor: Arc<dyn Supervisor>,
-    scheduler: Arc<AgentScheduler>,
     access_manager: Arc<parking_lot::Mutex<AccessManager>>,
     persona_manager: PersonaManager,
     mcp_bridge: Arc<McpBridge>,
@@ -46,6 +45,11 @@ pub struct Kernel {
     budget_manager: Arc<BudgetManager>,
     resource_monitor: Arc<ResourceMonitor>,
     project_manager: Option<Arc<ProjectManager>>,
+    /// Mount manager (RFC-025 path aliases). `None` when SQLite memory is off.
+    /// Wired into the lazily-cached handle so `/api/mounts` and the mount tool
+    /// see live data — without this the API's handle has `mounts = None` even
+    /// though the orchestrator holds a separate `Arc<MountManager>`.
+    mount_manager: Option<Arc<oxios_kernel::MountManager>>,
     start_time: std::time::Instant,
     /// Path to config.toml (for persistence).
     config_path: PathBuf,
@@ -172,7 +176,7 @@ impl Kernel {
                     agent_api.set_agent_log_db(db.clone());
                 }
 
-                Arc::new(oxios_kernel::KernelHandle::new(
+                let kh = oxios_kernel::KernelHandle::new(
                     oxios_kernel::StateApi::new(self.state_store.clone()),
                     agent_api,
                     oxios_kernel::SecurityApi::new(
@@ -186,7 +190,6 @@ impl Kernel {
                     oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
                     oxios_kernel::InfraApi::new(
                         self.git_layer.clone(),
-                        self.scheduler.clone(),
                         self.cron_scheduler.clone(),
                         self.resource_monitor.clone(),
                         self.event_bus.clone(),
@@ -213,7 +216,16 @@ impl Kernel {
                     self.build_marketplace_api(),
                     self.build_calendar_api(),
                     self.build_email_api(),
-                ))
+                );
+                // RFC-025: attach MountApi to the handle the HTTP API and CLI
+                // actually use. The orchestrator gets its own Arc directly; this
+                // facade is what `/api/mounts` reads (`state.kernel.mounts`).
+                let kh = if let Some(mm) = &self.mount_manager {
+                    kh.with_mounts(oxios_kernel::MountApi::new(mm.clone()))
+                } else {
+                    kh
+                };
+                Arc::new(kh)
             })
             .clone()
     }
@@ -803,11 +815,6 @@ impl KernelBuilder {
             tracing::info!(path = %expanded.display(), "Audit log file persistence enabled");
         }
         let access_manager = Arc::new(parking_lot::Mutex::new(access_manager));
-        let scheduler = Arc::new(AgentScheduler::new(
-            config.scheduler.max_concurrent,
-            config.scheduler.rate_limit_per_minute,
-            config.scheduler.zombie_timeout_secs,
-        ));
 
         let persona_manager = PersonaManager::new();
         if let Some(p) = persona_manager.first_enabled() {
@@ -1131,7 +1138,6 @@ impl KernelBuilder {
                 oxios_kernel::McpApi::new(mcp_bridge.clone()),
                 oxios_kernel::InfraApi::new(
                     git_layer.clone(),
-                    scheduler.clone(),
                     cron_scheduler.clone(),
                     resource_monitor.clone(),
                     event_bus.clone(),
@@ -1283,7 +1289,6 @@ impl KernelBuilder {
 
         let lifecycle = oxios_kernel::AgentLifecycleManager::new(
             supervisor.clone(),
-            scheduler.clone(),
             access_manager.clone(),
             a2a_protocol.clone(),
             event_bus.clone(),
@@ -1306,14 +1311,7 @@ impl KernelBuilder {
                         ..Default::default()
                     };
                     let env = oxios_ouroboros::ExecEnv::default();
-                    match lc
-                        .execute_directive(
-                            &directive,
-                            &env,
-                            oxios_kernel::scheduler::Priority::Normal,
-                        )
-                        .await
-                    {
+                    match lc.execute_directive(&directive, &env).await {
                         Ok(result) => Ok(serde_json::json!({
                             "output": result.output,
                             "success": result.success,
@@ -1376,7 +1374,6 @@ impl KernelBuilder {
             config,
             skill_manager,
             supervisor,
-            scheduler,
             access_manager,
             persona_manager,
             mcp_bridge,
@@ -1388,6 +1385,7 @@ impl KernelBuilder {
             budget_manager,
             resource_monitor,
             project_manager,
+            mount_manager,
             start_time: std::time::Instant::now(),
             config_path,
             // Do NOT pre-seed with the cycle-breaking preliminary handle

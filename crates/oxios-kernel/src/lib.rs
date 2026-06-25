@@ -24,7 +24,6 @@ pub mod agent_log_db;
 pub mod budget;
 pub mod cron;
 pub mod orchestrator;
-pub mod scheduler;
 // ─── Resilience (RFC-029) ──────────────────────────────────────────────
 // Failure classification + (P2) recovery coordination.
 pub mod resilience;
@@ -124,7 +123,7 @@ pub use budget::{
 pub use cron::{CronJob, CronJobResult, CronJobUpdate, CronScheduler, JobSource};
 pub use orchestrator::{AgentRole, OrchestrationResult, Orchestrator, SubTask};
 // CircuitBreaker removed — use oxi_sdk::ProviderCircuitBreaker directly (#11).
-pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
+pub use types::Priority;
 
 // ─── Security ───────────────────────────────────────────────────────
 pub use access_manager::{

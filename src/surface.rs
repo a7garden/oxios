@@ -9,6 +9,7 @@ use anyhow::Result;
 use oxios_gateway::ActiveWebDist;
 use std::path::Path;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 use crate::kernel::Kernel;
 
@@ -21,18 +22,29 @@ pub fn build_surfaces() -> Vec<Box<dyn Surface>> {
     surfaces
 }
 
+/// One activated surface and its background task handles.
+pub struct ActivatedSurface {
+    /// Surface name (e.g. "web").
+    pub name: String,
+    /// Background task handles spawned by the surface.
+    pub tasks: Vec<tokio::task::JoinHandle<()>>,
+}
+
 /// Activate all enabled surfaces.
 ///
 /// Surfaces receive full kernel access. If a surface also returns a channel,
-/// it is registered with the gateway for message routing.
+/// it is registered with the gateway for message routing. The shared `shutdown`
+/// token (RFC-030 A5) is threaded into each surface's context so it wires its
+/// graceful-shutdown path to a single signal source owned by the supervisor.
 pub async fn activate_surfaces(
     kernel: &Kernel,
     config_path: &Path,
     web_dist: ActiveWebDist,
-) -> Result<Vec<tokio::task::JoinHandle<()>>> {
+    shutdown: CancellationToken,
+) -> Result<Vec<ActivatedSurface>> {
     let surfaces = build_surfaces();
     let config = kernel.config();
-    let mut all_tasks = Vec::new();
+    let mut activated = Vec::new();
 
     // Read surface names from config — surfaces are listed separately from channels.
     let surface_names: Vec<String> = config
@@ -62,6 +74,7 @@ pub async fn activate_surfaces(
                     config: Arc::new(parking_lot::RwLock::new(config.clone())),
                     config_path: config_path.to_path_buf(),
                     web_dist: web_dist.clone(),
+                    shutdown: shutdown.clone(),
                 };
                 match surface.start(ctx).await {
                     Ok(handle) => {
@@ -71,7 +84,10 @@ pub async fn activate_surfaces(
                         {
                             tracing::error!(surface = %name, error = %e, "Failed to register surface channel");
                         }
-                        all_tasks.extend(handle.tasks);
+                        activated.push(ActivatedSurface {
+                            name: name.clone(),
+                            tasks: handle.tasks,
+                        });
                     }
                     Err(e) => {
                         tracing::error!(surface = %name, error = %e, "Failed to activate surface")
@@ -87,5 +103,5 @@ pub async fn activate_surfaces(
         }
     }
 
-    Ok(all_tasks)
+    Ok(activated)
 }

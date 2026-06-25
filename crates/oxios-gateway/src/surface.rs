@@ -30,6 +30,7 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use crate::ActiveWebDist;
 use crate::Channel;
@@ -48,6 +49,14 @@ pub struct SurfaceContext {
     /// Surfaces should serve from `web_dist.path()` on every request. When
     /// the inner path is `None`, surfaces fall back to embedded assets.
     pub web_dist: ActiveWebDist,
+    /// Shared cancellation token for the process lifecycle (RFC-030 A5).
+    ///
+    /// The supervisor owns the root token. Each surface instance receives a
+    /// clone (or a child token on restart). Surfaces that run a server
+    /// (e.g. the web dashboard's axum loop) should wire their graceful-shutdown
+    /// path to `shutdown.cancelled()` rather than listening to ctrl_c
+    /// themselves, so there is a single shutdown signal source.
+    pub shutdown: CancellationToken,
 }
 
 /// Handle returned by a surface after initialization.

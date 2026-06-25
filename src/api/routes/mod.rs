@@ -93,8 +93,7 @@ pub(crate) use infra::{
     handle_audit_log, handle_mcp_server_delete, handle_mcp_server_refresh,
     handle_mcp_server_register, handle_mcp_server_toggle, handle_mcp_servers_list,
     handle_mcp_tool_call, handle_mcp_tools_list, handle_metrics, handle_permissions_get,
-    handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks,
-    handle_security_permissions,
+    handle_permissions_put, handle_security_permissions,
 };
 pub(crate) use knowledge_routes::{
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
@@ -328,9 +327,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/memory/{name}",
             get(handle_memory_get).delete(handle_memory_delete),
         )
-        // Scheduler stats & tasks
-        .route("/api/scheduler/stats", get(handle_scheduler_stats))
-        .route("/api/scheduler/tasks", get(handle_scheduler_tasks))
         // Audit log
         .route("/api/audit/entries", get(handle_audit_entries))
         .route("/api/audit/verify", get(handle_audit_verify))
