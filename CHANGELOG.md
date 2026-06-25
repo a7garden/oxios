@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.10.0] - 2026-06-25
+
+### Added
+- **RFC-029: execution resilience** — OTP-style recovery layered on the existing Unix supervisor: snapshot/restore, `SupervisorPolicy` + `RestartBackoff`, and `ModelSwitched` lifecycle events (adopted from oxi-sdk). A bounded recovery ladder runs on provider failure: L0 execute → L1 restart (same model) → L2 snapshot+restore-with-new-model → L3 compact-or-larger → L4 A2A delegate → L5 terminal `ResilientFailure`. Backed by error classification (`FailureClass`), a shared `AttemptBudget`, and a per-provider circuit breaker (`ProviderHealthRegistry`) that replaces the global `LLM_CIRCUIT_BREAKER`.
+
+### Fixed
+- **P0: provider errors now propagate as `Err`** — `run_agent` previously swallowed provider failures as `Ok(success:false)`, burying them in `ExecutionResult.output`. It now returns `Err`, so the lifecycle boundary and the recovery ladder can react. `ExecutionResult` carries `failure_class` + `restore_state` so the class/state survive even when a caller returns `Ok(success:false)`.
+
+### Changed
+- `oxios-ouroboros` gains a resilience bridge for directive-level recovery; the orchestrator wires `RecoveryCoordinator` behind a read lock and falls back to the direct lifecycle when unconfigured.
+
 ## [1.9.0] - 2026-06-24
 
 ### Added
@@ -24,8 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Cargo.lock update** — Lockfile refresh to include the correct dependency resolution for the v1.7.0 release.
-
-## [Unreleased]
 
 ## [1.8.1] - 2026-06-22
 
