@@ -1017,7 +1017,7 @@ checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]
@@ -5308,7 +5308,7 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5359,7 +5359,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-calendar"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5380,7 +5380,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-gateway"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -5399,7 +5399,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-kernel"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5459,7 +5459,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-markdown"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5488,7 +5488,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-mcp"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "parking_lot",
@@ -5500,7 +5500,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-memory"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5522,7 +5522,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-ouroboros"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6055,9 +6055,9 @@ dependencies = [
 
 [[package]]
 name = "quinn-proto"
-version = "0.11.14"
+version = "0.11.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098"
+checksum = "4fcb935c5bec503c2f0e306bdd3e58bb9029dcb14fa8d9ac76e3a5256ac0763e"
 dependencies = [
  "bytes",
  "getrandom 0.3.4",

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-06-25
+
+### Security
+- **RUSTSEC-2026-0185 (quinn-proto)** — Bumped `quinn-proto` 0.11.14 → 0.11.15 via a lockfile-only `cargo update`, fixing a remote memory-exhaustion vector from unbounded out-of-order stream reassembly. The vulnerability was reachable transitively via `reqwest → quinn → quinn-proto`. No API or behavior change; `cargo audit` now reports zero vulnerabilities.
+
 ## [1.10.0] - 2026-06-25
 
 ### Added
