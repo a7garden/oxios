@@ -5,6 +5,8 @@ web/dist/
 web/storybook-static/
 web/playwright-report/
 web/test-results/
+/node_modules
+web/.tanstack/
 *.swp
 *.swo
 .DS_Store

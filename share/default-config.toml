@@ -273,3 +273,23 @@ preset = "balanced"
 # auto_protection = true
 # auto_classification = true
 # proactive_recall = true
+
+# ── Token Maxing (RFC-031) ───────────────────────────────────────────────
+# Autonomous burn of SUBSCRIPTION-quota providers during a configured time
+# window. ONLY providers declared here with billing_model = "subscription"
+# are ever used — a metered (per-token) key can never be silently drafted.
+# Disabled by default; uncomment and set enabled = true to opt in.
+#
+# [token-maxing]
+# enabled = false
+# default_min_remaining_percent = 5     # stop draining a provider below this %
+# recalibration_interval_secs = 60      # 0 = off (stay purely self-tracked)
+# parallel_providers = false            # cross-provider parallelism (Phase 5)
+#
+# [[token-maxing.providers]]
+# provider = "zai"                      # must match the engine provider id
+# billing_model = "subscription"        # REQUIRED — the only accepted value
+# token_limit = 2000000                 # plan allocation per window (tokens)
+# reset_window_secs = 18000             # 5h — drain window + reset cadence
+# min_remaining_percent = 5             # floor for this provider (optional)
+# models = ["zai/glm-4.6", "zai/glm-4.5-air"]  # REQUIRED non-empty: models to round-robin

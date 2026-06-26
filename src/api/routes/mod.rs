@@ -27,6 +27,7 @@ mod project_routes;
 mod resource_routes;
 mod secrets_routes;
 mod system;
+mod token_maxing_routes;
 mod tools;
 mod workspace;
 
@@ -62,6 +63,10 @@ pub(crate) use calendar_routes::{
 pub(crate) use cost_routes::{
     handle_cost_by_model, handle_cost_by_project, handle_cost_daily, handle_cost_providers,
     handle_cost_spend_limit_get, handle_cost_spend_limit_set, handle_cost_summary,
+};
+pub(crate) use token_maxing_routes::{
+    handle_token_maxing_providers, handle_token_maxing_session, handle_token_maxing_sessions,
+    handle_token_maxing_start, handle_token_maxing_status, handle_token_maxing_stop,
 };
 pub(crate) use chat::{
     handle_ask_user_respond, handle_chat, handle_chat_stream, handle_chat_ticket,
@@ -493,6 +498,13 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/costs/spend-limit",
             get(handle_cost_spend_limit_get).put(handle_cost_spend_limit_set),
         )
+        // Token-maxing (RFC-031) — autonomous subscription-quota drain
+        .route("/api/token-maxing/start", post(handle_token_maxing_start))
+        .route("/api/token-maxing/stop", post(handle_token_maxing_stop))
+        .route("/api/token-maxing/status", get(handle_token_maxing_status))
+        .route("/api/token-maxing/sessions", get(handle_token_maxing_sessions))
+        .route("/api/token-maxing/sessions/{id}", get(handle_token_maxing_session))
+        .route("/api/token-maxing/providers", get(handle_token_maxing_providers))
         // Knowledge
         .route("/api/knowledge/tree", get(handle_knowledge_tree))
         // Knowledge — file CRUD + git sub-paths unified under one catch-all.

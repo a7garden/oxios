@@ -6,6 +6,7 @@ import {
   Bot,
   Brain,
   FilePlus,
+  Flame,
   FolderKanban,
   FolderOpen,
   FolderPlus,
@@ -133,6 +134,11 @@ const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
       { labelKey: 'common.cost', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
+      {
+        labelKey: 'common.tokenMaxing',
+        href: '/token-maxing',
+        icon: <Flame className="h-4 w-4" />,
+      },
     ],
   },
   {

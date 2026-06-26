@@ -17,6 +17,7 @@ pub mod persona_api;
 pub mod project_api;
 pub mod security_api;
 pub mod state_api;
+pub mod token_maxing_api;
 
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
@@ -42,6 +43,7 @@ pub use persona_api::PersonaApi;
 pub use project_api::{ProjectApi, ProjectInfo};
 pub use security_api::SecurityApi;
 pub use state_api::StateApi;
+pub use token_maxing_api::TokenMaxingApi;
 
 use crate::git_layer::CommitInfo;
 use crate::readiness::ReadinessGate;
@@ -98,6 +100,9 @@ pub struct KernelHandle {
     pub calendar: Option<CalendarApi>,
     /// Email — send HTML emails via SMTP, template management.
     pub email: Option<EmailApi>,
+    /// Token-maxing (RFC-031): the shared QuotaTracker facade. `None` only on
+    /// the incomplete preliminary handle; the cached handle attaches it.
+    pub token_maxing: Option<TokenMaxingApi>,
     /// RFC-024 SP4: subsystem readiness gate.
     pub readiness: Arc<ReadinessGate>,
 }
@@ -144,6 +149,7 @@ impl KernelHandle {
             marketplace_api,
             calendar,
             email,
+            token_maxing: None,
             // RFC-024 SP4: default Warming/no-deadline. The Kernel
             // (src/kernel.rs) sets the actual state and deadline during
             // startup via `readiness.set_*` / a background task.
@@ -164,6 +170,18 @@ impl KernelHandle {
     /// Set the Mounts facade in place (post-construction wiring).
     pub fn set_mounts(&mut self, mounts: MountApi) {
         self.mounts = Some(mounts);
+    }
+
+    /// Attach the TokenMaxing facade (RFC-031). Called by the kernel
+    /// assembler after constructing the shared `QuotaTracker`.
+    pub fn with_token_maxing(mut self, api: TokenMaxingApi) -> Self {
+        self.token_maxing = Some(api);
+        self
+    }
+
+    /// Set the TokenMaxing facade in place (post-construction wiring).
+    pub fn set_token_maxing(&mut self, api: TokenMaxingApi) {
+        self.token_maxing = Some(api);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

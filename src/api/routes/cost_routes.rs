@@ -205,12 +205,12 @@ pub(crate) async fn handle_cost_spend_limit_set(
     Json(body): Json<SpendLimitBody>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Validate: negative limits make no sense.
-    if let Some(v) = body.monthly_limit_usd {
-        if v < 0.0 {
-            return Err(AppError::BadRequest(
-                "monthly_limit_usd must be non-negative".into(),
-            ));
-        }
+    if let Some(v) = body.monthly_limit_usd
+        && v < 0.0
+    {
+        return Err(AppError::BadRequest(
+            "monthly_limit_usd must be non-negative".into(),
+        ));
     }
 
     // Update in-memory config.

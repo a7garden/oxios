@@ -43,6 +43,10 @@ pub struct Kernel {
     git_layer: Arc<GitLayer>,
     audit_trail: Arc<AuditTrail>,
     budget_manager: Arc<BudgetManager>,
+    /// RFC-031: the shared QuotaTracker (self-tracker + recalibration).
+    quota_tracker: Arc<oxios_kernel::QuotaTracker>,
+    /// RFC-031: the TokenMaxer orchestrator (drain loop).
+    token_maxer: Arc<oxios_kernel::TokenMaxer>,
     resource_monitor: Arc<ResourceMonitor>,
     project_manager: Option<Arc<ProjectManager>>,
     /// Mount manager (RFC-025 path aliases). `None` when SQLite memory is off.
@@ -225,6 +229,10 @@ impl Kernel {
                 } else {
                     kh
                 };
+                let kh = kh.with_token_maxing(oxios_kernel::TokenMaxingApi::new(
+                    self.quota_tracker.clone(),
+                    self.token_maxer.clone(),
+                ));
                 Arc::new(kh)
             })
             .clone()
@@ -1047,6 +1055,23 @@ impl KernelBuilder {
         };
 
         let budget_manager = Arc::new(BudgetManager::new());
+        // RFC-031: the shared QuotaTracker (Phase 1/2 self-tracker). One live
+        // instance per kernel — shared with the handle, the API/UI, and the
+        // recalibration tick below. This is the integration point that makes
+        // the (previously orphaned) library actually live.
+        let quota_tracker = Arc::new(oxios_kernel::QuotaTracker::new(
+            config.token_maxing.clone(),
+        ));
+        // RFC-031 Phase 2: recalibration tick. Where a provider exposes a
+        // usage/balance endpoint, periodically snap the self-tracked counter
+        // to real state, erasing drift from a key shared with another app.
+        {
+            let interval = config.token_maxing.recalibration_interval_secs;
+            let api_key = config.engine.api_key.clone();
+            if interval > 0 {
+                tokio::spawn(recalibration_tick(Arc::clone(&quota_tracker), interval, api_key));
+            }
+        }
 
         let auth_manager = AuthManager::new();
         // API key auth is now via engine.api_key or ~/.oxi/auth.json
@@ -1326,6 +1351,21 @@ impl KernelBuilder {
             }))
             .await;
 
+        // RFC-031 Phase 3: the TokenMaxer orchestrator. Clone the lifecycle
+        // manager (it impls Clone) before the orchestrator consumes it; the
+        // maxer drains eligible subscription providers over a window.
+        let maxer_lifecycle = lifecycle.clone();
+        let planner = oxios_kernel::WorkPlanner::new(
+            Arc::clone(&skill_manager),
+            project_manager.clone(),
+        );
+        let token_maxer = Arc::new(oxios_kernel::TokenMaxer::new(
+            maxer_lifecycle,
+            Arc::clone(&quota_tracker),
+            planner,
+            state_store.clone(),
+        ));
+
         let mut orchestrator = Orchestrator::with_config(
             event_bus.clone(),
             state_store.clone(),
@@ -1383,6 +1423,8 @@ impl KernelBuilder {
             git_layer,
             audit_trail,
             budget_manager,
+            quota_tracker,
+            token_maxer,
             resource_monitor,
             project_manager,
             mount_manager,
@@ -1424,6 +1466,77 @@ impl KernelBuilder {
         handle.readiness.set_deadline_secs(deadline_secs);
 
         Ok(kernel)
+    }
+}
+
+/// RFC-031 Phase 2: background recalibration loop. Periodically fetches real
+/// provider quota and snaps the [`QuotaTracker`]'s self-tracked counter to it.
+///
+/// Only eligible (`billing_model = "subscription"`) providers are probed; a
+/// failed/non-existent fetcher leaves that provider self-tracked (Phase 1)
+/// and just logs a `FetchFailed` recalibration record. Cheap, HTTP-bound, no
+/// retries — a transient failure simply waits for the next tick.
+async fn recalibration_tick(
+    tracker: Arc<oxios_kernel::QuotaTracker>,
+    interval_secs: u64,
+    api_key: Option<String>,
+) {
+    let mut ticker = tokio::time::interval(std::time::Duration::from_secs(interval_secs));
+    // The first tick fires immediately on construction — skip it so we don't
+    // fan out HTTP on boot, then settle into the configured cadence.
+    ticker.tick().await;
+    loop {
+        ticker.tick().await;
+        let cfg = tracker.config();
+        if !cfg.enabled {
+            continue;
+        }
+        let eligible: Vec<String> = cfg
+            .providers
+            .iter()
+            .filter(|p| cfg.is_eligible(&p.provider))
+            .map(|p| p.provider.clone())
+            .collect();
+        drop(cfg);
+        if eligible.is_empty() {
+            continue;
+        }
+        let mut creds: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+        for p in &eligible {
+            if let Some((key, _)) = oxios_kernel::CredentialStore::resolve(p, api_key.as_deref()) {
+                creds.insert(p.clone(), key);
+            }
+        }
+        if creds.is_empty() {
+            continue;
+        }
+        let snaps = crate::api::quota::fetch_all(&creds).await;
+        for snap in &snaps {
+            if snap.error.is_some() {
+                tracker.apply_recalibration(
+                    &snap.provider,
+                    None,
+                    None,
+                    oxios_kernel::RecalibrationOutcome::FetchFailed,
+                );
+                continue;
+            }
+            let rw = snap
+                .rate_windows
+                .iter()
+                .find(|w| w.remaining_percent.is_some());
+            let (rem, resets) = match rw {
+                Some(w) => (w.remaining_percent, w.resets_at),
+                None => (None, None),
+            };
+            tracker.apply_recalibration(
+                &snap.provider,
+                rem,
+                resets,
+                oxios_kernel::RecalibrationOutcome::Ok,
+            );
+        }
     }
 }
 

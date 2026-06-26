@@ -941,7 +941,10 @@ pub struct OxiosConfig {
     /// Agent history log configuration.
     #[serde(default)]
     pub agent_log: AgentLogConfig,
-}
+    /// Token Maxing mode configuration (RFC-031).
+    #[serde(default)]
+    pub token_maxing: crate::token_maxing::TokenMaxingConfig,
+ }
 
 /// Kernel configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -2055,6 +2058,12 @@ impl OxiosConfig {
                 "channels.telegram: {} env var not set — telegram channel will fail",
                 self.channels.telegram.bot_token_env
             ));
+        }
+        // Token Maxing (RFC-031) — only fail-closed at startup if the
+        // user explicitly opted in but the entry is broken. A valid
+        // empty/disabled config never errors.
+        for err in self.token_maxing.validate() {
+            errors.push(err);
         }
 
         (errors, warnings)

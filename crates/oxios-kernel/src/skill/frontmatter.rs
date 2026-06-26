@@ -96,6 +96,7 @@ struct OxiosFm {
     install: Option<Vec<YamlInstallSpec>>,
     os: Option<Vec<String>>,
     always: Option<bool>,
+    autonomous: Option<bool>,
     #[serde(rename = "primaryEnv")]
     primary_env: Option<String>,
     #[serde(rename = "skillKey")]
@@ -124,6 +125,7 @@ impl OxiosFm {
                     .collect(),
                 os: self.os.unwrap_or_default(),
                 always: self.always.unwrap_or(false),
+                autonomous: self.autonomous.unwrap_or(false),
                 primary_env: self.primary_env,
                 skill_key: self.skill_key,
             },

@@ -1347,6 +1347,7 @@ pub(crate) async fn handle_config_put(
 const HOT_RELOADABLE_SECTIONS: &[(&str, &str)] = &[
     ("exec", "exec_api"),
     ("resource_monitor", "resource_monitor"),
+    ("token_maxing", "quota_tracker"),
 ];
 
 /// Subset of fields that always require a restart even inside a
@@ -1591,6 +1592,12 @@ pub(crate) async fn handle_config_patch(
             memory_percent: updated.resource_monitor.memory_threshold,
             load_avg: updated.resource_monitor.load_threshold,
         });
+
+    // RFC-031: hot-reload token-maxing config into the live QuotaTracker,
+    // preserving usage counters for providers that remain eligible.
+    if let Some(ref tm) = state.kernel.token_maxing {
+        tm.reload(updated.token_maxing.clone());
+    }
 
     let total = applied.len() + restart.len();
     tracing::info!(

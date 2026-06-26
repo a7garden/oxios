@@ -141,6 +141,10 @@ pub struct SkillMetadata {
     pub install: Vec<SkillInstallSpec>,
     #[serde(default)]
     pub always: bool,
+    /// RFC-031 §6.3: this skill may fire unattended during a token-maxing
+    /// window. Defaults false — frequency is never the gate, only this flag.
+    #[serde(default)]
+    pub autonomous: bool,
     #[serde(default, rename = "primaryEnv")]
     pub primary_env: Option<String>,
     #[serde(default, rename = "skillKey")]

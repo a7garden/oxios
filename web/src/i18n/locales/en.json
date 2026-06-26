@@ -65,6 +65,7 @@
     "security": "Security",
     "budget": "Budget",
     "cost": "Cost",
+    "tokenMaxing": "Token Maxing",
     "git": "Git",
     "sessions": "Sessions",
     "spaces": "Spaces",
@@ -1621,5 +1622,91 @@
     "updateError": "Failed to update: {{error}}",
     "updateSuccess": "Project updated",
     "updatedAt": "Updated"
+  },
+  "tokenMaxing": {
+    "title": "Token Maxing",
+    "subtitle": "Autonomously drain subscription quotas across eligible providers",
+    "status": {
+      "title": "Session Status",
+      "running": "Running",
+      "idle": "Idle",
+      "currentProvider": "Current Provider",
+      "noneActive": "—",
+      "currentTask": "Current Task",
+      "noActiveTask": "—",
+      "tokensThisSession": "Tokens This Session",
+      "tasksThisSession": "Tasks This Session",
+      "window": "Window",
+      "manual": "Manual",
+      "noWindow": "—"
+    },
+    "controls": {
+      "title": "Controls",
+      "windowStart": "Start",
+      "windowEnd": "End",
+      "startWindow": "Start Window",
+      "startManual": "Run Manually",
+      "stop": "Stop",
+      "noEnabledProviders": "No enabled subscription providers",
+      "startFailed": "Start failed: {{error}}",
+      "stopFailed": "Stop failed: {{error}}"
+    },
+    "providers": {
+      "title": "Provider Availability",
+      "empty": "No providers to display",
+      "notEligible": "Not registered in [token-maxing]",
+      "noSnapshot": "No quota snapshot",
+      "tokensUsed": "Used {{used}} / {{limit}} tokens",
+      "remaining": "{{percent}}% remaining",
+      "resetsAt": "Resets {{time}}",
+      "cooldownUntil": "Cool-down until {{time}}",
+      "cooldownReason": "Reason: {{reason}}",
+      "verdict": {
+        "available": "Available",
+        "draining": "Draining",
+        "cooledDown": "Cool-down",
+        "ineligible": "Inactive"
+      }
+    },
+    "sessions": {
+      "title": "Session History",
+      "emptyTitle": "No token-maxing sessions yet",
+      "emptyDesc": "Start a session to see records here.",
+      "inProgress": "In progress",
+      "unknownStop": "Unknown",
+      "tasksAndTokens": "{{tasks}} tasks · {{tokens}} tokens",
+      "drained": "{{count}} providers drained",
+      "resets": "{{count}} resets"
+    },
+    "stopReason": {
+      "windowEnded": "Window ended",
+      "noWork": "No work",
+      "cancelled": "Cancelled"
+    },
+    "report": {
+      "title": "Session Report",
+      "loadFailed": "Could not load session.",
+      "totals": "Totals",
+      "tasks": "Tasks",
+      "taskList": "Task list",
+      "drained": "Providers drained",
+      "resets": "Resets observed",
+      "perProvider": "Per provider",
+      "noProviderData": "No provider data",
+      "models": "Models: {{models}}",
+      "windowsDrained": "{{count}} windows drained",
+      "noTasks": "No tasks executed",
+      "startedAt": "Started",
+      "endedAt": "Ended",
+      "window": "Window",
+      "stopReason": "Stop reason",
+      "tokensFmt": "{{tokens}} tokens",
+      "duration": "{{seconds}}s",
+      "source": {
+        "skill": "Skill",
+        "project": "Project",
+        "recurring": "Recurring"
+      }
+    }
   }
 }

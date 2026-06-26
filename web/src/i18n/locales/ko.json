@@ -65,6 +65,7 @@
     "security": "보안",
     "budget": "예산",
     "cost": "비용",
+    "tokenMaxing": "토큰 맥싱",
     "git": "Git",
     "sessions": "세션",
     "spaces": "공간",
@@ -1621,5 +1622,91 @@
     "updateError": "수정 실패: {{error}}",
     "updateSuccess": "프로젝트가 수정되었습니다",
     "updatedAt": "수정일"
+  },
+  "tokenMaxing": {
+    "title": "토큰 맥싱",
+    "subtitle": "구독형 프로바이더의 할당량을 자율적으로 소진하는 세션 관리",
+    "status": {
+      "title": "세션 상태",
+      "running": "실행 중",
+      "idle": "대기 중",
+      "currentProvider": "현재 프로바이더",
+      "noneActive": "—",
+      "currentTask": "현재 작업",
+      "noActiveTask": "—",
+      "tokensThisSession": "이번 세션 토큰",
+      "tasksThisSession": "이번 세션 작업 수",
+      "window": "윈도우",
+      "manual": "수동(Manual)",
+      "noWindow": "—"
+    },
+    "controls": {
+      "title": "제어",
+      "windowStart": "시작",
+      "windowEnd": "종료",
+      "startWindow": "윈도우 시작",
+      "startManual": "수동 실행",
+      "stop": "중지",
+      "noEnabledProviders": "활성화된 구독형 프로바이더가 없습니다",
+      "startFailed": "시작 실패: {{error}}",
+      "stopFailed": "중지 실패: {{error}}"
+    },
+    "providers": {
+      "title": "프로바이더 가용성",
+      "empty": "표시할 프로바이더가 없습니다",
+      "notEligible": "[token-maxing] 설정에 등록되지 않은 프로바이더",
+      "noSnapshot": "할당량 데이터 없음",
+      "tokensUsed": "사용 {{used}} / {{limit}} 토큰",
+      "remaining": "잔여 {{percent}}%",
+      "resetsAt": "초기화 {{time}}",
+      "cooldownUntil": "{{time}}까지 쿨다운",
+      "cooldownReason": "원인: {{reason}}",
+      "verdict": {
+        "available": "사용 가능",
+        "draining": "소진 중",
+        "cooledDown": "쿨다운",
+        "ineligible": "비활성"
+      }
+    },
+    "sessions": {
+      "title": "세션 기록",
+      "emptyTitle": "아직 토큰 맥싱 세션이 없습니다",
+      "emptyDesc": "세션을 시작하면 여기에 기록이 표시됩니다.",
+      "inProgress": "진행 중",
+      "unknownStop": "알 수 없음",
+      "tasksAndTokens": "{{tasks}}개 작업 · {{tokens}} 토큰",
+      "drained": "{{count}}개 프로바이더 소진",
+      "resets": "초기화 {{count}}회"
+    },
+    "stopReason": {
+      "windowEnded": "시간 종료",
+      "noWork": "할 작업 없음",
+      "cancelled": "중단됨"
+    },
+    "report": {
+      "title": "세션 리포트",
+      "loadFailed": "세션을 불러올 수 없습니다.",
+      "totals": "합계",
+      "tasks": "작업 수",
+      "taskList": "작업 목록",
+      "drained": "소진된 프로바이더",
+      "resets": "초기화 횟수",
+      "perProvider": "프로바이더별",
+      "noProviderData": "프로바이더 데이터 없음",
+      "models": "모델: {{models}}",
+      "windowsDrained": "{{count}}개 윈도우 소진",
+      "noTasks": "실행된 작업 없음",
+      "startedAt": "시작",
+      "endedAt": "종료",
+      "window": "윈도우",
+      "stopReason": "중단 사유",
+      "tokensFmt": "{{tokens}} 토큰",
+      "duration": "{{seconds}}초",
+      "source": {
+        "skill": "스킬",
+        "project": "프로젝트",
+        "recurring": "반복"
+      }
+    }
   }
 }

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TokenMaxingRouteImport } from './routes/token-maxing'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SecurityRouteImport } from './routes/security'
@@ -35,6 +36,11 @@ import { Route as KnowledgeGraphRouteImport } from './routes/knowledge/graph'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
 import { Route as AgentsAgentIdTraceRouteImport } from './routes/agents/$agentId/trace'
 
+const TokenMaxingRoute = TokenMaxingRouteImport.update({
+  id: '/token-maxing',
+  path: '/token-maxing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SkillsRoute = SkillsRouteImport.update({
   id: '/skills',
   path: '/skills',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
+  '/token-maxing': typeof TokenMaxingRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
   '/knowledge/graph': typeof KnowledgeGraphRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
+  '/token-maxing': typeof TokenMaxingRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
   '/knowledge/graph': typeof KnowledgeGraphRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
+  '/token-maxing': typeof TokenMaxingRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
   '/knowledge/graph': typeof KnowledgeGraphRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/settings'
     | '/skills'
+    | '/token-maxing'
     | '/agents/$agentId'
     | '/knowledge/graph'
     | '/projects/$projectId'
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/settings'
     | '/skills'
+    | '/token-maxing'
     | '/agents/$agentId'
     | '/knowledge/graph'
     | '/projects/$projectId'
@@ -314,6 +325,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/settings'
     | '/skills'
+    | '/token-maxing'
     | '/agents/$agentId'
     | '/knowledge/graph'
     | '/projects/$projectId'
@@ -342,6 +354,7 @@ export interface RootRouteChildren {
   SecurityRoute: typeof SecurityRoute
   SettingsRoute: typeof SettingsRoute
   SkillsRoute: typeof SkillsRoute
+  TokenMaxingRoute: typeof TokenMaxingRoute
   AgentsAgentIdRoute: typeof AgentsAgentIdRouteWithChildren
   KnowledgeGraphRoute: typeof KnowledgeGraphRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
@@ -356,6 +369,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/token-maxing': {
+      id: '/token-maxing'
+      path: '/token-maxing'
+      fullPath: '/token-maxing'
+      preLoaderRoute: typeof TokenMaxingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/skills': {
       id: '/skills'
       path: '/skills'
@@ -561,6 +581,7 @@ const rootRouteChildren: RootRouteChildren = {
   SecurityRoute: SecurityRoute,
   SettingsRoute: SettingsRoute,
   SkillsRoute: SkillsRoute,
+  TokenMaxingRoute: TokenMaxingRoute,
   AgentsAgentIdRoute: AgentsAgentIdRouteWithChildren,
   KnowledgeGraphRoute: KnowledgeGraphRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
