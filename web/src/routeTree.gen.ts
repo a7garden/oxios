@@ -18,13 +18,10 @@ import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MarketplaceRouteImport } from './routes/marketplace'
 import { Route as GitRouteImport } from './routes/git'
-import { Route as EventsRouteImport } from './routes/events'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as CronJobsRouteImport } from './routes/cron-jobs'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as BudgetRouteImport } from './routes/budget'
-import { Route as ApprovalsRouteImport } from './routes/approvals'
-import { Route as A2aRouteImport } from './routes/a2a'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkspaceIndexRouteImport } from './routes/workspace/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
@@ -32,14 +29,10 @@ import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as MountsIndexRouteImport } from './routes/mounts/index'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
-import { Route as AgentGroupsIndexRouteImport } from './routes/agent-groups/index'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
-import { Route as KnowledgeSettingsRouteImport } from './routes/knowledge/settings'
-import { Route as KnowledgeHabitsRouteImport } from './routes/knowledge/habits'
 import { Route as KnowledgeGraphRouteImport } from './routes/knowledge/graph'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
-import { Route as AgentGroupsGroupIdRouteImport } from './routes/agent-groups/$groupId'
 import { Route as AgentsAgentIdTraceRouteImport } from './routes/agents/$agentId/trace'
 
 const SkillsRoute = SkillsRouteImport.update({
@@ -87,11 +80,6 @@ const GitRoute = GitRouteImport.update({
   path: '/git',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EventsRoute = EventsRouteImport.update({
-  id: '/events',
-  path: '/events',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const EmailRoute = EmailRouteImport.update({
   id: '/email',
   path: '/email',
@@ -110,16 +98,6 @@ const ChatRoute = ChatRouteImport.update({
 const BudgetRoute = BudgetRouteImport.update({
   id: '/budget',
   path: '/budget',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApprovalsRoute = ApprovalsRouteImport.update({
-  id: '/approvals',
-  path: '/approvals',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const A2aRoute = A2aRouteImport.update({
-  id: '/a2a',
-  path: '/a2a',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -157,11 +135,6 @@ const AgentsIndexRoute = AgentsIndexRouteImport.update({
   path: '/agents/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AgentGroupsIndexRoute = AgentGroupsIndexRouteImport.update({
-  id: '/agent-groups/',
-  path: '/agent-groups/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   id: '/sessions/$sessionId',
   path: '/sessions/$sessionId',
@@ -170,16 +143,6 @@ const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/projects/$projectId',
   path: '/projects/$projectId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KnowledgeSettingsRoute = KnowledgeSettingsRouteImport.update({
-  id: '/knowledge/settings',
-  path: '/knowledge/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KnowledgeHabitsRoute = KnowledgeHabitsRouteImport.update({
-  id: '/knowledge/habits',
-  path: '/knowledge/habits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KnowledgeGraphRoute = KnowledgeGraphRouteImport.update({
@@ -192,11 +155,6 @@ const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
   path: '/agents/$agentId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AgentGroupsGroupIdRoute = AgentGroupsGroupIdRouteImport.update({
-  id: '/agent-groups/$groupId',
-  path: '/agent-groups/$groupId',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AgentsAgentIdTraceRoute = AgentsAgentIdTraceRouteImport.update({
   id: '/trace',
   path: '/trace',
@@ -205,13 +163,10 @@ const AgentsAgentIdTraceRoute = AgentsAgentIdTraceRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/a2a': typeof A2aRoute
-  '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/email': typeof EmailRoute
-  '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/marketplace': typeof MarketplaceRoute
   '/mcp': typeof McpRoute
@@ -221,14 +176,10 @@ export interface FileRoutesByFullPath {
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
-  '/agent-groups/$groupId': typeof AgentGroupsGroupIdRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
   '/knowledge/graph': typeof KnowledgeGraphRoute
-  '/knowledge/habits': typeof KnowledgeHabitsRoute
-  '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/agent-groups/': typeof AgentGroupsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/mounts/': typeof MountsIndexRoute
@@ -239,13 +190,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/a2a': typeof A2aRoute
-  '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/email': typeof EmailRoute
-  '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/marketplace': typeof MarketplaceRoute
   '/mcp': typeof McpRoute
@@ -255,14 +203,10 @@ export interface FileRoutesByTo {
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
-  '/agent-groups/$groupId': typeof AgentGroupsGroupIdRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
   '/knowledge/graph': typeof KnowledgeGraphRoute
-  '/knowledge/habits': typeof KnowledgeHabitsRoute
-  '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/agent-groups': typeof AgentGroupsIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/knowledge': typeof KnowledgeIndexRoute
   '/mounts': typeof MountsIndexRoute
@@ -274,13 +218,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/a2a': typeof A2aRoute
-  '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/email': typeof EmailRoute
-  '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/marketplace': typeof MarketplaceRoute
   '/mcp': typeof McpRoute
@@ -290,14 +231,10 @@ export interface FileRoutesById {
   '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
-  '/agent-groups/$groupId': typeof AgentGroupsGroupIdRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
   '/knowledge/graph': typeof KnowledgeGraphRoute
-  '/knowledge/habits': typeof KnowledgeHabitsRoute
-  '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/agent-groups/': typeof AgentGroupsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/mounts/': typeof MountsIndexRoute
@@ -310,13 +247,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/a2a'
-    | '/approvals'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
     | '/email'
-    | '/events'
     | '/git'
     | '/marketplace'
     | '/mcp'
@@ -326,14 +260,10 @@ export interface FileRouteTypes {
     | '/security'
     | '/settings'
     | '/skills'
-    | '/agent-groups/$groupId'
     | '/agents/$agentId'
     | '/knowledge/graph'
-    | '/knowledge/habits'
-    | '/knowledge/settings'
     | '/projects/$projectId'
     | '/sessions/$sessionId'
-    | '/agent-groups/'
     | '/agents/'
     | '/knowledge/'
     | '/mounts/'
@@ -344,13 +274,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/a2a'
-    | '/approvals'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
     | '/email'
-    | '/events'
     | '/git'
     | '/marketplace'
     | '/mcp'
@@ -360,14 +287,10 @@ export interface FileRouteTypes {
     | '/security'
     | '/settings'
     | '/skills'
-    | '/agent-groups/$groupId'
     | '/agents/$agentId'
     | '/knowledge/graph'
-    | '/knowledge/habits'
-    | '/knowledge/settings'
     | '/projects/$projectId'
     | '/sessions/$sessionId'
-    | '/agent-groups'
     | '/agents'
     | '/knowledge'
     | '/mounts'
@@ -378,13 +301,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/a2a'
-    | '/approvals'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
     | '/email'
-    | '/events'
     | '/git'
     | '/marketplace'
     | '/mcp'
@@ -394,14 +314,10 @@ export interface FileRouteTypes {
     | '/security'
     | '/settings'
     | '/skills'
-    | '/agent-groups/$groupId'
     | '/agents/$agentId'
     | '/knowledge/graph'
-    | '/knowledge/habits'
-    | '/knowledge/settings'
     | '/projects/$projectId'
     | '/sessions/$sessionId'
-    | '/agent-groups/'
     | '/agents/'
     | '/knowledge/'
     | '/mounts/'
@@ -413,13 +329,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  A2aRoute: typeof A2aRoute
-  ApprovalsRoute: typeof ApprovalsRoute
   BudgetRoute: typeof BudgetRoute
   ChatRoute: typeof ChatRoute
   CronJobsRoute: typeof CronJobsRoute
   EmailRoute: typeof EmailRoute
-  EventsRoute: typeof EventsRoute
   GitRoute: typeof GitRoute
   MarketplaceRoute: typeof MarketplaceRoute
   McpRoute: typeof McpRoute
@@ -429,14 +342,10 @@ export interface RootRouteChildren {
   SecurityRoute: typeof SecurityRoute
   SettingsRoute: typeof SettingsRoute
   SkillsRoute: typeof SkillsRoute
-  AgentGroupsGroupIdRoute: typeof AgentGroupsGroupIdRoute
   AgentsAgentIdRoute: typeof AgentsAgentIdRouteWithChildren
   KnowledgeGraphRoute: typeof KnowledgeGraphRoute
-  KnowledgeHabitsRoute: typeof KnowledgeHabitsRoute
-  KnowledgeSettingsRoute: typeof KnowledgeSettingsRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
-  AgentGroupsIndexRoute: typeof AgentGroupsIndexRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
   MountsIndexRoute: typeof MountsIndexRoute
@@ -510,13 +419,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GitRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/events': {
-      id: '/events'
-      path: '/events'
-      fullPath: '/events'
-      preLoaderRoute: typeof EventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/email': {
       id: '/email'
       path: '/email'
@@ -543,20 +445,6 @@ declare module '@tanstack/react-router' {
       path: '/budget'
       fullPath: '/budget'
       preLoaderRoute: typeof BudgetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/approvals': {
-      id: '/approvals'
-      path: '/approvals'
-      fullPath: '/approvals'
-      preLoaderRoute: typeof ApprovalsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/a2a': {
-      id: '/a2a'
-      path: '/a2a'
-      fullPath: '/a2a'
-      preLoaderRoute: typeof A2aRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -608,13 +496,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/agent-groups/': {
-      id: '/agent-groups/'
-      path: '/agent-groups'
-      fullPath: '/agent-groups/'
-      preLoaderRoute: typeof AgentGroupsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/sessions/$sessionId': {
       id: '/sessions/$sessionId'
       path: '/sessions/$sessionId'
@@ -629,20 +510,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/knowledge/settings': {
-      id: '/knowledge/settings'
-      path: '/knowledge/settings'
-      fullPath: '/knowledge/settings'
-      preLoaderRoute: typeof KnowledgeSettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/knowledge/habits': {
-      id: '/knowledge/habits'
-      path: '/knowledge/habits'
-      fullPath: '/knowledge/habits'
-      preLoaderRoute: typeof KnowledgeHabitsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/knowledge/graph': {
       id: '/knowledge/graph'
       path: '/knowledge/graph'
@@ -655,13 +522,6 @@ declare module '@tanstack/react-router' {
       path: '/agents/$agentId'
       fullPath: '/agents/$agentId'
       preLoaderRoute: typeof AgentsAgentIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agent-groups/$groupId': {
-      id: '/agent-groups/$groupId'
-      path: '/agent-groups/$groupId'
-      fullPath: '/agent-groups/$groupId'
-      preLoaderRoute: typeof AgentGroupsGroupIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents/$agentId/trace': {
@@ -688,13 +548,10 @@ const AgentsAgentIdRouteWithChildren = AgentsAgentIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  A2aRoute: A2aRoute,
-  ApprovalsRoute: ApprovalsRoute,
   BudgetRoute: BudgetRoute,
   ChatRoute: ChatRoute,
   CronJobsRoute: CronJobsRoute,
   EmailRoute: EmailRoute,
-  EventsRoute: EventsRoute,
   GitRoute: GitRoute,
   MarketplaceRoute: MarketplaceRoute,
   McpRoute: McpRoute,
@@ -704,14 +561,10 @@ const rootRouteChildren: RootRouteChildren = {
   SecurityRoute: SecurityRoute,
   SettingsRoute: SettingsRoute,
   SkillsRoute: SkillsRoute,
-  AgentGroupsGroupIdRoute: AgentGroupsGroupIdRoute,
   AgentsAgentIdRoute: AgentsAgentIdRouteWithChildren,
   KnowledgeGraphRoute: KnowledgeGraphRoute,
-  KnowledgeHabitsRoute: KnowledgeHabitsRoute,
-  KnowledgeSettingsRoute: KnowledgeSettingsRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
-  AgentGroupsIndexRoute: AgentGroupsIndexRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   KnowledgeIndexRoute: KnowledgeIndexRoute,
   MountsIndexRoute: MountsIndexRoute,

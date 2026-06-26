@@ -22,6 +22,7 @@ export interface A2AMessage {
 
 export interface TopologyNode {
   id: string
+  agent_id: string
   label: string
   status: string
   capabilities: string[]
