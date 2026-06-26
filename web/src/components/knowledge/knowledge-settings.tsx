@@ -1,4 +1,4 @@
-import { Save, Settings } from 'lucide-react'
+import { Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { useKnowledgeConfig, useKnowledgeConfigUpdate } from '@/hooks/use-knowledge'
 import type { KnowledgeConfig } from '@/types/knowledge'
 
-export function KnowledgeSettings() {
+export function KnowledgeSettings({ onSaved }: { onSaved?: () => void }) {
   const { t } = useTranslation()
   const { data: config, isLoading } = useKnowledgeConfig()
   const updateConfig = useKnowledgeConfigUpdate()
@@ -19,10 +19,11 @@ export function KnowledgeSettings() {
   }, [config])
 
   if (isLoading)
-    return <div className="p-6 text-muted-foreground">{t('knowledge.loadingSettings')}</div>
+    return <div className="py-6 text-muted-foreground">{t('knowledge.loadingSettings')}</div>
 
   const handleSave = async () => {
     await updateConfig.mutateAsync(form)
+    onSaved?.()
   }
 
   const update = (key: keyof KnowledgeConfig, value: unknown) => {
@@ -30,12 +31,7 @@ export function KnowledgeSettings() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-2xl mx-auto">
-      <h2 className="text-lg font-semibold flex items-center gap-2">
-        <Settings className="h-5 w-5" />
-        {t('knowledge.title')} {t('common.settings')}
-      </h2>
-
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">{t('knowledge.general')}</CardTitle>

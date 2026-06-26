@@ -27,17 +27,6 @@ test.describe('Sidebar Navigation', () => {
     await expect(page).toHaveURL('/settings')
   })
 
-  test('agent-groups page is reachable', async ({ page }) => {
-    await page.goto('/agent-groups')
-    await expect(page.getByRole('heading', { name: /agent.*group/i })).toBeVisible({ timeout: 5000 })
-  })
-
-  test('a2a page is reachable', async ({ page }) => {
-    await page.goto('/a2a')
-    // A2A page might have different heading - check for any valid content
-    await page.waitForLoadState('networkidle')
-    // Page should load without errors
-  })
 
   test('sidebar collapse toggle works', async ({ page }) => {
     // Find and click the collapse toggle

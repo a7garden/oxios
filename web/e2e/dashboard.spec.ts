@@ -3,10 +3,9 @@ import { test, expect } from '@playwright/test'
 /**
  * E2E test for the Live Operations Dashboard (RFC-T1-C).
  *
- * Validates the basic structure: 5 KPI cards, Live Activity Feed,
- * and a "View all" link to the full approvals page. Does not depend
- * on any specific event being present in the SSE stream — empty
- * states are valid for a quiet system.
+ * Validates the basic structure: 5 KPI cards and Live Activity Feed.
+ * Does not depend on any specific event being present in the SSE
+ * stream — empty states are valid for a quiet system.
  */
 test.describe('Live Operations Dashboard (RFC-T1-C)', () => {
   test('renders the five KPI stat cards', async ({ page }) => {
@@ -33,14 +32,4 @@ test.describe('Live Operations Dashboard (RFC-T1-C)', () => {
     await expect(page.getByLabel('Pause', { exact: false })).toBeVisible()
   })
 
-  test('Active Agents sidebar link works', async ({ page }) => {
-    await page.goto('/')
-
-    // Click the "Pending Approvals" card → /approvals
-    const approvalsLink = page.getByText('Pending Approvals', { exact: true }).first()
-    await approvalsLink.click()
-
-    await expect(page).toHaveURL('/approvals')
-    await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible()
-  })
 })

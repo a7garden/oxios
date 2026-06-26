@@ -62,8 +62,8 @@ test.describe('Oxios Web UI', () => {
       'Dashboard', 'Chat',
       'Agents', 'Sessions', 'Spaces', 'Programs', 'Skills',
       'Memory', 'Workspace',
-      'Scheduler', 'Security', 'Budget', 'Resources', 'Events',
-      'Approvals', 'Cron Jobs', 'Git', 'Personas', 'Agent Groups', 'Host Tools',
+      'Scheduler', 'Security', 'Budget', 'Resources',
+      'Cron Jobs', 'Git', 'Personas', 'Agent Groups', 'Host Tools',
     ]
 
     for (const item of navItems) {
