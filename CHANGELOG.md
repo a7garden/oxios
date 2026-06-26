@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-06-26
+
+### Added
+- **RFC-031: token-maxing mode** — Unattended work within configured windows, gated to subscription-only providers (never API-credit plans). Adds `token_maxing/` (QuotaTracker, BudgetGuard, WorkPlanner, TokenMaxingSession), a `TokenMaxingApi` with REST routes under `/api/token-maxing/*`, assembler wiring, a config block, and a web provider-status panel + session report.
+- **Cost aggregation** — Per-provider token/cost tracking through the kernel, with ZAI + Minimax subscription quota fetchers powering token-maxing's eligibility detection.
+- **Cost & quota REST endpoints** — Spend/cost/quota surface for the new cost dashboard.
+- **Unified agent monitor + cost views** — Redesigned web IA: A2A, agent-groups, approvals, events collapsed into a single Agents view; new cost dashboard with spend limits.
+- **Budget config block** — `share/default-config.toml` ships a `[budget]` section.
+- **Persona security review** — Hardened persona creation/edit paths.
+
+### Changed
+- Web: biome formatting + lint conformance (import ordering, `Number.isNaN`, React Flow a11y) across cost/agent-monitor/budget/engine views.
+- Workspace `cargo fmt` applied across the release range.
+
+### Fixed
+- **Chat WebSocket join-set** — Leaked join handles on the chat stream are now correctly awaited.
+
 ## [1.12.0] - 2026-06-25
 
 ### Added
