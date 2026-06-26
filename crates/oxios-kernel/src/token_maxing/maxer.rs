@@ -21,8 +21,8 @@
 //! `max_execution_time`).
 
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use parking_lot::RwLock;
@@ -34,10 +34,10 @@ use crate::agent_lifecycle::AgentLifecycleManager;
 use crate::resilience::FailureClass;
 use crate::state_store::StateStore;
 
+use super::TokenMaxingConfig;
 use super::planner::{PlannedTask, WorkPlanner};
 use super::quota_tracker::{Availability, QuotaTracker};
 use super::session::{MaxerStatus, MaxingStart, StopReason, TokenMaxingSession};
-use super::TokenMaxingConfig;
 
 /// Per-task hard timeout (defense-in-depth). Bounds any blocking tool.
 const MAX_TASK_SECS: u64 = 600;
@@ -298,7 +298,14 @@ impl TokenMaxer {
             Ok(Err(e)) => {
                 tracing::warn!(error = %e, "token-maxing task failed");
                 session.record_task(
-                    source, source_name, goal, provider, model, false, 0, dur,
+                    source,
+                    source_name,
+                    goal,
+                    provider,
+                    model,
+                    false,
+                    0,
+                    dur,
                     format!("error: {e}"),
                 );
             }
@@ -309,7 +316,14 @@ impl TokenMaxer {
                 self.tracker
                     .record_failure(&provider, FailureClass::Transient, None);
                 session.record_task(
-                    source, source_name, goal, provider, model, false, 0, dur,
+                    source,
+                    source_name,
+                    goal,
+                    provider,
+                    model,
+                    false,
+                    0,
+                    dur,
                     "timed out".into(),
                 );
             }
@@ -321,7 +335,8 @@ impl TokenMaxer {
     fn pick_provider(&self, cfg: &TokenMaxingConfig) -> Option<String> {
         let snaps = self.tracker.snapshots();
         if let Some(s) = snaps.iter().find(|s| {
-            matches!(s.availability, Availability::Available { .. }) && self.has_model(cfg, &s.provider)
+            matches!(s.availability, Availability::Available { .. })
+                && self.has_model(cfg, &s.provider)
         }) {
             return Some(s.provider.clone());
         }
@@ -351,7 +366,11 @@ impl TokenMaxer {
         if p.models.is_empty() {
             return None;
         }
-        let used = session.tasks.iter().filter(|t| t.provider == provider).count();
+        let used = session
+            .tasks
+            .iter()
+            .filter(|t| t.provider == provider)
+            .count();
         Some(p.models[used % p.models.len()].clone())
     }
 

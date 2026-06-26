@@ -12,8 +12,8 @@ mod a2a;
 mod audit_routes;
 mod budget_routes;
 mod calendar_routes;
-mod cost_routes;
 mod chat;
+mod cost_routes;
 mod cron_jobs;
 mod email_routes;
 mod engine_routes;
@@ -60,18 +60,14 @@ pub(crate) use calendar_routes::{
     handle_calendar_event_update, handle_calendar_events, handle_calendar_freebusy,
     handle_calendar_search,
 };
-pub(crate) use cost_routes::{
-    handle_cost_by_model, handle_cost_by_project, handle_cost_daily, handle_cost_providers,
-    handle_cost_spend_limit_get, handle_cost_spend_limit_set, handle_cost_summary,
-};
-pub(crate) use token_maxing_routes::{
-    handle_token_maxing_providers, handle_token_maxing_session, handle_token_maxing_sessions,
-    handle_token_maxing_start, handle_token_maxing_status, handle_token_maxing_stop,
-};
 pub(crate) use chat::{
     handle_ask_user_respond, handle_chat, handle_chat_stream, handle_chat_ticket,
     handle_knowledge_saves, handle_remove_knowledge_save, handle_save_to_knowledge,
     handle_session_tool_calls, handle_tool_approval_respond,
+};
+pub(crate) use cost_routes::{
+    handle_cost_by_model, handle_cost_by_project, handle_cost_daily, handle_cost_providers,
+    handle_cost_spend_limit_get, handle_cost_spend_limit_set, handle_cost_summary,
 };
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
@@ -136,6 +132,10 @@ pub(crate) use system::{
     handle_config_patch, handle_config_put, handle_doctor, handle_health, handle_log,
     handle_readiness, handle_status, handle_update_changelog, handle_update_check,
     handle_update_run,
+};
+pub(crate) use token_maxing_routes::{
+    handle_token_maxing_providers, handle_token_maxing_session, handle_token_maxing_sessions,
+    handle_token_maxing_start, handle_token_maxing_status, handle_token_maxing_stop,
 };
 pub(crate) use tools::handle_tools_registry;
 pub(crate) use workspace::{
@@ -502,9 +502,18 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/token-maxing/start", post(handle_token_maxing_start))
         .route("/api/token-maxing/stop", post(handle_token_maxing_stop))
         .route("/api/token-maxing/status", get(handle_token_maxing_status))
-        .route("/api/token-maxing/sessions", get(handle_token_maxing_sessions))
-        .route("/api/token-maxing/sessions/{id}", get(handle_token_maxing_session))
-        .route("/api/token-maxing/providers", get(handle_token_maxing_providers))
+        .route(
+            "/api/token-maxing/sessions",
+            get(handle_token_maxing_sessions),
+        )
+        .route(
+            "/api/token-maxing/sessions/{id}",
+            get(handle_token_maxing_session),
+        )
+        .route(
+            "/api/token-maxing/providers",
+            get(handle_token_maxing_providers),
+        )
         // Knowledge
         .route("/api/knowledge/tree", get(handle_knowledge_tree))
         // Knowledge — file CRUD + git sub-paths unified under one catch-all.

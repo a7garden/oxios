@@ -66,11 +66,11 @@ pub mod persona;
 // ─── Tools & Skills ───────────────────────────────────────────────
 // 에이전트가 사용하는 도구, 스킬.
 pub mod skill;
+pub mod token_maxing;
 pub mod tools;
 #[cfg(feature = "wasm-sandbox")]
 pub mod wasm_sandbox;
 pub mod workers;
-pub mod token_maxing;
 
 // ─── State & Config ─────────────────────────────────────────────────
 // 영속 상태, 설정, 백업, 리소스 모니터링.
@@ -228,15 +228,16 @@ pub use tools::{ExecTool, KnowledgeTool};
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 // Token-maxing (RFC-031): self-tracker + QuotaTracker + maxer/planner/session.
+pub use kernel_handle::TokenMaxingApi;
 pub use token_maxing::{
     Availability, CooldownRecord, ProviderBudget, ProviderSnapshot, ProviderState, QuotaTracker,
     QuotaTrackerSnapshot, RecalibrationOutcome, RecalibrationRecord, ReserveError,
-    TokenMaxingConfig, TokenMaxingProviderConfig, SUBSCRIPTION_BILLING_MODEL,
+    SUBSCRIPTION_BILLING_MODEL, TokenMaxingConfig, TokenMaxingProviderConfig,
 };
 pub use token_maxing::{
-    MaxerStatus, MaxingStart, MaxingWindow, PlannedTask, TokenMaxer, TokenMaxingSession, WorkPlanner,
+    MaxerStatus, MaxingStart, MaxingWindow, PlannedTask, TokenMaxer, TokenMaxingSession,
+    WorkPlanner,
 };
-pub use kernel_handle::TokenMaxingApi;
 
 // ─── State & Config ─────────────────────────────────────────────────
 pub use backup::{BackupManifest, BackupSection};

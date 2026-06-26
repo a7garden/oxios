@@ -6,8 +6,8 @@
 
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
 use axum::Json;
+use axum::extract::{Path, State};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
@@ -55,7 +55,10 @@ pub(crate) async fn handle_token_maxing_start(
         MaxingStart::Manual
     } else {
         match req.window {
-            Some(w) => MaxingStart::Scheduled(MaxingWindow { start: w.start, end: w.end }),
+            Some(w) => MaxingStart::Scheduled(MaxingWindow {
+                start: w.start,
+                end: w.end,
+            }),
             None => MaxingStart::Manual,
         }
     };

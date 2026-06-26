@@ -472,7 +472,9 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::AskUserRequest { id, question, .. } => AuditAction::Other {
             detail: format!("ask_user:{id}:{question}"),
         },
-        KernelEvent::PersonaCreated { id, name, source, .. } => AuditAction::Other {
+        KernelEvent::PersonaCreated {
+            id, name, source, ..
+        } => AuditAction::Other {
             detail: format!("persona:created:{id}:{name}:{source}"),
         },
         KernelEvent::PersonaUpdated { id, name, source } => AuditAction::Other {

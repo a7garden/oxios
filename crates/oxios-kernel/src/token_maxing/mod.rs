@@ -31,13 +31,13 @@ pub mod quota_tracker;
 pub mod session;
 
 pub use budget::{ProviderBudget, ProviderSnapshot, ProviderState, ReserveError};
-pub use config::{TokenMaxingConfig, TokenMaxingProviderConfig, SUBSCRIPTION_BILLING_MODEL};
+pub use config::{SUBSCRIPTION_BILLING_MODEL, TokenMaxingConfig, TokenMaxingProviderConfig};
+pub use maxer::TokenMaxer;
+pub use planner::{PlannedTask, WorkPlanner};
 pub use quota_tracker::{
     Availability, CooldownRecord, QuotaTracker, QuotaTrackerSnapshot, RecalibrationOutcome,
     RecalibrationRecord,
 };
-pub use maxer::TokenMaxer;
-pub use planner::{PlannedTask, WorkPlanner};
 pub use session::{
     MaxerStatus, MaxingStart, MaxingWindow, ProviderSessionRecord, ProviderWindowRecord,
     SessionTotals, StopReason, TaskRecord, TaskSource, TokenMaxingSession,

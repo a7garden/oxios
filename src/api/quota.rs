@@ -21,7 +21,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use chrono::{Datelike, DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use serde::Serialize;
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -184,26 +184,24 @@ impl QuotaFetcher for OpenAiQuotaFetcher {
 /// Navigates `data[].results[].cost.value` (a JSON string) and returns the
 /// total spend, or `None` when no `data` array is present.
 fn parse_openai_spend(body: &serde_json::Value) -> Option<f64> {
-    body.get("data")
-        .and_then(|d| d.as_array())
-        .map(|entries| {
-            let mut total = 0.0_f64;
-            for entry in entries {
-                if let Some(results) = entry.get("results").and_then(|r| r.as_array()) {
-                    for r in results {
-                        if let Some(val) = r
-                            .get("cost")
-                            .and_then(|c| c.get("value"))
-                            .and_then(|v| v.as_str())
-                            .and_then(|s| s.parse::<f64>().ok())
-                        {
-                            total += val;
-                        }
+    body.get("data").and_then(|d| d.as_array()).map(|entries| {
+        let mut total = 0.0_f64;
+        for entry in entries {
+            if let Some(results) = entry.get("results").and_then(|r| r.as_array()) {
+                for r in results {
+                    if let Some(val) = r
+                        .get("cost")
+                        .and_then(|c| c.get("value"))
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                    {
+                        total += val;
                     }
                 }
             }
-            total
-        })
+        }
+        total
+    })
 }
 
 // ── Generic usage probe (ZAI / Minimax / future) ─────────────────────────
@@ -294,8 +292,8 @@ impl UsageProbe {
             .or_else(|| body.get("remainingPercent").and_then(|v| v.as_f64()));
         let used = body.get("used").and_then(|v| v.as_f64());
         let limit = body.get("limit").and_then(|v| v.as_f64());
-        let resets_at = parse_resets_at(&body, "resets_at")
-            .or_else(|| parse_resets_at(&body, "resetsAt"));
+        let resets_at =
+            parse_resets_at(&body, "resets_at").or_else(|| parse_resets_at(&body, "resetsAt"));
         let window = RateWindow {
             name: "subscription-window".into(),
             used,
@@ -413,9 +411,7 @@ pub fn all_fetchers() -> Vec<Box<dyn QuotaFetcher>> {
 ///
 /// Providers without a key are silently skipped. Each fetcher runs
 /// concurrently; a single failure does not abort the others.
-pub async fn fetch_all(
-    credentials: &HashMap<String, String>,
-) -> Vec<QuotaSnapshot> {
+pub async fn fetch_all(credentials: &HashMap<String, String>) -> Vec<QuotaSnapshot> {
     let fetchers = all_fetchers();
     let mut results = Vec::with_capacity(fetchers.len());
 

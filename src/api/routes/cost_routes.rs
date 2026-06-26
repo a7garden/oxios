@@ -6,11 +6,11 @@
 
 use std::sync::Arc;
 
-use axum::extract::{Query, State};
-use axum::Json;
-use chrono::{DateTime, Datelike, Duration, Utc};
 use crate::api::error::AppError;
 use crate::api::server::AppState;
+use axum::Json;
+use axum::extract::{Query, State};
+use chrono::{DateTime, Datelike, Duration, Utc};
 use serde::Deserialize;
 
 /// Query parameter selecting a relative spend window.
@@ -154,8 +154,12 @@ pub(crate) async fn handle_cost_providers(
     // Resolve credentials for all known providers from config + credential store.
     let config_key = state.config.read().api_key();
     let mut credentials = std::collections::HashMap::new();
-    for provider in crate::api::quota::all_fetchers().iter().map(|f| f.provider().to_string()) {
-        if let Some((key, _)) = oxios_kernel::CredentialStore::resolve(&provider, config_key.as_deref())
+    for provider in crate::api::quota::all_fetchers()
+        .iter()
+        .map(|f| f.provider().to_string())
+    {
+        if let Some((key, _)) =
+            oxios_kernel::CredentialStore::resolve(&provider, config_key.as_deref())
         {
             credentials.insert(provider, key);
         }

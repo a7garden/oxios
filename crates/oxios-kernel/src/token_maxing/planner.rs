@@ -51,7 +51,11 @@ impl WorkPlanner {
     pub async fn next_task(&self, done_goals: &HashSet<String>) -> Option<PlannedTask> {
         // Source A — autonomous-eligible skills.
         for entry in self.skills.list_skills().await {
-            let autonomous = entry.metadata.as_ref().map(|m| m.autonomous).unwrap_or(false);
+            let autonomous = entry
+                .metadata
+                .as_ref()
+                .map(|m| m.autonomous)
+                .unwrap_or(false);
             if !autonomous {
                 continue;
             }

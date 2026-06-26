@@ -1059,9 +1059,7 @@ impl KernelBuilder {
         // instance per kernel — shared with the handle, the API/UI, and the
         // recalibration tick below. This is the integration point that makes
         // the (previously orphaned) library actually live.
-        let quota_tracker = Arc::new(oxios_kernel::QuotaTracker::new(
-            config.token_maxing.clone(),
-        ));
+        let quota_tracker = Arc::new(oxios_kernel::QuotaTracker::new(config.token_maxing.clone()));
         // RFC-031 Phase 2: recalibration tick. Where a provider exposes a
         // usage/balance endpoint, periodically snap the self-tracked counter
         // to real state, erasing drift from a key shared with another app.
@@ -1069,7 +1067,11 @@ impl KernelBuilder {
             let interval = config.token_maxing.recalibration_interval_secs;
             let api_key = config.engine.api_key.clone();
             if interval > 0 {
-                tokio::spawn(recalibration_tick(Arc::clone(&quota_tracker), interval, api_key));
+                tokio::spawn(recalibration_tick(
+                    Arc::clone(&quota_tracker),
+                    interval,
+                    api_key,
+                ));
             }
         }
 
@@ -1355,10 +1357,8 @@ impl KernelBuilder {
         // manager (it impls Clone) before the orchestrator consumes it; the
         // maxer drains eligible subscription providers over a window.
         let maxer_lifecycle = lifecycle.clone();
-        let planner = oxios_kernel::WorkPlanner::new(
-            Arc::clone(&skill_manager),
-            project_manager.clone(),
-        );
+        let planner =
+            oxios_kernel::WorkPlanner::new(Arc::clone(&skill_manager), project_manager.clone());
         let token_maxer = Arc::new(oxios_kernel::TokenMaxer::new(
             maxer_lifecycle,
             Arc::clone(&quota_tracker),
@@ -1501,8 +1501,7 @@ async fn recalibration_tick(
         if eligible.is_empty() {
             continue;
         }
-        let mut creds: std::collections::HashMap<String, String> =
-            std::collections::HashMap::new();
+        let mut creds: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         for p in &eligible {
             if let Some((key, _)) = oxios_kernel::CredentialStore::resolve(p, api_key.as_deref()) {
                 creds.insert(p.clone(), key);

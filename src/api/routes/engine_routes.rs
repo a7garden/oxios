@@ -226,9 +226,17 @@ pub(crate) async fn handle_engine_validate_key(
     }
 
     let result = if body.api_key.is_empty() {
-        state.kernel.engine.validate_stored_key(&body.provider).await
+        state
+            .kernel
+            .engine
+            .validate_stored_key(&body.provider)
+            .await
     } else {
-        state.kernel.engine.validate_key(&body.provider, &body.api_key).await
+        state
+            .kernel
+            .engine
+            .validate_key(&body.provider, &body.api_key)
+            .await
     };
     Ok(Json(serde_json::json!(result)))
 }

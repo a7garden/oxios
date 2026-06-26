@@ -944,7 +944,7 @@ pub struct OxiosConfig {
     /// Token Maxing mode configuration (RFC-031).
     #[serde(default)]
     pub token_maxing: crate::token_maxing::TokenMaxingConfig,
- }
+}
 
 /// Kernel configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]

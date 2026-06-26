@@ -419,10 +419,7 @@ impl AgentApi {
     }
 
     /// Daily spend time-series for the last `days` days.
-    pub fn cost_daily(
-        &self,
-        days: u32,
-    ) -> anyhow::Result<Vec<crate::agent_log_db::DailyCostRow>> {
+    pub fn cost_daily(&self, days: u32) -> anyhow::Result<Vec<crate::agent_log_db::DailyCostRow>> {
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref db) = self.agent_log_db {
             return db.cost_daily(days).map_err(|e| anyhow::anyhow!("{e}"));

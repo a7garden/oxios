@@ -1592,7 +1592,8 @@ mod tests {
             0.10,
             1000,
             500,
-        )).unwrap();
+        ))
+        .unwrap();
         db.upsert_agent(&cost_agent(
             "550e8400-e29b-41d4-a716-446655440002",
             "openai/gpt-4o",
@@ -1601,7 +1602,8 @@ mod tests {
             0.25,
             2000,
             1000,
-        )).unwrap();
+        ))
+        .unwrap();
 
         let s = db.cost_summary(None).unwrap();
         assert!((s.total_cost_usd - 0.35).abs() < 1e-9);
@@ -1620,7 +1622,8 @@ mod tests {
             0.10,
             100,
             50,
-        )).unwrap();
+        ))
+        .unwrap();
         db.upsert_agent(&cost_agent(
             "550e8400-e29b-41d4-a716-446655440002",
             "openai/gpt-4o",
@@ -1629,7 +1632,8 @@ mod tests {
             0.25,
             200,
             100,
-        )).unwrap();
+        ))
+        .unwrap();
 
         // Window starting 2025-06-01 should exclude the January agent.
         let since = DateTime::parse_from_rfc3339("2025-06-01T00:00:00Z")
@@ -1651,7 +1655,8 @@ mod tests {
             0.05,
             100,
             50,
-        )).unwrap();
+        ))
+        .unwrap();
         db.upsert_agent(&cost_agent(
             "550e8400-e29b-41d4-a716-446655440002",
             "openai/gpt-4o",
@@ -1660,7 +1665,8 @@ mod tests {
             0.10,
             100,
             50,
-        )).unwrap();
+        ))
+        .unwrap();
         db.upsert_agent(&cost_agent(
             "550e8400-e29b-41d4-a716-446655440003",
             "anthropic/claude-sonnet-4",
@@ -1669,7 +1675,8 @@ mod tests {
             0.50,
             500,
             200,
-        )).unwrap();
+        ))
+        .unwrap();
 
         let rows = db.cost_by_model(None).unwrap();
         assert_eq!(rows.len(), 2);
@@ -1696,7 +1703,8 @@ mod tests {
             0.30,
             100,
             50,
-        )).unwrap();
+        ))
+        .unwrap();
         // Agent WITHOUT a project (project_id = None).
         db.upsert_agent(&cost_agent(
             "550e8400-e29b-41d4-a716-446655440002",
@@ -1706,7 +1714,8 @@ mod tests {
             0.99,
             100,
             50,
-        )).unwrap();
+        ))
+        .unwrap();
 
         let rows = db.cost_by_project(None).unwrap();
         // Only the project-tagged agent should appear.
@@ -1726,7 +1735,8 @@ mod tests {
             0.10,
             100,
             50,
-        )).unwrap();
+        ))
+        .unwrap();
         db.upsert_agent(&cost_agent(
             "550e8400-e29b-41d4-a716-446655440002",
             "openai/gpt-4o",
@@ -1735,7 +1745,8 @@ mod tests {
             0.20,
             200,
             100,
-        )).unwrap();
+        ))
+        .unwrap();
         db.upsert_agent(&cost_agent(
             "550e8400-e29b-41d4-a716-446655440003",
             "openai/gpt-4o",
@@ -1744,7 +1755,8 @@ mod tests {
             0.05,
             50,
             25,
-        )).unwrap();
+        ))
+        .unwrap();
 
         // 365-day window captures all three.
         let rows = db.cost_daily(365).unwrap();

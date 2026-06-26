@@ -58,8 +58,7 @@ impl ProviderState {
 
     /// Whether the sliding window has expired.
     fn window_expired(&self, now: DateTime<Utc>) -> bool {
-        now.signed_duration_since(self.window_start)
-            >= Duration::seconds(self.window_secs as i64)
+        now.signed_duration_since(self.window_start) >= Duration::seconds(self.window_secs as i64)
     }
 
     /// Reset the counter, honoring `resets_at` if present.
@@ -279,7 +278,9 @@ pub enum ReserveError {
     #[error("no budget configured for provider '{0}'")]
     UnknownProvider(String),
     /// Requested tokens would push the counter past the plan limit.
-    #[error("token limit exceeded: requested {requested} but only {remaining} remaining (limit {limit})")]
+    #[error(
+        "token limit exceeded: requested {requested} but only {remaining} remaining (limit {limit})"
+    )]
     Exceeded {
         limit: u64,
         used: u64,

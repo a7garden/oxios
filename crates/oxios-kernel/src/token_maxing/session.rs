@@ -112,10 +112,7 @@ impl TokenMaxingSession {
     /// Begin a new session.
     pub fn start(window: Option<MaxingWindow>, manual: bool) -> Self {
         let now = Utc::now();
-        let id = format!(
-            "tm-{}",
-            now.timestamp_millis()
-        );
+        let id = format!("tm-{}", now.timestamp_millis());
         Self {
             id,
             started_at: now,

@@ -238,7 +238,10 @@ impl AgentTool for PersonaTool {
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string(),
-                    enabled: params.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true),
+                    enabled: params
+                        .get("enabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true),
                     model: params
                         .get("model")
                         .and_then(|v| v.as_str())
@@ -292,23 +295,23 @@ impl AgentTool for PersonaTool {
 
                 let existing = match api.get(id) {
                     Some(p) => p,
-                    None => {
-                        return Ok(AgentToolResult::error(format!(
-                            "Persona '{id}' not found"
-                        )))
-                    }
+                    None => return Ok(AgentToolResult::error(format!("Persona '{id}' not found"))),
                 };
 
                 // Only the system_prompt is injected into agent sessions, so the
                 // security review runs exactly when it is being authored/changed.
-                let prompt_changed = params.get("system_prompt").and_then(|v| v.as_str()).is_some();
+                let prompt_changed = params
+                    .get("system_prompt")
+                    .and_then(|v| v.as_str())
+                    .is_some();
 
                 let updated = Persona {
                     id: existing.id,
                     name: str_or(&params, "name").unwrap_or(existing.name),
                     role: str_or(&params, "role").unwrap_or(existing.role),
                     description: str_or(&params, "description").unwrap_or(existing.description),
-                    system_prompt: str_or(&params, "system_prompt").unwrap_or(existing.system_prompt),
+                    system_prompt: str_or(&params, "system_prompt")
+                        .unwrap_or(existing.system_prompt),
                     enabled: params
                         .get("enabled")
                         .and_then(|v| v.as_bool())
@@ -370,7 +373,10 @@ impl AgentTool for PersonaTool {
 
 /// Read an optional string parameter.
 fn str_or(params: &Value, key: &str) -> Option<String> {
-    params.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+    params
+        .get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 /// Parse an optional array-of-strings parameter.
@@ -515,8 +521,18 @@ mod tests {
             assert!(actions.iter().any(|x| x == a), "schema missing action {a}");
         }
         // create/update writable fields are exposed.
-        for f in ["name", "role", "description", "system_prompt", "enabled", "model"] {
-            assert!(schema["properties"].get(f).is_some(), "schema missing field {f}");
+        for f in [
+            "name",
+            "role",
+            "description",
+            "system_prompt",
+            "enabled",
+            "model",
+        ] {
+            assert!(
+                schema["properties"].get(f).is_some(),
+                "schema missing field {f}"
+            );
         }
     }
 }

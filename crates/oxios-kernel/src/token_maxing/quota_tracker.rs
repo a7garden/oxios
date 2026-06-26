@@ -224,7 +224,10 @@ impl QuotaTracker {
         class: FailureClass,
         resets_at: Option<DateTime<Utc>>,
     ) {
-        if !matches!(class, FailureClass::QuotaExhausted | FailureClass::Transient) {
+        if !matches!(
+            class,
+            FailureClass::QuotaExhausted | FailureClass::Transient
+        ) {
             return;
         }
         if !self.config.read().is_eligible(provider) {
@@ -314,11 +317,7 @@ impl QuotaTracker {
 
     /// Reserve tokens against the self-tracked counter. Used by the
     /// TokenMaxer after dispatching each unit of work.
-    pub fn reserve(
-        &self,
-        provider: &str,
-        tokens: u64,
-    ) -> Result<(), super::budget::ReserveError> {
+    pub fn reserve(&self, provider: &str, tokens: u64) -> Result<(), super::budget::ReserveError> {
         self.budget.reserve(provider, tokens)
     }
 
