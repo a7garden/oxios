@@ -1681,6 +1681,11 @@ pub struct BudgetConfig {
     /// Enable budget enforcement.
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Monthly spend limit in USD. When set, the cost summary includes
+    /// month-to-date spend and remaining budget. Phase 1: monitoring +
+    /// alerts only. Phase 2: pre-execution enforcement.
+    #[serde(default)]
+    pub monthly_spend_limit_usd: Option<f64>,
 }
 
 fn default_budget_window() -> u64 {
@@ -1694,6 +1699,7 @@ impl Default for BudgetConfig {
             default_calls_budget: 0,
             default_window_secs: default_budget_window(),
             enabled: true,
+            monthly_spend_limit_usd: None,
         }
     }
 }

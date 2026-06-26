@@ -245,6 +245,16 @@ prune_batch_size = 100
 # Path to the SQLite database file (empty = ~/.oxios/state/agent_log.db)
 # db_path = ""
 
+# Budget enforcement — token/call rate limits per agent.
+# [budget]
+# enabled = true
+# default_token_budget = 0   # 0 = unlimited
+# default_calls_budget = 0   # 0 = unlimited
+# default_window_secs = 3600 # reset window
+# Monthly spend limit in USD (null = no limit).
+# When set, the cost dashboard shows month-to-date spend vs this limit.
+# monthly_spend_limit_usd = 50.0
+
 # Email system (disabled by default).
 # Enable to allow agents to send HTML emails via SMTP.
 # v1: sends to your own email only (my_email).
