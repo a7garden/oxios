@@ -568,6 +568,11 @@ pub struct ProviderInfo {
     pub model_count: usize,
     /// Whether an API key is currently configured.
     pub has_key: bool,
+    /// Source of the API key: `"env"`, `"auth_store"`, `"config"`, or `"none"`.
+    /// Used by the Web UI to determine whether the key is removable
+    /// (env-var-sourced keys cannot be cleared via the API).
+    #[serde(default)]
+    pub key_source: String,
     /// Short description for tooltips / help text. Empty for unknown
     /// providers that have no entry in [`PROVIDER_META`].
     #[serde(default)]
@@ -799,7 +804,16 @@ impl EngineApi {
                 } else {
                     oxi_sdk::get_provider_models(&p).len()
                 };
-                let has_key = CredentialStore::has_credential(&p, api_key_override.as_deref());
+                let resolved = CredentialStore::resolve(&p, api_key_override.as_deref());
+                let has_key = resolved.is_some();
+                let key_source = resolved
+                    .map(|(_, src)| match src {
+                        crate::credential::CredentialSource::EnvVar => "env",
+                        crate::credential::CredentialSource::Config => "config",
+                        crate::credential::CredentialSource::OxiAuthStore => "auth_store",
+                    })
+                    .unwrap_or("none")
+                    .to_string();
                 let meta = provider_meta(&p);
                 ProviderInfo {
                     id: p.clone(),
@@ -807,6 +821,7 @@ impl EngineApi {
                     category: provider_category(&p),
                     model_count,
                     has_key,
+                    key_source,
                     description: meta.map(|m| m.description.to_string()).unwrap_or_default(),
                     env_key: meta.map(|m| m.env_key.to_string()).unwrap_or_default(),
                 }
@@ -1003,6 +1018,38 @@ impl EngineApi {
         Ok(())
     }
 
+    /// Delete a provider's API key entirely.
+    ///
+    /// Removes the credential from both the auth store (`~/.oxi/auth.json`)
+    /// and `config.toml` (when the provider matches the current default).
+    /// Hot-swaps the runtime engine so the credential is dropped immediately.
+    ///
+    /// Note: keys sourced from environment variables (`OXIOS_<PROVIDER>_API_KEY`
+    /// or provider-native vars) cannot be removed via this method — they persist
+    /// as long as the env var is set. The caller should check the credential
+    /// source before offering a "remove" action.
+    pub fn delete_api_key(&self, provider: &str) -> anyhow::Result<()> {
+        CredentialStore::delete(provider)?;
+        // Also clear from config.toml if this is the default provider.
+        let snapshot = {
+            let mut cfg = self.config.write();
+            let matches = CredentialStore::provider_from_model(&cfg.engine.default_model)
+                .is_some_and(|current_provider| current_provider == provider);
+            if matches {
+                cfg.engine.api_key = None;
+                Some(cfg.clone())
+            } else {
+                None
+            }
+        };
+        if let Some(snap) = snapshot {
+            self.persist(&snap)?;
+        }
+        tracing::info!(provider = %provider, "API key deleted from credential store");
+        self.rebuild_and_swap();
+        Ok(())
+    }
+
     /// Update provider options in config.toml.
     ///
     /// Persists the options and makes them available for the next agent run.
@@ -1047,14 +1094,12 @@ impl EngineApi {
         Ok(())
     }
 
-    /// Validate an API key by making a simple test call.
+    /// Validate an API key by making a real minimal completion request.
     ///
-    /// Creates a lightweight provider and attempts a minimal request.
-    /// Returns the validation result.
-    pub fn validate_key(&self, provider: &str, api_key: &str) -> ValidateKeyResult {
-        // Try to create a provider with the given key and make a minimal completion request
-        let result = self.try_validate(provider, api_key);
-        match result {
+    /// Sends a 1-token "Hi" request to the provider's API. If the key
+    /// is invalid or expired, the provider returns an auth error.
+    pub async fn validate_key(&self, provider: &str, api_key: &str) -> ValidateKeyResult {
+        match self.try_validate(provider, api_key).await {
             Ok(()) => ValidateKeyResult {
                 valid: true,
                 provider: provider.to_string(),
@@ -1063,47 +1108,75 @@ impl EngineApi {
             Err(e) => ValidateKeyResult {
                 valid: false,
                 provider: provider.to_string(),
-                message: Some(format!("Validation failed: {e}")),
+                message: Some(format!("{e}")),
             },
         }
     }
 
-    /// Attempt a lightweight validation call.
-    fn try_validate(&self, provider: &str, api_key: &str) -> anyhow::Result<()> {
-        // Build an OxiBuilder with builtins and the provided key
+    /// Validate the stored API key for a provider.
+    ///
+    /// Resolves the key from the credential store (env var → config → auth.json)
+    /// and validates it via a real API call. Returns `valid: false` with a
+    /// descriptive message when no key is found.
+    pub async fn validate_stored_key(&self, provider: &str) -> ValidateKeyResult {
+        let api_key_override = {
+            let cfg = self.config.read();
+            cfg.api_key().as_deref().map(str::to_owned)
+        };
+        match CredentialStore::resolve(provider, api_key_override.as_deref()) {
+            Some((key, _)) => self.validate_key(provider, &key).await,
+            None => ValidateKeyResult {
+                valid: false,
+                provider: provider.to_string(),
+                message: Some("No API key found for this provider".to_string()),
+            },
+        }
+    }
+
+    /// Make a real minimal API call to verify the key works.
+    ///
+    /// Sends a "Hi" completion request with a 15-second timeout.
+    /// Invalid/expired keys trigger an immediate auth error from the provider.
+    async fn try_validate(&self, provider: &str, api_key: &str) -> anyhow::Result<()> {
+        if api_key.is_empty() {
+            anyhow::bail!("API key is empty");
+        }
+
         let builder = oxi_sdk::OxiBuilder::new()
             .with_builtins()
             .api_key(provider, api_key);
         let oxi = builder.build();
 
-        // Try to resolve any model from this provider
         let models = oxi_sdk::get_provider_models(provider);
         if models.is_empty() {
             anyhow::bail!("No models found for provider '{provider}'");
         }
 
         let model_id = format!("{}/{}", provider, models[0].id);
-        let _model = oxi.resolve_model(&model_id)?;
+        let model = oxi
+            .resolve_model(&model_id)
+            .with_context(|| format!("Unknown model '{model_id}'"))?;
+        let provider_inst = oxi
+            .create_provider(provider)
+            .with_context(|| format!("Failed to create provider '{provider}'"))?;
 
-        // Create a provider with the injected key
-        let _provider = oxi.create_provider(provider)?;
+        let mut ctx = oxi_sdk::Context::new();
+        ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new("Hi")));
 
-        // If we got this far, the provider was created with the key.
-        // Note: Actual API call validation would require a lightweight
-        // completion request. For now, this validates key format + provider existence.
-        if api_key.is_empty() {
-            anyhow::bail!("API key is empty");
+        let stream_result = tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            provider_inst.stream(&model, &ctx, None),
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Request timed out (15s)"))?;
+
+        match stream_result {
+            Ok(_) => {
+                tracing::debug!(provider = %provider, model = %model_id, "Key validated via real API call");
+                Ok(())
+            }
+            Err(e) => Err(anyhow::anyhow!("{e}")),
         }
-        if api_key.len() < 8 {
-            anyhow::bail!("API key appears too short");
-        }
-
-        tracing::debug!(
-            provider = %provider,
-            model = %model_id,
-            "Key validation: provider resolved with injected key"
-        );
-        Ok(())
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
@@ -1251,6 +1324,7 @@ mod tests {
             category: ProviderCategory::Major,
             model_count: 15,
             has_key: true,
+            key_source: "auth_store".to_string(),
             description: "Claude models with extended thinking".to_string(),
             env_key: "ANTHROPIC_API_KEY".to_string(),
         };

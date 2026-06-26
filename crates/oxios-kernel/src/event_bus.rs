@@ -298,6 +298,27 @@ pub enum KernelEvent {
         /// Optional structured options. Empty when the question is open-ended.
         options: Vec<String>,
     },
+    // ── Persona (agent-authored writes are security-reviewed) ───────────
+    /// A persona was created (by an agent tool, the HTTP API, or the UI).
+    PersonaCreated {
+        /// Persona ID.
+        id: String,
+        /// Persona display name.
+        name: String,
+        /// Whether it was registered enabled.
+        enabled: bool,
+        /// Origin of the change: "agent" | "api" | "ui".
+        source: String,
+    },
+    /// A persona was updated.
+    PersonaUpdated {
+        /// Persona ID.
+        id: String,
+        /// Persona display name.
+        name: String,
+        /// Origin of the change: "agent" | "api" | "ui".
+        source: String,
+    },
 }
 
 /// Convert a KernelEvent to an AuditAction for the audit trail.
@@ -450,6 +471,12 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         },
         KernelEvent::AskUserRequest { id, question, .. } => AuditAction::Other {
             detail: format!("ask_user:{id}:{question}"),
+        },
+        KernelEvent::PersonaCreated { id, name, source, .. } => AuditAction::Other {
+            detail: format!("persona:created:{id}:{name}:{source}"),
+        },
+        KernelEvent::PersonaUpdated { id, name, source } => AuditAction::Other {
+            detail: format!("persona:updated:{id}:{name}:{source}"),
         },
     }
 }

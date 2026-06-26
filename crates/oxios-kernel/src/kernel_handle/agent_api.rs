@@ -378,6 +378,57 @@ impl AgentApi {
         }
         Ok(s)
     }
+    // ── Cost aggregation (dollar-based spend views) ─────────────────
+
+    /// Aggregate spend for a time window.
+    pub fn cost_summary(
+        &self,
+        since: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> anyhow::Result<crate::agent_log_db::CostSummary> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref db) = self.agent_log_db {
+            return db.cost_summary(since).map_err(|e| anyhow::anyhow!("{e}"));
+        }
+        Ok(crate::agent_log_db::CostSummary::default())
+    }
+
+    /// Per-model spend breakdown for a time window.
+    pub fn cost_by_model(
+        &self,
+        since: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> anyhow::Result<Vec<crate::agent_log_db::ModelCostRow>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref db) = self.agent_log_db {
+            return db.cost_by_model(since).map_err(|e| anyhow::anyhow!("{e}"));
+        }
+        Ok(Vec::new())
+    }
+
+    /// Per-project spend breakdown for a time window.
+    pub fn cost_by_project(
+        &self,
+        since: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> anyhow::Result<Vec<crate::agent_log_db::ProjectCostRow>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref db) = self.agent_log_db {
+            return db
+                .cost_by_project(since)
+                .map_err(|e| anyhow::anyhow!("{e}"));
+        }
+        Ok(Vec::new())
+    }
+
+    /// Daily spend time-series for the last `days` days.
+    pub fn cost_daily(
+        &self,
+        days: u32,
+    ) -> anyhow::Result<Vec<crate::agent_log_db::DailyCostRow>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref db) = self.agent_log_db {
+            return db.cost_daily(days).map_err(|e| anyhow::anyhow!("{e}"));
+        }
+        Ok(Vec::new())
+    }
 
     /// Rebuild SQLite agent log index from filesystem JSON.
     #[cfg(feature = "sqlite-memory")]

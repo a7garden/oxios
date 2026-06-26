@@ -269,6 +269,59 @@ pub struct RebuildReport {
     pub orphaned: u64,
     pub errors: u64,
 }
+// ===========================================================================
+// Cost aggregation (dollar-based spend views over agent_log_db)
+// ===========================================================================
+
+/// Aggregate spend summary for a time window.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct CostSummary {
+    /// Total USD spent in the window.
+    pub total_cost_usd: f64,
+    /// Total tokens (input + output) consumed in the window.
+    pub total_tokens: u64,
+    /// Number of agent executions in the window.
+    pub agent_count: u64,
+}
+
+/// Per-model spend breakdown row.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ModelCostRow {
+    /// Model ID (e.g. `anthropic/claude-sonnet-4`).
+    pub model_id: String,
+    /// USD spent on this model.
+    pub cost_usd: f64,
+    /// Tokens consumed on this model.
+    pub tokens: u64,
+    /// Agent executions using this model.
+    pub agent_count: u64,
+}
+
+/// Per-project spend breakdown row.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ProjectCostRow {
+    /// Project ID (empty string = no project).
+    pub project_id: String,
+    /// USD spent in this project.
+    pub cost_usd: f64,
+    /// Tokens consumed in this project.
+    pub tokens: u64,
+    /// Agent executions in this project.
+    pub agent_count: u64,
+}
+
+/// Daily spend row for time-series charts.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DailyCostRow {
+    /// Local date in `YYYY-MM-DD` format.
+    pub date: String,
+    /// USD spent that day.
+    pub cost_usd: f64,
+    /// Tokens consumed that day.
+    pub tokens: u64,
+    /// Agent executions that day.
+    pub agent_count: u64,
+}
 
 // ===========================================================================
 // AgentLogDb
@@ -584,6 +637,172 @@ impl AgentLogDb {
             .map(|dt| dt.with_timezone(&Utc));
 
         Ok(s)
+    }
+    // ── Cost aggregation (dollar-based spend views) ─────────────────
+
+    /// Aggregate spend for a time window (`since` = inclusive lower bound).
+    ///
+    /// When `since` is `None`, returns all-time totals.
+    pub fn cost_summary(&self, since: Option<DateTime<Utc>>) -> Result<CostSummary> {
+        let conn = self.conn.lock();
+        match since {
+            Some(ts) => {
+                let row = conn
+                    .query_row(
+                        "SELECT COALESCE(SUM(cost_usd), 0.0),
+                                COALESCE(SUM(tokens_input + tokens_output), 0),
+                                COUNT(*)
+                         FROM agents WHERE created_at >= ?1",
+                        rusqlite::params![ts.to_rfc3339()],
+                        |row| {
+                            Ok(CostSummary {
+                                total_cost_usd: row.get(0)?,
+                                total_tokens: row.get::<_, i64>(1)? as u64,
+                                agent_count: row.get::<_, i64>(2)? as u64,
+                            })
+                        },
+                    )
+                    .context("Failed to compute cost summary")?;
+                Ok(row)
+            }
+            None => {
+                let row = conn
+                    .query_row(
+                        "SELECT COALESCE(SUM(cost_usd), 0.0),
+                                COALESCE(SUM(tokens_input + tokens_output), 0),
+                                COUNT(*)
+                         FROM agents",
+                        [],
+                        |row| {
+                            Ok(CostSummary {
+                                total_cost_usd: row.get(0)?,
+                                total_tokens: row.get::<_, i64>(1)? as u64,
+                                agent_count: row.get::<_, i64>(2)? as u64,
+                            })
+                        },
+                    )
+                    .context("Failed to compute cost summary")?;
+                Ok(row)
+            }
+        }
+    }
+
+    /// Per-model spend breakdown for a time window.
+    pub fn cost_by_model(&self, since: Option<DateTime<Utc>>) -> Result<Vec<ModelCostRow>> {
+        let conn = self.conn.lock();
+        let since_ts = since.map(|t| t.to_rfc3339());
+        let mut stmt = if since_ts.is_some() {
+            conn.prepare(
+                "SELECT model_id,
+                        COALESCE(SUM(cost_usd), 0.0),
+                        COALESCE(SUM(tokens_input + tokens_output), 0),
+                        COUNT(*)
+                 FROM agents
+                 WHERE created_at >= ?1 AND model_id != ''
+                 GROUP BY model_id
+                 ORDER BY SUM(cost_usd) DESC",
+            )?
+        } else {
+            conn.prepare(
+                "SELECT model_id,
+                        COALESCE(SUM(cost_usd), 0.0),
+                        COALESCE(SUM(tokens_input + tokens_output), 0),
+                        COUNT(*)
+                 FROM agents
+                 WHERE model_id != ''
+                 GROUP BY model_id
+                 ORDER BY SUM(cost_usd) DESC",
+            )?
+        };
+
+        let map = |row: &rusqlite::Row| -> rusqlite::Result<ModelCostRow> {
+            Ok(ModelCostRow {
+                model_id: row.get(0)?,
+                cost_usd: row.get(1)?,
+                tokens: row.get::<_, i64>(2)? as u64,
+                agent_count: row.get::<_, i64>(3)? as u64,
+            })
+        };
+
+        let rows = match &since_ts {
+            Some(ts) => stmt.query_map(rusqlite::params![ts], map)?,
+            None => stmt.query_map([], map)?,
+        };
+        rows.collect::<Result<Vec<_>, _>>()
+            .context("Failed to collect cost-by-model rows")
+    }
+
+    /// Per-project spend breakdown for a time window.
+    pub fn cost_by_project(&self, since: Option<DateTime<Utc>>) -> Result<Vec<ProjectCostRow>> {
+        let conn = self.conn.lock();
+        let since_ts = since.map(|t| t.to_rfc3339());
+        let mut stmt = if since_ts.is_some() {
+            conn.prepare(
+                "SELECT COALESCE(project_id, ''),
+                        COALESCE(SUM(cost_usd), 0.0),
+                        COALESCE(SUM(tokens_input + tokens_output), 0),
+                        COUNT(*)
+                 FROM agents
+                 WHERE created_at >= ?1 AND project_id IS NOT NULL AND project_id != ''
+                 GROUP BY project_id
+                 ORDER BY SUM(cost_usd) DESC",
+            )?
+        } else {
+            conn.prepare(
+                "SELECT COALESCE(project_id, ''),
+                        COALESCE(SUM(cost_usd), 0.0),
+                        COALESCE(SUM(tokens_input + tokens_output), 0),
+                        COUNT(*)
+                 FROM agents
+                 WHERE project_id IS NOT NULL AND project_id != ''
+                 GROUP BY project_id
+                 ORDER BY SUM(cost_usd) DESC",
+            )?
+        };
+
+        let map = |row: &rusqlite::Row| -> rusqlite::Result<ProjectCostRow> {
+            Ok(ProjectCostRow {
+                project_id: row.get(0)?,
+                cost_usd: row.get(1)?,
+                tokens: row.get::<_, i64>(2)? as u64,
+                agent_count: row.get::<_, i64>(3)? as u64,
+            })
+        };
+
+        let rows = match &since_ts {
+            Some(ts) => stmt.query_map(rusqlite::params![ts], map)?,
+            None => stmt.query_map([], map)?,
+        };
+        rows.collect::<Result<Vec<_>, _>>()
+            .context("Failed to collect cost-by-project rows")
+    }
+
+    /// Daily spend time-series for the last `days` days (inclusive of today).
+    pub fn cost_daily(&self, days: u32) -> Result<Vec<DailyCostRow>> {
+        let conn = self.conn.lock();
+        let since = Utc::now() - chrono::Duration::days(days as i64);
+        let mut stmt = conn.prepare(
+            "SELECT date(created_at) AS d,
+                    COALESCE(SUM(cost_usd), 0.0),
+                    COALESCE(SUM(tokens_input + tokens_output), 0),
+                    COUNT(*)
+             FROM agents
+             WHERE created_at >= ?1
+             GROUP BY d
+             ORDER BY d ASC",
+        )?;
+
+        let rows = stmt.query_map(rusqlite::params![since.to_rfc3339()], |row| {
+            Ok(DailyCostRow {
+                date: row.get(0)?,
+                cost_usd: row.get(1)?,
+                tokens: row.get::<_, i64>(2)? as u64,
+                agent_count: row.get::<_, i64>(3)? as u64,
+            })
+        })?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .context("Failed to collect daily cost rows")
     }
 
     pub fn get(&self, id: &str) -> Result<Option<AgentInfo>> {
@@ -1340,5 +1559,215 @@ mod tests {
         assert_eq!(calls.len(), 2);
         assert_eq!(calls[0].tool, "bash");
         assert_eq!(calls[1].tool, "read");
+    }
+
+    // ── Cost aggregation tests ──────────────────────────────────────
+
+    /// Helper: build an agent with configurable model/project/tokens.
+    fn cost_agent(
+        id: &str,
+        model: &str,
+        project: Option<&str>,
+        created: &str,
+        cost: f64,
+        tokens_in: u64,
+        tokens_out: u64,
+    ) -> AgentInfo {
+        let mut a = sample_agent(id, AgentStatus::Completed, created, cost);
+        a.model_id = model.into();
+        a.project_id = project.map(|p| uuid::Uuid::parse_str(p).unwrap());
+        a.tokens_input = tokens_in;
+        a.tokens_output = tokens_out;
+        a
+    }
+
+    #[test]
+    fn test_cost_summary_all_time() {
+        let (db, _dir) = make_test_db();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440001",
+            "anthropic/claude-sonnet-4",
+            None,
+            "2025-01-15T10:00:00Z",
+            0.10,
+            1000,
+            500,
+        )).unwrap();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440002",
+            "openai/gpt-4o",
+            None,
+            "2025-06-20T10:00:00Z",
+            0.25,
+            2000,
+            1000,
+        )).unwrap();
+
+        let s = db.cost_summary(None).unwrap();
+        assert!((s.total_cost_usd - 0.35).abs() < 1e-9);
+        assert_eq!(s.total_tokens, 4500); // (1000+500) + (2000+1000)
+        assert_eq!(s.agent_count, 2);
+    }
+
+    #[test]
+    fn test_cost_summary_time_window() {
+        let (db, _dir) = make_test_db();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440001",
+            "anthropic/claude-sonnet-4",
+            None,
+            "2025-01-15T10:00:00Z",
+            0.10,
+            100,
+            50,
+        )).unwrap();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440002",
+            "openai/gpt-4o",
+            None,
+            "2025-06-24T10:00:00Z",
+            0.25,
+            200,
+            100,
+        )).unwrap();
+
+        // Window starting 2025-06-01 should exclude the January agent.
+        let since = DateTime::parse_from_rfc3339("2025-06-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let s = db.cost_summary(Some(since)).unwrap();
+        assert!((s.total_cost_usd - 0.25).abs() < 1e-9);
+        assert_eq!(s.agent_count, 1);
+    }
+
+    #[test]
+    fn test_cost_by_model_groups_and_sorts() {
+        let (db, _dir) = make_test_db();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440001",
+            "openai/gpt-4o",
+            None,
+            "2025-06-20T10:00:00Z",
+            0.05,
+            100,
+            50,
+        )).unwrap();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440002",
+            "openai/gpt-4o",
+            None,
+            "2025-06-21T10:00:00Z",
+            0.10,
+            100,
+            50,
+        )).unwrap();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440003",
+            "anthropic/claude-sonnet-4",
+            None,
+            "2025-06-22T10:00:00Z",
+            0.50,
+            500,
+            200,
+        )).unwrap();
+
+        let rows = db.cost_by_model(None).unwrap();
+        assert_eq!(rows.len(), 2);
+        // Sorted by cost desc: claude (0.50) first, then gpt-4o (0.15).
+        assert_eq!(rows[0].model_id, "anthropic/claude-sonnet-4");
+        assert!((rows[0].cost_usd - 0.50).abs() < 1e-9);
+        assert_eq!(rows[0].agent_count, 1);
+        assert_eq!(rows[1].model_id, "openai/gpt-4o");
+        assert!((rows[1].cost_usd - 0.15).abs() < 1e-9);
+        assert_eq!(rows[1].agent_count, 2);
+        assert_eq!(rows[1].tokens, 300); // 2 × (100+50)
+    }
+
+    #[test]
+    fn test_cost_by_project_excludes_null() {
+        let (db, _dir) = make_test_db();
+        let pid = "660e8400-e29b-41d4-a716-446655440099";
+        // Agent WITH a project.
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440001",
+            "openai/gpt-4o",
+            Some(pid),
+            "2025-06-20T10:00:00Z",
+            0.30,
+            100,
+            50,
+        )).unwrap();
+        // Agent WITHOUT a project (project_id = None).
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440002",
+            "openai/gpt-4o",
+            None,
+            "2025-06-21T10:00:00Z",
+            0.99,
+            100,
+            50,
+        )).unwrap();
+
+        let rows = db.cost_by_project(None).unwrap();
+        // Only the project-tagged agent should appear.
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].project_id, pid);
+        assert!((rows[0].cost_usd - 0.30).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_cost_daily_groups_by_date() {
+        let (db, _dir) = make_test_db();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440001",
+            "openai/gpt-4o",
+            None,
+            "2026-06-23T08:00:00Z",
+            0.10,
+            100,
+            50,
+        )).unwrap();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440002",
+            "openai/gpt-4o",
+            None,
+            "2026-06-23T20:00:00Z",
+            0.20,
+            200,
+            100,
+        )).unwrap();
+        db.upsert_agent(&cost_agent(
+            "550e8400-e29b-41d4-a716-446655440003",
+            "openai/gpt-4o",
+            None,
+            "2026-06-24T10:00:00Z",
+            0.05,
+            50,
+            25,
+        )).unwrap();
+
+        // 365-day window captures all three.
+        let rows = db.cost_daily(365).unwrap();
+        assert_eq!(rows.len(), 2); // two distinct dates
+
+        // Sorted ascending by date.
+        assert_eq!(rows[0].date, "2026-06-23");
+        assert!((rows[0].cost_usd - 0.30).abs() < 1e-9); // 0.10 + 0.20
+        assert_eq!(rows[0].agent_count, 2);
+        assert_eq!(rows[1].date, "2026-06-24");
+        assert!((rows[1].cost_usd - 0.05).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_cost_aggregations_empty_db() {
+        let (db, _dir) = make_test_db();
+
+        let s = db.cost_summary(None).unwrap();
+        assert!((s.total_cost_usd).abs() < 1e-9);
+        assert_eq!(s.agent_count, 0);
+
+        assert!(db.cost_by_model(None).unwrap().is_empty());
+        assert!(db.cost_by_project(None).unwrap().is_empty());
+        assert!(db.cost_daily(30).unwrap().is_empty());
     }
 }
