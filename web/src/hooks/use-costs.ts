@@ -21,8 +21,7 @@ export function useCostSummary(period: CostPeriod = 'all') {
 export function useCostByModel(period: CostPeriod = 'all') {
   return useQuery({
     queryKey: ['costs', 'by-model', period],
-    queryFn: () =>
-      api.get<{ items: ModelCostRow[] }>(`/api/costs/by-model?period=${period}`),
+    queryFn: () => api.get<{ items: ModelCostRow[] }>(`/api/costs/by-model?period=${period}`),
     refetchInterval: 30000,
   })
 }
@@ -30,10 +29,7 @@ export function useCostByModel(period: CostPeriod = 'all') {
 export function useCostByProject(period: CostPeriod = 'all') {
   return useQuery({
     queryKey: ['costs', 'by-project', period],
-    queryFn: () =>
-      api.get<{ items: ProjectCostRow[] }>(
-        `/api/costs/by-project?period=${period}`,
-      ),
+    queryFn: () => api.get<{ items: ProjectCostRow[] }>(`/api/costs/by-project?period=${period}`),
     refetchInterval: 30000,
   })
 }
@@ -41,8 +37,7 @@ export function useCostByProject(period: CostPeriod = 'all') {
 export function useCostDaily(days = 30) {
   return useQuery({
     queryKey: ['costs', 'daily', days],
-    queryFn: () =>
-      api.get<{ items: DailyCostRow[] }>(`/api/costs/daily?days=${days}`),
+    queryFn: () => api.get<{ items: DailyCostRow[] }>(`/api/costs/daily?days=${days}`),
     refetchInterval: 60000,
   })
 }
@@ -50,8 +45,7 @@ export function useCostDaily(days = 30) {
 export function useProviderQuotas() {
   return useQuery({
     queryKey: ['costs', 'providers'],
-    queryFn: () =>
-      api.get<{ providers: QuotaSnapshot[] }>(`/api/costs/providers`),
+    queryFn: () => api.get<{ providers: QuotaSnapshot[] }>(`/api/costs/providers`),
     refetchInterval: 120000,
     retry: false, // external API calls may fail; don't hammer
   })

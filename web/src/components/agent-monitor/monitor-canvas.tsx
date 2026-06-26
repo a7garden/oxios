@@ -113,7 +113,8 @@ export function MonitorCanvas({
           if (!nodes.some((n) => n.agentId === sourceId || n.name === e.from)) return null
           if (!nodes.some((n) => n.agentId === targetId || n.name === e.to)) return null
           const isSelected =
-            selectedAgentId != null && (sourceId === selectedAgentId || targetId === selectedAgentId)
+            selectedAgentId != null &&
+            (sourceId === selectedAgentId || targetId === selectedAgentId)
           return {
             id: `${sourceId}->${targetId}`,
             source: sourceId,

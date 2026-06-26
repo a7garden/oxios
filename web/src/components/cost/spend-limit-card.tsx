@@ -1,3 +1,4 @@
+import { AlertTriangle, Pencil, Target } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
@@ -11,8 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { useSpendLimit, useSetSpendLimit } from '@/hooks/use-costs'
-import { AlertTriangle, Pencil, Target } from 'lucide-react'
+import { useSetSpendLimit, useSpendLimit } from '@/hooks/use-costs'
 
 /** Monthly spend limit card — shows a progress bar of month-to-date spend
  * against the user-configured limit, with an inline dialog to set or clear
@@ -62,18 +62,14 @@ export function SpendLimitCard() {
               <div className="h-2.5 rounded-full bg-muted overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
-                    isOver
-                      ? 'bg-error'
-                      : isNear
-                        ? 'bg-warning'
-                        : 'bg-primary'
+                    isOver ? 'bg-error' : isNear ? 'bg-warning' : 'bg-primary'
                   }`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">
-                  {t('cost.remaining')}: ${(Math.max(0, limit - mtdSpend)).toFixed(2)}
+                  {t('cost.remaining')}: ${Math.max(0, limit - mtdSpend).toFixed(2)}
                 </p>
                 {(isOver || isNear) && (
                   <span className="flex items-center gap-1 text-xs text-warning">
@@ -109,11 +105,7 @@ export function SpendLimitCard() {
         </CardContent>
       </Card>
 
-      <SetLimitDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        currentLimit={limit}
-      />
+      <SetLimitDialog open={dialogOpen} onOpenChange={setDialogOpen} currentLimit={limit} />
     </>
   )
 }
@@ -129,14 +121,12 @@ function SetLimitDialog({
 }) {
   const { t } = useTranslation()
   const mutation = useSetSpendLimit()
-  const [value, setValue] = useState(
-    currentLimit != null ? currentLimit.toString() : '',
-  )
+  const [value, setValue] = useState(currentLimit != null ? currentLimit.toString() : '')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const parsed = parseFloat(value)
-    mutation.mutate(isNaN(parsed) ? null : parsed, {
+    mutation.mutate(Number.isNaN(parsed) ? null : parsed, {
       onSuccess: () => onOpenChange(false),
     })
   }
@@ -155,9 +145,7 @@ function SetLimitDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">
-              {t('cost.monthlyLimitUsd')}
-            </label>
+            <label className="text-sm font-medium">{t('cost.monthlyLimitUsd')}</label>
             <Input
               type="number"
               step="0.01"
@@ -166,9 +154,7 @@ function SetLimitDialog({
               value={value}
               onChange={(e) => setValue(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">
-              {t('cost.spendLimitHint')}
-            </p>
+            <p className="text-xs text-muted-foreground">{t('cost.spendLimitHint')}</p>
           </div>
           <DialogFooter className="gap-2">
             {currentLimit != null && (

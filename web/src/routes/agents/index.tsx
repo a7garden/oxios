@@ -325,9 +325,7 @@ function AgentsListPage() {
               {monitor.stats.totalTokens > 0 && (
                 <span>{monitor.stats.totalTokens.toLocaleString()} tokens</span>
               )}
-              {monitor.edges.length > 0 && (
-                <span>{monitor.edges.length} A2A connections</span>
-              )}
+              {monitor.edges.length > 0 && <span>{monitor.edges.length} A2A connections</span>}
             </div>
           )}
         </div>

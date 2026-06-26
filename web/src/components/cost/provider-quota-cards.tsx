@@ -1,11 +1,11 @@
+import { AlertCircle, CheckCircle2, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useProviderQuotas } from '@/hooks/use-costs'
 import { useProviders } from '@/hooks/use-engine'
-import { AlertCircle, CheckCircle2, Wallet } from 'lucide-react'
-import type { ProviderInfo } from '@/types/engine'
 import type { QuotaSnapshot } from '@/types/cost'
+import type { ProviderInfo } from '@/types/engine'
 
 /** Provider panel — shows ALL configured providers, merged with external
  * quota/billing data where available.
@@ -29,9 +29,10 @@ export function ProviderQuotaCards() {
   const quotaMap = new Map<string, QuotaSnapshot>()
   for (const q of quotas) quotaMap.set(q.provider, q)
 
-  const merged: { info: ProviderInfo; quota: QuotaSnapshot | null }[] = configured.map(
-    (info) => ({ info, quota: quotaMap.get(info.id) ?? null }),
-  )
+  const merged: { info: ProviderInfo; quota: QuotaSnapshot | null }[] = configured.map((info) => ({
+    info,
+    quota: quotaMap.get(info.id) ?? null,
+  }))
 
   // Also include quota-only providers (fetcher found a key but provider
   // isn't in the engine catalog — rare, but shouldn't be hidden).

@@ -1,12 +1,12 @@
+import { Gauge } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Card, CardContent } from '@/components/ui/card'
 import { AgentBudgetCard } from '@/components/budget/agent-budget-card'
 import { BudgetSummaryCard } from '@/components/budget/budget-summary'
 import { SetBudgetDialog } from '@/components/budget/set-budget-dialog'
-import { useBudgetList, useBudgetSet, useBudgetDelete, useBudgetReset } from '@/hooks/use-budget'
+import { Card, CardContent } from '@/components/ui/card'
+import { useBudgetDelete, useBudgetList, useBudgetReset, useBudgetSet } from '@/hooks/use-budget'
 import type { AgentBudget } from '@/types/budget'
-import { Gauge } from 'lucide-react'
 
 /** Agent budget management section — token/call budgets with sliding windows.
  *

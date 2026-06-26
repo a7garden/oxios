@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { useCostByProject } from '@/hooks/use-costs'
 import type { CostPeriod } from '@/types/cost'
-import { EmptyState } from '@/components/shared/empty-state'
 
 interface Props {
   period: CostPeriod

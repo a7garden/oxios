@@ -10,8 +10,8 @@
  * node with no edges; multi-agent delegation shows nodes + message edges.
  */
 
+import type { TopologyEdge, TopologyNode } from './a2a'
 import type { AgentListItem } from './agent'
-import type { TopologyNode, TopologyEdge } from './a2a'
 
 /** A2A enrichment data for a running agent (may be absent for completed). */
 export interface AgentA2AInfo {
@@ -36,7 +36,14 @@ export interface MonitorNode {
   /** Lifecycle record (cost, tokens, status, etc.). */
   lifecycle: Pick<
     AgentListItem,
-    'status' | 'cost_usd' | 'tokens_used' | 'duration_secs' | 'model_id' | 'error' | 'created_at' | 'session_id'
+    | 'status'
+    | 'cost_usd'
+    | 'tokens_used'
+    | 'duration_secs'
+    | 'model_id'
+    | 'error'
+    | 'created_at'
+    | 'session_id'
   >
   /** A2A enrichment (capabilities, skills, lastSeen). Undefined when not in A2A registry. */
   a2a?: AgentA2AInfo

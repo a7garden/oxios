@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { useCostByModel } from '@/hooks/use-costs'
 import type { CostPeriod } from '@/types/cost'
-import { EmptyState } from '@/components/shared/empty-state'
 
 interface Props {
   period: CostPeriod
@@ -33,9 +33,7 @@ export function CostByModel({ period }: Props) {
               return (
                 <div key={row.model_id} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-mono text-xs truncate max-w-[60%]">
-                      {row.model_id}
-                    </span>
+                    <span className="font-mono text-xs truncate max-w-[60%]">{row.model_id}</span>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span>${row.cost_usd.toFixed(4)}</span>
                       <span>{(row.tokens / 1000).toFixed(1)}k</span>

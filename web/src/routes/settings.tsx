@@ -32,8 +32,6 @@ import { LoadingCards } from '@/components/shared/loading'
 import { SystemToolsPanel } from '@/components/system/system-tools'
 import { SystemUpdateCard } from '@/components/system/system-update'
 import { Separator } from '@/components/ui/separator'
-import { api } from '@/lib/api-client'
-import type { ProviderModelsResponse } from '@/types/engine'
 import {
   type ConfigDiffEntry,
   type ConfigPatchResponse,
@@ -50,6 +48,8 @@ import {
   useSetModel,
   useSetProviderOptions,
 } from '@/hooks/use-engine'
+import { api } from '@/lib/api-client'
+import type { ProviderModelsResponse } from '@/types/engine'
 
 export const Route = createFileRoute('/settings')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -350,9 +350,7 @@ function EnginePanel() {
   const setProviderOptions = useSetProviderOptions()
 
   const currentModel = engineConfig?.default_model ?? ''
-  const defaultProvider = currentModel.includes('/')
-    ? (currentModel.split('/')[0] ?? null)
-    : null
+  const defaultProvider = currentModel.includes('/') ? (currentModel.split('/')[0] ?? null) : null
 
   const { data: models = [] } = useModels(defaultProvider)
 
@@ -361,10 +359,13 @@ function EnginePanel() {
   const isMutating = setApiKey.isPending || deleteApiKey.isPending || setModel.isPending
 
   const handleAdd = (provider: string, apiKey: string) => {
-    setApiKey.mutate({ provider, apiKey }, {
-      onSuccess: () => toast.success(t('engine.connected')),
-      onError: () => toast.error(t('common.error')),
-    })
+    setApiKey.mutate(
+      { provider, apiKey },
+      {
+        onSuccess: () => toast.success(t('engine.connected')),
+        onError: () => toast.error(t('common.error')),
+      },
+    )
   }
 
   const handleChangeKey = (provider: string, apiKey: string) => {
@@ -431,9 +432,7 @@ function EnginePanel() {
             ))}
             {connected.length === 0 && (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center min-h-[124px]">
-                <p className="text-sm text-muted-foreground">
-                  {t('engine.noProvidersConnected')}
-                </p>
+                <p className="text-sm text-muted-foreground">{t('engine.noProvidersConnected')}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {t('engine.noProvidersConnectedDesc')}
                 </p>
@@ -461,11 +460,7 @@ function EnginePanel() {
               </p>
             </div>
             <div className="shrink-0 w-64">
-              <ModelSelect
-                models={models}
-                value={currentModel}
-                onValueChange={handleModelChange}
-              />
+              <ModelSelect models={models} value={currentModel} onValueChange={handleModelChange} />
             </div>
           </div>
         )}

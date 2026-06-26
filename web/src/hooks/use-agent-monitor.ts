@@ -13,8 +13,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { api } from '@/lib/api-client'
-import type { AgentListResponse, AgentListItem } from '@/types/agent'
 import type { A2AAgentCard, A2ATopology, TopologyNode } from '@/types/a2a'
+import type { AgentListItem, AgentListResponse } from '@/types/agent'
 import type { MonitorData, MonitorEdge, MonitorNode } from '@/types/agent-monitor'
 
 /** Normalise raw lifecycle status string → display status. */

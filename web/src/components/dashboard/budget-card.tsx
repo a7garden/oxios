@@ -50,17 +50,12 @@ export function BudgetCard({ className }: { className?: string }) {
             {models.length > 0 && (
               <div className="pt-1 space-y-1">
                 {models.map((m) => {
-                  const pct =
-                    maxModelCost > 0 ? (m.cost_usd / maxModelCost) * 100 : 0
+                  const pct = maxModelCost > 0 ? (m.cost_usd / maxModelCost) * 100 : 0
                   return (
                     <div key={m.model_id} className="space-y-0.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="truncate max-w-[60%] font-mono">
-                          {m.model_id}
-                        </span>
-                        <span className="text-muted-foreground">
-                          ${m.cost_usd.toFixed(4)}
-                        </span>
+                        <span className="truncate max-w-[60%] font-mono">{m.model_id}</span>
+                        <span className="text-muted-foreground">${m.cost_usd.toFixed(4)}</span>
                       </div>
                       <Progress value={pct} className="h-1" />
                     </div>

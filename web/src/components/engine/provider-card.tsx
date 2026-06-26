@@ -1,11 +1,24 @@
-import { AlertCircle, Check, Eye, EyeOff, KeyRound, Loader2, Lock, Plus, ShieldCheck, Star, Trash2, X } from 'lucide-react'
+import {
+  AlertCircle,
+  Check,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Lock,
+  Plus,
+  ShieldCheck,
+  Star,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
 import { api } from '@/lib/api-client'
+import { cn } from '@/lib/utils'
 import type { ProviderInfo } from '@/types/engine'
 import { ProviderSelect } from './provider-select'
 
@@ -48,7 +61,9 @@ export function ProviderCard({
   const [showKeyInput, setShowKeyInput] = useState(false)
   const [keyValue, setKeyValue] = useState('')
   const [keyVisible, setKeyVisible] = useState(false)
-  const [validateState, setValidateState] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle')
+  const [validateState, setValidateState] = useState<'idle' | 'validating' | 'valid' | 'invalid'>(
+    'idle',
+  )
   const [validateMsg, setValidateMsg] = useState('')
 
   const isEnvKey = provider.keySource === 'env'
@@ -65,10 +80,9 @@ export function ProviderCard({
     setValidateState('validating')
     setValidateMsg('')
     try {
-      const res = await api.post<{ valid: boolean; message?: string }>(
-        '/api/engine/validate-key',
-        { provider: provider.id },
-      )
+      const res = await api.post<{ valid: boolean; message?: string }>('/api/engine/validate-key', {
+        provider: provider.id,
+      })
       setValidateState(res.valid ? 'valid' : 'invalid')
       setValidateMsg(res.message ?? '')
     } catch {
@@ -113,7 +127,9 @@ export function ProviderCard({
 
       {/* Status */}
       <div className="flex items-center gap-1.5 mt-2 text-xs">
-        <Check className={cn('h-3.5 w-3.5 shrink-0', isEnvKey ? 'text-amber-500' : 'text-emerald-500')} />
+        <Check
+          className={cn('h-3.5 w-3.5 shrink-0', isEnvKey ? 'text-amber-500' : 'text-emerald-500')}
+        />
         <span className="text-muted-foreground">
           {isEnvKey ? t('engine.envKey') : t('engine.connected')}
           {' · '}
@@ -170,7 +186,12 @@ export function ProviderCard({
             </button>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" className="h-7" onClick={handleKeySubmit} disabled={isPending || !keyValue.trim()}>
+            <Button
+              size="sm"
+              className="h-7"
+              onClick={handleKeySubmit}
+              disabled={isPending || !keyValue.trim()}
+            >
               {t('common.save')}
             </Button>
             <Button
@@ -345,7 +366,12 @@ export function AddProviderCard({ availableProviders, onAdd, isPending }: AddPro
             {keyVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           </button>
         </div>
-        <Button className="w-full" size="sm" onClick={handleConnect} disabled={isPending || !selectedProvider || !apiKey.trim()}>
+        <Button
+          className="w-full"
+          size="sm"
+          onClick={handleConnect}
+          disabled={isPending || !selectedProvider || !apiKey.trim()}
+        >
           {t('engine.connect')}
         </Button>
       </div>

@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BudgetManagement } from '@/components/budget/budget-management'
 import { CostByModel } from '@/components/cost/cost-by-model'
 import { CostByProject } from '@/components/cost/cost-by-project'
@@ -39,11 +39,7 @@ function CostPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SpendLimitCard />
         <div className="flex items-end sm:col-span-1 lg:col-span-3">
-          <Tabs
-            value={period}
-            onValueChange={(v) => setPeriod(v as CostPeriod)}
-            className="w-full"
-          >
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as CostPeriod)} className="w-full">
             <TabsList>
               {PERIODS.map((p) => (
                 <TabsTrigger key={p} value={p}>

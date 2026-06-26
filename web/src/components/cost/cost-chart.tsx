@@ -1,16 +1,8 @@
 import { useTranslation } from 'react-i18next'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCostDaily } from '@/hooks/use-costs'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import { EmptyState } from '@/components/shared/empty-state'
 
 interface Props {
   days?: number
@@ -52,11 +44,7 @@ export function CostChart({ days = 30 }: Props) {
                 formatter={(value) => [`$${Number(value).toFixed(4)}`, t('cost.spend')]}
                 labelStyle={{ fontSize: 12 }}
               />
-              <Bar
-                dataKey="cost_usd"
-                fill="hsl(var(--primary))"
-                radius={[4, 4, 0, 0]}
-              />
+              <Bar dataKey="cost_usd" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

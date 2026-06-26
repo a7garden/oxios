@@ -16,14 +16,18 @@ import { useTranslation } from 'react-i18next'
 import { AgentBudgetBar } from '@/components/agent/agent-budget-bar'
 import { AgentLogs } from '@/components/agent/agent-logs'
 import { ExecutionTrace } from '@/components/agent/execution-trace'
+import { statusBorder, statusDot } from '@/components/shared/status-palette'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useA2AMessages } from '@/hooks/use-a2a'
-import { useAgentDetail, useAgentLogs as useAgentLogsHook, useAgentTrace } from '@/hooks/use-agent-trace'
+import {
+  useAgentDetail,
+  useAgentLogs as useAgentLogsHook,
+  useAgentTrace,
+} from '@/hooks/use-agent-trace'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
-import { statusBorder, statusDot } from '@/components/shared/status-palette'
 import type { MonitorNode } from '@/types/agent-monitor'
 
 interface DetailPanelProps {
@@ -117,7 +121,10 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span
-                    className={cn('h-2.5 w-2.5 shrink-0 rounded-full', statusDot(node.displayStatus))}
+                    className={cn(
+                      'h-2.5 w-2.5 shrink-0 rounded-full',
+                      statusDot(node.displayStatus),
+                    )}
                     aria-hidden="true"
                   />
                   <h2 className="truncate text-lg font-semibold" title={node.name}>
@@ -125,7 +132,10 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                   </h2>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <Badge variant="outline" className={cn('gap-1 text-2xs', statusBorder(node.displayStatus))}>
+                  <Badge
+                    variant="outline"
+                    className={cn('gap-1 text-2xs', statusBorder(node.displayStatus))}
+                  >
                     {node.displayStatus}
                   </Badge>
                   <span className="font-mono text-2xs text-muted-foreground">

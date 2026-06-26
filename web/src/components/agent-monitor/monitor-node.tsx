@@ -7,10 +7,10 @@
  */
 
 import { memo } from 'react'
-import type { MonitorNode as MonitorNodeType } from '@/types/agent-monitor'
 import { Handle, Position } from 'reactflow'
-import { cn } from '@/lib/utils'
 import { statusBorder, statusDot } from '@/components/shared/status-palette'
+import { cn } from '@/lib/utils'
+import type { MonitorNode as MonitorNodeType } from '@/types/agent-monitor'
 
 /** Data injected by the canvas into each React Flow node. */
 export interface MonitorNodeData extends MonitorNodeType {
@@ -47,6 +47,7 @@ function MonitorNodeInner({ data }: { data: MonitorNodeData }) {
   const isRunning = displayStatus === 'running'
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: React Flow custom node container must remain a div to preserve connection handles and DnD
     <div
       className={cn(
         'group relative w-[200px] cursor-pointer rounded-lg border bg-card p-3 shadow-sm',
@@ -110,7 +111,10 @@ function MonitorNodeInner({ data }: { data: MonitorNodeData }) {
             {lifecycle.model_id && (
               <div className="flex items-center justify-between text-2xs">
                 <span className="text-muted-foreground">Model</span>
-                <span className="truncate font-mono text-muted-foreground" title={lifecycle.model_id}>
+                <span
+                  className="truncate font-mono text-muted-foreground"
+                  title={lifecycle.model_id}
+                >
                   {lifecycle.model_id}
                 </span>
               </div>
