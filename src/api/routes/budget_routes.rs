@@ -42,11 +42,15 @@ pub(crate) async fn handle_budget_list(
 
     let all_budgets = state.kernel.agents.all_budget_info();
 
+    // Build a set of agent IDs that already have budgets.
+    let budgeted_ids: std::collections::HashSet<oxios_kernel::AgentId> =
+        all_budgets.iter().map(|b| b.agent_id).collect();
+
     let mut total_tokens_used = 0u64;
     let mut total_tokens_limit = 0u64;
     let mut exhausted_count = 0usize;
 
-    let items: Vec<serde_json::Value> = all_budgets
+    let mut items: Vec<serde_json::Value> = all_budgets
         .into_iter()
         .map(|b| {
             total_tokens_used += b.tokens_used;
@@ -64,6 +68,7 @@ pub(crate) async fn handle_budget_list(
             serde_json::json!({
                 "agent_id": b.agent_id.to_string(),
                 "name": agent_name,
+                "has_budget": true,
                 "budget": {
                     "token_limit": b.token_limit,
                     "tokens_used": b.tokens_used,
@@ -78,6 +83,29 @@ pub(crate) async fn handle_budget_list(
             })
         })
         .collect();
+
+    // Also include running agents that don't have a budget configured yet,
+    // so the user can set one from the UI.
+    for a in &agents {
+        if !budgeted_ids.contains(&a.id) {
+            items.push(serde_json::json!({
+                "agent_id": a.id.to_string(),
+                "name": a.name.clone(),
+                "has_budget": false,
+                "budget": {
+                    "token_limit": 0,
+                    "tokens_used": 0,
+                    "tokens_remaining": 0,
+                    "calls_limit": 0,
+                    "calls_used": 0,
+                    "calls_remaining": 0,
+                    "window_secs": 0,
+                    "window_remaining_secs": 0,
+                    "is_exhausted": false,
+                }
+            }));
+        }
+    }
 
     let summary = serde_json::json!({
         "total_agents": items.len(),

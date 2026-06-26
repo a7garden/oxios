@@ -9,10 +9,10 @@
 //! - **events**: Sessions, SSE events, approvals
 
 mod a2a;
-mod agent_groups;
 mod audit_routes;
 mod budget_routes;
 mod calendar_routes;
+mod cost_routes;
 mod chat;
 mod cron_jobs;
 mod email_routes;
@@ -46,9 +46,6 @@ use crate::api::server::AppState;
 pub(crate) use a2a::{
     handle_a2a_agent_detail, handle_a2a_agents, handle_a2a_messages, handle_a2a_topology,
 };
-pub(crate) use agent_groups::{
-    handle_agent_group_get, handle_agent_group_progress, handle_agent_groups_list,
-};
 pub(crate) use audit_routes::{
     handle_audit_by_agent, handle_audit_entries, handle_audit_export, handle_audit_flush,
     handle_audit_verify,
@@ -61,6 +58,10 @@ pub(crate) use calendar_routes::{
     handle_calendar_event_create, handle_calendar_event_delete, handle_calendar_event_get,
     handle_calendar_event_update, handle_calendar_events, handle_calendar_freebusy,
     handle_calendar_search,
+};
+pub(crate) use cost_routes::{
+    handle_cost_by_model, handle_cost_by_project, handle_cost_daily, handle_cost_providers,
+    handle_cost_spend_limit_get, handle_cost_spend_limit_set, handle_cost_summary,
 };
 pub(crate) use chat::{
     handle_ask_user_respond, handle_chat, handle_chat_stream, handle_chat_ticket,
@@ -76,10 +77,10 @@ pub(crate) use email_routes::{
     handle_email_template_get, handle_email_templates, handle_email_test,
 };
 pub(crate) use engine_routes::{
-    handle_engine_config, handle_engine_models, handle_engine_providers,
-    handle_engine_routing_fallbacks, handle_engine_routing_stats, handle_engine_set_api_key,
-    handle_engine_set_model, handle_engine_set_provider_options, handle_engine_set_routing,
-    handle_engine_validate_key,
+    handle_engine_config, handle_engine_delete_api_key, handle_engine_models,
+    handle_engine_providers, handle_engine_routing_fallbacks, handle_engine_routing_stats,
+    handle_engine_set_api_key, handle_engine_set_model, handle_engine_set_provider_options,
+    handle_engine_set_routing, handle_engine_validate_key,
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
@@ -262,7 +263,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/engine/models", get(handle_engine_models))
         .route("/api/engine/config", get(handle_engine_config))
         .route("/api/engine/model", put(handle_engine_set_model))
-        .route("/api/engine/api-key", put(handle_engine_set_api_key))
+        .route(
+            "/api/engine/api-key",
+            put(handle_engine_set_api_key).delete(handle_engine_delete_api_key),
+        )
         .route(
             "/api/engine/provider-options",
             put(handle_engine_set_provider_options),
@@ -365,13 +369,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/resources", get(handle_resource_snapshot))
         .route("/api/resources/history", get(handle_resource_history))
         .route("/api/resources/overload", get(handle_resource_overload))
-        // Agent Groups
-        .route("/api/agent-groups", get(handle_agent_groups_list))
-        .route("/api/agent-groups/{id}", get(handle_agent_group_get))
-        .route(
-            "/api/agent-groups/{id}/progress",
-            get(handle_agent_group_progress),
-        )
         // A2A Monitor
         .route("/api/a2a/agents", get(handle_a2a_agents))
         .route("/api/a2a/agents/{id}", get(handle_a2a_agent_detail))
@@ -486,6 +483,16 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             post(handle_budget_reserve),
         )
         .route("/api/budget/{agent_id}/reset", post(handle_budget_reset))
+        // Costs — dollar-based spend views over agent_log_db
+        .route("/api/costs/summary", get(handle_cost_summary))
+        .route("/api/costs/by-model", get(handle_cost_by_model))
+        .route("/api/costs/by-project", get(handle_cost_by_project))
+        .route("/api/costs/daily", get(handle_cost_daily))
+        .route("/api/costs/providers", get(handle_cost_providers))
+        .route(
+            "/api/costs/spend-limit",
+            get(handle_cost_spend_limit_get).put(handle_cost_spend_limit_set),
+        )
         // Knowledge
         .route("/api/knowledge/tree", get(handle_knowledge_tree))
         // Knowledge — file CRUD + git sub-paths unified under one catch-all.

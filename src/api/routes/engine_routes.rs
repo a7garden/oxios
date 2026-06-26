@@ -50,8 +50,16 @@ pub struct SetProviderOptionsRequest {
 pub struct ValidateKeyRequest {
     /// Provider name.
     pub provider: String,
-    /// API key to validate.
+    /// API key to validate. When empty, validates the stored key.
+    #[serde(default)]
     pub api_key: String,
+}
+
+/// Query params for DELETE /api/engine/api-key
+#[derive(Debug, Deserialize)]
+pub struct DeleteKeyQuery {
+    /// Provider name whose key should be deleted.
+    pub provider: String,
 }
 
 /// Request body for PUT /api/engine/routing
@@ -166,6 +174,32 @@ pub(crate) async fn handle_engine_set_api_key(
     })))
 }
 
+/// DELETE /api/engine/api-key — Delete a provider's API key entirely.
+///
+/// Removes the key from the credential store (`~/.oxi/auth.json`) and
+/// config.toml. Keys sourced from environment variables cannot be
+/// removed this way — the caller should check the credential source first.
+pub(crate) async fn handle_engine_delete_api_key(
+    state: State<Arc<AppState>>,
+    Query(params): Query<DeleteKeyQuery>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    if params.provider.is_empty() {
+        return Err(AppError::BadRequest("provider is required".into()));
+    }
+
+    state
+        .kernel
+        .engine
+        .delete_api_key(&params.provider)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    tracing::info!(provider = %params.provider, "API key deleted");
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "provider": params.provider,
+    })))
+}
+
 /// PUT /api/engine/provider-options — Update provider-specific options.
 pub(crate) async fn handle_engine_set_provider_options(
     state: State<Arc<AppState>>,
@@ -191,10 +225,11 @@ pub(crate) async fn handle_engine_validate_key(
         return Err(AppError::BadRequest("provider is required".into()));
     }
 
-    let result = state
-        .kernel
-        .engine
-        .validate_key(&body.provider, &body.api_key);
+    let result = if body.api_key.is_empty() {
+        state.kernel.engine.validate_stored_key(&body.provider).await
+    } else {
+        state.kernel.engine.validate_key(&body.provider, &body.api_key).await
+    };
     Ok(Json(serde_json::json!(result)))
 }
 

@@ -431,9 +431,18 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // RFC-015: also forward real-time kernel events (tool execution, token
     // usage, memory recall, reasoning fragments) as WS chunks so the
     // frontend can show live progress.
-    let mut recv_task = {
+    // The connection's three concurrent halves (recv / send / keepalive) run in
+    // one JoinSet so teardown can drain each task exactly once. The previous
+    // form spawned three JoinHandles and polled them by `&mut` inside a
+    // `select!`, then `.await`ed them again to drain — the winning handle was
+    // double-polled, panicking "JoinHandle polled after completion". Under the
+    // release profile (`panic = "abort"`) that aborts the whole daemon on every
+    // WebSocket close. JoinSet removes a task as it yields it, so this is
+    // structurally impossible to re-trigger.
+    let mut set: tokio::task::JoinSet<()> = tokio::task::JoinSet::new();
+    set.spawn({
         let ws_tx = ws_tx.clone();
-        tokio::spawn(async move {
+        async move {
             // Track the active session so we only forward events tagged with it.
             // Multi-turn conversations keep the same session_id across messages.
             let mut active_session_id: Option<String> = None;
@@ -623,16 +632,16 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     }
                 }
             }
-        })
-    };
+        }
+    });
 
     // ── Receive from WebSocket client → gateway ──
     //
     // Frontend sends JSON:
     //   `{ type: "message", content: "...", session_id?, project_id? }`
-    let mut send_task = {
+    set.spawn({
         let pong_signal = pong_signal.clone();
-        tokio::spawn(async move {
+        async move {
             while let Some(Ok(msg)) = FuturesStreamExt::next(&mut ws_rx).await {
                 match msg {
                     Message::Text(text) => {
@@ -803,19 +812,19 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     _ => {}
                 }
             }
-        })
-    };
+        }
+    });
 
     // RFC-024 SP2 (B3): dedicated keepalive task. Sends an empty Ping
     // every 20 s; if no Pong arrives within 60 s of the most recent
     // activity (ping OR pong), the connection is treated as dead — the
     // most common cause is a NAT / proxy / load-balancer silently
     // closing the idle TCP socket.
-    let mut keepalive_task = {
+    set.spawn({
         let ws_tx = ws_tx.clone();
         let pong_signal = pong_signal.clone();
         let keepalive_timed_out = keepalive_timed_out.clone();
-        tokio::spawn(async move {
+        async move {
             let ping_interval = std::time::Duration::from_secs(20);
             let pong_timeout = std::time::Duration::from_secs(60);
             let mut ticker = tokio::time::interval(ping_interval);
@@ -856,33 +865,24 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     }
                 }
             }
-        })
-    };
-    // F7: when any side finishes, abort the others so the broadcast
-    // subscribers and WebSocket half are released promptly. Without
-    // this, a client that stops reading but leaves the socket
-    // half-open lets the recv_task block forever on
-    // `ws_tx.send().await`, leaking a broadcast subscriber and its
-    // buffer per abandoned connection — a trivial memory /
+        }
+    });
+    // F7: when any side finishes, tear the connection down so the broadcast
+    // subscribers and WebSocket half are released promptly. Without this, a
+    // client that stops reading but leaves the socket half-open lets a recv or
+    // send task block forever on `ws_tx.send().await`, leaking a broadcast
+    // subscriber and its buffer per abandoned connection — a trivial memory /
     // subscriber-exhaustion DoS.
-    tokio::select! {
-        _ = &mut recv_task => {
-            send_task.abort();
-            keepalive_task.abort();
-        }
-        _ = &mut send_task => {
-            recv_task.abort();
-            keepalive_task.abort();
-        }
-        _ = &mut keepalive_task => {
-            recv_task.abort();
-            send_task.abort();
-        }
-    }
-    // Drain all three handles so no task is leaked.
-    let _ = recv_task.await;
-    let _ = send_task.await;
-    let _ = keepalive_task.await;
+    //
+    // The first task to finish triggers teardown; `abort_all()` cancels the two
+    // survivors, and the drain loop collects each exactly once (each resolves
+    // to `Err(JoinError::Cancelled)`). `join_next()` removes a task as it
+    // yields it, so no handle is ever polled twice — the double-poll panic that
+    // the old `select! { &mut task }` + `task.await` drain caused is now
+    // structurally impossible.
+    let _ = set.join_next().await;
+    set.abort_all();
+    while set.join_next().await.is_some() {}
     // RFC-024 §11: pick the close label. The keepalive task sets the
     // flag only when it bailed because the pong deadline elapsed; the
     // peer-driven path (client sent `Message::Close` or the socket

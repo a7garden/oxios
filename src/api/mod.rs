@@ -10,6 +10,7 @@ pub mod error;
 pub mod format;
 pub mod middleware;
 pub mod persona_routes;
+pub mod quota;
 pub mod plugin;
 pub mod routes;
 pub mod server;

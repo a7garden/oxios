@@ -482,6 +482,24 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "question": question,
             "options": options,
         }),
+        KernelEvent::PersonaCreated {
+            id,
+            name,
+            enabled,
+            source,
+        } => serde_json::json!({
+            "type": "persona_created",
+            "id": id,
+            "name": name,
+            "enabled": enabled,
+            "source": source,
+        }),
+        KernelEvent::PersonaUpdated { id, name, source } => serde_json::json!({
+            "type": "persona_updated",
+            "id": id,
+            "name": name,
+            "source": source,
+        }),
     };
     // Merge payload into base
     if let serde_json::Value::Object(mut map) = base {

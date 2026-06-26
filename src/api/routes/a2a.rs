@@ -172,6 +172,7 @@ pub(crate) async fn handle_a2a_topology(
             let last = last_seen.get(&a.agent_id).map(|t| t.to_rfc3339());
             serde_json::json!({
                 "id": a.name,
+                "agent_id": a.agent_id.to_string(),
                 "label": a.name,
                 "status": format!("{:?}", a.status).to_lowercase(),
                 "capabilities": a.capabilities,
