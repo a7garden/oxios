@@ -1,4 +1,4 @@
-import { BarChart3, ChevronLeft, ChevronRight, Dumbbell, Smile } from 'lucide-react'
+import { BarChart3, ChevronLeft, ChevronRight, Smile } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -240,7 +240,7 @@ export function Habits() {
   const { data: habits, isLoading } = useKnowledgeHabits(year)
 
   if (isLoading) {
-    return <div className="p-6 text-muted-foreground">{t('knowledge.loadingHabits')}</div>
+    return <div className="py-6 text-muted-foreground">{t('knowledge.loadingHabits')}</div>
   }
 
   const habitsData = habits as HabitMap | undefined
@@ -254,33 +254,27 @@ export function Habits() {
   })
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Dumbbell className="h-5 w-5" />
-          {t('knowledge.habits')}
-        </h2>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setYear((y) => y - 1)}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium w-12 text-center">{year}</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setYear((y) => Math.min(y + 1, currentYear))}
-            disabled={year >= currentYear}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="space-y-4">
+      {/* Year navigation */}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setYear((y) => y - 1)}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm font-medium w-12 text-center">{year}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setYear((y) => Math.min(y + 1, currentYear))}
+          disabled={year >= currentYear}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Legend */}

@@ -964,6 +964,20 @@ export function useSetApiKey() {
       api.put('/api/engine/api-key', { provider, api_key: apiKey }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['engine', 'config'] })
+      qc.invalidateQueries({ queryKey: ['engine', 'providers'] })
+    },
+  })
+}
+
+/** Delete a provider's API key entirely. */
+export function useDeleteApiKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (provider: string) =>
+      api.delete(`/api/engine/api-key?provider=${encodeURIComponent(provider)}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['engine', 'config'] })
+      qc.invalidateQueries({ queryKey: ['engine', 'providers'] })
     },
   })
 }

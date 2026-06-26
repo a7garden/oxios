@@ -2,12 +2,12 @@ import { PanelRightClose } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   useKnowledgeBacklinks,
   useKnowledgeFileHistory,
   useKnowledgeFileRestore,
 } from '@/hooks/use-knowledge'
-import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { Copilot } from './copilot'
 import { LinkGraph } from './link-graph'
@@ -28,29 +28,31 @@ export function InfoPanel() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b">
         <span className="text-sm font-medium">{t('knowledge.info')}</span>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleInfoPanel}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={toggleInfoPanel}
+          aria-label={t('common.close')}
+        >
           <PanelRightClose className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b">
-        {(['backlinks', 'copilot', 'graph', 'history'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={cn(
-              'flex-1 px-2 py-1.5 text-xs font-medium transition-colors capitalize',
-              tab === t
-                ? 'text-foreground border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as Tab)}
+        className="shrink-0 px-2 pt-2 border-b"
+      >
+        <TabsList className="w-full">
+          {(['backlinks', 'copilot', 'graph', 'history'] as Tab[]).map((tabValue) => (
+            <TabsTrigger key={tabValue} value={tabValue} className="capitalize">
+              {tabValue}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">

@@ -204,12 +204,12 @@ const linkClickHandler = EditorView.domEventHandlers({
 // ─────────────────────────────────────────────────────────────────────────
 const baseTheme = EditorView.theme({
   '&': {
-    fontSize: '14px',
+    fontSize: 'var(--editor-font-size, 0.875rem)',
     height: '100%',
   },
   '.cm-scroller': {
-    fontFamily:
-      'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    fontFamily: 'var(--editor-font-mono, ui-monospace, monospace)',
+    lineHeight: 'var(--editor-line-height, 1.7)',
   },
   '.cm-content': {
     padding: '12px 8px',

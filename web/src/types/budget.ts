@@ -15,6 +15,7 @@ export interface BudgetData {
 export interface AgentBudget {
   agent_id: string
   name?: string
+  has_budget?: boolean
   budget: BudgetData
 }
 

@@ -155,6 +155,14 @@
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
   --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
   --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.08);
+  /* ── Knowledge editor typography ───────────────────────────
+     Semantic tokens for the CodeMirror markdown editor. Wired to
+     the design system's Geist Mono family + sm font-size so the
+     editor participates in the token hierarchy rather than
+     hardcoding px/monospace strings. */
+  --editor-font-size: 0.875rem; /* 14px — typography.fontSize.sm */
+  --editor-line-height: 1.7; /* relaxed prose editing */
+  --editor-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 .dark {
@@ -217,6 +225,13 @@
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
   --shadow-md: 0 2px 8px oklch(0 0 0 / 0.3);
   --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.4);
+}
+/* ── Mobile: bump editor font-size for touch readability ──── */
+@media (max-width: 767px) {
+  :root {
+    --editor-font-size: 0.9375rem; /* 15px */
+    --editor-line-height: 1.65;
+  }
 }
 
 @layer base {

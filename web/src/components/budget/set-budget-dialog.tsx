@@ -32,9 +32,16 @@ export function SetBudgetDialog({
   const targetId = agent?.agent_id ?? agentId ?? ''
   const displayName = agent?.name || `${targetId.slice(0, 12)}...`
 
-  const [tokenBudget, setTokenBudget] = useState(agent?.budget.token_limit?.toString() ?? '50000')
-  const [callsBudget, setCallsBudget] = useState(agent?.budget.calls_limit?.toString() ?? '100')
-  const [windowSecs, setWindowSecs] = useState(agent?.budget.window_secs?.toString() ?? '3600')
+  const hasBudget = agent?.has_budget !== false && (agent?.budget.token_limit ?? 0) > 0
+  const [tokenBudget, setTokenBudget] = useState(
+    hasBudget ? agent!.budget.token_limit.toString() : '50000',
+  )
+  const [callsBudget, setCallsBudget] = useState(
+    hasBudget ? agent!.budget.calls_limit.toString() : '100',
+  )
+  const [windowSecs, setWindowSecs] = useState(
+    hasBudget ? agent!.budget.window_secs.toString() : '3600',
+  )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

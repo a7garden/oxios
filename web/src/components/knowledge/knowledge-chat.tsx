@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import {
   useChatAppend,
   useChatDelete,
@@ -530,17 +531,13 @@ export function KnowledgeChat() {
       {/* Input area */}
       <div className="border-t p-3 shrink-0">
         <div className="flex gap-2 items-end">
-          <textarea
+          <Textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('knowledge.chatPlaceholder')}
-            className={cn(
-              'flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm',
-              'focus:outline-none focus:ring-1 focus:ring-primary',
-              'max-h-40 overflow-y-auto',
-            )}
+            className="flex-1 resize-none min-h-0 max-h-40 overflow-y-auto bg-background"
             rows={1}
           />
           <Button

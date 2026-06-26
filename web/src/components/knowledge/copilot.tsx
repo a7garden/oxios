@@ -2,6 +2,7 @@ import { Bot, ExternalLink, Send } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { useKnowledgeCopilot } from '@/hooks/use-knowledge'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
@@ -44,12 +45,12 @@ export function Copilot() {
           <span className="text-sm font-medium">{t('knowledge.copilot')}</span>
         </div>
         <div className="flex gap-2">
-          <textarea
+          <Textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('knowledge.copilotPlaceholder')}
-            className="flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            className="flex-1 resize-none bg-background"
             rows={2}
           />
           <Button onClick={handleAsk} disabled={!question.trim() || copilot.isPending} size="icon">

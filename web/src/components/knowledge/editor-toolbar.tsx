@@ -47,11 +47,11 @@ export function EditorToolbar() {
   }, [handleSave])
 
   return (
-    <div className="flex items-center gap-1 px-3 py-1.5 border-b bg-muted/30 min-h-[40px]">
+    <div className="flex items-center gap-1 px-3 py-1.5 border-b bg-muted/30 min-h-[44px]">
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7"
+        className="h-8 w-8"
         onClick={() => goBack()}
         disabled={!canGoBack}
         title={t('knowledge.goBack')}
@@ -61,7 +61,7 @@ export function EditorToolbar() {
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7"
+        className="h-8 w-8"
         onClick={() => goForward()}
         disabled={!canGoForward}
         title={t('knowledge.goForward')}
@@ -80,9 +80,9 @@ export function EditorToolbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-8 w-8"
               onClick={handleSave}
-              title={t('common.save')}
+              aria-label={t('common.save')}
             >
               <Save className="h-4 w-4" />
             </Button>
@@ -98,9 +98,9 @@ export function EditorToolbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-8 w-8 hidden md:inline-flex"
               onClick={() => openSplit(currentFilePath)}
-              title={t('knowledge.openSplitView')}
+              aria-label={t('knowledge.openSplitView')}
             >
               <Columns2 className="h-4 w-4" />
             </Button>
@@ -116,9 +116,9 @@ export function EditorToolbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-8 w-8"
               onClick={closeSplit}
-              title={t('knowledge.closeSplit')}
+              aria-label={t('knowledge.closeSplit')}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -133,9 +133,9 @@ export function EditorToolbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-8 w-8"
             onClick={toggleInfoPanel}
-            title={t('knowledge.toggleInfoPanel')}
+            aria-label={t('knowledge.toggleInfoPanel')}
           >
             <PanelRight className="h-4 w-4" />
           </Button>

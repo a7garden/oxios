@@ -36,10 +36,29 @@ export function AgentBudgetCard({
   const { t } = useTranslation()
   const b = agent.budget
   const name = agent.name || `${agent.agent_id.slice(0, 12)}...`
+  const noBudget = agent.has_budget === false
 
   const tokenPct = b.token_limit > 0 ? Math.min(100, (b.tokens_used / b.token_limit) * 100) : 0
   const callPct = b.calls_limit > 0 ? Math.min(100, (b.calls_used / b.calls_limit) * 100) : 0
 
+  if (noBudget) {
+    return (
+      <Card className="border-dashed">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+            <span className="font-mono">{name}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">{t('budget.noBudgetSet')}</p>
+          <Button size="sm" variant="outline" onClick={() => onEdit(agent)}>
+            {t('budget.setBudget')}
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
   return (
     <Card className={b.is_exhausted ? 'border-error/50' : ''}>
       <CardHeader className="pb-2">

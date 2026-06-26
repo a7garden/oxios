@@ -1,13 +1,12 @@
 import { useNavigate } from '@tanstack/react-router'
 import type { TFunction } from 'i18next'
 import { Bell, Check, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EventDetail } from '@/components/calendar/event-detail'
 import { EventEditor } from '@/components/calendar/event-editor'
 import { MiniCalendar } from '@/components/calendar/mini-calendar'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   useCalendarCreate,
   useCalendarDelete,
@@ -15,30 +14,35 @@ import {
   useCalendarUpdate,
 } from '@/hooks/use-calendar'
 import { cn } from '@/lib/utils'
-import { type CenterTab, useNotificationCenter } from '@/stores/notification-center'
+import { useNotificationCenter } from '@/stores/notification-center'
 import {
   type Notification,
   type NotificationSeverity,
   useNotificationStore,
 } from '@/stores/notifications'
+import { useHour12 } from '@/stores/ui-prefs'
 import type { CalendarEvent, CreateEventRequest, UpdateEventRequest } from '@/types/calendar'
 
-// ─── Notifications-tab helpers (ported from the old inline bell dropdown) ──
+// ─── Notification helpers (ported from the old inline bell dropdown) ──────
 
 const SEVERITY_DOT: Record<NotificationSeverity, string> = {
   info: 'bg-info',
   warning: 'bg-warning',
-  error: 'bg-error',
+  error: 'bg-destructive',
   success: 'bg-success',
 }
 
 /** i18n-aware relative time formatter. */
 function timeAgo(iso: string, t: TFunction): string {
   const diff = Date.now() - new Date(iso).getTime()
-  if (diff < 60_000) return t('common.justNow', 'just now')
-  if (diff < 3_600_000) return t('common.minutesAgo', { count: Math.floor(diff / 60_000) })
-  if (diff < 86_400_000) return t('common.hoursAgo', { count: Math.floor(diff / 3_600_000) })
-  return t('common.daysAgo', { count: Math.floor(diff / 86_400_000) })
+  const sec = Math.floor(diff / 1000)
+  if (sec < 60) return t('common.justNow')
+  const min = Math.floor(sec / 60)
+  if (min < 60) return t('common.minutesAgo', { count: min })
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return t('common.hoursAgo', { count: hr })
+  const day = Math.floor(hr / 24)
+  return t('common.daysAgo', { count: day })
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────
@@ -54,31 +58,31 @@ function isSameDay(a: Date, b: Date): boolean {
 /** First cell (Sunday) of the 6×7 grid for the month of `anchor`. */
 function gridStart(anchor: Date): Date {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
-  return new Date(first.getFullYear(), first.getMonth(), first.getDate() - first.getDay())
+  const start = new Date(first)
+  start.setDate(start.getDate() - first.getDay())
+  return start
 }
 
 /** `YYYY-MM-DD` local key (own local time, no TZ shift). */
 function dateKey(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 // ─── Shell ─────────────────────────────────────────────────────────────────
 
 /**
- * Notification Center — macOS-style right slide-over unifying the schedule
- * (calendar) and the notification feed behind two tabs.
+ * Notification Center — macOS-style right slide-over.
  *
- * Always mounted (so the slide transition can play on close); the tab content
- * is cheap enough to keep warm, giving instant data when opened.
+ * A single unified scrolling view: calendar widget at the top, notification
+ * cards stacked below. No tabs. Frosted-glass panel, rounded cards.
  */
 export function NotificationCenter() {
   const { t } = useTranslation()
   const open = useNotificationCenter((s) => s.open)
-  const activeTab = useNotificationCenter((s) => s.activeTab)
-  const setTab = useNotificationCenter((s) => s.setTab)
   const closeCenter = useNotificationCenter((s) => s.closeCenter)
-  const unreadCount = useNotificationStore((s) => s.unreadCount)
+
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   // Escape closes — only while open.
   useEffect(() => {
@@ -90,10 +94,12 @@ export function NotificationCenter() {
     return () => document.removeEventListener('keydown', onKey)
   }, [open, closeCenter])
 
-  const tabs: { id: CenterTab; label: string; badge?: number }[] = [
-    { id: 'schedule', label: t('notificationCenter.schedule') },
-    { id: 'notifications', label: t('notificationCenter.notifications'), badge: unreadCount },
-  ]
+  // Reset scroll to top when the panel opens.
+  useEffect(() => {
+    if (!open) return
+    const id = requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: 0 }))
+    return () => cancelAnimationFrame(id)
+  }, [open])
 
   return (
     <>
@@ -109,62 +115,44 @@ export function NotificationCenter() {
         )}
       />
 
-      {/* Slide-over panel */}
+      {/* Slide-over panel — frosted glass like macOS NC */}
       <aside
         role="dialog"
         aria-modal="false"
         aria-label={t('notificationCenter.title')}
         className={cn(
           'fixed inset-y-0 right-0 z-50 flex w-[380px] max-w-[calc(100vw-1.5rem)] flex-col',
-          'border-l bg-background shadow-2xl',
+          'border-l border-border/50 bg-background/80 backdrop-blur-xl shadow-2xl',
           'transition-transform duration-300 ease-[var(--animate-in-easing)] will-change-transform',
           'pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
           open ? 'translate-x-0' : 'pointer-events-none translate-x-full',
         )}
       >
-        {/* Header: tabs */}
-        <div className="flex items-center gap-1 border-b px-3 py-2">
-          <div className="flex flex-1 items-center gap-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setTab(tab.id)}
-                className={cn(
-                  'relative rounded-md px-3 py-1.5 text-sm transition-colors',
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                  activeTab === tab.id
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent/50',
-                )}
-              >
-                {tab.label}
-                {tab.badge ? (
-                  <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-bold text-destructive-foreground">
-                    {tab.badge > 99 ? '99+' : tab.badge}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={closeCenter}>
+        {/* Title bar */}
+        <div className="flex items-center justify-between px-4 py-3">
+          <h2 className="text-sm font-semibold tracking-tight">{t('notificationCenter.title')}</h2>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={closeCenter}>
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        {/* Body */}
-        <ScrollArea className="flex-1 min-h-0">
-          {activeTab === 'schedule' ? <ScheduleTab /> : <NotificationsTab />}
-        </ScrollArea>
+        {/* Unified scroll view — calendar widget on top, notifications below */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3 pb-4">
+          <ScheduleWidget />
+          <div className="mt-4">
+            <NotificationsSection />
+          </div>
+        </div>
       </aside>
     </>
   )
 }
 
-// ─── Schedule tab ──────────────────────────────────────────────────────────
+// ─── Schedule widget (calendar card) ──────────────────────────────────────
 
-function ScheduleTab() {
+function ScheduleWidget() {
   const { t, i18n } = useTranslation()
+  const hour12 = useHour12()
   const now = useMemo(() => new Date(), [])
   const [viewAnchor, setViewAnchor] = useState(() => new Date())
   const [selectedDate, setSelectedDate] = useState<Date>(now)
@@ -229,7 +217,8 @@ function ScheduleTab() {
   })
 
   return (
-    <div className="space-y-3 p-3">
+    // ── Calendar widget card ──
+    <div className="rounded-2xl border border-border/40 bg-card/50 p-3 shadow-sm">
       <MiniCalendar
         events={events}
         viewAnchor={viewAnchor}
@@ -240,7 +229,7 @@ function ScheduleTab() {
 
       {/* Next event banner */}
       {nextEvent && (
-        <div className="rounded-lg border bg-accent/30 px-3 py-2">
+        <div className="mt-3 rounded-xl bg-accent/40 px-3 py-2">
           <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
             {t('notificationCenter.nextEvent')}
           </p>
@@ -251,13 +240,14 @@ function ScheduleTab() {
               day: 'numeric',
               hour: '2-digit',
               minute: '2-digit',
+              hour12,
             })}
           </p>
         </div>
       )}
 
-      {/* Agenda for selected day */}
-      <div>
+      {/* Day agenda */}
+      <div className="mt-3">
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">
             {isToday ? t('calendar.today') : selectedLabel}
@@ -279,13 +269,13 @@ function ScheduleTab() {
             {t('notificationCenter.noUpcoming')}
           </p>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {dayEvents.map((ev) => (
               <button
                 key={ev.uid}
                 type="button"
                 onClick={() => setDetailEvent(ev)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <span
                   className={cn(
@@ -303,6 +293,7 @@ function ScheduleTab() {
                     : new Date(ev.start).toLocaleTimeString(i18n.language, {
                         hour: '2-digit',
                         minute: '2-digit',
+                        hour12,
                       })}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm">{ev.title}</span>
@@ -340,9 +331,9 @@ function ScheduleTab() {
   )
 }
 
-// ─── Notifications tab ────────────────────────────────────────────────────
+// ─── Notifications section ────────────────────────────────────────────────
 
-function NotificationsTab() {
+function NotificationsSection() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const closeCenter = useNotificationCenter((s) => s.closeCenter)
@@ -362,32 +353,37 @@ function NotificationsTab() {
   }
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-xs text-muted-foreground">
-          {unreadCount > 0 ? t('notifications.unreadCount', { count: unreadCount }) : null}
+    <div>
+      {/* Section header */}
+      <div className="mb-2 flex items-center justify-between px-1">
+        <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {t('notificationCenter.notifications')}
         </span>
         {unreadCount > 0 && (
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={markAllRead}>
-            <Check className="mr-1 h-3 w-3" /> {t('notifications.markAllRead')}
-          </Button>
+          <button
+            type="button"
+            onClick={markAllRead}
+            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+          >
+            <Check className="h-3 w-3" /> {t('notifications.markAllRead')}
+          </button>
         )}
       </div>
 
       {notifications.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
-          <Bell className="h-8 w-8 opacity-30" />
-          <p className="text-sm">{t('notifications.noNotifications')}</p>
+        <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
+          <Bell className="h-7 w-7 opacity-25" />
+          <p className="text-xs">{t('notifications.noNotifications')}</p>
         </div>
       ) : (
-        <div className="divide-y">
+        <div className="space-y-2">
           {notifications.map((n) => (
-            // biome-ignore lint/a11y/useSemanticElements: nested dismiss button; div is correct
+            // biome-ignore lint/a11y/useSemanticElements: card with nested dismiss button
             <div
               key={n.id}
               className={cn(
-                'group flex gap-2 px-3 py-2.5 transition-all cursor-pointer hover:bg-accent/50',
-                !n.read && 'bg-accent/20',
+                'group relative cursor-pointer overflow-hidden rounded-2xl border border-border/40 p-3 shadow-sm transition-all hover:bg-card/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                !n.read ? 'bg-card/70' : 'bg-card/40',
               )}
               onClick={() => handleClick(n)}
               role="button"
@@ -396,23 +392,32 @@ function NotificationsTab() {
                 if (e.key === 'Enter') handleClick(n)
               }}
             >
-              <div
-                className={cn('mt-0.5 h-2 w-2 shrink-0 rounded-full', SEVERITY_DOT[n.severity])}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium leading-tight">{n.title}</p>
-                {n.message && (
-                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.message}</p>
-                )}
-                <p className="mt-1 text-2xs text-muted-foreground/60">{timeAgo(n.timestamp, t)}</p>
+              {/* Unread accent bar */}
+              {!n.read && <span className="absolute inset-y-0 left-0 w-0.5 bg-primary" />}
+
+              <div className="flex gap-2.5 pl-1">
+                <div
+                  className={cn('mt-0.5 h-2 w-2 shrink-0 rounded-full', SEVERITY_DOT[n.severity])}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium leading-tight">{n.title}</p>
+                  {n.message && (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.message}</p>
+                  )}
+                  <p className="mt-1 text-2xs text-muted-foreground/60">
+                    {timeAgo(n.timestamp, t)}
+                  </p>
+                </div>
               </div>
+
+              {/* Dismiss — appears on hover */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
                   dismiss(n.id)
                 }}
-                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                className="absolute right-2 top-2 rounded-full bg-background/60 p-0.5 text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100"
                 aria-label={t('common.dismiss')}
               >
                 <X className="h-3 w-3" />

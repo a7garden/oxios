@@ -1,130 +1,80 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Plus, Wallet } from 'lucide-react'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
-import { AgentBudgetCard } from '@/components/budget/agent-budget-card'
-import { BudgetSummaryCard } from '@/components/budget/budget-summary'
-import { SetBudgetDialog } from '@/components/budget/set-budget-dialog'
-import { EmptyState } from '@/components/shared/empty-state'
-import { ErrorState } from '@/components/shared/error-state'
-import { LoadingCards } from '@/components/shared/loading'
+import { useState } from 'react'
+import { BudgetManagement } from '@/components/budget/budget-management'
+import { CostByModel } from '@/components/cost/cost-by-model'
+import { CostByProject } from '@/components/cost/cost-by-project'
+import { CostChart } from '@/components/cost/cost-chart'
+import { CostSummaryCards } from '@/components/cost/cost-summary'
+import { ProviderQuotaCards } from '@/components/cost/provider-quota-cards'
+import { SpendLimitCard } from '@/components/cost/spend-limit-card'
 import { RefreshButton } from '@/components/shared/refresh-button'
-import { Button } from '@/components/ui/button'
-import { useBudgetDelete, useBudgetList, useBudgetReset, useBudgetSet } from '@/hooks/use-budget'
-import type { AgentBudget } from '@/types/budget'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useCostSummary } from '@/hooks/use-costs'
+import type { CostPeriod } from '@/types/cost'
 
-export const Route = createFileRoute('/budget')({ component: BudgetPage })
+export const Route = createFileRoute('/budget')({ component: CostPage })
 
-function BudgetPage() {
+const PERIODS: CostPeriod[] = ['today', 'week', 'month', 'all']
+
+function CostPage() {
   const { t } = useTranslation()
-  const { data, isLoading, isError, refetch, isFetching } = useBudgetList()
-
-  const setMutation = useBudgetSet()
-  const deleteMutation = useBudgetDelete()
-  const resetMutation = useBudgetReset()
-
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingAgent, setEditingAgent] = useState<AgentBudget | null>(null)
-  const [newAgentId, setNewAgentId] = useState('')
-
-  if (isLoading) return <LoadingCards count={4} />
-  if (isError) return <ErrorState onRetry={() => refetch()} />
-
-  const agents = Array.isArray(data?.agents) ? data.agents : []
-  const summary = data?.summary ?? {
-    total_agents: 0,
-    total_tokens_used: 0,
-    total_tokens_limit: 0,
-    exhausted_agents: 0,
-  }
-
-  const handleEdit = (agent: AgentBudget) => {
-    setEditingAgent(agent)
-    setNewAgentId('')
-    setDialogOpen(true)
-  }
-
-  const handleNewBudget = () => {
-    setEditingAgent(null)
-    setNewAgentId('')
-    setDialogOpen(true)
-  }
-
-  const handleSubmit = (params: {
-    agentId: string
-    token_budget: number
-    calls_budget: number
-    window_secs: number
-  }) => {
-    setMutation.mutate(params, {
-      onSuccess: () => toast.success(t('budget.setSuccess')),
-      onError: (e: unknown) => toast.error(e instanceof Error ? e.message : t('common.error')),
-    })
-  }
-
-  const handleReset = (agentId: string) => {
-    resetMutation.mutate(agentId, {
-      onSuccess: () => toast.success(t('budget.resetSuccess')),
-    })
-  }
-
-  const handleRemove = (agentId: string) => {
-    deleteMutation.mutate(agentId, {
-      onSuccess: () => toast.success(t('budget.removeSuccess')),
-    })
-  }
+  const [period, setPeriod] = useState<CostPeriod>('month')
+  const { refetch, isFetching } = useCostSummary(period)
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('budget.title')}</h1>
-          <p className="text-muted-foreground">{t('budget.subtitle')}</p>
+          <h1 className="text-2xl font-bold">{t('cost.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('cost.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={handleNewBudget} className="gap-1.5">
-            <Plus className="h-4 w-4" /> {t('budget.setBudget')}
-          </Button>
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
         </div>
       </div>
 
-      {/* Summary */}
-      <BudgetSummaryCard summary={summary} />
-
-      {/* Agent Budgets */}
-      {agents.length === 0 ? (
-        <EmptyState
-          icon={<Wallet className="h-10 w-10" />}
-          title={t('budget.noBudgetData')}
-          description={t('budget.noBudgetDataDescription')}
-        />
-      ) : (
-        <div className="space-y-3">
-          {agents.map((agent) => (
-            <AgentBudgetCard
-              key={agent.agent_id}
-              agent={agent}
-              onEdit={handleEdit}
-              onReset={handleReset}
-              onRemove={handleRemove}
-              isResetting={resetMutation.isPending}
-              isRemoving={deleteMutation.isPending}
-            />
-          ))}
+      {/* Spend limit + period selector */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <SpendLimitCard />
+        <div className="flex items-end sm:col-span-1 lg:col-span-3">
+          <Tabs
+            value={period}
+            onValueChange={(v) => setPeriod(v as CostPeriod)}
+            className="w-full"
+          >
+            <TabsList>
+              {PERIODS.map((p) => (
+                <TabsTrigger key={p} value={p}>
+                  {t(`cost.period.${p}`)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
-      )}
+      </div>
 
-      {/* Set Budget Dialog */}
-      <SetBudgetDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        agent={editingAgent}
-        agentId={newAgentId || undefined}
-        onSubmit={handleSubmit}
-        isPending={setMutation.isPending}
-      />
+      {/* Summary stat cards */}
+      <CostSummaryCards period={period} />
+
+      {/* Daily spend chart */}
+      <CostChart days={30} />
+
+      {/* Breakdowns */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <CostByModel period={period} />
+        <CostByProject period={period} />
+      </div>
+
+      {/* Provider panel — all configured providers + quota data */}
+      <ProviderQuotaCards />
+
+      {/* Agent budget management — token/call rate limits */}
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">{t('budget.title')}</h2>
+        <BudgetManagement />
+      </div>
     </div>
   )
 }

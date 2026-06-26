@@ -13,9 +13,9 @@ export function EditorPanel() {
   const writeFile = useWriteFile()
 
   return (
-    <div className="flex flex-1 min-w-0">
+    <div className="flex flex-col md:flex-row flex-1 min-w-0">
       {/* Main editor */}
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <EditorToolbar />
         <div className="flex-1 overflow-hidden">
           {isLoading ? (

@@ -54,6 +54,8 @@ export interface ProviderInfo {
   category: ProviderCategory
   /** Whether an API key is detected (env or auth store) */
   hasKey: boolean
+  /** Source of the API key: env, auth_store, config, or none */
+  keySource?: string
   /** Number of available models */
   modelCount: number
   /** Short description for tooltips / help text. Optional for

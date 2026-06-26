@@ -43,7 +43,7 @@ export interface FormattedEvent {
 function routeFromEvent(event: OxiosEvent): string | undefined {
   const type = event.type
   if (type === 'approval_requested' || type === 'approval_resolved') {
-    return '/approvals'
+    return '/'
   }
   if (
     type === 'agent_created' ||

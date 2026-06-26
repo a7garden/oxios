@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Activity,
@@ -6,7 +5,6 @@ import {
   BookOpen,
   Bot,
   Brain,
-  CheckSquare,
   FilePlus,
   FolderKanban,
   FolderOpen,
@@ -22,13 +20,14 @@ import {
   Theater,
   Timer,
   Trash2,
-  Users,
   Wallet,
   Zap,
 } from 'lucide-react'
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileTree } from '@/components/knowledge/file-tree'
+import { HabitsDialog } from '@/components/knowledge/habits-dialog'
+import { KnowledgeSettingsDialog } from '@/components/knowledge/knowledge-settings-dialog'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -38,12 +37,12 @@ import {
   useKnowledgeTree,
   useWriteFile,
 } from '@/hooks/use-knowledge'
-import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { deriveSidebarMode, useSidebarStore } from '@/stores/sidebar'
 import { ChatSessionNav } from './chat-session-nav'
 import { ModeTabs } from './mode-tabs'
+import { SidebarFooter } from './sidebar-footer'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -99,11 +98,6 @@ const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     labelKey: 'common.agents',
     items: [
       { labelKey: 'common.agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
-      {
-        labelKey: 'common.agentGroups',
-        href: '/agent-groups',
-        icon: <Users className="h-4 w-4" />,
-      },
       { labelKey: 'common.personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
       { labelKey: 'common.skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
     ],
@@ -138,7 +132,7 @@ const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     labelKey: 'common.operations',
     items: [
       { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
-      { labelKey: 'common.budget', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
+      { labelKey: 'common.cost', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
     ],
   },
   {
@@ -147,7 +141,6 @@ const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
       { labelKey: 'common.mcpServers', href: '/mcp', icon: <Zap className="h-4 w-4" /> },
       { labelKey: 'common.email', href: '/email', icon: <Mail className="h-4 w-4" /> },
       { labelKey: 'common.git', href: '/git', icon: <GitBranch className="h-4 w-4" /> },
-      { labelKey: 'common.a2aMonitor', href: '/a2a', icon: <Network className="h-4 w-4" /> },
     ],
   },
   {
@@ -155,7 +148,6 @@ const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
       { labelKey: 'common.security', href: '/security', icon: <Bell className="h-4 w-4" /> },
-      { labelKey: 'common.events', href: '/events', icon: <Bell className="h-4 w-4" /> },
     ],
   },
 ]
@@ -220,56 +212,25 @@ export function Sidebar() {
         {mode === 'knowledge' && <KnowledgeNav />}
         {mode === 'chat' && <ChatSessionNav />}
       </nav>
+
+      {/* Footer — global preferences (theme / language / settings) */}
+      <Separator />
+      <SidebarFooter collapsed={collapsed && !mobileOpen} />
     </aside>
   )
 }
 
 // ── Console Nav ────────────────────────────────────────────────
 
-function useApprovalsCount() {
-  const { data } = useQuery({
-    queryKey: ['approvals-pending-count'],
-    queryFn: async () => {
-      const res = await api.get<{ id: string; status: string }[]>('/api/approvals')
-      const items = Array.isArray(res) ? res : []
-      return items.filter((a) => a.status === 'pending').length
-    },
-    refetchInterval: 10_000,
-  })
-  return data ?? 0
-}
-
 function ConsoleNav() {
   const { t } = useTranslation()
   const router = useRouterState()
   const currentPath = router.location.pathname
   const { collapsed } = useSidebarStore()
-  const pendingCount = useApprovalsCount()
-
-  const mainItems: NavItem[] = [
-    consoleNavGroups[0]!.items[0]!, // Dashboard
-    {
-      labelKey: 'common.approvals',
-      href: '/approvals',
-      icon: <CheckSquare className="h-4 w-4" />,
-      badge: pendingCount,
-    },
-  ]
 
   return (
     <>
-      <div className={sectionGap}>
-        {!collapsed && <p className={sectionHeader}>{t('common.main')}</p>}
-        {mainItems.map((item) => (
-          <NavItemLink
-            key={item.href}
-            item={item}
-            currentPath={currentPath}
-            collapsed={collapsed}
-          />
-        ))}
-      </div>
-      {consoleNavGroups.slice(1).map((group) => (
+      {consoleNavGroups.map((group) => (
         <div key={group.labelKey} className={sectionGap}>
           {!collapsed && <p className={sectionHeader}>{t(group.labelKey)}</p>}
           {group.items.map((item) => (
@@ -298,6 +259,8 @@ function KnowledgeNav() {
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
   const journalToday = useJournalToday()
+  const [habitsOpen, setHabitsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const handleNewFile = useCallback(async () => {
     const name = 'New file.md'
@@ -329,50 +292,92 @@ function KnowledgeNav() {
   // Collapsed: show minimal icons
   if (collapsed) {
     return (
-      <div className="flex flex-col items-center gap-1 py-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => openChat()}
-              className={cn(itemCollapsedBase, mode === 'chat' && itemActive)}
-            >
-              <MessageSquare className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">{t('knowledge.chatTitle', 'Quick Notes')}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={handleOpenJournal}
-              className={cn(itemCollapsedBase, itemInactive)}
-            >
-              <BookOpen className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">{t('knowledge.toJournal')}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={handleNewFile}
-              className={cn(itemCollapsedBase, itemInactive)}
-            >
-              <FilePlus className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">{t('knowledge.newFile')}</TooltipContent>
-        </Tooltip>
-      </div>
+      <>
+        <div className="flex flex-col items-center gap-1 py-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => openChat()}
+                className={cn(itemCollapsedBase, mode === 'chat' && itemActive)}
+              >
+                <MessageSquare className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('knowledge.chatTitle', 'Quick Notes')}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleOpenJournal}
+                className={cn(itemCollapsedBase, itemInactive)}
+              >
+                <BookOpen className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('knowledge.toJournal')}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to="/knowledge/graph"
+                className={cn(
+                  itemCollapsedBase,
+                  currentPath === '/knowledge/graph' ? itemActive : itemInactive,
+                )}
+              >
+                <Network className="h-4 w-4" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('knowledge.linkGraphTitle')}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleNewFile}
+                className={cn(itemCollapsedBase, itemInactive)}
+              >
+                <FilePlus className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('knowledge.newFile')}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setHabitsOpen(true)}
+                className={cn(itemCollapsedBase, itemInactive)}
+              >
+                <Activity className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('knowledge.habitsTitle')}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className={cn(itemCollapsedBase, itemInactive)}
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('knowledge.knowledgeSettings')}</TooltipContent>
+          </Tooltip>
+        </div>
+        <HabitsDialog open={habitsOpen} onOpenChange={setHabitsOpen} />
+        <KnowledgeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      </>
     )
   }
 
   return (
     <>
-      {/* Quick Notes */}
+      {/* Views — Quick Notes, Journal, Graph */}
       <div className={sectionGap}>
         <button
           type="button"
@@ -382,10 +387,6 @@ function KnowledgeNav() {
           <MessageSquare className="h-4 w-4" />
           <span>{t('knowledge.chatTitle', 'Quick Notes')}</span>
         </button>
-      </div>
-
-      {/* Journal */}
-      <div className={sectionGap}>
         <button
           type="button"
           onClick={handleOpenJournal}
@@ -395,10 +396,6 @@ function KnowledgeNav() {
           <BookOpen className="h-4 w-4" />
           <span>{t('knowledge.toJournal')}</span>
         </button>
-      </div>
-
-      {/* Sub-routes */}
-      <div className={sectionGap}>
         <NavItemLink
           item={{
             href: '/knowledge/graph',
@@ -408,32 +405,12 @@ function KnowledgeNav() {
           currentPath={currentPath}
           collapsed={collapsed}
         />
-        <NavItemLink
-          item={{
-            href: '/knowledge/habits',
-            icon: <Activity className="h-4 w-4" />,
-            labelKey: 'knowledge.habitsTitle',
-          }}
-          currentPath={currentPath}
-          collapsed={collapsed}
-        />
-        <NavItemLink
-          item={{
-            href: '/knowledge/settings',
-            icon: <Settings className="h-4 w-4" />,
-            labelKey: 'knowledge.knowledgeSettings',
-          }}
-          currentPath={currentPath}
-          collapsed={collapsed}
-        />
       </div>
 
       <div className={sectionSeparator} />
 
       {/* File tree */}
-      <div className={sectionGap}>
-        <p className={sectionHeader}>{t('knowledge.files', 'Files')}</p>
-      </div>
+      <p className={sectionHeader}>{t('knowledge.files', 'Files')}</p>
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="px-4 py-2 text-xs text-sidebar-foreground/50">
@@ -444,7 +421,7 @@ function KnowledgeNav() {
         ) : null}
       </div>
 
-      {/* Action bar */}
+      {/* Action bar — file ops (left) · tools (right) */}
       <div className="flex items-center gap-0.5 pt-2 border-t border-sidebar-border mt-2 px-1">
         <Button
           variant="ghost"
@@ -476,10 +453,30 @@ function KnowledgeNav() {
           </Button>
         )}
         <div className="flex-1" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 hover:bg-sidebar-accent/50"
+          onClick={() => setHabitsOpen(true)}
+          title={t('knowledge.habitsTitle')}
+        >
+          <Activity className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 hover:bg-sidebar-accent/50"
+          onClick={() => setSettingsOpen(true)}
+          title={t('knowledge.knowledgeSettings')}
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
         <span className="text-2xs text-sidebar-foreground/50 font-mono rounded border bg-sidebar/50 px-1.5 py-0.5">
           ⌘K
         </span>
       </div>
+      <HabitsDialog open={habitsOpen} onOpenChange={setHabitsOpen} />
+      <KnowledgeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   )
 }

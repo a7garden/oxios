@@ -10,9 +10,9 @@ export function SplitEditor({ filePath }: SplitEditorProps) {
   const writeFile = useWriteFile()
 
   return (
-    <div className="w-1/2 min-w-[200px] border-l flex flex-col">
-      <div className="px-4 py-2 text-sm font-medium border-b bg-muted/30 truncate">
-        {filePath.split('/').pop()?.replace(/\.md$/, '')}
+    <div className="flex flex-col flex-1 md:w-1/2 md:flex-none min-w-0 min-h-0 border-t md:border-l md:border-t-0">
+      <div className="flex items-center gap-2 px-4 py-2 text-sm font-medium border-b bg-muted/30">
+        <span className="truncate flex-1">{filePath.split('/').pop()?.replace(/\.md$/, '')}</span>
       </div>
       <div className="flex-1 overflow-hidden">
         <MarkdownEditor

@@ -136,7 +136,7 @@ export function useApprovalWatcher() {
         title: 'Approval Required',
         message: `${count - prevCount.current} new request(s) pending`,
         severity: 'warning',
-        link: '/approvals',
+        link: '/',
       })
     }
     prevCount.current = count
@@ -168,12 +168,20 @@ function eventTitle(e: OxiosEvent): string | null {
       return 'Agent Started'
     case 'agent_stopped':
       return agentStoppedSuccess(e) ? 'Task Completed' : 'Task Failed'
+    case 'persona_created':
+      return 'Persona Created'
+    case 'persona_updated':
+      return 'Persona Updated'
     default:
       return null
   }
 }
 
 function eventMessage(e: OxiosEvent): string {
+  if (e.type === 'persona_created' || e.type === 'persona_updated') {
+    const name = e.data?.name ? ` "${e.data.name}"` : ''
+    return `Agent edited a persona${name}`
+  }
   const agent = e.agent_id ? `Agent ${e.agent_id.slice(0, 8)}…` : 'Unknown agent'
   const detail = e.data?.description ?? e.data?.error ?? ''
   return detail ? `${agent}: ${String(detail).slice(0, 100)}` : agent
@@ -187,6 +195,9 @@ function eventSeverity(e: OxiosEvent): NotificationSeverity {
       return 'error'
     case 'agent_stopped':
       return agentStoppedSuccess(e) ? 'success' : 'warning'
+    case 'persona_created':
+    case 'persona_updated':
+      return 'info'
     default:
       return 'info'
   }
@@ -195,11 +206,14 @@ function eventSeverity(e: OxiosEvent): NotificationSeverity {
 function eventLink(e: OxiosEvent): string | undefined {
   switch (e.type) {
     case 'approval_requested':
-      return '/approvals'
+      return '/'
     case 'agent_failed':
     case 'agent_started':
     case 'agent_stopped':
       return e.agent_id ? '/agents' : undefined
+    case 'persona_created':
+    case 'persona_updated':
+      return '/personas'
     default:
       return undefined
   }

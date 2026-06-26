@@ -3,10 +3,9 @@ import { createFileRoute, useSearch } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { ApiKeyInput } from '@/components/engine/api-key-input'
 import { ModelSelect } from '@/components/engine/model-select'
+import { AddProviderCard, ProviderCard } from '@/components/engine/provider-card'
 import { ProviderOptionsPanel } from '@/components/engine/provider-options'
-import { ProviderSelect } from '@/components/engine/provider-select'
 import { RoutingSection } from '@/components/engine/routing-section'
 import { ChannelsSection } from '@/components/settings/channels-section'
 import { DiffPreview } from '@/components/settings/diff-preview'
@@ -33,6 +32,8 @@ import { LoadingCards } from '@/components/shared/loading'
 import { SystemToolsPanel } from '@/components/system/system-tools'
 import { SystemUpdateCard } from '@/components/system/system-update'
 import { Separator } from '@/components/ui/separator'
+import { api } from '@/lib/api-client'
+import type { ProviderModelsResponse } from '@/types/engine'
 import {
   type ConfigDiffEntry,
   type ConfigPatchResponse,
@@ -41,6 +42,7 @@ import {
   useSaveConfig,
 } from '@/hooks/use-config'
 import {
+  useDeleteApiKey,
   useEngineConfig,
   useModels,
   useProviders,
@@ -341,43 +343,61 @@ function setNestedValue(obj: Record<string, unknown>, dotted: string, value: unk
 function EnginePanel() {
   const { t } = useTranslation()
   const { data: providers = [] } = useProviders()
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
-  const { data: models = [] } = useModels(selectedProvider)
   const { data: engineConfig } = useEngineConfig()
   const setModel = useSetModel()
   const setApiKey = useSetApiKey()
+  const deleteApiKey = useDeleteApiKey()
   const setProviderOptions = useSetProviderOptions()
 
   const currentModel = engineConfig?.default_model ?? ''
-  const resolvedProvider = useMemo((): string | null => {
-    if (selectedProvider) return selectedProvider
-    if (currentModel.includes('/')) return currentModel.split('/')[0] ?? null
-    return null
-  }, [selectedProvider, currentModel])
+  const defaultProvider = currentModel.includes('/')
+    ? (currentModel.split('/')[0] ?? null)
+    : null
 
-  const currentModelId = useMemo(() => {
-    if (!currentModel.includes('/')) return null
-    return currentModel
-  }, [currentModel])
+  const { data: models = [] } = useModels(defaultProvider)
 
-  const handleProviderChange = (providerId: string) => {
-    setSelectedProvider(providerId)
+  const connected = providers.filter((p) => p.hasKey)
+  const available = providers.filter((p) => !p.hasKey)
+  const isMutating = setApiKey.isPending || deleteApiKey.isPending || setModel.isPending
+
+  const handleAdd = (provider: string, apiKey: string) => {
+    setApiKey.mutate({ provider, apiKey }, {
+      onSuccess: () => toast.success(t('engine.connected')),
+      onError: () => toast.error(t('common.error')),
+    })
+  }
+
+  const handleChangeKey = (provider: string, apiKey: string) => {
+    setApiKey.mutate({ provider, apiKey })
+  }
+
+  const handleRemove = (provider: string) => {
+    deleteApiKey.mutate(provider, {
+      onSuccess: () => toast.success(t('common.success')),
+    })
+  }
+
+  const handleSetDefault = async (providerId: string) => {
+    try {
+      const res = await api.get<ProviderModelsResponse>(
+        `/api/engine/models?provider=${encodeURIComponent(providerId)}`,
+      )
+      const first = res.models[0]
+      if (first) {
+        setModel.mutate(first.id)
+      }
+    } catch {
+      toast.error(t('common.error'))
+    }
   }
 
   const handleModelChange = (modelId: string) => {
     setModel.mutate(modelId)
   }
 
-  const handleApiKeySubmit = (apiKey: string) => {
-    setApiKey.mutate({ provider: resolvedProvider ?? 'unknown', apiKey })
-  }
-
   const handleOptionsSave = (options: Record<string, unknown>) => {
-    setProviderOptions.mutate({ provider: resolvedProvider ?? 'unknown', options })
+    setProviderOptions.mutate({ provider: defaultProvider ?? 'unknown', options })
   }
-
-  const apiKeySource =
-    engineConfig?.api_key_source ?? (engineConfig?.api_key_set ? 'config' : 'none')
 
   return (
     <Card>
@@ -389,78 +409,87 @@ function EnginePanel() {
         <p className="text-sm text-muted-foreground">{t('settings.engineDescription')}</p>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-start justify-between gap-6">
-          <div className="flex-1 min-w-0 pt-0.5">
-            <label className="text-sm font-medium">{t('settings.provider')}</label>
+        {/* ── Connected Providers ── */}
+        <div>
+          <div className="mb-3">
+            <label className="text-sm font-medium">{t('engine.connectedProviders')}</label>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {t('settings.providerDescription')}
+              {t('engine.connectedProvidersDesc')}
             </p>
           </div>
-          <div className="shrink-0 w-56">
-            <ProviderSelect
-              providers={providers}
-              value={resolvedProvider}
-              onValueChange={handleProviderChange}
-            />
-          </div>
-        </div>
-
-        <Separator />
-
-        <div className="flex items-start justify-between gap-6">
-          <div className="flex-1 min-w-0 pt-0.5">
-            <label className="text-sm font-medium">{t('settings.model')}</label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {currentModel ? (
-                <span>{t('settings.modelDescription', { model: currentModel })}</span>
-              ) : (
-                t('settings.modelSelectProviderFirst')
-              )}
-            </p>
-          </div>
-          <div className="shrink-0 w-64">
-            <ModelSelect models={models} value={currentModelId} onValueChange={handleModelChange} />
-          </div>
-        </div>
-
-        <Separator />
-
-        <div className="flex items-start justify-between gap-6">
-          <div className="flex-1 min-w-0 pt-0.5">
-            <label className="text-sm font-medium">{t('settings.apiKey')}</label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t('settings.apiKeyDescription')}
-            </p>
-          </div>
-          <div className="shrink-0 w-72">
-            <ApiKeyInput
-              hasKey={engineConfig?.api_key_set ?? false}
-              source={apiKeySource}
-              providerName={resolvedProvider ?? 'provider'}
-              onSubmit={handleApiKeySubmit}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-fr">
+            {connected.map((p) => (
+              <ProviderCard
+                key={p.id}
+                provider={p}
+                isDefault={p.id === defaultProvider}
+                onSetDefault={() => handleSetDefault(p.id)}
+                onChangeKey={(key) => handleChangeKey(p.id, key)}
+                onRemove={() => handleRemove(p.id)}
+                isPending={isMutating}
+              />
+            ))}
+            {connected.length === 0 && (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center min-h-[124px]">
+                <p className="text-sm text-muted-foreground">
+                  {t('engine.noProvidersConnected')}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('engine.noProvidersConnectedDesc')}
+                </p>
+              </div>
+            )}
+            <AddProviderCard
+              availableProviders={available}
+              onAdd={handleAdd}
               isPending={setApiKey.isPending}
             />
           </div>
         </div>
 
-        {resolvedProvider && ['anthropic', 'openai', 'google'].includes(resolvedProvider) && (
+        <Separator />
+
+        {/* ── Default Model ── */}
+        {defaultProvider && (
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex-1 min-w-0 pt-0.5">
+              <label className="text-sm font-medium">{t('engine.defaultModel')}</label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {currentModel
+                  ? t('settings.modelDescription', { model: currentModel })
+                  : t('engine.defaultModelDesc')}
+              </p>
+            </div>
+            <div className="shrink-0 w-64">
+              <ModelSelect
+                models={models}
+                value={currentModel}
+                onValueChange={handleModelChange}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Advanced Options ── */}
+        {defaultProvider && ['anthropic', 'openai', 'google'].includes(defaultProvider) && (
           <>
             <Separator />
             <div>
               <div className="mb-3">
                 <label className="text-sm font-medium">{t('settings.advancedOptions')}</label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {t('settings.advancedOptionsDescription', { provider: resolvedProvider })}
+                  {t('settings.advancedOptionsDescription', { provider: defaultProvider })}
                 </p>
               </div>
               <ProviderOptionsPanel
-                provider={resolvedProvider}
+                provider={defaultProvider}
                 onSave={handleOptionsSave}
                 isPending={setProviderOptions.isPending}
               />
             </div>
           </>
         )}
+
         <RoutingSection />
       </CardContent>
     </Card>

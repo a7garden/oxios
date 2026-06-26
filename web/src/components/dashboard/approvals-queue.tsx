@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import { AlertTriangle, Bell, CheckCircle, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -49,12 +48,6 @@ export function ApprovalsQueue() {
             {pending.length}
           </Badge>
         </CardTitle>
-        <Link
-          to="/approvals"
-          className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
-        >
-          {t('dashboard.viewAll')}
-        </Link>
       </CardHeader>
       <CardContent className="pt-2">
         {isLoading ? (

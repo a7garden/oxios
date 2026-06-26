@@ -171,7 +171,6 @@ function DashboardPage() {
           hint={
             pendingApprovals.length > 0 ? t('dashboard.needsAttention') : t('dashboard.allClear')
           }
-          href="/approvals"
         />
       </div>
 
