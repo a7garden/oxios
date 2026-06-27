@@ -1319,7 +1319,9 @@
     "notifications": "알림",
     "nextEvent": "다음 일정",
     "noUpcoming": "예정된 일정이 없어요",
-    "openCalendar": "캘린더 열기"
+    "openCalendar": "캘린더 열기",
+    "calendarDisabled": "캘린더가 비활성화되어 있어요",
+    "enableCalendar": "설정에서 활성화"
   },
   "workspace": {
     "title": "작업공간",

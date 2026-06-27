@@ -12,6 +12,15 @@ export class ApiError extends Error {
     this.name = 'ApiError'
   }
 }
+/** A 503 "subsystem not available" — calendar/email/etc. is disabled in config.
+ *  It is a permanent failure and must not be retried. */
+export function isSubsystemUnavailable(error: unknown): boolean {
+  return Boolean(
+    error instanceof ApiError &&
+      error.status === 503 &&
+      error.body?.includes('subsystem not available'),
+  )
+}
 
 interface RequestOptions {
   method?: string

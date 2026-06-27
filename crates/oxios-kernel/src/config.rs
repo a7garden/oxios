@@ -1117,7 +1117,7 @@ impl Default for SkillsShConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CalendarConfig {
     /// Enable the calendar system.
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub enabled: bool,
     /// Default timezone for events.
     #[serde(default = "default_calendar_timezone")]
@@ -1158,7 +1158,7 @@ fn default_archive_days() -> u32 {
 impl Default for CalendarConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             timezone: default_calendar_timezone(),
             default_reminder_minutes: default_reminder_minutes(),
             alarm_channels: vec![],

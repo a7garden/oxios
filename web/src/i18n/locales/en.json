@@ -1317,7 +1317,9 @@
     "notifications": "Notifications",
     "nextEvent": "Next event",
     "noUpcoming": "No upcoming events",
-    "openCalendar": "Open calendar"
+    "openCalendar": "Open calendar",
+    "calendarDisabled": "Calendar is disabled",
+    "enableCalendar": "Enable in Settings"
   },
   "workspace": {
     "title": "Workspace",

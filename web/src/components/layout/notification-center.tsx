@@ -13,6 +13,7 @@ import {
   useCalendarEvents,
   useCalendarUpdate,
 } from '@/hooks/use-calendar'
+import { isSubsystemUnavailable } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { useNotificationCenter } from '@/stores/notification-center'
 import {
@@ -169,7 +170,9 @@ function ScheduleWidget() {
     return { from: start.toISOString(), to: end.toISOString() }
   }, [viewAnchor])
 
-  const { data, isLoading } = useCalendarEvents(from, to)
+  const { data, isLoading, error } = useCalendarEvents(from, to)
+  const unavailable = isSubsystemUnavailable(error)
+  const navigate = useNavigate()
   const events = useMemo(() => (Array.isArray(data?.events) ? data.events : []), [data])
 
   const createMutation = useCalendarCreate()
@@ -216,6 +219,21 @@ function ScheduleWidget() {
     weekday: 'long',
   })
 
+  if (unavailable) {
+    return (
+      <div className="rounded-2xl border border-border/40 bg-card/50 p-3 shadow-sm">
+        <p className="text-xs text-muted-foreground">{t('notificationCenter.calendarDisabled')}</p>
+        <Button
+          variant="link"
+          size="sm"
+          className="mt-1 h-auto p-0 text-xs"
+          onClick={() => navigate({ to: '/settings', search: { section: 'calendar' } })}
+        >
+          {t('notificationCenter.enableCalendar')}
+        </Button>
+      </div>
+    )
+  }
   return (
     // ── Calendar widget card ──
     <div className="rounded-2xl border border-border/40 bg-card/50 p-3 shadow-sm">

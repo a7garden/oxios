@@ -217,8 +217,8 @@ sync_enabled = false
 # 프리셋: "conservative" | "balanced" | "aggressive" | "custom"
 # 프리셋을 변경하면 아래 개별 필드가 무시되고 프리셋 값으로 덮어씌워집니다.
 # 개별 필드를 직접 제어하려면 preset = "custom" 으로 설정하세요.
-# Calendar system (disabled by default).
-# Enable to allow agents and users to manage events.
+# Calendar system (enabled by default).
+# Uncomment to customize settings; when the section is omitted, defaults below apply.
 # Events are stored as .ics files in ~/.oxios/workspace/calendar/events/
 # [calendar]
 # enabled = true
