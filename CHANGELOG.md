@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-06-27
+
+### Fixed
+- **Calendar enabled by default** — `CalendarConfig.enabled` now defaults to `true` (serde field default + `Default` impl); fresh installs no longer see calendar 503s in the web UI.
+- **Disabled-subsystem 503 handling (web)** — react-query no longer retries a permanent "subsystem not available" 503; the notification-center schedule widget shows a friendly "enable in settings" prompt when a subsystem (calendar/email) is disabled.
+
 ## [1.13.0] - 2026-06-26
 
 ### Added
