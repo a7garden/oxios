@@ -321,10 +321,8 @@ impl AccessGate {
                     agent: ctx.agent_name.clone(),
                     resource: tool.to_string(),
                     layer: DenyLayer::Capability,
-                    reason: format!("CSpace에 '{tool}' 도구에 대한 EXECUTE capability 없음"),
-                    suggestion: Some(format!(
-                        "에이전트의 Seed에 '{tool}' capability를 추가하세요."
-                    )),
+                    reason: format!("CSpace lacks EXECUTE capability for tool '{tool}'"),
+                    suggestion: Some(format!("Add the '{tool}' capability to the agent's Seed.")),
                 });
             }
         }
@@ -337,12 +335,12 @@ impl AccessGate {
                 resource: tool.to_string(),
                 layer: DenyLayer::Permission,
                 reason: format!(
-                    "Agent '{}'의 allowed_tools에 '{}' 없음",
-                    ctx.agent_name, tool
+                    "'{}' is not in agent '{}'s allowed_tools",
+                    tool, ctx.agent_name
                 ),
                 suggestion: Some(format!(
-                    "관리자에게 '{}' 에이전트의 '{}' 도구 권한을 요청하세요.",
-                    ctx.agent_name, tool
+                    "Request permission for the '{}' tool on agent '{}' from your administrator.",
+                    tool, ctx.agent_name
                 )),
             });
         }
@@ -401,8 +399,8 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: path_str.to_string(),
                 layer: DenyLayer::Rbac,
-                reason: "RBAC 정책이 경로 접근을 허용하지 않음".into(),
-                suggestion: Some("RBAC 정책을 확인하세요.".into()),
+                reason: "RBAC policy denies access to this path".into(),
+                suggestion: Some("Review the RBAC policy.".into()),
             });
         }
 
@@ -412,8 +410,8 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: path_str.to_string(),
                 layer: DenyLayer::Permission,
-                reason: format!("경로 '{path_str}'이(가) 허용 목록에 없거나 거부 목록에 포함됨"),
-                suggestion: Some("allowed_paths / denied_paths 설정을 확인하세요.".into()),
+                reason: format!("Path '{path_str}' is not in allowed_paths or is in denied_paths"),
+                suggestion: Some("Review the allowed_paths / denied_paths settings.".into()),
             });
         }
 
@@ -432,7 +430,7 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: path_str.to_string(),
                 layer: DenyLayer::Permission,
-                reason: format!("경로 '{path_str}'이(가) 워크스페이스 '{ws}' 경계를 벗어남"),
+                reason: format!("Path '{path_str}' is outside the '{ws}' workspace boundary"),
                 suggestion: None,
             });
         }
@@ -462,8 +460,8 @@ impl AccessGate {
                     agent: ctx.agent_name.clone(),
                     resource: binary.to_string(),
                     layer: DenyLayer::Capability,
-                    reason: "CSpace에 Exec capability 없음".into(),
-                    suggestion: Some("Seed에 Exec capability를 추가하세요.".into()),
+                    reason: "CSpace lacks Exec capability".into(),
+                    suggestion: Some("Add the Exec capability to the Seed.".into()),
                 });
             }
         }
@@ -477,7 +475,7 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: binary.to_string(),
                 layer: DenyLayer::Permission,
-                reason: format!("에이전트가 '{binary}' 실행 권한 없음"),
+                reason: format!("Agent lacks permission to execute '{binary}'"),
                 suggestion: None,
             });
         }
@@ -488,8 +486,8 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: binary.to_string(),
                 layer: DenyLayer::ExecPolicy,
-                reason: format!("바이너리 '{binary}'이(가) 허용 목록에 없음"),
-                suggestion: Some("exec.allowed_commands에 추가하세요.".into()),
+                reason: format!("Binary '{binary}' is not in the allowlist"),
+                suggestion: Some("Add it to exec.allowed_commands.".into()),
             });
         }
 
@@ -499,7 +497,7 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: binary.to_string(),
                 layer: DenyLayer::ExecPolicy,
-                reason: "인수에 셸 메타문자 또는 경로 순회 패턴 포함".into(),
+                reason: "Arguments contain shell metacharacters or path traversal patterns".into(),
                 suggestion: None,
             });
         }
@@ -514,8 +512,8 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: "<network>".into(),
                 layer: DenyLayer::Permission,
-                reason: "네트워크 접근이 비활성화됨".into(),
-                suggestion: Some("permissions.network_access를 true로 설정하세요.".into()),
+                reason: "Network access is disabled".into(),
+                suggestion: Some("Set permissions.network_access to true.".into()),
             });
         }
         Ok(())
@@ -531,7 +529,7 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: "fork".into(),
                 layer: DenyLayer::Capability,
-                reason: "CSpace에 에이전트 관리 capability 없음".into(),
+                reason: "CSpace lacks agent-management capability".into(),
                 suggestion: None,
             });
         }
@@ -543,8 +541,8 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: "fork".into(),
                 layer: DenyLayer::Permission,
-                reason: "에이전트 fork 권한 없음".into(),
-                suggestion: Some("permissions.can_fork를 true로 설정하세요.".into()),
+                reason: "Agent lacks fork permission".into(),
+                suggestion: Some("Set permissions.can_fork to true.".into()),
             });
         }
         Ok(())

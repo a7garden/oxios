@@ -60,24 +60,27 @@ fn infer_kind(e: &anyhow::Error) -> ErrorKind {
 fn user_message_and_suggestion(kind: &ErrorKind, _raw_msg: &str) -> (String, Option<String>) {
     match kind {
         ErrorKind::ApiKeyMissing => (
-            "API 키가 설정되지 않았습니다.".to_string(),
-            Some("설정에서 API 키를 등록하거나 사용 가능한 모델로 변경하세요.".to_string()),
+            "No API key configured.".to_string(),
+            Some("Register an API key in settings, or switch to an available model.".to_string()),
         ),
-        ErrorKind::ExecutionFailed => ("요청을 처리하는 중 오류가 발생했습니다.".to_string(), None),
+        ErrorKind::ExecutionFailed => (
+            "An error occurred while processing your request.".to_string(),
+            None,
+        ),
         ErrorKind::ProviderError => (
-            "AI 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요.".to_string(),
-            Some("1-2분 후 다시 시도하거나 다른 모델을 선택하세요.".to_string()),
+            "The AI service is temporarily unavailable. Please try again shortly.".to_string(),
+            Some("Try again in 1-2 minutes, or select a different model.".to_string()),
         ),
         ErrorKind::Timeout => (
-            "요청 처리 시간이 초과되었습니다.".to_string(),
-            Some("더 간단한 요청으로 시도하거나 타임아웃을 늘리세요.".to_string()),
+            "The request timed out.".to_string(),
+            Some("Try a simpler request, or increase the timeout.".to_string()),
         ),
         ErrorKind::PermissionDenied => (
-            "이 작업을 수행할 권한이 없습니다.".to_string(),
-            Some("관리자에게 권한을 요청하세요.".to_string()),
+            "You don't have permission to perform this action.".to_string(),
+            Some("Request the required permission from your administrator.".to_string()),
         ),
-        ErrorKind::ValidationError => ("입력이 올바르지 않습니다.".to_string(), None),
-        ErrorKind::Internal => ("내부 오류가 발생했습니다.".to_string(), None),
+        ErrorKind::ValidationError => ("Invalid input.".to_string(), None),
+        ErrorKind::Internal => ("An internal error occurred.".to_string(), None),
     }
 }
 

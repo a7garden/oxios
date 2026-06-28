@@ -258,18 +258,18 @@ enum Command {
 
 #[derive(Debug, Clone, Subcommand)]
 enum ConfigAction {
-    /// 전체 설정 출력
+    /// Show the full configuration
     Show,
-    /// 설정값 조회
+    /// Get a configuration value
     Get { key: String },
-    /// 설정값 변경 (코멘트/포맷팅 보존)
+    /// Set a configuration value (preserves comments and formatting)
     Set { key: String, value: String },
-    /// 모든 설정 키 나열
+    /// List all configuration keys
     List {
-        /// 필터 접두어 (예: "memory" → memory.* 만 표시)
+        /// Filter prefix (e.g. "memory" → show only memory.*)
         prefix: Option<String>,
     },
-    /// 설정값을 기본값으로 되돌림
+    /// Reset a configuration value to its default
     Reset { key: String },
 }
 
@@ -606,7 +606,7 @@ async fn cmd_config(action: &ConfigAction, config_path: &Path) -> Result<()> {
             let default_value = config_get(&defaults, key)?;
             config_set(config_path, key, &default_value)?;
             println!(
-                "  {} {} → 기본값 ({})",
+                "  {} {} → default ({})",
                 style("Reset").green(),
                 key,
                 default_value
@@ -627,14 +627,14 @@ fn load_config_or_default(config_path: &Path) -> Result<OxiosConfig> {
 // ─── Config Get: serde_json 기반 전체 필드 dot-notation 조회 ─────────────
 
 fn config_get(config: &OxiosConfig, key: &str) -> Result<String> {
-    let json = serde_json::to_value(config).context("설정을 JSON으로 변환 실패")?;
+    let json = serde_json::to_value(config).context("Failed to serialize config to JSON")?;
 
     let value = json
         .pointer(&format!("/{}", key.replace('.', "/")))
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "알 수 없는 설정 키: '{key}'\n\
-                 사용 가능한 키는 `oxios config list`로 확인하세요."
+                "Unknown config key: '{key}'\n\
+                 Run `oxios config list` to see available keys."
             )
         })?;
 
@@ -661,10 +661,10 @@ fn config_set(config_path: &Path, key: &str, raw_value: &str) -> Result<()> {
     }
 
     let toml_str = std::fs::read_to_string(config_path)
-        .with_context(|| format!("설정 파일을 읽을 수 없습니다: {}", config_path.display()))?;
+        .with_context(|| format!("Failed to read config file: {}", config_path.display()))?;
     let mut doc = toml_str
         .parse::<toml_edit::DocumentMut>()
-        .context("설정 파일 파싱 실패")?;
+        .context("Failed to parse config file")?;
 
     // 기존 필드 타입 존중
     let existing_type = get_existing_type(&doc, key);
@@ -674,7 +674,7 @@ fn config_set(config_path: &Path, key: &str, raw_value: &str) -> Result<()> {
     set_toml_dot(&mut doc, key, parsed)?;
 
     std::fs::write(config_path, doc.to_string())?;
-    tracing::info!(key, value = raw_value, "설정 변경");
+    tracing::info!(key, value = raw_value, "Config changed");
     Ok(())
 }
 
@@ -692,9 +692,7 @@ fn set_toml_dot(doc: &mut toml_edit::DocumentMut, key: &str, value: toml_edit::I
                 .entry(part)
                 .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
                 .as_table_mut()
-                .ok_or_else(|| {
-                    anyhow::anyhow!("'{}'는 테이블이 아닙니다", parts[..=i].join("."))
-                })?;
+                .ok_or_else(|| anyhow::anyhow!("'{}' is not a table", parts[..=i].join(".")))?;
         }
     }
     Ok(())
@@ -782,7 +780,7 @@ fn config_list(config: &OxiosConfig, prefix: Option<&str>) -> Result<()> {
 
     let root = if let Some(p) = prefix {
         json.pointer(&format!("/{}", p.replace('.', "/")))
-            .ok_or_else(|| anyhow::anyhow!("알 수 없는 접두어: '{p}'"))?
+            .ok_or_else(|| anyhow::anyhow!("Unknown prefix: '{p}'"))?
     } else {
         &json
     };
@@ -791,13 +789,13 @@ fn config_list(config: &OxiosConfig, prefix: Option<&str>) -> Result<()> {
     collect_leaf_keys(root, prefix.unwrap_or(""), &mut keys);
 
     if keys.is_empty() {
-        println!("  설정 키가 없습니다.");
+        println!("  No configuration keys.");
     } else {
         for (key, value) in &keys {
             println!("  {:<50} {}", key, style(value).dim());
         }
         println!();
-        println!("  {}개 설정 키", style(keys.len()).cyan());
+        println!("  {} config keys", style(keys.len()).cyan());
     }
     Ok(())
 }

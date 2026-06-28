@@ -28,9 +28,9 @@ impl ChannelFormatter for CliFormatter {
                     eval_icon,
                     meta.phase,
                     if meta.evaluation_passed.unwrap_or(false) {
-                        "통과"
+                        "pass"
                     } else {
-                        "미통과"
+                        "fail"
                     }
                 ));
             }
@@ -77,12 +77,12 @@ impl ChannelFormatter for CliFormatter {
 
     fn format_progress(&self, phase: &str) -> String {
         match phase {
-            "Interview" => "🔍 분석 중...".into(),
-            "Seed" => "📋 계획 수립 중...".into(),
-            "Execute" => "⚡ 실행 중...".into(),
-            "Evaluate" => "📊 평가 중...".into(),
-            "Evolve" => "🔄 개선 중...".into(),
-            _ => "⏳ 처리 중...".into(),
+            "Interview" => "🔍 Analyzing...".into(),
+            "Seed" => "📋 Planning...".into(),
+            "Execute" => "⚡ Executing...".into(),
+            "Evaluate" => "📊 Evaluating...".into(),
+            "Evolve" => "🔄 Refining...".into(),
+            _ => "⏳ Processing...".into(),
         }
     }
 }
@@ -130,7 +130,7 @@ mod tests {
         let msg = make_msg("Done!", Some(meta));
         let formatter = CliFormatter;
         let output = formatter.format_success(&msg);
-        assert!(output.contains("✅ Execute | 통과"));
+        assert!(output.contains("✅ Execute | pass"));
         assert!(output.contains("[🔧 oxios]"));
         assert!(output.contains("1.5s"));
     }
@@ -151,7 +151,7 @@ mod tests {
         let msg = make_msg("Partial", Some(meta));
         let formatter = CliFormatter;
         let output = formatter.format_success(&msg);
-        assert!(output.contains("⚠️ Evaluate | 미통과"));
+        assert!(output.contains("⚠️ Evaluate | fail"));
         assert!(output.contains("500ms"));
     }
 
@@ -165,18 +165,18 @@ mod tests {
             evaluation_passed: None,
             duration_ms: None,
             error: Some(UserFacingError {
-                message: "시간이 초과되었습니다.".into(),
+                message: "Timed out.".into(),
                 kind: ErrorKind::Timeout,
-                suggestion: Some("더 간단한 요청으로 시도하세요.".into()),
+                suggestion: Some("Try a simpler request.".into()),
             }),
             interview_questions: None,
             interview_round: None,
         };
-        let msg = make_msg("시간이 초과되었습니다.", Some(meta));
+        let msg = make_msg("Timed out.", Some(meta));
         let formatter = CliFormatter;
         let output = formatter.format_error(&msg);
         assert!(output.starts_with("⏱️"));
-        assert!(output.contains("💡 더 간단한 요청으로 시도하세요."));
+        assert!(output.contains("💡 Try a simpler request."));
     }
 
     #[test]
@@ -189,14 +189,14 @@ mod tests {
             evaluation_passed: None,
             duration_ms: None,
             error: Some(UserFacingError {
-                message: "AI 서비스 오류.".into(),
+                message: "AI service error.".into(),
                 kind: ErrorKind::ProviderError,
                 suggestion: None,
             }),
             interview_questions: None,
             interview_round: None,
         };
-        let msg = make_msg("AI 서비스 오류.", Some(meta));
+        let msg = make_msg("AI service error.", Some(meta));
         let formatter = CliFormatter;
         let output = formatter.format_error(&msg);
         assert!(output.starts_with("🔌"));
@@ -206,11 +206,11 @@ mod tests {
     #[test]
     fn format_progress_phases() {
         let formatter = CliFormatter;
-        assert_eq!(formatter.format_progress("Interview"), "🔍 분석 중...");
-        assert_eq!(formatter.format_progress("Seed"), "📋 계획 수립 중...");
-        assert_eq!(formatter.format_progress("Execute"), "⚡ 실행 중...");
-        assert_eq!(formatter.format_progress("Evaluate"), "📊 평가 중...");
-        assert_eq!(formatter.format_progress("Evolve"), "🔄 개선 중...");
-        assert_eq!(formatter.format_progress("Unknown"), "⏳ 처리 중...");
+        assert_eq!(formatter.format_progress("Interview"), "🔍 Analyzing...");
+        assert_eq!(formatter.format_progress("Seed"), "📋 Planning...");
+        assert_eq!(formatter.format_progress("Execute"), "⚡ Executing...");
+        assert_eq!(formatter.format_progress("Evaluate"), "📊 Evaluating...");
+        assert_eq!(formatter.format_progress("Evolve"), "🔄 Refining...");
+        assert_eq!(formatter.format_progress("Unknown"), "⏳ Processing...");
     }
 }

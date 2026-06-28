@@ -60,12 +60,12 @@ impl ChannelFormatter for TelegramFormatter {
 
     fn format_progress(&self, phase: &str) -> String {
         match phase {
-            "Interview" => "🔍 분석 중...",
-            "Seed" => "📋 계획 수립 중...",
-            "Execute" => "⚡ 실행 중...",
-            "Evaluate" => "📊 평가 중...",
-            "Evolve" => "🔄 개선 중...",
-            _ => "⏳ 처리 중...",
+            "Interview" => "🔍 Analyzing...",
+            "Seed" => "📋 Planning...",
+            "Execute" => "⚡ Executing...",
+            "Evaluate" => "📊 Evaluating...",
+            "Evolve" => "🔄 Refining...",
+            _ => "⏳ Processing...",
         }
         .into()
     }
@@ -134,7 +134,7 @@ mod tests {
             evaluation_passed: None,
             duration_ms: None,
             error: Some(UserFacingError {
-                message: "내부 오류".to_string(),
+                message: "Internal error".to_string(),
                 kind: ErrorKind::Internal,
                 suggestion: None,
             }),
@@ -143,7 +143,7 @@ mod tests {
             interview_ambiguity: None,
             mode: None,
         };
-        let msg = make_msg("내부 오류", Some(meta));
+        let msg = make_msg("Internal error", Some(meta));
         let fmt = TelegramFormatter;
         let result = fmt.format_error(&msg);
         assert!(result.starts_with("❌"));
@@ -160,16 +160,16 @@ mod tests {
             evaluation_passed: None,
             duration_ms: None,
             error: Some(UserFacingError {
-                message: "AI 서비스 오류".to_string(),
+                message: "AI service error".to_string(),
                 kind: ErrorKind::ProviderError,
-                suggestion: Some("1-2분 후 다시 시도하세요.".to_string()),
+                suggestion: Some("Try again in 1-2 minutes.".to_string()),
             }),
             interview_questions: None,
             interview_round: None,
             interview_ambiguity: None,
             mode: None,
         };
-        let msg = make_msg("AI 서비스 오류", Some(meta));
+        let msg = make_msg("AI service error", Some(meta));
         let fmt = TelegramFormatter;
         let result = fmt.format_error(&msg);
         assert!(result.starts_with("🔌"));
@@ -179,14 +179,14 @@ mod tests {
     #[test]
     fn format_progress_known_phases() {
         let fmt = TelegramFormatter;
-        assert_eq!(fmt.format_progress("Interview"), "🔍 분석 중...");
-        assert_eq!(fmt.format_progress("Execute"), "⚡ 실행 중...");
-        assert_eq!(fmt.format_progress("Evolve"), "🔄 개선 중...");
+        assert_eq!(fmt.format_progress("Interview"), "🔍 Analyzing...");
+        assert_eq!(fmt.format_progress("Execute"), "⚡ Executing...");
+        assert_eq!(fmt.format_progress("Evolve"), "🔄 Refining...");
     }
 
     #[test]
     fn format_progress_unknown() {
         let fmt = TelegramFormatter;
-        assert_eq!(fmt.format_progress("Unknown"), "⏳ 처리 중...");
+        assert_eq!(fmt.format_progress("Unknown"), "⏳ Processing...");
     }
 }

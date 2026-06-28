@@ -54,7 +54,7 @@ fn format_denied(denied: &AccessDenied) -> String {
         DenyLayer::ExecPolicy => "[ExecPolicy]",
     };
     format!(
-        "🔒 권한 거부: {} — {} {}",
+        "🔒 Access denied: {} — {} {}",
         denied.reason,
         denied.suggestion.as_deref().unwrap_or(""),
         layer_tag
@@ -153,7 +153,7 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                     "GatedTool: path access denied"
                 );
                 return Ok(AgentToolResult::error(format!(
-                    "🔒 경로 접근 거부: {}",
+                    "🔒 Path access denied: {}",
                     denied.reason
                 )));
             }

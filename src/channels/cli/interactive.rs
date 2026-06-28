@@ -80,7 +80,7 @@ impl InteractiveLoop {
 
                     // Reject input while a previous request is still in-flight.
                     if self.handle.is_processing() {
-                        println!("⏳ 이전 요청을 처리 중입니다. 잠시만 기다려주세요.");
+                        println!("⏳ Still processing your previous request. Please wait.");
                         continue;
                     }
 
@@ -149,17 +149,17 @@ impl InteractiveLoop {
             MetaCommand::Space(None) => {
                 // Space info is managed by the kernel via message routing.
                 // Channels don't have direct kernel access.
-                println!("📋 .space 명령어는 현재 Surface(Web 대시보드)에서만 사용 가능합니다.");
+                println!("📋 The .space command is only available in the Web dashboard.");
                 Ok(false)
             }
             MetaCommand::Space(Some(_id_or_name)) => {
                 // Space switching requires kernel access.
                 // Channels don't have direct kernel access.
-                println!("📋 .space 명령어는 현재 Surface(Web 대시보드)에서만 사용 가능합니다.");
+                println!("📋 The .space command is only available in the Web dashboard.");
                 Ok(false)
             }
             MetaCommand::Spaces => {
-                println!("📋 .spaces 명령어는 현재 Surface(Web 대시보드)에서만 사용 가능합니다.");
+                println!("📋 The .spaces command is only available in the Web dashboard.");
                 Ok(false)
             }
             MetaCommand::Clear => {

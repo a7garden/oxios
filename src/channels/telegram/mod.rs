@@ -362,7 +362,7 @@ impl Channel for TelegramChannel {
                                         let _ = this
                                             .send_text(
                                                 cid,
-                                                &format!("🔄 새 세션을 시작합니다.\\n`{}`", new_session_id.chars().take(8).collect::<String>()),
+                                                &format!("🔄 Starting a new session.\\n`{}`", new_session_id.chars().take(8).collect::<String>()),
                                                 Some(message_id),
                                             )
                                             .await;
@@ -374,7 +374,7 @@ impl Channel for TelegramChannel {
                                         let sessions = this.chat_sessions.read().await;
                                         if let Some(session) = sessions.get(&cid) {
                                             let info = format!(
-                                                "📋 현재 세션\\n• ID: `{}`\\n• 메시지: {}개\\n• 시작: {}\\n• 마지막 활동: {}",
+                                                "📋 Current session\\n• ID: `{}`\\n• Messages: {}\\n• Started: {}\\n• Last activity: {}",
                                                 session.session_id.chars().take(8).collect::<String>(),
                                                 session.message_count,
                                                 session.created_at.format("%m/%d %H:%M"),
@@ -385,7 +385,7 @@ impl Channel for TelegramChannel {
                                         } else {
                                             drop(sessions);
                                             let _ = this
-                                                .send_text(cid, "📋 활성 세션이 없습니다.", Some(message_id))
+                                                .send_text(cid, "📋 No active sessions.", Some(message_id))
                                                 .await;
                                         }
                                         continue;
@@ -393,13 +393,13 @@ impl Channel for TelegramChannel {
 
                                     // /spaces command — channels don't have kernel access
                                     if trimmed == "/spaces" || trimmed.starts_with("/spaces@") {
-                                        let _ = this.send_text(cid, "Space 관리는 Web 대시보드에서 사용 가능합니다.", Some(message_id)).await;
+                                        let _ = this.send_text(cid, "Space management is available in the Web dashboard.", Some(message_id)).await;
                                         continue;
                                     }
 
                                     // /space command — channels don't have kernel access
                                     if trimmed.starts_with("/space") && !trimmed.starts_with("/spaces") {
-                                        let _ = this.send_text(cid, "Space 관리는 Web 대시보드에서 사용 가능합니다.", Some(message_id)).await;
+                                        let _ = this.send_text(cid, "Space management is available in the Web dashboard.", Some(message_id)).await;
                                         continue;
                                     }
 

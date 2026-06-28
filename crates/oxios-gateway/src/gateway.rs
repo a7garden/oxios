@@ -600,7 +600,7 @@ impl Gateway {
             match (engine_api, channel) {
                 (Some(api), Some(channel)) => match api.set_model(&model_id) {
                     Ok(()) => {
-                        let response = format!("✅ 모델이 {model_id}(으)로 전환되었습니다.");
+                        let response = format!("✅ Switched model to {model_id}.");
                         let mut outgoing = OutgoingMessage::success(
                             msg.id,
                             &msg.channel,
@@ -626,10 +626,10 @@ impl Gateway {
                     Err(e) => {
                         tracing::error!(error = %e, "switch_model failed");
                         let user_err = UserFacingError {
-                            message: format!("❌ 모델 전환 실패: {e}"),
+                            message: format!("❌ Failed to switch model: {e}"),
                             kind: ErrorKind::Internal,
                             suggestion: Some(
-                                "모델 ID가 올바른지 확인하세요. (예: anthropic/claude-sonnet-4)"
+                                "Check that the model ID is correct (e.g. anthropic/claude-sonnet-4)."
                                     .to_string(),
                             ),
                         };
@@ -680,8 +680,7 @@ impl Gateway {
             match (persona_api, channel) {
                 (Some(api), Some(channel)) => match api.set_active(&persona_id) {
                     Ok(()) => {
-                        let response =
-                            format!("✅ 페르소나가 '{persona_id}'(으)로 전환되었습니다.");
+                        let response = format!("✅ Switched persona to '{persona_id}'.");
                         let mut outgoing = OutgoingMessage::success(
                             msg.id,
                             &msg.channel,
@@ -707,9 +706,9 @@ impl Gateway {
                     Err(e) => {
                         tracing::error!(error = %e, "switch_persona failed");
                         let user_err = UserFacingError {
-                                message: format!("❌ 페르소나 전환 실패: {e}"),
+                                message: format!("❌ Failed to switch persona: {e}"),
                                 kind: ErrorKind::Internal,
-                                suggestion: Some("페르소나 ID가 올바른지 확인하세요. (.help를 입력하여 명령어를 확인하세요.)".to_string()),
+                                suggestion: Some("Check that the persona ID is correct (type .help to see available commands).".to_string()),
                             };
                         let mut outgoing =
                             OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);

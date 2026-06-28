@@ -53,7 +53,7 @@ oxios/
 
 ## Conventions
 
-- **Language:** Code, comments, docs, commits — English. User-facing messages — Korean.
+- **Language:** Code, comments, docs, commits — English. **Structural/tool output is English** (global product): CLI `--help`, status panels, banners, error messages, permission-denial reasons, and Telegram bot guidance/commands. **Agent conversational replies follow the user's language** (Korean for Korean users). **Web UI is bilingual** (Korean/English). The string *sources* in `oxios-gateway`/`oxios-kernel` (e.g. `error_classify.rs`, `gate.rs`) count as tool output → English.
 - **Rust:** `anyhow` for apps, `thiserror` for libs. `#![warn(missing_docs)]` on public crates.
 - **Naming:** Crates `oxios-<component>`, public API `verb_noun`.
 - **Testing:** Unit tests in `#[cfg(test)] mod tests`. Integration tests in `tests/`.
