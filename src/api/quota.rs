@@ -41,6 +41,23 @@ pub struct RateWindow {
     pub resets_at: Option<DateTime<Utc>>,
 }
 
+/// Billing-model classification returned by a provider's quota API.
+/// Mirrors `oxios_kernel::token_maxing::live_quota::PlanType` so the
+/// binary crate can construct snapshots without taking a kernel
+/// dependency. Translation happens in
+/// [`crate::api::quota::to_live_snapshot`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PlanType {
+    /// Reset-window allocation (Coding Plan, Pro, etc.) — maxable.
+    Subscription,
+    /// Pay-per-token — excluded from token maxing.
+    Metered,
+    /// No live data yet (fetcher never ran or returned an error).
+    #[default]
+    Unknown,
+}
+
 /// Snapshot of a provider account's quota/balance state.
 #[derive(Debug, Clone, Serialize)]
 pub struct QuotaSnapshot {
@@ -54,6 +71,14 @@ pub struct QuotaSnapshot {
     pub period_start: Option<DateTime<Utc>>,
     /// Human-readable plan / subscription name.
     pub plan: Option<String>,
+    /// Billing-model classification. See [`PlanType`].
+    #[serde(default)]
+    pub plan_type: PlanType,
+    /// Total token limit for the primary window (when known). Used
+    /// by `apply_recalibration` to recompute the self-tracked
+    /// counter against the live response.
+    #[serde(default)]
+    pub token_limit: Option<f64>,
     /// Rate-limit / quota windows.
     pub rate_windows: Vec<RateWindow>,
     /// When this snapshot was fetched.
@@ -144,6 +169,8 @@ impl QuotaFetcher for OpenAiQuotaFetcher {
                 period_spend_usd: None,
                 period_start: Some(period_start),
                 plan: None,
+                plan_type: PlanType::Metered, // OpenAI is metered by default
+                token_limit: None,
                 rate_windows: vec![],
                 fetched_at: now,
                 error: Some("requires admin API key with organization:read".into()),
@@ -156,6 +183,8 @@ impl QuotaFetcher for OpenAiQuotaFetcher {
                 period_spend_usd: None,
                 period_start: Some(period_start),
                 plan: None,
+                plan_type: PlanType::Metered,
+                token_limit: None,
                 rate_windows: vec![],
                 fetched_at: now,
                 error: Some(format!("OpenAI API returned {status}")),
@@ -172,6 +201,8 @@ impl QuotaFetcher for OpenAiQuotaFetcher {
             period_spend_usd: period_spend,
             period_start: Some(period_start),
             plan: None,
+            plan_type: PlanType::Metered,
+            token_limit: None,
             rate_windows: vec![],
             fetched_at: now,
             error: None,
@@ -325,6 +356,8 @@ fn blank_snapshot() -> QuotaSnapshot {
         period_spend_usd: None,
         period_start: None,
         plan: None,
+        plan_type: PlanType::Unknown,
+        token_limit: None,
         rate_windows: vec![],
         fetched_at: Utc::now(),
         error: None,
@@ -333,34 +366,232 @@ fn blank_snapshot() -> QuotaSnapshot {
 
 // ── ZAI subscription fetcher ─────────────────────────────────────────────
 
-/// ZAI subscription quota fetcher (best-effort).
+/// ZAI subscription quota fetcher.
 ///
-/// Probes a usage endpoint with a bearer token. The exact response shape
-/// is **not** publicly documented; this fetcher is written permissively
-/// — any non-2xx or unparseable response yields an `error` field rather
-/// than a hard failure, so the QuotaTracker keeps the self-tracked
-/// counter (Phase 1) and the snapshot just becomes a
-/// `RecalibrationOutcome::FetchFailed` log entry. If the endpoint moves
-/// or the auth flow changes, update [`UsageProbe::new`].
+/// Calls `GET https://api.z.ai/api/monitor/usage/quota/limit` with a
+/// Bearer token and parses the typed `data.limits[]` array. Each
+/// entry has `type` ∈ {`TOKENS_LIMIT`, `TIME_LIMIT`}, a `unit`+`number`
+/// window, and `nextResetTime` (epoch ms). See
+/// <https://github.com/steipete/CodexBar/blob/main/docs/zai.md>.
+///
+/// **Subscription vs metered** is decided by whether any
+/// `TOKENS_LIMIT` entry is present. A bare metered key returns
+/// `plan_type = Metered` and no usable `TOKENS_LIMIT` window.
+///
+/// Region: the default base URL is the Global endpoint. BigModel
+/// China mainland users can override via `Z_AI_API_HOST=open.bigmodel.cn`.
 pub struct ZaiQuotaFetcher {
-    probe: UsageProbe,
+    client: reqwest::Client,
+    base_url: String,
 }
 
 impl Default for ZaiQuotaFetcher {
     fn default() -> Self {
+        let host = std::env::var("Z_AI_API_HOST")
+            .ok()
+            .filter(|h| !h.is_empty())
+            .map(normalize_zai_host)
+            .unwrap_or_else(|| "https://api.z.ai".to_string());
         Self {
-            probe: UsageProbe::new("zai", "https://api.z.ai/api/usage"),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(15))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
+            base_url: host,
         }
     }
+}
+
+/// Convert a bare host or `https?://host` override into a
+/// `https://host` prefix with no trailing slash. Explicit `http://`
+/// is upgraded to `https://` to avoid sending Bearer tokens over
+/// plaintext.
+fn normalize_zai_host(host: String) -> String {
+    if host.starts_with("http://") {
+        return host.replacen("http://", "https://", 1);
+    }
+    if host.starts_with("https://") {
+        return host.trim_end_matches('/').to_string();
+    }
+    format!("https://{}", host.trim_end_matches('/'))
 }
 
 #[async_trait]
 impl QuotaFetcher for ZaiQuotaFetcher {
     fn provider(&self) -> &str {
-        self.probe.provider_name
+        "zai"
     }
     async fn fetch(&self, api_key: Option<&str>) -> anyhow::Result<QuotaSnapshot> {
-        Ok(self.probe.probe(api_key).await)
+        let key = api_key.ok_or_else(|| anyhow::anyhow!("no API key"))?;
+        let now = Utc::now();
+        let url = format!(
+            "{}/api/monitor/usage/quota/limit",
+            self.base_url.trim_end_matches('/')
+        );
+        let resp = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {key}"))
+            .header("Accept", "application/json")
+            .send()
+            .await?;
+        let status = resp.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED
+            || status == reqwest::StatusCode::FORBIDDEN
+        {
+            return Ok(QuotaSnapshot {
+                provider: "zai".into(),
+                credit_balance_usd: None,
+                period_spend_usd: None,
+                period_start: None,
+                plan: None,
+                plan_type: PlanType::Unknown,
+                token_limit: None,
+                rate_windows: vec![],
+                fetched_at: now,
+                error: Some(format!(
+                    "ZAI API returned {status} — invalid or non-subscription key"
+                )),
+            });
+        }
+        if !status.is_success() {
+            return Ok(QuotaSnapshot {
+                provider: "zai".into(),
+                credit_balance_usd: None,
+                period_spend_usd: None,
+                period_start: None,
+                plan: None,
+                plan_type: PlanType::Unknown,
+                token_limit: None,
+                rate_windows: vec![],
+                fetched_at: now,
+                error: Some(format!("ZAI API returned {status}")),
+            });
+        }
+        let body: serde_json::Value = resp.json().await?;
+        Ok(parse_zai_quota_limit(&body, now))
+    }
+}
+
+/// Walk ZAI's `data.limits[]` array and map entries to `RateWindow`s.
+fn parse_zai_quota_limit(body: &serde_json::Value, now: DateTime<Utc>) -> QuotaSnapshot {
+    let data = body.get("data");
+    let plan = data
+        .and_then(|d| d.get("planName"))
+        .or_else(|| data.and_then(|d| d.get("plan")))
+        .or_else(|| data.and_then(|d| d.get("plan_type")))
+        .or_else(|| data.and_then(|d| d.get("packageName")))
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let mut token_entries: Vec<&serde_json::Value> = Vec::new();
+    let mut time_entries: Vec<&serde_json::Value> = Vec::new();
+    if let Some(limits) = data.and_then(|d| d.get("limits")).and_then(|l| l.as_array()) {
+        for entry in limits {
+            match entry.get("type").and_then(|t| t.as_str()) {
+                Some("TOKENS_LIMIT") => token_entries.push(entry),
+                Some("TIME_LIMIT") => time_entries.push(entry),
+                _ => {}
+            }
+        }
+    }
+    token_entries.sort_by_key(|e| zai_window_minutes(e));
+    let mut rate_windows = Vec::new();
+    let mut token_limit: Option<f64> = None;
+    if let Some(primary) = token_entries.last() {
+        if let Some(w) = zai_entry_to_rate_window(primary, "tokens-primary", now) {
+            token_limit = w.limit;
+            rate_windows.push(w);
+        }
+    }
+    if token_entries.len() >= 2 {
+        let tertiary_idx = if token_entries.len() >= 3 {
+            token_entries.len() - 2
+        } else {
+            0
+        };
+        if let Some(w) =
+            zai_entry_to_rate_window(token_entries[tertiary_idx], "tokens-tertiary", now)
+        {
+            rate_windows.push(w);
+        }
+    }
+    for entry in &time_entries {
+        if let Some(w) = zai_entry_to_rate_window(entry, "time", now) {
+            rate_windows.push(w);
+        }
+    }
+    let plan_type = if !token_entries.is_empty() {
+        PlanType::Subscription
+    } else {
+        PlanType::Metered
+    };
+    let error = if rate_windows.is_empty() {
+        Some("no TOKENS_LIMIT/TIME_LIMIT entries in response".to_string())
+    } else {
+        None
+    };
+    QuotaSnapshot {
+        provider: "zai".into(),
+        credit_balance_usd: None,
+        period_spend_usd: None,
+        period_start: None,
+        plan,
+        plan_type,
+        token_limit,
+        rate_windows,
+        fetched_at: now,
+        error,
+    }
+}
+
+fn zai_entry_to_rate_window(
+    entry: &serde_json::Value,
+    kind: &str,
+    now: DateTime<Utc>,
+) -> Option<RateWindow> {
+    let number = entry.get("number").and_then(|n| n.as_f64())?;
+    let unit = entry.get("unit").and_then(|u| u.as_str()).unwrap_or("");
+    let resets_at = entry
+        .get("nextResetTime")
+        .and_then(|v| v.as_i64())
+        .and_then(|ms| DateTime::<Utc>::from_timestamp_millis(ms));
+    let limit = entry.get("usage").and_then(|u| u.as_f64());
+    let used = entry.get("currentValue").and_then(|v| v.as_f64());
+    let remaining_percent = match (used, limit) {
+        (Some(u), Some(l)) if l > 0.0 => Some(((l - u) / l * 100.0).clamp(0.0, 100.0)),
+        _ => entry
+            .get("percentage")
+            .and_then(|p| p.as_f64())
+            .map(|p| 100.0 - p),
+    };
+    let window_label = match (number, unit) {
+        (n, "hours") => format!("{kind} {n}h"),
+        (n, "minutes") => format!("{kind} {n}m"),
+        (n, "days") => format!("{kind} {n}d"),
+        (n, "weeks") => format!("{kind} {n}w"),
+        _ => kind.to_string(),
+    };
+    Some(RateWindow {
+        name: window_label,
+ used,
+        limit,
+        remaining_percent,
+        resets_at: match resets_at {
+            Some(r) if r + chrono::Duration::minutes(1) < now => None,
+            other => other,
+        },
+    })
+}
+
+fn zai_window_minutes(entry: &serde_json::Value) -> u64 {
+    let number = entry.get("number").and_then(|n| n.as_f64()).unwrap_or(0.0) as u64;
+    let unit = entry.get("unit").and_then(|u| u.as_str()).unwrap_or("");
+    match unit {
+        "minutes" => number,
+        "hours" => number * 60,
+        "days" => number * 60 * 24,
+        "weeks" => number * 60 * 24 * 7,
+        _ => u64::MAX,
     }
 }
 
@@ -429,6 +660,8 @@ pub async fn fetch_all(credentials: &HashMap<String, String>) -> Vec<QuotaSnapsh
                 period_spend_usd: None,
                 period_start: None,
                 plan: None,
+                plan_type: PlanType::Unknown,
+                token_limit: None,
                 rate_windows: vec![],
                 fetched_at: Utc::now(),
                 error: Some(e.to_string()),
@@ -438,6 +671,43 @@ pub async fn fetch_all(credentials: &HashMap<String, String>) -> Vec<QuotaSnapsh
     }
 
     results
+}
+
+/// Convert a binary-crate `QuotaSnapshot` into the kernel's
+/// `live_quota::QuotaSnapshot` so it can be cached in
+/// `QuotaTracker::update_live_snapshot`. Field-by-field translation;
+/// the `PlanType` discriminant names match across both crates.
+pub fn to_live_snapshot(
+    snap: &QuotaSnapshot,
+) -> oxios_kernel::token_maxing::live_quota::QuotaSnapshot {
+    use oxios_kernel::token_maxing::live_quota::{
+        PlanType as LivePt, QuotaSnapshot as Live, RateWindow as LiveRw,
+    };
+    let plan_type = match snap.plan_type {
+        PlanType::Subscription => LivePt::Subscription,
+        PlanType::Metered => LivePt::Metered,
+        PlanType::Unknown => LivePt::Unknown,
+    };
+    let rate_windows = snap
+        .rate_windows
+        .iter()
+        .map(|w| LiveRw {
+            name: w.name.clone(),
+            used: w.used,
+            limit: w.limit,
+            remaining_percent: w.remaining_percent,
+            resets_at: w.resets_at,
+        })
+        .collect();
+    Live {
+        provider: snap.provider.clone(),
+        plan: snap.plan.clone(),
+        plan_type,
+        token_limit: snap.token_limit,
+        rate_windows,
+        fetched_at: snap.fetched_at,
+        error: snap.error.clone(),
+    }
 }
 
 #[cfg(test)]

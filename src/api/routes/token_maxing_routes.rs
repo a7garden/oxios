@@ -106,36 +106,47 @@ pub(crate) async fn handle_token_maxing_session(
 
 /// GET /api/token-maxing/providers — eligibility + live availability.
 ///
-/// The `providers` array is a richer per-provider DTO built at the route
-/// layer (rather than [`QuotaTrackerSnapshot`], which stays a thin
-/// `{provider, availability}` shape). Each entry adds a `billing_model`
-/// string derived from the live config:
+/// The `providers` array is a richer per-provider DTO built at the
+/// route layer. Each entry adds a `billing_model` string derived
+/// from the **live quota snapshot** (RFC-031 v2), not the v1
+/// `[[token-maxing.providers]]` config:
 ///
-/// - `"subscription"` — the provider entry exists and
-///   `billing_model == "subscription"`.
-/// - `"metered"` — the provider entry exists and
-///   `billing_model == "metered"` (a user who explicitly tagged it as
-///   pay-per-use, now possible because v1 no longer rejects the field).
-/// - `"unknown"` — the provider has no config entry, or the entry's
-///   `billing_model` is anything other than the two canonical values
-///   above (free-form / garbage).
+/// - `"subscription"` — the live `QuotaSnapshot` returned
+///   `plan_type = Subscription` (e.g. ZAI Coding Plan with
+///   `TOKENS_LIMIT`).
+/// - `"metered"` — the live response had no `TOKENS_LIMIT`
+///   window (pay-per-token key).
+/// - `"unknown"` — no live snapshot has been received yet (fetcher
+///   hasn't run, or returned an error).
+///
+/// The `provider` array is also widened to include
+/// auto-discovered providers that have a live snapshot but no
+/// `[[token-maxing.providers]]` entry.
 pub(crate) async fn handle_token_maxing_providers(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let api = tm(&state)?;
-    let cfg = api.config();
-    let providers: Vec<serde_json::Value> = api
-        .snapshots()
+    let snapshots = api.snapshots();
+    let providers: Vec<serde_json::Value> = snapshots
         .into_iter()
         .map(|s| {
-            let billing_model = cfg
-                .get(&s.provider)
-                .map(|p| match p.billing_model.as_str() {
-                    oxios_kernel::SUBSCRIPTION_BILLING_MODEL => "subscription",
-                    "metered" => "metered",
-                    _ => "unknown",
-                })
-                .unwrap_or("unknown");
+            // v2: source from the live snapshot's plan_type, not
+            // the v1 config block. A subscription key auto-
+            // discovered via live fetch (zai Coding Plan) returns
+            // "subscription" even with no `[[token-maxing.providers]]`
+            // entry.
+            let billing_model = match api
+                .tracker()
+                .live_snapshot(&s.provider)
+                .map(|snap| snap.plan_type)
+            {
+                Some(oxios_kernel::token_maxing::live_quota::PlanType::Subscription) => {
+                    "subscription"
+                }
+                Some(oxios_kernel::token_maxing::live_quota::PlanType::Metered) => "metered",
+                // PlanType::Unknown or no live snapshot at all
+                _ => "unknown",
+            };
             serde_json::json!({
                 "provider": s.provider,
                 "availability": s.availability,
