@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-06-28
+
+### Added
+- **Live activity transparency** — Real-time agent progress display through SSE streaming_sink and live-activity bar, showing thinking/reasoning/phase transitions to the user.
+- **MCP server edit dialog** — Inline dialog for editing MCP server config (command, args, env, enable/disable).
+- **Mount edit dialog** — Inline dialog for editing mount names.
+- **Persona edit dialog** — Inline dialog for editing persona config.
+- **Cron job management UI** — List view and edit dialog for cron jobs.
+- **Kernel streaming sink** — `StreamingSinkRegistry` for agent-to-client real-time transparency.
+- **i18n updates** — EN/KO translations for all new UI components.
+
+### Changed
+- **Gateway rework** — Improved message routing and event bus architecture.
+- **Typing indicator** — Real-time update improvements for WebSocket-based chat.
+- **State store & session nav** — Enhanced session navigation and state persistence.
+- **Workspace members** — Added `oxios-ouroboros` and `oxios-gateway` to workspace members for full CI coverage across all published crates.
+
+### Fixed
+- **Clippy warnings** — 7 lint fixes across kernel, MCP, and API routes (collapsible if, clone on copy, len_without_is_empty, unnecessary get-then-check).
+
 ## [1.13.2] - 2026-06-28
 
 ### Changed
