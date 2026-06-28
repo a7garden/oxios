@@ -1,6 +1,7 @@
 import { Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { CronScheduleEditor } from '@/components/cron/cron-schedule-editor'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -85,13 +86,7 @@ export function EditCronDialog({ job, isPending, onOpenChange, onSave }: EditCro
           </div>
           <div className="space-y-2">
             <Label htmlFor="cron-edit-schedule">{t('cronJobs.schedule', '스케줄')}</Label>
-            <Input
-              id="cron-edit-schedule"
-              value={schedule}
-              onChange={(e) => setSchedule(e.target.value)}
-              placeholder="0 */6 * * *"
-              className="font-mono"
-            />
+            <CronScheduleEditor id="cron-edit-schedule" value={schedule} onChange={setSchedule} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="cron-edit-goal">{t('cronJobs.goal', '목표')}</Label>

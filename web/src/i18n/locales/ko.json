@@ -118,7 +118,14 @@
     "previousPage": "이전 페이지",
     "selectAll": "전체 선택",
     "unreadCount": "(읽지 않음 {{count}})",
-    "mounts": "마운트"
+    "mounts": "마운트",
+    "sun": "일",
+    "mon": "월",
+    "tue": "화",
+    "wed": "수",
+    "thu": "목",
+    "fri": "금",
+    "sat": "토"
   },
   "ui": {
     "selectPlaceholder": "선택..."
@@ -1199,7 +1206,31 @@
     "edit": "Cron 작업 편집",
     "editDescription": "작업의 이름, 스케줄, 목표를 변경합니다.",
     "saved": "Cron 작업이 저장되었습니다",
-    "saveFailed": "Cron 작업 저장에 실패했습니다"
+    "saveFailed": "Cron 작업 저장에 실패했습니다",
+    "freqMinutes": "분 단위",
+    "freqHourly": "시간 단위",
+    "freqDaily": "매일",
+    "freqWeekly": "매주",
+    "freqMonthly": "매월",
+    "repeat": "반복",
+    "simpleMode": "간편 모드",
+    "advancedMode": "고급 (Cron)",
+    "every": "주기",
+    "everyNMinutes_other": "{{count}}분마다",
+    "everyNHours_other": "{{count}}시간마다",
+    "atMinute": "분",
+    "atTime": "시간",
+    "onDays": "요일",
+    "onDay": "일",
+    "invalidCron": "유효하지 않은 cron 식입니다",
+    "preview": "미리보기",
+    "previewEmpty": "미리보기 없음",
+    "customSchedule": "사용자 지정 스케줄",
+    "descMinutes_other": "{{count}}분마다",
+    "descHourly_other": "{{count}}시간마다 {{minute}}분에",
+    "descDaily": "매일 {{time}}",
+    "descWeekly": "매주 {{days}} {{time}}",
+    "descMonthly": "매월 {{day}}일 {{time}}"
   },
   "git": {
     "title": "Git",

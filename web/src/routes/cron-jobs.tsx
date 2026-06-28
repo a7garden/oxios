@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Pencil, Plus, Power, PowerOff, Timer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { CronScheduleEditor } from '@/components/cron/cron-schedule-editor'
 import { EditCronDialog } from '@/components/cron/edit-cron-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
+import { DEFAULT_CRON } from '@/lib/cron-utils'
 import type { CronJob } from '@/types'
 
 export const Route = createFileRoute('/cron-jobs')({ component: CronJobsPage })
@@ -23,7 +25,7 @@ function CronJobsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [editingJob, setEditingJob] = useState<CronJob | null>(null)
   const [name, setName] = useState('')
-  const [schedule, setSchedule] = useState('')
+  const [schedule, setSchedule] = useState(DEFAULT_CRON)
   const [goal, setGoal] = useState('')
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
@@ -42,7 +44,7 @@ function CronJobsPage() {
       queryClient.invalidateQueries({ queryKey: ['cron-jobs'] })
       setShowCreate(false)
       setName('')
-      setSchedule('')
+      setSchedule(DEFAULT_CRON)
       setGoal('')
     },
   })
@@ -98,11 +100,7 @@ function CronJobsPage() {
               onChange={(e) => setName(e.target.value)}
               placeholder={t('cronJobs.jobNamePlaceholder')}
             />
-            <Input
-              value={schedule}
-              onChange={(e) => setSchedule(e.target.value)}
-              placeholder={t('cronJobs.cronSchedulePlaceholder')}
-            />
+            <CronScheduleEditor value={schedule} onChange={setSchedule} />
             <Input
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
