@@ -1,8 +1,16 @@
-import { AlertCircle, Hand, Play, Square } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Hand, Play, Square } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   useTokenMaxingProviders,
@@ -35,16 +43,43 @@ export function TokenMaxingControls() {
   const [start, setStart] = useState(defaultStart)
   const [end, setEnd] = useState(defaultEnd)
 
+  // Pending start action — captures which variant the user clicked so we
+  // can fire the right mutation after the metered-provider confirm dialog.
+  const [pending, setPending] = useState<StartRequest | null>(null)
+
+  const meteredProviders = (providers?.providers ?? []).filter(
+    (p) => p.billing_model === 'metered',
+  )
+  const hasMetered = meteredProviders.length > 0
+
+  const guardedStart = (req: StartRequest) => {
+    if (hasMetered) {
+      setPending(req)
+      return
+    }
+    startMutation.mutate(req)
+  }
+
   const handleStartWindow = () => {
     const startIso = fromLocalInput(start)
     const endIso = fromLocalInput(end)
     if (!startIso || !endIso) return
     if (new Date(endIso) <= new Date(startIso)) return
-    startMutation.mutate({ window: { start: startIso, end: endIso } })
+    guardedStart({ window: { start: startIso, end: endIso } })
   }
 
   const handleStartManual = () => {
-    startMutation.mutate({ manual: true })
+    guardedStart({ manual: true })
+  }
+
+  const handleConfirmMetered = () => {
+    if (!pending) return
+    startMutation.mutate(pending)
+    setPending(null)
+  }
+
+  const handleCancelMetered = () => {
+    setPending(null)
   }
 
   const handleStop = () => {
@@ -133,9 +168,39 @@ export function TokenMaxingControls() {
           </p>
         )}
       </CardContent>
+
+      <Dialog open={pending != null} onOpenChange={(o) => !o && handleCancelMetered()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              {t('tokenMaxing.billing.meteredWarningTitle')}
+            </DialogTitle>
+            <DialogDescription>{t('tokenMaxing.billing.meteredWarning')}</DialogDescription>
+          </DialogHeader>
+          {meteredProviders.length > 0 && (
+            <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+              {meteredProviders.map((p) => (
+                <li key={p.provider}>{p.provider}</li>
+              ))}
+            </ul>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelMetered}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleConfirmMetered} disabled={startMutation.isPending}>
+              {t('common.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
+
+/** Payload the controls will hand to `useTokenMaxingStart().mutate`. */
+type StartRequest = { window: { start: string; end: string } } | { manual: true }
 
 /** Format a Date as the `YYYY-MM-DDTHH:mm` value that `<input type="datetime-local">` expects. */
 function toLocalInput(d: Date): string {
@@ -145,7 +210,6 @@ function toLocalInput(d: Date): string {
 
 /** Convert `<input type="datetime-local">` value back to ISO-8601 UTC. */
 function fromLocalInput(local: string): string | null {
-  if (!local) return null
   const d = new Date(local)
   if (Number.isNaN(d.getTime())) return null
   return d.toISOString()

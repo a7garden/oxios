@@ -10,6 +10,7 @@ import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
 import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useRoles } from '@/hooks/use-engine'
 import { useChatStore } from '@/stores/chat'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
@@ -30,8 +31,10 @@ function ChatPage() {
     activeInterview,
     interviewRound,
     interviewAmbiguity,
+    activeRole,
     sendMessage,
     setActiveProject,
+    setActiveRole,
     dismissDetection,
     submitInterviewResponse,
     activeToolApproval,
@@ -40,6 +43,8 @@ function ChatPage() {
     connect,
     newSession,
   } = useChatStore()
+  const { data: rolesData } = useRoles()
+  const roles = Object.entries(rolesData?.roles ?? {}).map(([name, model]) => ({ name, model }))
 
   const [input, setInput] = useState('')
   const [userScrolledUp, setUserScrolledUp] = useState(false)
@@ -192,6 +197,9 @@ function ChatPage() {
               value={input}
               onChange={setInput}
               onSend={handleSend}
+              roles={roles}
+              activeRole={activeRole}
+              setActiveRole={setActiveRole}
               onCancel={handleCancel}
               disabled={isStreaming}
               isStreaming={isStreaming}

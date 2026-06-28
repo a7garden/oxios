@@ -376,6 +376,7 @@ async fn test_orchestrator_happy_path() {
             None,
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -411,6 +412,7 @@ async fn test_orchestrator_evolution_loop() {
             None,
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -438,7 +440,15 @@ async fn test_orchestrator_events_published() {
     // Run orchestration in background.
     let handle = tokio::spawn(async move {
         orchestrator
-            .handle_unified("test-user", "Check events", None, None, None, "test-req")
+            .handle_unified(
+                "test-user",
+                "Check events",
+                None,
+                None,
+                None,
+                None,
+                "test-req",
+            )
             .await
     });
 
@@ -700,6 +710,7 @@ async fn test_orchestrator_routes_to_supervisor() {
             None,
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await

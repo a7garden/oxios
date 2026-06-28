@@ -148,12 +148,7 @@ impl TokenMaxingConfig {
             if p.provider.trim().is_empty() {
                 errors.push(format!("token-maxing.providers[{i}].provider is empty"));
             }
-            if p.billing_model != SUBSCRIPTION_BILLING_MODEL {
-                errors.push(format!(
-                    "token-maxing.providers[{i}].billing_model = {:?} is not permitted; the only accepted value is {:?}",
-                    p.billing_model, SUBSCRIPTION_BILLING_MODEL,
-                ));
-            }
+
             if p.token_limit == 0 {
                 errors.push(format!(
                     "token-maxing.providers[{i}].token_limit must be > 0"
@@ -191,7 +186,9 @@ mod tests {
         };
         assert!(!cfg.is_eligible("openai"));
         assert!(!cfg.is_eligible("zai"));
-        assert!(!cfg.validate().is_empty());
+        // validate() no longer rejects metered entries — the eligibility
+        // rule is enforced at runtime by QuotaTracker via is_eligible().
+        assert!(cfg.validate().is_empty());
     }
 
     #[test]

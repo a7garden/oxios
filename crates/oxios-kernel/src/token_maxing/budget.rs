@@ -271,7 +271,42 @@ impl From<&ProviderState> for ProviderSnapshot {
     }
 }
 
-/// Errors from [`ProviderBudget::reserve`].
+impl ProviderSnapshot {
+    /// Build a snapshot directly from parts — used by the v2 live
+    /// quota path. `window_secs` defaults to 1h as a placeholder
+    /// when no live `resets_at` is known.
+    pub fn from_parts(
+        _provider: &str,
+        tokens_used: u64,
+        token_limit: u64,
+        resets_at: Option<DateTime<Utc>>,
+        _floor_percent: u8,
+    ) -> Self {
+        let tokens_remaining = token_limit.saturating_sub(tokens_used);
+        let remaining_percent = if token_limit == 0 {
+            0.0
+        } else {
+            (tokens_remaining as f64 / token_limit as f64) * 100.0
+        };
+        let now = Utc::now();
+        let window_remaining_secs = match resets_at {
+            Some(r) => (r - now).num_seconds().max(0) as u64,
+            None => 3600,
+        };
+        Self {
+            token_limit,
+            window_secs: 3600,
+            tokens_used,
+            tokens_remaining,
+            remaining_percent,
+            window_start: now,
+            resets_at,
+            window_remaining_secs,
+        }
+    }
+}
+
+ /// Errors from [`ProviderBudget::reserve`].
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum ReserveError {
     /// Provider has no budget configured (ineligible).

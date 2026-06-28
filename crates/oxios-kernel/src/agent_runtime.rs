@@ -293,6 +293,7 @@ impl AgentRuntime {
             session_id,
             Some(directive),
             env.model_override.as_deref(),
+            env.role.as_deref(),
             env.restore_state.as_ref(),
         )
         .await
@@ -319,6 +320,7 @@ impl AgentRuntime {
         session_id: Option<String>,
         persistence_directive: Option<&Directive>,
         model_override: Option<&str>,
+        role: Option<&str>,
         restore_state: Option<&serde_json::Value>,
     ) -> Result<ExecutionResult> {
         let prompt = build_user_prompt_inner(goal, acceptance_criteria);
@@ -464,13 +466,20 @@ impl AgentRuntime {
             Err(e) => tracing::warn!(error = %e, "Failed to recall knowledge context"),
         }
 
-        // Resolve the model. RFC-029 P2: honor a model_override from the
-        // ExecEnv (set by RecoveryCoordinator for fallback retries) before
-        // falling back to the LIVE default model (post-hot-swap). This is
-        // the single source of truth for model resolution across all phases.
+        // RFC-032 + RFC-029 P2: resolve the model. Precedence:
+        //   1.  — set by RecoveryCoordinator during fallback
+        //      retries. MUST win over role routing: if a role-mapped model
+        //      is the one that just failed, letting role override recovery
+        //      would loop the failure.
+        //   2.  — when the WS client supplied a role
+        //      hint, consult  for a role → model
+        //      mapping. Read from  directly (not via the
+        //      EngineApi facade) so the resolution stays on the hot path.
+        //   3.  — the configured default.
         let engine = self.engine_handle.get();
         let model_id = model_override
             .map(|s| s.to_string())
+            .or_else(|| role.and_then(|r| self.kernel_handle.engine.model_for_role(r)))
             .unwrap_or_else(|| engine.default_model_id().to_string());
         // Validates fail-fast: a bad model ID is rejected here at execute entry.
         engine.resolve_model(&model_id)?;

@@ -1699,6 +1699,14 @@
         "ineligible": "Inactive"
       }
     },
+    "billing": {
+      "subscription": "Subscription",
+      "metered": "Metered",
+      "unknown": "Unknown",
+      "unknownHelp": "No quota API response for this provider.",
+      "meteredWarning": "This provider is metered. Activating it will incur real costs. Continue?",
+      "meteredWarningTitle": "Metered provider warning"
+    },
     "sessions": {
       "title": "Session History",
       "emptyTitle": "No token-maxing sessions yet",

@@ -180,6 +180,7 @@ async fn test_orchestrator_happy_path() {
             None,
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -213,6 +214,7 @@ async fn test_orchestrator_evolution_loop() {
             None,
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -242,6 +244,7 @@ async fn test_session_continuation() {
             Some(session_id),
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -256,6 +259,7 @@ async fn test_session_continuation() {
             Some(session_id),
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -276,6 +280,7 @@ async fn test_multiple_sessions_independent() {
             Some("session-a"),
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -287,6 +292,7 @@ async fn test_multiple_sessions_independent() {
             Some("session-b"),
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -313,6 +319,7 @@ async fn test_session_cleaned_after_completion() {
             Some(session_id),
             None,
             None,
+            None, // RFC-032: role
             "test-req",
         )
         .await
@@ -320,7 +327,15 @@ async fn test_session_cleaned_after_completion() {
 
     // New message without session ID should get a fresh session.
     let result2 = orchestrator
-        .handle_unified("test-user", "Another task", None, None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Another task",
+            None,
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -336,7 +351,15 @@ async fn test_phase_events_published() {
         build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
 
     let result = orchestrator
-        .handle_unified("test-user", "Test events", None, None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Test events",
+            None,
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 

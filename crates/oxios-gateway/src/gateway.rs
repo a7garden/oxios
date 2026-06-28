@@ -28,6 +28,7 @@
 //! ```
 
 use anyhow::Result;
+use oxios_ouroboros::FailureClass;
 use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -542,6 +543,7 @@ impl Gateway {
 
             // RFC-027: unified path. Falls back to handle_message internally
             // if IntentEngine is not wired.
+            let role = msg.metadata.get("role").map(String::as_str);
             let result = orchestrator
                 .handle_unified(
                     &msg.user_id,
@@ -549,6 +551,7 @@ impl Gateway {
                     session_id.as_deref(),
                     project_ids.as_deref(),
                     mount_ids.as_deref(),
+                    role,
                     &request_id,
                 )
                 .await;
@@ -625,9 +628,9 @@ impl Gateway {
                         phase: orchestration.phase_reached.to_string(),
                         evaluation_passed: orchestration.evaluation_passed,
                         duration_ms: Some(duration_ms),
-                        error: None,
-                        // Chat UI redesign: interactive interview payload.
-                        // None when the LLM did not produce structured
+                        error: orchestration
+                            .failure_class
+                            .map(|fc| failure_class_to_user_error(fc, &orchestration.response)),
                         // questions — the frontend falls back to markdown.
                         interview_questions: orchestration.interview_questions,
                         interview_round: orchestration.interview_round,
@@ -884,5 +887,24 @@ impl Gateway {
 impl std::fmt::Debug for Gateway {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Gateway").finish()
+    }
+}
+
+/// Convert an `oxios_ouroboros::FailureClass` to a `UserFacingError` for
+/// the frontend. The `response` text is already populated by the orchestrator
+/// with a user-friendly message (RFC-032).
+fn failure_class_to_user_error(fc: FailureClass, response: &str) -> UserFacingError {
+    let kind = match fc {
+        FailureClass::BudgetExceeded | FailureClass::QuotaExhausted => ErrorKind::ProviderError,
+        FailureClass::AuthFailure => ErrorKind::ApiKeyMissing,
+        FailureClass::ModelUnavailable => ErrorKind::ProviderError,
+        FailureClass::ContextOverflow => ErrorKind::ExecutionFailed,
+        FailureClass::Transient => ErrorKind::ProviderError,
+        FailureClass::Unknown => ErrorKind::Internal,
+    };
+    UserFacingError {
+        message: response.to_string(),
+        kind,
+        suggestion: None,
     }
 }

@@ -695,6 +695,9 @@ pub struct EngineConfigResponse {
     pub provider: Option<String>,
     /// Current routing configuration.
     pub routing: RoutingConfigSnapshot,
+    /// Role-based model routing config (RFC-032).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role_routing: Option<crate::config::RoleRoutingConfig>,
 }
 
 /// Result of an API key validation attempt.
@@ -756,6 +759,39 @@ impl EngineApi {
     /// Get a reference to the engine handle.
     pub fn engine_handle(&self) -> &Arc<crate::engine::EngineHandle> {
         &self.engine_handle
+    }
+    /// RFC-032: Get the current role routing config (role → model mapping).
+    pub fn role_routing(&self) -> crate::config::RoleRoutingConfig {
+        self.config.read().engine.role_routing.clone()
+    }
+
+    /// RFC-032: Resolve the model ID for a given role, if configured.
+    /// Reads the LIVE config under its shared RwLock so updates take
+    /// effect immediately. Returns `None` when the role is not in
+    /// the mapping.
+    pub fn model_for_role(&self, role: &str) -> Option<String> {
+        self.config
+            .read()
+            .engine
+            .role_routing
+            .roles
+            .get(role)
+            .cloned()
+    }
+
+    /// RFC-032: Update role routing config and persist to config.toml.
+    pub fn set_role_routing(
+        &self,
+        role_routing: crate::config::RoleRoutingConfig,
+    ) -> anyhow::Result<()> {
+        let snapshot = {
+            let mut cfg = self.config.write();
+            cfg.engine.role_routing = role_routing;
+            cfg.clone()
+        };
+        self.persist(&snapshot)?;
+        tracing::info!("Role routing updated");
+        Ok(())
     }
 
     // ── Read operations ────────────────────────────────────────────────
@@ -898,6 +934,12 @@ impl EngineApi {
             .map(|p| CredentialStore::has_credential(p, cfg.api_key().as_deref()))
             .unwrap_or(false);
 
+        let role_routing = if cfg.engine.role_routing.roles.is_empty() {
+            None
+        } else {
+            Some(cfg.engine.role_routing.clone())
+        };
+
         EngineConfigResponse {
             default_model: cfg.engine.default_model.clone(),
             api_key_set,
@@ -909,10 +951,10 @@ impl EngineApi {
                 fallback_models: cfg.engine.fallback_models.clone(),
                 excluded_models: cfg.engine.excluded_models.clone(),
             },
+            role_routing,
         }
     }
 
-    /// Get routing stats snapshot (for Web dashboard).
     pub fn routing_stats_snapshot(&self) -> RoutingStatsSnapshot {
         self.routing_stats.snapshot()
     }
@@ -1396,6 +1438,7 @@ mod tests {
                 fallback_models: vec![],
                 excluded_models: vec![],
             },
+            role_routing: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
         let restored: EngineConfigResponse = serde_json::from_str(&json).unwrap();

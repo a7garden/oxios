@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTokenMaxingProviders, useTokenMaxingStatus } from '@/hooks/use-token-maxing'
 import {
   type AvailabilityVerdict,
+  type BillingModel,
   type NormalizedAvailability,
   normalizeAvailability,
 } from '@/types/token-maxing'
+import { BillingBadge } from './billing-badge'
 
 /** Live provider availability panel — RFC-031 §4 verdict per provider.
  *  Mirrors ProviderQuotaCards structure (Card → list of rows with
@@ -38,10 +40,14 @@ export function TokenMaxingProviderCards() {
           <p className="text-sm text-muted-foreground py-4">{t('tokenMaxing.providers.empty')}</p>
         ) : (
           <div className="space-y-3">
-            {providers.map((p) => {
-              const norm = normalizeAvailability(p.availability)
-              return <ProviderRow key={p.provider} provider={p.provider} availability={norm} />
-            })}
+            {providers.map((p) => (
+              <ProviderRow
+                key={p.provider}
+                provider={p.provider}
+                availability={normalizeAvailability(p.availability)}
+                billingModel={p.billing_model}
+              />
+            ))}
           </div>
         )}
       </CardContent>
@@ -52,16 +58,22 @@ export function TokenMaxingProviderCards() {
 function ProviderRow({
   provider,
   availability,
+  billingModel,
 }: {
   provider: string
   availability: NormalizedAvailability
+  /** Orthogonal to availability state — derived from the live quota API
+   *  (RFC-031 v2). May be missing on backends that pre-date v2; the
+   *  BillingBadge coerces undefined to `unknown`. */
+  billingModel: BillingModel | null | undefined
 }) {
   return (
     <div className="flex items-center justify-between rounded-lg border p-3">
       <div className="space-y-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{provider}</span>
           <VerdictBadge verdict={availability.verdict} />
+          <BillingBadge billingModel={billingModel} />
         </div>
         <ProviderDetail availability={availability} />
       </div>

@@ -1699,6 +1699,14 @@
         "ineligible": "비활성"
       }
     },
+    "billing": {
+      "subscription": "구독형",
+      "metered": "종량제",
+      "unknown": "미확인",
+      "unknownHelp": "이 provider는 quota API에서 응답을 받지 못했습니다.",
+      "meteredWarning": "이 provider는 종량제입니다. 활성화 시 실제 비용이 청구됩니다. 계속하시겠습니까?",
+      "meteredWarningTitle": "종량제 provider 경고"
+    },
     "sessions": {
       "title": "세션 기록",
       "emptyTitle": "아직 토큰 맥싱 세션이 없습니다",

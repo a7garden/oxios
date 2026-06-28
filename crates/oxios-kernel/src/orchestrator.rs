@@ -556,6 +556,7 @@ impl Orchestrator {
     /// Builds a [`MsgCtx`] from the session history (if any), then delegates
     /// to [`handle`](Self::handle). Falls back to `handle_message` if no
     /// `IntentEngine` is wired.
+    #[allow(clippy::too_many_arguments)]
     pub async fn handle_unified(
         &self,
         user_id: &str,
@@ -563,6 +564,7 @@ impl Orchestrator {
         session_id: Option<&str>,
         project_ids: Option<&str>,
         mount_ids: Option<&str>,
+        role: Option<&str>,
         request_id: &str,
     ) -> Result<OrchestrationResult> {
         // Get the IntentEngine (always wired by the kernel assembler).
@@ -580,6 +582,7 @@ impl Orchestrator {
             history,
             project_ids: project_ids.map(String::from),
             mount_ids: mount_ids.map(String::from),
+            role: role.map(String::from),
             user_id: user_id.to_string(),
         };
 
@@ -632,6 +635,7 @@ impl Orchestrator {
                 tool_calls: Vec::new(),
                 interview_questions: None,
                 interview_round: None,
+                failure_class: None,
                 reasoning_text: String::new(),
             },
             HandleResponse::Clarify(questions) => {
@@ -673,6 +677,7 @@ impl Orchestrator {
                     tool_calls: Vec::new(),
                     interview_questions: structured,
                     interview_round: Some(((ctx.history.len() / 2) as u32).max(1)),
+                    failure_class: None,
                     reasoning_text: String::new(),
                 }
             }
@@ -684,7 +689,14 @@ impl Orchestrator {
                 verdict,
                 evaluation_passed,
             } => {
-                let response_text = if directive.acceptance_criteria.is_empty() {
+                // RFC-032: when execution failed (budget/quota/auth/etc) and
+                // RFC-032: when execution failed (budget/quota/auth/etc) and
+                // the output is empty, generate a user-friendly error message
+                // so the WS handler can relay it as an `type: "error"` chunk.
+                let failure_class: Option<oxios_ouroboros::FailureClass> = result.failure_class;
+                let response_text = if !result.success && result.output.trim().is_empty() {
+                    failure_class_to_user_message(failure_class.as_ref())
+                } else if directive.acceptance_criteria.is_empty() {
                     result.output.clone()
                 } else {
                     match &verdict {
@@ -714,6 +726,7 @@ impl Orchestrator {
                     evaluation_passed,
                     output: Some(result.output.clone()),
                     tool_calls: result.tool_calls.clone(),
+                    failure_class,
                     interview_questions: None,
                     interview_round: None,
                     reasoning_text: result.reasoning_text.clone(),
@@ -721,8 +734,6 @@ impl Orchestrator {
             }
         }
     }
-
-    /// Resolve an [`ExecEnv`] from the per-message context.
     ///
     /// Mirrors the Mount workspace resolution done by `handle_message()`
     /// and `chat()` but packages the result as the new [`ExecEnv`] type.
@@ -775,6 +786,7 @@ impl Orchestrator {
             project_id,
             cspace_hint: None,
             model_override: None,
+            role: ctx.role.clone(),
             restore_state: None,
         }
     }
@@ -958,6 +970,52 @@ pub struct OrchestrationResult {
     /// `tool_calls` and restore on session reopen.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub reasoning_text: String,
+    /// Provider failure classification (RFC-029). `Some` when execution
+    /// failed with a classifiable provider/infra error; `None` on success,
+    /// interview, clarify, or unclassified failure.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure_class: Option<oxios_ouroboros::FailureClass>,
+}
+/// Generate a user-facing error message based on the failure class.
+/// Used when execution failed with no output text to show.
+fn failure_class_to_user_message(class: Option<&oxios_ouroboros::FailureClass>) -> String {
+    use oxios_ouroboros::FailureClass;
+    match class {
+        Some(FailureClass::BudgetExceeded) => {
+            "\u{26a0}\u{fe0f} Token budget exceeded for this provider. \
+             Try selecting a different model or configuring additional providers \
+             in Settings \u{2192} Engine."
+                .to_string()
+        }
+        Some(FailureClass::QuotaExhausted) => "\u{26a0}\u{fe0f} Provider quota exhausted. \
+             The selected provider has reached its rate or usage limit. \
+             Wait a moment and retry, or switch to a different model."
+            .to_string(),
+        Some(FailureClass::AuthFailure) => "\u{26a0}\u{fe0f} Authentication failed. \
+             Your API key for this provider may be invalid or expired. \
+             Check your credentials in Settings \u{2192} Engine."
+            .to_string(),
+        Some(FailureClass::ModelUnavailable) => "\u{26a0}\u{fe0f} Model unavailable. \
+             The selected model is no longer available or was not found. \
+             Choose a different model in Settings \u{2192} Engine."
+            .to_string(),
+        Some(FailureClass::ContextOverflow) => "\u{26a0}\u{fe0f} Context window exceeded. \
+             The conversation is too long for this model's context limit. \
+             Start a new session or switch to a model with a larger context window."
+            .to_string(),
+        Some(FailureClass::Transient) => {
+            "\u{26a0}\u{fe0f} A temporary error occurred while contacting the provider. \
+             The system will retry automatically. If the issue persists, \
+             try a different model or check your network connection."
+                .to_string()
+        }
+        Some(FailureClass::Unknown) | None => {
+            "\u{26a0}\u{fe0f} An unexpected error occurred during execution. \
+             Please try again. If the problem persists, check your provider \
+             configuration in Settings \u{2192} Engine."
+                .to_string()
+        }
+    }
 }
 
 /// Render the body of the `## Workspace Context` prompt section (RFC-025).

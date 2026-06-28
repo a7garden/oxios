@@ -917,21 +917,41 @@ export function useProviders() {
   })
 }
 
-/** Fetch models for a specific provider. */
+/** Fetch models, optionally filtered by provider. When `provider` is null,
+ *  returns models from ALL connected providers (RFC-032). */
 export function useModels(provider: string | null) {
   return useQuery({
-    queryKey: ['engine', 'models', provider],
+    queryKey: ['engine', 'models', provider ?? '__all__'],
     queryFn: async (): Promise<ModelInfo[]> => {
-      if (!provider) return []
+      if (provider) {
+        try {
+          const res = await api.get<ProviderModelsResponse>(`/api/engine/models?provider=${encodeURIComponent(provider)}`)
+          return res.models
+        } catch {
+          // Fall back to static catalog
+        }
+        return MODEL_CATALOG[provider] ?? []
+      }
+      // RFC-032: fetch models from all connected providers
       try {
-        const res = await api.get<ProviderModelsResponse>(`/api/engine/models?provider=${provider}`)
+        const res = await api.get<ProviderModelsResponse>('/api/engine/models')
         return res.models
       } catch {
-        // Fall back to static catalog
+        // Fall back to static catalog — merge all providers
+        const all: ModelInfo[] = []
+        const seen = new Set<string>()
+        for (const models of Object.values(MODEL_CATALOG)) {
+          for (const m of models) {
+            if (!seen.has(m.id)) {
+              seen.add(m.id)
+              all.push(m)
+            }
+          }
+        }
+        return all
       }
-      return MODEL_CATALOG[provider] ?? []
     },
-    enabled: !!provider,
+    enabled: true,
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -1019,6 +1039,36 @@ export function useSetRouting() {
     },
   })
 }
+// ── Role routing hooks (RFC-032) ────────────────────────────────
+
+export interface RoleRoutingResponse {
+  roles: Record<string, string>
+  count: number
+}
+
+/** Fetch the current role routing config (role → model ID). */
+export function useRoles() {
+  return useQuery({
+    queryKey: ['engine', 'roles'],
+    queryFn: async (): Promise<RoleRoutingResponse> => {
+      return api.get<RoleRoutingResponse>('/api/engine/roles')
+    },
+    staleTime: 60 * 1000,
+  })
+}
+
+/** Update role routing config (PUT /api/engine/roles). */
+export function useSetRoles() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (roles: Record<string, string>) =>
+      api.put<{ ok: boolean; roles: Record<string, string> }>('/api/engine/roles', { roles }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['engine', 'roles'] })
+    },
+  })
+}
+
 
 /** Fetch routing statistics (model usage counts + costs). */
 export function useRoutingStats() {

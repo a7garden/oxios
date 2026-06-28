@@ -105,13 +105,47 @@ pub(crate) async fn handle_token_maxing_session(
 }
 
 /// GET /api/token-maxing/providers — eligibility + live availability.
+///
+/// The `providers` array is a richer per-provider DTO built at the route
+/// layer (rather than [`QuotaTrackerSnapshot`], which stays a thin
+/// `{provider, availability}` shape). Each entry adds a `billing_model`
+/// string derived from the live config:
+///
+/// - `"subscription"` — the provider entry exists and
+///   `billing_model == "subscription"`.
+/// - `"metered"` — the provider entry exists and
+///   `billing_model == "metered"` (a user who explicitly tagged it as
+///   pay-per-use, now possible because v1 no longer rejects the field).
+/// - `"unknown"` — the provider has no config entry, or the entry's
+///   `billing_model` is anything other than the two canonical values
+///   above (free-form / garbage).
 pub(crate) async fn handle_token_maxing_providers(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let api = tm(&state)?;
+    let cfg = api.config();
+    let providers: Vec<serde_json::Value> = api
+        .snapshots()
+        .into_iter()
+        .map(|s| {
+            let billing_model = cfg
+                .get(&s.provider)
+                .map(|p| match p.billing_model.as_str() {
+                    oxios_kernel::SUBSCRIPTION_BILLING_MODEL => "subscription",
+                    "metered" => "metered",
+                    _ => "unknown",
+                })
+                .unwrap_or("unknown");
+            serde_json::json!({
+                "provider": s.provider,
+                "availability": s.availability,
+                "billing_model": billing_model,
+            })
+        })
+        .collect();
     Ok(Json(serde_json::json!({
         "enabled": api.enabled(),
-        "providers": api.snapshots(),
+        "providers": providers,
         "recalibrations": api.recalibration_history(),
         "cooldowns": api.cooldown_history(),
     })))

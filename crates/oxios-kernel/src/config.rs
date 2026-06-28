@@ -666,6 +666,15 @@ impl Default for TelegramChannelConfig {
         }
     }
 }
+///
+/// Role-to-model routing configuration (RFC-032).
+/// Maps role names to model IDs in "provider/model" format.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RoleRoutingConfig {
+    /// Role name → model ID mapping (e.g. "coder" → "anthropic/claude-sonnet-4-20250514").
+    #[serde(default)]
+    pub roles: std::collections::HashMap<String, String>,
+}
 
 /// LLM engine configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -698,6 +707,11 @@ pub struct EngineConfig {
     /// Models excluded from automatic routing.
     #[serde(default)]
     pub excluded_models: Vec<String>,
+    /// Role-based model routing (RFC-032).
+    /// Maps role names (e.g. "coder", "writer") to model IDs.
+    /// When present, messages with a matching role will use the mapped model.
+    #[serde(default)]
+    pub role_routing: RoleRoutingConfig,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -711,6 +725,7 @@ impl Default for EngineConfig {
             prefer_cost_efficient: false,
             fallback_models: Vec::new(),
             excluded_models: Vec::new(),
+            role_routing: RoleRoutingConfig::default(),
         }
     }
 }

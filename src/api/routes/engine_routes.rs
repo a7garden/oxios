@@ -93,18 +93,31 @@ pub(crate) async fn handle_engine_models(
         (Some(provider), None) => state.kernel.engine.models(provider, None),
         (None, Some(q)) => state.kernel.engine.search_models(q),
         (None, None) => {
-            // Return models for the current provider, or all if not configured
-            let config = state.config.read();
-            let provider = oxios_kernel::credential::CredentialStore::provider_from_model(
-                &config.engine.default_model,
-            );
-            match provider {
-                Some(p) => state.kernel.engine.models(p, None),
-                None => {
-                    // Return a reasonable default — anthropic models
-                    state.kernel.engine.models("anthropic", None)
+            // RFC-032: return models from ALL providers that have credentials
+            // configured, not just the default provider. This lets the frontend
+            // show a complete model picker regardless of which provider is active.
+            let connected: Vec<_> = state
+                .kernel
+                .engine
+                .providers()
+                .into_iter()
+                .filter(|p| p.has_key)
+                .collect();
+            let providers = if connected.is_empty() {
+                state.kernel.engine.providers()
+            } else {
+                connected
+            };
+            let mut all_models = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            for p in providers {
+                for m in state.kernel.engine.models(&p.id, None) {
+                    if seen.insert(m.id.clone()) {
+                        all_models.push(m);
+                    }
                 }
             }
+            all_models
         }
     };
     Ok(Json(serde_json::json!({
@@ -239,6 +252,40 @@ pub(crate) async fn handle_engine_validate_key(
             .await
     };
     Ok(Json(serde_json::json!(result)))
+}
+
+/// GET /api/engine/roles — Get the current role routing config (RFC-032).
+pub(crate) async fn handle_engine_roles(
+    state: State<Arc<crate::api::server::AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let role_routing = state.kernel.engine.role_routing();
+    Ok(Json(serde_json::json!({
+        "roles": role_routing.roles,
+        "count": role_routing.roles.len(),
+    })))
+}
+
+/// PUT /api/engine/roles — Update role routing config and persist (RFC-032).
+pub(crate) async fn handle_engine_set_roles(
+    state: State<Arc<crate::api::server::AppState>>,
+    Json(body): Json<RoleRoutingUpdateRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let role_routing = oxios_kernel::config::RoleRoutingConfig { roles: body.roles };
+    state
+        .kernel
+        .engine
+        .set_role_routing(role_routing)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "roles": state.kernel.engine.role_routing().roles,
+    })))
+}
+
+/// Request body for PUT /api/engine/roles.
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct RoleRoutingUpdateRequest {
+    pub roles: std::collections::HashMap<String, String>,
 }
 
 /// PUT /api/engine/routing — Update routing configuration.

@@ -425,7 +425,7 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_unified("cli", prompt, session_id, None, None, "cli-direct")
+            .handle_unified("cli", prompt, session_id, None, None, None, "cli-direct")
             .await
     }
 
@@ -439,7 +439,7 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_unified("cli", prompt, session_id, None, None, "cli-direct")
+            .handle_unified("cli", prompt, session_id, None, None, None, "cli-direct")
             .await
     }
 
@@ -1062,11 +1062,23 @@ impl KernelBuilder {
         };
 
         let budget_manager = Arc::new(BudgetManager::new());
-        // RFC-031: the shared QuotaTracker (Phase 1/2 self-tracker). One live
-        // instance per kernel — shared with the handle, the API/UI, and the
-        // recalibration tick below. This is the integration point that makes
-        // the (previously orphaned) library actually live.
+        // RFC-031 v2: the shared QuotaTracker. One live instance per
+        // kernel. v2 derives eligibility from live quota snapshots;
+        // the v1 `[[token-maxing.providers]]` opt-in block is now
+        // optional and no longer required. We keep a forward-looking
+        // warning so users with existing v1 configs know they can
+        // remove the block safely.
+        if !config.token_maxing.providers.is_empty() {
+            tracing::warn!(
+                count = config.token_maxing.providers.len(),
+                "[[token-maxing.providers]] is no longer required by RFC-031 v2; \
+                 token-maxing now derives eligibility from live quota API \
+                 responses. The block was preserved for back-compat but can be \
+                 removed."
+            );
+        }
         let quota_tracker = Arc::new(oxios_kernel::QuotaTracker::new(config.token_maxing.clone()));
+
         // RFC-031 Phase 2: recalibration tick. Where a provider exposes a
         // usage/balance endpoint, periodically snap the self-tracked counter
         // to real state, erasing drift from a key shared with another app.
@@ -1482,13 +1494,15 @@ impl KernelBuilder {
     }
 }
 
-/// RFC-031 Phase 2: background recalibration loop. Periodically fetches real
-/// provider quota and snaps the [`QuotaTracker`]'s self-tracked counter to it.
-///
-/// Only eligible (`billing_model = "subscription"`) providers are probed; a
-/// failed/non-existent fetcher leaves that provider self-tracked (Phase 1)
-/// and just logs a `FetchFailed` recalibration record. Cheap, HTTP-bound, no
-/// retries — a transient failure simply waits for the next tick.
+/// RFC-031 v2: background recalibration loop. Periodically fetches
+/// real provider quota and caches the live snapshot in
+/// [`QuotaTracker`]. v2 departure from v1: probes **every provider
+/// for which a [`QuotaFetcher`] is registered** (via
+/// [`crate::api::quota::all_fetchers`]) AND has credentials
+/// configured. This is what makes the user's bug fix work: zai is
+/// registered in the engine (so the credential store has a key)
+/// but missing from `[[token-maxing.providers]]`. The v1 tick
+/// filtered on config eligibility and never fetched zai.
 async fn recalibration_tick(
     tracker: Arc<oxios_kernel::QuotaTracker>,
     interval_secs: u64,
@@ -1504,20 +1518,20 @@ async fn recalibration_tick(
         if !cfg.enabled {
             continue;
         }
-        let eligible: Vec<String> = cfg
-            .providers
-            .iter()
-            .filter(|p| cfg.is_eligible(&p.provider))
-            .map(|p| p.provider.clone())
-            .collect();
         drop(cfg);
-        if eligible.is_empty() {
-            continue;
-        }
-        let mut creds: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-        for p in &eligible {
-            if let Some((key, _)) = oxios_kernel::CredentialStore::resolve(p, api_key.as_deref()) {
-                creds.insert(p.clone(), key);
+
+        // v2: probe every registered fetcher. `all_fetchers()` is the
+        // canonical list of providers with a known quota endpoint
+        // (zai, openai, minimax today).
+        let fetchers = crate::api::quota::all_fetchers();
+        let mut creds: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+        for f in &fetchers {
+            let provider = f.provider();
+            if let Some((key, _)) =
+                oxios_kernel::CredentialStore::resolve(provider, api_key.as_deref())
+            {
+                creds.insert(provider.to_string(), key);
             }
         }
         if creds.is_empty() {
@@ -1525,9 +1539,14 @@ async fn recalibration_tick(
         }
         let snaps = crate::api::quota::fetch_all(&creds).await;
         for snap in &snaps {
+            // v2: also cache the live snapshot so QuotaTracker::availability
+            // can use it for auto-discovery.
+            let live = crate::api::quota::to_live_snapshot(snap);
+            tracker.update_live_snapshot(live);
             if snap.error.is_some() {
                 tracker.apply_recalibration(
                     &snap.provider,
+                    None,
                     None,
                     None,
                     oxios_kernel::RecalibrationOutcome::FetchFailed,
@@ -1546,6 +1565,7 @@ async fn recalibration_tick(
                 &snap.provider,
                 rem,
                 resets,
+                snap.token_limit.and_then(|l| if l > 0.0 { Some(l as u64) } else { None }),
                 oxios_kernel::RecalibrationOutcome::Ok,
             );
         }

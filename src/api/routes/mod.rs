@@ -79,9 +79,10 @@ pub(crate) use email_routes::{
 };
 pub(crate) use engine_routes::{
     handle_engine_config, handle_engine_delete_api_key, handle_engine_models,
-    handle_engine_providers, handle_engine_routing_fallbacks, handle_engine_routing_stats,
-    handle_engine_set_api_key, handle_engine_set_model, handle_engine_set_provider_options,
-    handle_engine_set_routing, handle_engine_validate_key,
+    handle_engine_providers, handle_engine_roles, handle_engine_routing_fallbacks,
+    handle_engine_routing_stats, handle_engine_set_api_key, handle_engine_set_model,
+    handle_engine_set_provider_options, handle_engine_set_roles, handle_engine_set_routing,
+    handle_engine_validate_key,
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
@@ -278,6 +279,11 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         .route("/api/engine/validate-key", post(handle_engine_validate_key))
         .route("/api/engine/routing", put(handle_engine_set_routing))
+        // RFC-032: role routing — role → model mapping
+        .route(
+            "/api/engine/roles",
+            get(handle_engine_roles).put(handle_engine_set_roles),
+        )
         .route(
             "/api/engine/routing/stats",
             get(handle_engine_routing_stats),

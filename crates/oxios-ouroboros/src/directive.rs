@@ -82,6 +82,12 @@ pub struct ExecEnv {
     /// failed directive with a fallback model. `None` for normal runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_override: Option<String>,
+    /// RFC-032: Role hint (optional). When set, the agent runtime consults
+    /// `engine.role_routing[role]` to choose a model ID. Precedence:
+    /// `model_override` (recovery retry) > `role_routing[role]` > default.
+    /// Set by the gateway when the WS client supplied a `role` field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
 
     /// Agent conversation state to restore on retry (RFC-029 P2b).
     ///
@@ -139,6 +145,10 @@ pub struct MsgCtx {
     pub project_ids: Option<String>,
     /// Comma-separated Mount IDs.
     pub mount_ids: Option<String>,
+    /// RFC-032: Role hint (optional). When set, the orchestrator
+    /// resolves the model via `engine.role_routing[role]`. Populated
+    /// by the gateway from the WS `role` field.
+    pub role: Option<String>,
     /// User identifier.
     pub user_id: String,
 }

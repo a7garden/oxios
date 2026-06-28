@@ -34,6 +34,12 @@ export interface ProviderSnapshot {
   rate_windows: RateWindow[]
 }
 
+// ── Billing classification (RFC-031 v2) ──────────────────────
+
+/** How a provider bills usage, derived from the live quota API rather than
+ *  the v1 `[token-maxing.providers]` config block. */
+export type BillingModel = 'subscription' | 'metered' | 'unknown'
+
 // ── Availability verdict ─────────────────────────────────────
 
 /** One branch of `Availability` from the Rust enum. Defensive union:
@@ -64,6 +70,12 @@ export type IneligibleAvailability = 'ineligible'
 export interface QuotaTrackerSnapshot {
   provider: string
   availability: Availability | IneligibleAvailability
+  /** How the provider bills usage, derived from the live quota API.
+   *  - `subscription`: capped plan (the original token-maxing target).
+   *  - `metered`: pay-per-use — running token-maxing against it will incur real cost.
+   *  - `unknown`: no quota snapshot available to classify.
+   */
+  billing_model: BillingModel
 }
 
 // ── Live status ──────────────────────────────────────────────

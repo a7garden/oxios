@@ -570,52 +570,27 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
 
                         // ── Forward to WebSocket client ──
                         //
-                        // Chat UI redesign: when `meta.interview_questions` is
-                        // present, send an `interview` chunk (structured widgets)
-                        // and skip the token chunk — the questions are already
-                        // carried by the interview payload. When absent, fall
-                        // back to the existing token + done sequence.
-                        let has_interview = msg.meta.as_ref().and_then(|m| m.interview_questions.as_ref()).is_some();
-                        let is_reasoning = msg.metadata.get("stream_kind").map(|v| v.as_str()) == Some("reasoning");
+                        // RFC-032: when the gateway attached a structured error
+                        // (e.g. budget exceeded, quota exhausted), send an error
+                        // chunk instead of a token chunk so the frontend can
+                        // display a visible error indicator and stop loading.
+                        let has_error = msg.meta.as_ref().and_then(|m| m.error.as_ref()).is_some();
 
-                        if has_interview {
-                            // Send interview chunk with structured questions
-                            let interview_chunk = serde_json::json!({
-                                "type": "interview",
+                        if has_error {
+                            let err = msg.meta.as_ref().and_then(|m| m.error.as_ref()).unwrap();
+                            let error_chunk = serde_json::json!({
+                                "type": "error",
                                 "seq": msg.seq,
-                                "session_id": session_id,
-                                "project_id": project_id,
-                                "questions": msg.meta.as_ref().and_then(|m| m.interview_questions.clone()),
-                                "round": msg.meta.as_ref().and_then(|m| m.interview_round),
-                            });
-                            let json = match serde_json::to_string(&interview_chunk) {
-                                Ok(j) => j,
-                                Err(e) => {
-                                    tracing::error!(error = %e, "Failed to serialize interview chunk");
-                                    continue;
-                                }
-                            };
-                            if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
-                                break;
-                            }
-                        } else if is_reasoning {
-                            // P4: reasoning deltas routed as `reasoning` chunks so
-                            // the chat store's existing chunkToActivity creates a
-                            // reasoning activity (not a token-flushed answer chunk).
-                            // No persistence — terminal still carries the full
-                            // answer; reasoning is ephemeral like other partials.
-                            let reasoning_chunk = serde_json::json!({
-                                "type": "reasoning",
-                                "seq": msg.seq,
-                                "content": msg.content,
-                                "source": "thinking",
+                                "message": err.message,
+                                "kind": err.kind,
+                                "suggestion": err.suggestion,
                                 "session_id": session_id,
                                 "project_id": project_id,
                             });
-                            let json = match serde_json::to_string(&reasoning_chunk) {
+                            let json = match serde_json::to_string(&error_chunk) {
                                 Ok(j) => j,
                                 Err(e) => {
-                                    tracing::error!(error = %e, "Failed to serialize reasoning chunk");
+                                    tracing::error!(error = %e, "Failed to serialize error chunk");
                                     continue;
                                 }
                             };
@@ -623,27 +598,68 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 break;
                             }
                         } else {
-                            // Standard token chunk
-                            let token_chunk = serde_json::json!({
-                                "type": "token",
-                                "seq": msg.seq,
-                                "content": msg.content,
-                                "session_id": session_id,
-                                "project_id": project_id,
-                            });
-                            let json = match serde_json::to_string(&token_chunk) {
-                                Ok(j) => j,
-                                Err(e) => {
-                                    tracing::error!(error = %e, "Failed to serialize outgoing message");
-                                    continue;
+                            let has_interview = msg.meta.as_ref().and_then(|m| m.interview_questions.as_ref()).is_some();
+                            let is_reasoning = msg.metadata.get("stream_kind").map(|v| v.as_str()) == Some("reasoning");
+
+                            if has_interview {
+                                let interview_chunk = serde_json::json!({
+                                    "type": "interview",
+                                    "seq": msg.seq,
+                                    "session_id": session_id,
+                                    "project_id": project_id,
+                                    "questions": msg.meta.as_ref().and_then(|m| m.interview_questions.clone()),
+                                    "round": msg.meta.as_ref().and_then(|m| m.interview_round),
+                                });
+                                let json = match serde_json::to_string(&interview_chunk) {
+                                    Ok(j) => j,
+                                    Err(e) => {
+                                        tracing::error!(error = %e, "Failed to serialize interview chunk");
+                                        continue;
+                                    }
+                                };
+                                if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                    break;
                                 }
-                            };
-                            if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
-                                break; // WS closed — session was already persisted above
+                            } else if is_reasoning {
+                                let reasoning_chunk = serde_json::json!({
+                                    "type": "reasoning",
+                                    "seq": msg.seq,
+                                    "content": msg.content,
+                                    "source": "thinking",
+                                    "session_id": session_id,
+                                    "project_id": project_id,
+                                });
+                                let json = match serde_json::to_string(&reasoning_chunk) {
+                                    Ok(j) => j,
+                                    Err(e) => {
+                                        tracing::error!(error = %e, "Failed to serialize reasoning chunk");
+                                        continue;
+                                    }
+                                };
+                                if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                    break;
+                                }
+                            } else {
+                                let token_chunk = serde_json::json!({
+                                    "type": "token",
+                                    "seq": msg.seq,
+                                    "content": msg.content,
+                                    "session_id": session_id,
+                                    "project_id": project_id,
+                                });
+                                let json = match serde_json::to_string(&token_chunk) {
+                                    Ok(j) => j,
+                                    Err(e) => {
+                                        tracing::error!(error = %e, "Failed to serialize outgoing message");
+                                        continue;
+                                    }
+                                };
+                                if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                    break;
+                                }
                             }
                         }
-
-                        if !is_partial {
+                        if !is_partial && !has_error {
                             let done_chunk = serde_json::json!({
                                 "type": "done",
                                 "seq": msg.seq,
@@ -731,6 +747,13 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             .and_then(|v| v.as_str())
                             .filter(|s| !s.is_empty())
                             .map(String::from);
+                        // RFC-032: role hint from the WS client. When set, the
+                        // orchestrator resolves the model via engine.role_routing[role].
+                        let incoming_role = parsed
+                            .get("role")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty())
+                            .map(String::from);
 
                         match msg_type {
                             // RFC-024 SP2 / C2 (replay): client announces its
@@ -801,6 +824,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 if let Some(ref mids) = incoming_mount_ids {
                                     incoming.metadata.insert("mount_ids".into(), mids.clone());
                                 }
+                                if let Some(ref role) = incoming_role {
+                                    incoming.metadata.insert("role".into(), role.clone());
+                                }
                                 incoming
                                     .metadata
                                     .insert("conn_id".into(), conn_id_for_send.clone());
@@ -843,6 +869,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 }
                                 if let Some(ref mids) = incoming_mount_ids {
                                     incoming.metadata.insert("mount_ids".into(), mids.clone());
+                                }
+                                if let Some(ref role) = incoming_role {
+                                    incoming.metadata.insert("role".into(), role.clone());
                                 }
                                 incoming
                                     .metadata

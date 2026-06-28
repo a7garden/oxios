@@ -23,6 +23,8 @@ interface PersistedState {
   activeProjectId: string | null
   /** RFC-025: Active Mount IDs (comma-separated, primary first). */
   activeMountIds: string | null
+  /** RFC-032: Active role hint (null = no role; uses default model). */
+  activeRole: string | null
 }
 
 const PERSIST_KEY = 'oxios-chat-persist'
@@ -108,6 +110,8 @@ interface ChatActions {
   setActiveProject: (projectId: string | null) => void
   /** RFC-025: Set active Mount IDs (comma-separated, primary first). */
   setActiveMountIds: (mountIds: string[] | null) => void
+  /** RFC-032: Set the active role hint. */
+  setActiveRole: (role: string | null) => void
   /** RFC-025: Set the detected mount tag from the orchestrator response. */
   setDetectedMountTag: (tag: string | null) => void
   /** RFC-025: Clear detected mount tag and IDs (e.g. on badge accept/dismiss). */
@@ -511,6 +515,7 @@ export const useChatStore = create<ChatStore>()(
       activeSessionId: null,
       activeProjectId: null,
       activeMountIds: null,
+      activeRole: null,
 
       // ── Runtime ──
       messages: [],
@@ -734,7 +739,7 @@ export const useChatStore = create<ChatStore>()(
       },
 
       sendMessage(content: string) {
-        const { activeSessionId, activeProjectId, activeMountIds, connected, connect, _ws } = get()
+        const { activeSessionId, activeProjectId, activeMountIds, activeRole, connected, connect, _ws } = get()
 
         // Ensure WS is connected first
         if (!connected || !_ws || _ws.readyState !== WebSocket.OPEN) {
@@ -763,6 +768,8 @@ export const useChatStore = create<ChatStore>()(
           // Web-C2: backend WS handler reads singular `project_id`
           project_id: activeProjectId ?? '',
           mount_ids: activeMountIds ?? '',
+          // RFC-032: role hint for model routing
+          role: activeRole ?? '',
         }
         _ws.send(JSON.stringify(payload))
       },
@@ -895,6 +902,10 @@ export const useChatStore = create<ChatStore>()(
         })
       },
 
+      setActiveRole(role: string | null) {
+        set({ activeRole: role })
+      },
+
       setDetectedMountTag(tag: string | null) {
         set({ detectedMountTag: tag })
       },
@@ -919,6 +930,7 @@ export const useChatStore = create<ChatStore>()(
           activeSessionId: null,
           activeProjectId: null,
           activeMountIds: null,
+          activeRole: null,
           messages: [],
           activeInterview: null,
           interviewRound: 0,
@@ -930,7 +942,7 @@ export const useChatStore = create<ChatStore>()(
       },
 
       submitInterviewResponse(answers: InterviewAnswer[]) {
-        const { _ws, activeInterview, activeSessionId, activeProjectId, interviewRound } = get()
+        const { _ws, activeInterview, activeSessionId, activeProjectId, activeRole, interviewRound } = get()
         if (!activeInterview) return
 
         // Build answer summary for user message bubble
@@ -964,6 +976,7 @@ export const useChatStore = create<ChatStore>()(
               type: 'interview_response',
               session_id: activeSessionId ?? '',
               project_id: activeProjectId ?? '',
+              role: activeRole ?? '',
               answers,
               text: answerText,
             }),
@@ -1278,7 +1291,30 @@ export const useChatStore = create<ChatStore>()(
             break
           }
           case 'error': {
-            set({ isStreaming: false })
+            // RFC-032: create an assistant message with the error text
+            // so the user sees the failure inline rather than just a
+            // loading spinner that silently stops.
+            const errMsg = (chunk as unknown as Record<string, unknown>).message as string | undefined
+            const errKind = (chunk as unknown as Record<string, unknown>).kind as string | undefined
+            const errSuggestion = (chunk as unknown as Record<string, unknown>).suggestion as string | undefined
+            const errorContent = errSuggestion
+              ? `${errMsg}\n\n${errSuggestion}`
+              : (errMsg ?? 'An error occurred')
+            set((s) => {
+              const updated = [...s.messages]
+              // Add an error message after the user's last message
+              const errorMsg: ChatMessage = {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: errorContent,
+                timestamp: new Date().toISOString(),
+                metadata: {
+                  isError: true,
+                  errorKind: errKind,
+                },
+              }
+              return { messages: [...updated, errorMsg], isStreaming: false }
+            })
             break
           }
         }
@@ -1290,6 +1326,7 @@ export const useChatStore = create<ChatStore>()(
         activeSessionId: state.activeSessionId,
         activeProjectId: state.activeProjectId,
         activeMountIds: state.activeMountIds,
+        activeRole: state.activeRole,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
