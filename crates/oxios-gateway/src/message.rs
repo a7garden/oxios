@@ -152,6 +152,14 @@ pub struct OutgoingMessage {
     /// Used to prevent cross-tab message leakage in multi-session scenarios.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_conn_id: Option<String>,
+    /// RFC-015 streaming: when `Some(true)`, this is a partial text/thinking
+    /// delta. The WS handler forwards it as a bare `token`/`reasoning` chunk
+    /// WITHOUT the terminal `done` chunk — the terminal is the single
+    /// subsequent message with `partial != Some(true)` (or absent, which is
+    /// the legacy/terminal default). `None` preserves legacy behavior
+    /// (terminal — emit `token` + `done`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partial: Option<bool>,
 }
 
 impl OutgoingMessage {
@@ -181,6 +189,7 @@ impl OutgoingMessage {
             metadata: HashMap::new(),
             meta: None,
             target_conn_id: None,
+            partial: None,
         }
     }
 
@@ -212,12 +221,23 @@ impl OutgoingMessage {
             metadata,
             meta: None,
             target_conn_id: None,
+            partial: None,
         }
     }
 
     /// Sets metadata on this message (builder pattern).
     pub fn with_metadata_only(mut self, metadata: HashMap<String, String>) -> Self {
         self.metadata = metadata;
+        self
+    }
+
+    /// Sets the streaming partial flag (builder pattern).
+    ///
+    /// `Some(true)` marks this message as a streaming delta — the WS handler
+    /// forwards it as a bare `token` chunk WITHOUT the terminal `done`.
+    /// `Some(false)` explicitly marks terminal (legacy default behavior).
+    pub fn with_partial(mut self, partial: bool) -> Self {
+        self.partial = Some(partial);
         self
     }
 
@@ -243,6 +263,7 @@ impl OutgoingMessage {
             metadata: channel_meta,
             meta: Some(response_meta),
             target_conn_id: None,
+            partial: None,
         }
     }
 
@@ -272,6 +293,7 @@ impl OutgoingMessage {
                 interview_round: None,
             }),
             target_conn_id: None,
+            partial: None,
         }
     }
 }

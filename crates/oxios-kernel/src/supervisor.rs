@@ -341,6 +341,7 @@ impl Supervisor for BasicSupervisor {
                     model_id: String::new(),
                     failure_class: None, // cancellation, not a provider failure
                     restore_state: None,
+                    reasoning_text: String::new(),
                 })
             } else {
                 let mut ctx = session_ctx.write().await;
@@ -382,6 +383,7 @@ impl Supervisor for BasicSupervisor {
                     model_id: String::new(),
                     failure_class: None, // abort (kill/panic), not a provider failure
                     restore_state: None,
+                    reasoning_text: String::new(),
                 })
             }
         };
@@ -486,17 +488,13 @@ impl Supervisor for BasicSupervisor {
                     tokens_input: 0,
                     tokens_output: 0,
                     model_id: String::new(),
-                    // RFC-029 P0: classify the error so downstream
+                    reasoning_text: String::new(),
                     // (P2 RecoveryCoordinator, gateway user-facing
                     // messages) can see whether this is a transient
                     // retry, a quota/auth that needs provider swap,
                     // context overflow, etc. Conservative: Unknown
                     // when no pattern matches.
                     failure_class: Some(classify(&e)),
-                    // RFC-029 P2b: extract the agent's exported state if
-                    // the error was wrapped by run_agent (AgentRunError).
-                    // This allows the RecoveryCoordinator to snapshot→
-                    // restore into a new model rather than restarting.
                     restore_state: e
                         .downcast_ref::<crate::resilience::AgentRunError>()
                         .and_then(|err| err.restore_state.clone()),

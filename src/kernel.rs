@@ -751,6 +751,13 @@ impl KernelBuilder {
         config.memory.consolidation.apply_preset();
 
         let event_bus = EventBus::new(config.kernel.event_bus_capacity);
+
+        // RFC-015 P1: shared streaming-sink registry. The gateway registers
+        // a strong sender per active chat session, the runtime callback
+        // looks it up by session_id to push live text deltas. The SAME Arc
+        // is attached to KernelHandle (for runtime lookup) and to the
+        // Gateway (for registration).
+        let streaming_sinks = Arc::new(oxios_kernel::streaming_sink::StreamingSinkRegistry::new());
         let state_store = Arc::new(oxios_kernel::state_store::StateStore::new(PathBuf::from(
             &config.kernel.workspace,
         ))?);
@@ -1198,6 +1205,11 @@ impl KernelBuilder {
                 None, // calendar (initialized later)
                 None, // email (initialized later)
             );
+            // RFC-015 P1: attach the streaming-sink registry so the runtime
+            // callback's per-session `TextChunk` lookup finds the gateway's
+            // collector sender. Wired before `Arc::new(kh)` so we can use
+            // the consuming builder.
+            let kh = kh.with_streaming_sinks(streaming_sinks.clone());
             // Attach the Mount facade (RFC-025). Set before Arc so the handle
             // carries it from construction.
             let kh = if let Some(mm) = mount_manager.clone() {
@@ -1396,11 +1408,12 @@ impl KernelBuilder {
 
         let orchestrator = Arc::new(orchestrator);
 
-        let gateway = Arc::new(Gateway::with_apis(
-            orchestrator.clone(),
-            engine_api,
-            persona_api,
-        ));
+        // RFC-015 P1: attach the streaming-sink registry shared with the
+        // KernelHandle so the runtime callback can find the gateway's
+        // collector sender for live text deltas.
+        let gateway = Gateway::with_apis(orchestrator.clone(), engine_api, persona_api)
+            .with_streaming_sinks(streaming_sinks);
+        let gateway = Arc::new(gateway);
 
         // Initialize metrics and observability singletons.
         oxios_kernel::register_builtin_metrics();

@@ -45,6 +45,11 @@ export interface SessionDetail {
   }[]
   active_seed_id?: string
   active_persona_id?: string
+  /// P4 (§7 persistence): reasoning text per turn. One record per turn
+  /// (when reasoning was emitted), same indexing as `agent_responses`.
+  /// Restored by `loadSession` and rendered in the ThinkingPanel above
+  /// the answer.
+  reasoning_records?: { content: string; source: string; timestamp: string }[]
   created_at: string
   updated_at: string
   metadata?: Record<string, unknown>
@@ -420,7 +425,7 @@ export interface CronJob {
   id: string
   name: string
   schedule: string
-  command?: string
+  goal: string
   enabled: boolean
   last_run?: string
   next_run?: string

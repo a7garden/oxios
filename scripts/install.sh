@@ -5,7 +5,7 @@ set -euo pipefail
 # Oxios Agent OS — Install Script
 # ═══════════════════════════════════════════════════════════
 
-readonly VERSION="${VERSION:-latest}"
+VERSION="${VERSION:-latest}"
 readonly INSTALL_DIR="${HOME}/.oxios/bin"
 readonly REPO="a7garden/oxios"
 
@@ -13,24 +13,24 @@ info()  { echo "[oxios] $*" >&2; }
 warn()  { echo "[oxios] WARNING: $*" >&2; }
 error() { echo "[oxios] ERROR: $*" >&2; exit 1; }
 
-# ── Detect OS & Architecture ──────────────────────────────────
+# ── Platform guard ─────────────────────────────────────────────
+# Prebuilt binaries target macOS Apple Silicon (aarch64-apple-darwin)
+# only. Any other OS/arch is rejected with a pointer to `cargo install`
+# so the script never silently installs a binary that won't run.
 detect_platform() {
-    local os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    local os="$(uname -s)"
     local arch="$(uname -m)"
 
-    case "$arch" in
-        arm64|aarch64) arch="arm64" ;;
-        x86_64)        arch="x86_64" ;;
-        *)             error "Unsupported architecture: $arch" ;;
-    esac
-
-    case "$os" in
-        darwin) os="macos" ;;
-        linux)  os="linux" ;;
-        *)      error "Unsupported OS: $os" ;;
-    esac
-
-    echo "${os}-${arch}"
+    if [ "$os" != "Darwin" ] || [ "$arch" != "arm64" ]; then
+        cat >&2 <<EOF
+[oxios] ERROR: Prebuilt binaries are macOS Apple Silicon (aarch64-apple-darwin) only.
+[oxios] ERROR: Detected: ${os}/${arch}. Install from source instead:
+[oxios] ERROR:   cargo install oxios
+[oxios] ERROR: See https://github.com/${REPO} for details.
+EOF
+        exit 1
+    fi
+    echo "macos-arm64"
 }
 
 # ── Download & Install ────────────────────────────────────────
@@ -57,42 +57,64 @@ install() {
 
     info "Downloading from ${base_url}"
 
-    # Download binary.
+    # Prebuilt asset is a tarball named by its Rust target triple.
+    local asset="oxios-aarch64-apple-darwin.tar.gz"
     local dest="${INSTALL_DIR}/${binary_name}"
-    local checksum_url="${base_url}/${binary_name}.sha256"
 
-    curl -sSL "${base_url}/${binary_name}" -o "$dest" \
+    # Stage the download in a temp dir so a failed/aborted install
+    # never leaves a half-written binary in INSTALL_DIR. `tmpdir` is
+    # deliberately NOT local: the EXIT trap fires after install()
+    # returns, when a local would be out of scope under `set -u`.
+    tmpdir="$(mktemp -d)"
+    trap 'rm -rf "$tmpdir"' EXIT
+
+    local archive="${tmpdir}/${asset}"
+    curl -fsSL "${base_url}/${asset}" -o "$archive" \
         || error "Download failed"
 
-    # Verify checksum.
-    if curl -sf "$checksum_url" > /dev/null; then
+    # Verify checksum. `shasum` ships with macOS; `sha256sum` does not.
+    if curl -fsSL "${base_url}/${asset}.sha256" -o "${tmpdir}/${asset}.sha256"; then
         info "Verifying checksum..."
-        local expected
-        expected=$(curl -sSL "$checksum_url" | awk '{print $1}')
-        local actual
-        actual=$(sha256sum "$dest" | awk '{print $1}')
-        if [ "$expected" != "$actual" ]; then
-            rm -f "$dest"
-            error "Checksum mismatch. Please try again."
-        fi
+        ( cd "$tmpdir" && shasum -a 256 -c "${asset}.sha256" >/dev/null 2>&1 ) \
+            || error "Checksum mismatch — the download may be corrupt or tampered."
         info "Checksum verified."
+    else
+        warn "No checksum sidecar in release ${tag#v}; skipping verification."
     fi
 
+    # Extract and move into place (overwrites a previous install).
+    tar -xzf "$archive" -C "$tmpdir"
+    [ -f "${tmpdir}/oxios" ] || error "Archive did not contain an 'oxios' binary."
+    mv -f "${tmpdir}/oxios" "$dest"
     chmod +x "$dest"
 
     # Add to PATH.
+    local shell="${SHELL##*/}"
     local shell_rc=""
-    case "${SHELL##*/}" in
-        zsh) shell_rc="${HOME}/.zshrc" ;;
+    case "$shell" in
+        zsh)  shell_rc="${HOME}/.zshrc" ;;
         bash) shell_rc="${HOME}/.bashrc" ;;
         fish) shell_rc="${HOME}/.config/fish/config.fish" ;;
-        *) shell_rc="${HOME}/.profile" ;;
+        *)    shell_rc="${HOME}/.profile" ;;
     esac
 
-    if [ -f "$shell_rc" ] && ! grep -q '"\$HOME/.oxios/bin"' "$shell_rc"; then
-        echo '' >> "$shell_rc"
-        echo '# Oxios Agent OS' >> "$shell_rc"
-        echo 'export PATH="$HOME/.oxios/bin:$PATH"' >> "$shell_rc"
+    # Create the rc file if missing (fish's config dir may not exist yet).
+    if [ "$shell" = "fish" ]; then
+        mkdir -p "$(dirname "$shell_rc")"
+    fi
+    touch "$shell_rc" 2>/dev/null || true
+
+    # Idempotent: skip if any oxios/bin PATH line is already present.
+    # `export PATH=...` is invalid in fish — use fish_add_path there.
+    if ! grep -qF '.oxios/bin' "$shell_rc"; then
+        {
+            printf '\n# Oxios Agent OS\n'
+            if [ "$shell" = "fish" ]; then
+                printf 'fish_add_path ~/.oxios/bin\n'
+            else
+                printf 'export PATH="$HOME/.oxios/bin:$PATH"\n'
+            fi
+        } >> "$shell_rc"
         info "Added $INSTALL_DIR to PATH (restart shell or source $shell_rc)"
     fi
 

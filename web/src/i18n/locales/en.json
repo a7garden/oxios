@@ -750,7 +750,9 @@
     "noMessages": "No messages yet",
     "startConversation": "Start a conversation",
     "activeConversation": "In conversation",
-    "newConversationButton": "+ New conversation",
+    "newConversationButton": "New conversation",
+    "newProjectButton": "New project",
+    "moreActions": "More",
     "connecting": "Connecting...",
     "connectingToServer": "Connecting to server...",
     "startConversationHint": "Send a message to start a conversation.",
@@ -776,8 +778,8 @@
     "knowledgeQualityCurated": "Quality: curated",
     "knowledgeRecurate": "Re-curate",
     "showLess": "← Show less",
-    "manageSessions": "Session management →",
-    "manageSpaces": "Spaces management →",
+    "manageSessions": "Session management",
+    "manageSpaces": "Spaces management",
     "user": "User",
     "assistant": "Assistant",
     "loadingSpacesShort": "Loading spaces...",
@@ -858,10 +860,16 @@
       "timelineHeader": "{{count}} activities",
       "toolCallCount": "{{count}} tool calls"
     },
+    "liveActivity": {
+      "thinking": "Thinking...",
+      "toolRunning": "Running {{name}}",
+      "reasoning": "Reasoning..."
+    },
     "cancel": "Cancel",
     "connected": "Connected",
     "greeting": "What can I help you with?",
-    "manageProjects": "Project management →",
+    "manageProjects": "Project management",
+    "manageMounts": "Mount management",
     "noSessionsInProject": "No conversations",
     "recentSessions": "Recent conversations",
     "reconnecting": "Reconnecting...",
@@ -1020,7 +1028,11 @@
     "activatePersona": "Activate persona",
     "deletePersona": "Delete persona",
     "descriptionHint": "Create personas to give agents distinct personalities.",
-    "role": "Role"
+    "role": "Role",
+    "edit": "Edit Persona",
+    "editDescription": "Change the persona's name, description, and system prompt.",
+    "saveFailed": "Failed to save persona",
+    "loadFailed": "Failed to load persona."
   },
   "skills": {
     "title": "Skills",
@@ -1181,7 +1193,11 @@
     "description": "Create scheduled tasks to automate recurring work.",
     "disableJob": "Disable job",
     "enableJob": "Enable job",
-    "deleteJob": "Delete job"
+    "deleteJob": "Delete job",
+    "edit": "Edit Cron Job",
+    "editDescription": "Change the job's name, schedule, and goal.",
+    "saved": "Cron job saved",
+    "saveFailed": "Failed to save cron job"
   },
   "git": {
     "title": "Git",
@@ -1356,7 +1372,15 @@
     "disable": "Disable",
     "serverNamePlaceholder": "e.g. filesystem",
     "commandPlaceholder": "e.g. npx -y @modelcontextprotocol/server-filesystem",
-    "argsPlaceholder": "Comma-separated, e.g. /path/to/dir, --verbose"
+    "argsPlaceholder": "Comma-separated, e.g. /path/to/dir, --verbose",
+    "edit": "Edit MCP Server",
+    "editDescription": "Change the server's command, arguments, and environment. The server will be restarted on save.",
+    "updated": "MCP server updated",
+    "updateFailed": "Failed to update MCP server",
+    "envParseError": "Invalid env var format. Use KEY=VALUE per line.",
+    "nameImmutable": "Name cannot be changed. Delete and re-register to rename.",
+    "envEmptyValue": "Environment variable value is empty. Set a value or remove the line.",
+    "env": "Environment variables (KEY=VALUE per line)"
   },
   "update": {
     "title": "Update",
@@ -1564,7 +1588,12 @@
     "applied": "applied",
     "bind": "Bind",
     "autoPromoted": "auto",
-    "needsRefresh": "Needs refresh"
+    "needsRefresh": "Needs refresh",
+    "edit": "Edit Mount",
+    "editDescription": "Update this mount's name and path.",
+    "saved": "Mount saved",
+    "saveFailed": "Failed to save mount",
+    "pathEditHint": "Changing the path re-seeds the auto description and tech stack."
   },
   "projects": {
     "activity": "Activity",

@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { ChatInput, type ContextAttachment } from '@/components/chat/chat-input'
 import { EmptyChatState } from '@/components/chat/empty-chat-state'
 import { InterviewWizard } from '@/components/chat/interview-wizard'
+import { LiveActivityBar } from '@/components/chat/live-activity-bar'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
-import { TypingIndicator } from '@/components/chat/typing-indicator'
 import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -177,8 +177,8 @@ function ChatPage() {
                 />
               )}
 
-              {/* Typing indicator */}
-              {isStreaming && !activeInterview && !activeToolApproval && <TypingIndicator />}
+              {/* Live activity header (replaces legacy 3-dot typing indicator) */}
+              {isStreaming && !activeInterview && !activeToolApproval && <LiveActivityBar />}
 
               <div ref={bottomRef} />
             </div>

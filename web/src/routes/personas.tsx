@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Plus, Star, Trash2, Users } from 'lucide-react'
+import { Pencil, Plus, Star, Trash2, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { EditPersonaDialog, type PersonaItem, type PersonaPatch } from '@/components/persona/edit-persona-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -19,6 +21,7 @@ function PersonasPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<PersonaItem | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
@@ -69,6 +72,19 @@ function PersonasPage() {
   const activateMutation = useMutation({
     mutationFn: (id: string) => api.post(`/api/personas/${id}/activate`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['personas'] }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: PersonaPatch }) =>
+      api.put(`/api/personas/${id}`, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['personas'] })
+      setEditing(null)
+      toast.success(t('personas.saved', '페르소나가 저장되었습니다'))
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : t('personas.saveFailed', '저장 실패'))
+    },
   })
 
   if (isLoading) return <LoadingCards count={4} />
@@ -152,6 +168,14 @@ function PersonasPage() {
                   )}
                 </div>
                 <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEditing(persona)}
+                    aria-label={t('common.edit', '편집')}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   {!persona.enabled && (
                     <Button
                       variant="ghost"
@@ -183,6 +207,16 @@ function PersonasPage() {
           ))}
         </div>
       )}
+
+      <EditPersonaDialog
+        persona={editing}
+        isPending={updateMutation.isPending}
+        onOpenChange={(open) => !open && setEditing(null)}
+        onSave={(patch) => {
+          if (!editing) return
+          updateMutation.mutate({ id: editing.id, patch })
+        }}
+      />
     </div>
   )
 }

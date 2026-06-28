@@ -78,6 +78,14 @@ Large language models are powerful, but they're stuck in chat boxes. Oxios gives
 
 ### Install
 
+**macOS (Apple Silicon)** — prebuilt binary, no Rust toolchain needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/a7garden/oxios/main/scripts/install.sh | bash
+```
+
+**Other platforms** (or build from source):
+
 ```bash
 cargo install oxios
 ```

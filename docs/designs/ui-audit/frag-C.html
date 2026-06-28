@@ -1,0 +1,631 @@
+<section class="screen" id="screen-memory">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">07 · Console / Storage</div>
+      <h3>Memory</h3>
+      <div class="smeta">route <code>/memory</code> · <code>web/src/routes/memory.tsx</code> · Tabs: Overview · Browse · Map · Dream · Search · 9 type × 3 tier 분류</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">레이아웃</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">배치/발견</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">내비게이션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">접근성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">타이포</div><div class="val">4</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현 · Overview 탭 기본 · 문제점 ①–⑧</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:30px;--px:280px" title="F1">①</span>
+          <span class="pin" style="--py:78px;--px:14px" title="F2">②</span>
+          <span class="pin" style="--py:108px;--px:14px" title="F3">③</span>
+          <span class="pin" style="--py:160px;--px:14px" title="F4">④</span>
+          <span class="pin" style="--py:78px;--px:520px" title="F5">⑤</span>
+          <span class="pin" style="--py:108px;--px:520px" title="F6">⑥</span>
+          <span class="pin" style="--py:30px;--px:14px" title="F7">⑦</span>
+          <span class="pin" style="--py:240px;--px:520px" title="F8">⑧</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it active"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Memory</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">메모리</h1><p style="font-size:11px;color:var(--ox-muted)">에이전트 인덱스 · 검색 · 시맨틱 맵</p></div>
+                </div>
+                <!-- TabsList -->
+                <div style="display:flex;gap:4px;padding:4px;background:var(--ox-accent);border-radius:8px;width:fit-content;font-size:10px">
+                  <span style="padding:4px 9px;border-radius:5px;background:var(--ox-card);color:var(--ox-fg);font-weight:600">Overview</span>
+                  <span style="padding:4px 9px;color:var(--ox-muted)">Browse</span>
+                  <span style="padding:4px 9px;color:var(--ox-muted)">Map</span>
+                  <span style="padding:4px 9px;color:var(--ox-muted)">Dream</span>
+                  <span style="padding:4px 9px;color:var(--ox-muted)">Search</span>
+                </div>
+                <!-- Stat cards (4-up) -->
+                <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+                  <div class="kpi"><div class="kl">전체 항목<span class="ki" style="background:var(--ox-info)"></span></div><div class="kv">1,284</div><div class="kf"><span style="color:var(--ox-muted)">인덱스</span></div></div>
+                  <div class="kpi"><div class="kl">벡터 인덱스<span class="ki" style="background:var(--ox-info)"></span></div><div class="kv">9</div><div class="kf"><span style="color:var(--ox-muted)">type</span></div></div>
+                  <div class="kpi"><div class="kl">고정됨<span class="ki" style="background:var(--ox-muted);opacity:.5"></span></div><div class="kv">0</div><div class="kf"><span style="color:var(--ox-muted)">항상 0</span></div></div>
+                  <div class="kpi"><div class="kl">드림 상태<span class="ki" style="background:var(--ox-success)"></span></div><div class="kv" style="font-size:14px">idle</div><div class="kf"><span style="color:var(--ox-muted)">대기</span></div></div>
+                </div>
+                <!-- Distribution cards side by side -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-warning)"></span>Tier 분포</div>
+                    <div style="display:flex;flex-direction:column;gap:5px;margin-top:5px">
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:36px;color:var(--ox-muted)">hot</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:62%;background:var(--ox-error)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-muted)">62</span></div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:36px;color:var(--ox-muted)">warm</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:88%;background:var(--ox-warning)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-muted)">874</span></div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:36px;color:var(--ox-muted)">cold</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:27%;background:var(--ox-info)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-muted)">348</span></div>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>Type 분포</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:5px;font-size:10px">
+                      <div style="display:flex;justify-content:space-between"><span style="color:var(--ox-muted)">fact</span><span style="font-variant-numeric:tabular-nums">412</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:var(--ox-muted)">episode</span><span style="font-variant-numeric:tabular-nums">286</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:var(--ox-muted)">knowledge</span><span style="font-variant-numeric:tabular-nums">198</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:var(--ox-muted)">decision</span><span style="font-variant-numeric:tabular-nums">142</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:var(--ox-muted)">skill</span><span style="font-variant-numeric:tabular-nums">128</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:var(--ox-muted)">preference</span><span style="font-variant-numeric:tabular-nums">76</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:var(--ox-muted)">conversation</span><span style="font-variant-numeric:tabular-nums">28</span></div>
+                      <div style="display:flex;justify-content:space-between"><span style="color:var(--ox-muted)">session</span><span style="font-variant-numeric:tabular-nums">14</span></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Map tab preview area (collapsed) -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-info)"></span>Map 미리보기 (미구현)</div>
+                  <div style="margin-top:5px;padding:14px;background:var(--ox-accent);border:1px dashed var(--ox-border);border-radius:6px;text-align:center;font-size:10px;color:var(--ox-muted)">Cmd+F 검색 · Tier / Type 필터 · 선택 패널은 Map 탭에서만 노출</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">Overview에 핵심 1·탭을 페이지 헤더로 승격 · 어포던스 통일</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it active"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Memory</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>메모리</h1><p>v1.2.0 · 1,284건 · hot 62 / warm 874 / cold 348</p></div>
+                  <div class="v"><span class="b1">+48 today</span><span class="b2">9 types</span></div>
+                </div>
+
+                <!-- Tab nav with count badges (page-level, not in body) -->
+                <div style="display:flex;gap:0;border-bottom:1px solid var(--ox-border);font-size:10px">
+                  <span style="padding:6px 11px;border-bottom:2px solid var(--ox-primary);color:var(--ox-fg);font-weight:600">Overview</span>
+                  <span style="padding:6px 11px;color:var(--ox-muted);border-bottom:2px solid transparent">Browse <span style="opacity:.7">·1,284</span></span>
+                  <span style="padding:6px 11px;color:var(--ox-muted);border-bottom:2px solid transparent">Map <span style="opacity:.7">·500</span></span>
+                  <span style="padding:6px 11px;color:var(--ox-muted);border-bottom:2px solid transparent">Dream <span style="opacity:.7">·idle</span></span>
+                  <span style="padding:6px 11px;color:var(--ox-muted);border-bottom:2px solid transparent">Search</span>
+                </div>
+
+                <!-- 3-tier hero: only meaningful KPI (Total + Pinned) -->
+                <div class="sect">
+                  <div class="clab">에이전트 인덱스 · 핵심</div>
+                  <div class="kpis-2">
+                    <div class="kpi clickable"><div class="kl">전체 항목<span class="ki" style="background:var(--ox-info)"></span></div><div class="kv">1,284</div><div class="kf"><span class="d up">▲ +48 today</span></div><div class="spk" style="background:linear-gradient(90deg,transparent,oklch(0.623 0.214 259.815/.4))"></div></div>
+                    <div class="kpi clickable"><div class="kl">고정됨<span class="ki" style="background:var(--ox-warning)"></span></div><div class="kv" style="color:var(--ox-warning)">0</div><div class="kf"><span style="color:var(--ox-muted)">고정 항목 없음 · 핀 추가</span></div></div>
+                  </div>
+                </div>
+
+                <!-- 2-col distributions with legend -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-warning)"></span>Tier 분포</div>
+                    <div style="display:flex;flex-direction:column;gap:5px;margin-top:5px">
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:36px;color:var(--ox-muted)">hot</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:62%;background:var(--ox-error)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-fg);font-weight:600">62</span></div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:36px;color:var(--ox-muted)">warm</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:100%;background:var(--ox-warning)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-fg);font-weight:600">874</span></div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:36px;color:var(--ox-muted)">cold</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:40%;background:var(--ox-info)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-fg);font-weight:600">348</span></div>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>Type 분포 · 상위 4</div>
+                    <div style="display:flex;flex-direction:column;gap:5px;margin-top:5px">
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:64px;color:var(--ox-muted)">fact</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:47%;background:var(--ox-primary)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-fg);font-weight:600">412</span></div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:64px;color:var(--ox-muted)">episode</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:33%;background:var(--ox-primary)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-fg);font-weight:600">286</span></div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:64px;color:var(--ox-muted)">knowledge</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:23%;background:var(--ox-primary)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-fg);font-weight:600">198</span></div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="width:64px;color:var(--ox-muted)">decision</span><span style="flex:1;height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:16%;background:var(--ox-primary)"></i></span><span style="font-variant-numeric:tabular-nums;color:var(--ox-fg);font-weight:600">142</span></div>
+                    </div>
+                    <div style="font-size:9px;color:var(--ox-muted);margin-top:6px;text-align:right">+ skill 128 · preference 76 · etc → Type 탭에서 보기</div>
+                  </div>
+                </div>
+
+                <!-- Map preview live, with filter row -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-info)"></span>Map 빠른 보기 · 500 노드 미리보기</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;font-size:9px">
+                    <span style="padding:2px 7px;background:var(--ox-accent);border-radius:9px;color:var(--ox-muted)">Tier: all</span>
+                    <span style="padding:2px 7px;background:var(--ox-accent);border-radius:9px;color:var(--ox-muted)">Type: all</span>
+                    <span style="padding:2px 7px;background:var(--ox-accent);border-radius:9px;color:var(--ox-muted)">Cmd+F</span>
+                    <span style="padding:2px 7px;background:var(--ox-accent);border-radius:9px;color:var(--ox-muted)">에니메이션 on</span>
+                  </div>
+                  <div style="position:relative;margin-top:6px;height:90px;background:radial-gradient(circle at 35% 45%, var(--ox-info) 0 2px, transparent 3px),radial-gradient(circle at 55% 35%, var(--ox-warning) 0 2px, transparent 3px),radial-gradient(circle at 70% 60%, var(--ox-error) 0 2px, transparent 3px),var(--ox-accent);border-radius:6px"></div>
+                  <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--ox-muted);margin-top:5px"><span>선택 패널: 우측 고정</span><span>↗ Map 탭 열기</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">8건 · High 2 / Med 4 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>'고정됨' 카드가 항상 0으로 표시됨 — 잘못된 메트릭</b> — stat 카드 중 <code>pinnedEntries</code>가 literal <code>0</code> 하드코딩으로 렌더되어 데이터 소스(<code>by_type.pinned</code> 등)와 무관하게 항상 0을 보여줌. 사용자에게 "고정 시스템이 비어있다"는 거짓 신호를 줌.<span class="ev">memory-overview.tsx:75</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>5개 탭이 페이지 안에 일렬로 들어가 위계 없음</b> — Overview/Browse/Map/Dream/Search가 한 줄 tablist로 동등하게 노출되지만 Dream·Search는 도구 탭, Map·Browse는 데이터 탭으로 무게가 다름. 한 화면의 가치 흐름이 한 줄로 평탄화됨.<span class="ev">memory.tsx:33-42</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>4개 stat 카드의 아이콘이 회색 placeholder, 차별성 없음</b> — Brain/Hash/Pin/Activity 아이콘이 모두 <code>text-muted-foreground</code>로 그려져 어떤 메트릭이 어떤 카테고리인지 시각적으로 구별 불가. 위계도 없음.<span class="ev">memory-overview.tsx:85</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>'dreamStatus' 카드의 value가 'idle' 문자열 — 메트릭 카드가 아닌 상태 라벨</b> — 4장 중 하나가 string 상태로, KPI 4-up 안에서 숫자/문자 혼재. dream 컴포넌트 자체가 별도 탭에 있으므로 중복.<span class="ev">memory-overview.tsx:76 · dream-panel.tsx</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>Tier·Type 분포가 두 카드로 분리됐으나 공통 축(총량/%) 없음</b> — Tier는 bar chart, Type은 격자식 key/value. 사용자가 두 분포의 비율을 한눈에 비교하기 어려움.<span class="ev">memory-overview.tsx:94-134</span></div></li>
+      <li class="med"><span class="fno">⑥</span><div class="ft"><span class="badge med">MED</span> <b>Browse 카드의 '접근 횟수(access_count)'가 정보 무게 대비 작게 표시</b> — 사용 패턴이 중요 메타인데 우측 끝 9px tiny text로 묻힘. 정렬 가능 컬럼이어야 함.<span class="ev">memory-card.tsx:36-40</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>Map 탭의 단축키(Cmd+F)가 UI에 전혀 표시되지 않음</b> — 키보드 사용자에게만 발견 가능. 인풋 placeholder는 있지만 단축키 안내 부재.<span class="ev">memory-map.tsx:60-80 · :199</span></div></li>
+      <li class="low"><span class="fno">⑧</span><div class="ft"><span class="badge low">LOW</span> <b>Overview 탭에서 Map을 미리볼 수단이 없음 — Map은 별도 클릭 필요</b> — 500 노드 캔버스가 페이지 핵심 자산인데 Overview에 일체 노출 없음. 컨텍스트 스위칭 비용.<span class="ev">memory.tsx:43-58 (overview vs map)</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>하드코딩 0 제거:</b> <code>pinnedEntries</code>를 <code>stats.pinned</code>(또는 <code>by_type.pinned</code>)로 연결. 데이터가 없으면 카드 자체를 숨기거나 0 카드를 "고정 항목 없음 · 추가하기 ↗" 액션 카드로 전환. ① 해결.</div></li>
+      <li><span></span><div><b>탭 재구성:</b> 페이지 헤더 아래로 tablist를 옮기고, 각 탭에 카운트(Overview·1,284 · Map·500 · Browse·1,284 · Dream·idle · Search) 배지 부여. Dream/Search는 도구 그룹으로 분리. ② 해결.</div></li>
+      <li><span></span><div><b>Stat 4 → 2 + 그룹 헤더:</b> Overview를 '에이전트 인덱스 · 핵심' 섹션으로 묶고 의미 있는 KPI만(전체·고정) 노출. dreamStatus 카드 제거(별도 탭). 아이콘을 카테고리별 컬러로 차별화. ③④ 해소.</div></li>
+      <li><span></span><div><b>분포 카드 통합:</b> Tier·Type을 같은 가로 bar 스타일로 통일하고, Type은 상위 4 + "더 보기" 링크로 정리. 공통 max-scale을 적용해 비율 비교 가능. ⑤ 해소.</div></li>
+      <li><span></span><div><b>Map 미리보기:</b> Overview 하단에 작은 캔버스(노드 점만)와 필터 칩/단축키 안내를 노출. 클릭 시 Map 탭으로 점프. ⑦⑧ 해소.</div></li>
+      <li><span></span><div><b>Browse 카드 정렬/가독성:</b> 접근 횟수 위치를 카드 푸터 중앙으로 이동하고 10px tabular-nums로 명시. ⑥ 해결.</div></li>
+    </ul>
+  </div>
+</section>
+
+<section class="screen" id="screen-workspace">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">08 · Console / Storage</div>
+      <h3>Workspace</h3>
+      <div class="smeta">route <code>/workspace</code> · <code>web/src/routes/workspace/index.tsx</code> · 좌: 파일트리(w-72) · 우: 뷰어/에디터 · 15초 자동 새로고침</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">레이아웃</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">내비게이션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">접근성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">타이포</div><div class="val">4</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현 · 문제점 ①–⑧</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:32px;--px:280px" title="F1">①</span>
+          <span class="pin" style="--py:62px;--px:540px" title="F2">②</span>
+          <span class="pin" style="--py:62px;--px:600px" title="F3">③</span>
+          <span class="pin" style="--py:78px;--px:14px" title="F4">④</span>
+          <span class="pin" style="--py:240px;--px:14px" title="F5">⑤</span>
+          <span class="pin" style="--py:118px;--px:14px" title="F6">⑥</span>
+          <span class="pin" style="--py:62px;--px:700px" title="F7">⑦</span>
+          <span class="pin" style="--py:140px;--px:660px" title="F8">⑧</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it active"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Workspace</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <!-- Header -->
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">워크스페이스</h1><p style="font-size:11px;color:var(--ox-muted)">파일 트리 · 뷰어 · 에디터</p></div>
+                  <div style="display:flex;gap:5px">
+                    <span style="padding:4px 9px;font-size:10px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card);color:var(--ox-fg)"><span style="display:inline-block;width:9px;height:9px;background:var(--ox-success);border-radius:2px;margin-right:4px"></span>Create</span>
+                    <span style="padding:4px 9px;font-size:10px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card);color:var(--ox-muted)"><span style="display:inline-block;width:9px;height:9px;background:var(--ox-info);border-radius:2px;margin-right:4px"></span>↻</span>
+                  </div>
+                </div>
+                <!-- Split -->
+                <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;min-height:280px">
+                  <!-- Tree -->
+                  <div style="border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card);overflow:hidden">
+                    <div style="padding:8px 10px;font-size:10px;font-weight:600;color:var(--ox-muted);border-bottom:1px solid var(--ox-border);display:flex;align-items:center;gap:5px"><span style="width:11px;height:11px;background:var(--ox-warning);border-radius:2px"></span>Files</div>
+                    <div style="padding:4px;font-size:10px">
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted)"><span style="font-size:8px">▶</span><span style="color:var(--ox-warning);font-size:11px">▤</span>agents</div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted);padding-left:14px"><span style="font-size:8px">▶</span><span style="color:var(--ox-warning);font-size:11px">▤</span>core</div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted);padding-left:28px"><span style="color:var(--ox-muted);font-size:11px">▢</span>agent.ts<span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">2.1K</span></div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600;padding-left:28px"><span style="color:var(--ox-primary);font-size:11px">▢</span>README.md</div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted);padding-left:14px"><span style="font-size:8px">▶</span><span style="color:var(--ox-warning);font-size:11px">▤</span>skills</div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted)"><span style="color:var(--ox-muted);font-size:11px">▢</span>.env<span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">412B</span></div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted)"><span style="color:var(--ox-muted);font-size:11px">▢</span>package.json<span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">1.8K</span></div>
+                    </div>
+                    <div style="padding:6px 8px;border-top:1px solid var(--ox-border)">
+                      <span style="display:block;text-align:center;font-size:9px;color:var(--ox-muted);padding:4px 0;border:1px dashed var(--ox-border);border-radius:4px">Upload file</span>
+                    </div>
+                  </div>
+                  <!-- Right viewer -->
+                  <div style="border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card);overflow:hidden;display:flex;flex-direction:column">
+                    <!-- Toolbar -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-bottom:1px solid var(--ox-border);font-size:10px">
+                      <div style="display:flex;align-items:center;gap:3px;color:var(--ox-muted)"><span>⌂</span> › <span>agents</span> › <span>core</span> › <b style="color:var(--ox-fg)">README.md</b></div>
+                      <div style="display:flex;gap:2px">
+                        <span style="width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:var(--ox-accent);color:var(--ox-primary)">👁</span>
+                        <span style="width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--ox-muted)">✎</span>
+                        <span style="width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--ox-error)">🗑</span>
+                        <span style="padding:3px 8px;font-size:9px;border:1px solid var(--ox-border);border-radius:5px;color:var(--ox-muted);margin-left:4px">Save</span>
+                      </div>
+                    </div>
+                    <!-- Content -->
+                    <div style="flex:1;padding:14px;font-size:11px;color:var(--ox-fg);font-family:ui-monospace,monospace;line-height:1.6">
+                      <div style="color:var(--ox-primary);font-weight:600"># Agent Core</div>
+                      <div>Core runtime for Oxios agents.</div>
+                      <div style="margin-top:8px;color:var(--ox-muted)">## Modules</div>
+                      <div>- bootstrap</div>
+                      <div>- scheduler</div>
+                      <div>- eventbus</div>
+                      <div style="margin-top:8px;color:var(--ox-muted)">Double-click으로 편집모드 진입</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">모드 토글 명확화 · 어포던스 통일 · 트리 검색 추가</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it active"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Workspace</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>워크스페이스</h1><p>파일 트리 · 뷰어 · 에디터 · 15s 자동 새로고침</p></div>
+                  <div class="v"><span class="b1">12 파일 · 4 폴더</span><span class="b2">⌘K 검색</span></div>
+                </div>
+
+                <!-- Header row: New + Upload + Refresh -->
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="display:flex;gap:5px;font-size:10px">
+                    <span style="padding:5px 10px;background:var(--ox-primary);color:#fff;border-radius:6px;font-weight:600">+ 새로 만들기</span>
+                    <span style="padding:5px 10px;border:1px solid var(--ox-border);border-radius:6px;color:var(--ox-fg)">업로드</span>
+                    <span style="padding:5px 10px;border:1px solid var(--ox-border);border-radius:6px;color:var(--ox-muted)">↻ 새로고침 · 15s</span>
+                  </div>
+                </div>
+
+                <!-- Split -->
+                <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;min-height:280px">
+                  <div style="border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card);overflow:hidden;display:flex;flex-direction:column">
+                    <div style="padding:6px 8px;border-bottom:1px solid var(--ox-border);display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--ox-muted)"><span style="width:11px;height:11px;background:var(--ox-warning);border-radius:2px"></span>Files</div>
+                    <!-- Tree search -->
+                    <div style="padding:4px 6px;border-bottom:1px solid var(--ox-border)">
+                      <div style="display:flex;align-items:center;gap:4px;padding:3px 6px;background:var(--ox-accent);border-radius:4px;font-size:9px;color:var(--ox-muted)"><span>⌕</span><span style="opacity:.7">이름으로 검색…</span></div>
+                    </div>
+                    <div style="padding:4px;font-size:10px;flex:1">
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted)"><span style="font-size:8px">▼</span><span style="color:var(--ox-warning);font-size:11px">▤</span>agents</div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted);padding-left:14px"><span style="font-size:8px">▼</span><span style="color:var(--ox-warning);font-size:11px">▤</span>core</div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted);padding-left:28px"><span style="color:var(--ox-muted);font-size:11px">▢</span>agent.ts<span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">2.1K</span></div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600;padding-left:28px"><span style="color:var(--ox-primary);font-size:11px">▢</span>README.md<span style="margin-left:auto;font-size:9px;color:var(--ox-primary)">1.2K</span></div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted);padding-left:14px"><span style="font-size:8px">▶</span><span style="color:var(--ox-warning);font-size:11px">▤</span>skills</div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted)"><span style="color:var(--ox-muted);font-size:11px">▢</span>.env<span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">412B</span></div>
+                      <div style="padding:3px 6px;display:flex;align-items:center;gap:5px;border-radius:4px;color:var(--ox-muted)"><span style="color:var(--ox-muted);font-size:11px">▢</span>package.json<span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">1.8K</span></div>
+                    </div>
+                  </div>
+                  <!-- Right viewer with explicit mode toggle + save state -->
+                  <div style="border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card);overflow:hidden;display:flex;flex-direction:column">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-bottom:1px solid var(--ox-border);font-size:10px">
+                      <div style="display:flex;align-items:center;gap:3px;color:var(--ox-muted)"><span>⌂</span> › <span>agents</span> › <span>core</span> › <b style="color:var(--ox-fg)">README.md</b> <span style="font-size:9px;color:var(--ox-warning);margin-left:6px">● 저장 안됨</span></div>
+                        <!-- Mode segmented control (replaces 3 icon-only buttons) -->
+                        <div style="display:flex;background:var(--ox-accent);border-radius:6px;padding:2px;font-size:9px">
+                          <span style="padding:3px 9px;background:var(--ox-card);border-radius:4px;color:var(--ox-fg);font-weight:600">뷰</span>
+                          <span style="padding:3px 9px;color:var(--ox-muted)">편집</span>
+                        </div>
+                        <span style="padding:3px 9px;font-size:9px;border:1px solid var(--ox-error);color:var(--ox-error);border-radius:5px">삭제</span>
+                        <span style="padding:4px 11px;font-size:9px;background:var(--ox-primary);color:#fff;border-radius:5px;font-weight:600">저장</span>
+                      </div>
+                    </div>
+                    <div style="flex:1;padding:14px;font-size:11px;color:var(--ox-fg);font-family:ui-monospace,monospace;line-height:1.6">
+                      <div style="color:var(--ox-primary);font-weight:600"># Agent Core</div>
+                      <div>Core runtime for Oxios agents.</div>
+                      <div style="margin-top:8px;color:var(--ox-muted)">## Modules</div>
+                      <div>- bootstrap</div>
+                      <div>- scheduler</div>
+                      <div>- eventbus</div>
+                      <div style="margin-top:8px;color:var(--ox-info)">편집 모드 진입: 더블클릭 · 또는 상단 토글 · ⌘S 저장</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">8건 · High 2 / Med 4 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>단일클릭=뷰, 더블클릭=에디트 — 제스처가 툴바에 표시되지 않음</b> — 사용자는 뷰어에서 에디트로 가는 진입점을 찾기 어렵다. 툴바의 Pencil 아이콘을 발견해도 더블클릭이 별도 제스처라는 사실을 모름. 코드 주석으로만 암묵적.<span class="ev">workspace/index.tsx:128-142 · :199-203</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>뷰/편집 토글이 두 개의 icon-only 버튼(Eye·Pencil)으로 나뉘어 모드가 모호</b> — 같은 파일 안에서 어떤 모드가 활성인지 색만으로 구분. segmented control이 자연스러운데 두 토글이 분리돼 있어 "이미 편집 모드인데 또 누르면?" 같은 혼란 발생.<span class="ev">workspace/index.tsx:306-323</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>Toolbar 아이콘 버튼 3개 모두 라벨 없음(Eye/Pencil/Trash)</b> — 22×22 정사각 버튼으로 hover tooltip도 없음. 키보드 사용자/스크린리더가 의미 식별 불가.<span class="ev">workspace/index.tsx:308-333</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>Create 다이얼로그에서 'Create as directory'가 체크박스 — 발견성 낮음</b> — 기본값이 파일이며 디렉토리 생성은 보조. select/toggle이 더 자연스럽고, dialog 타이틀도 'Create File/Directory'로 상태 따라 바뀌어야 일관.<span class="ev">create-file-dialog.tsx:50-71</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>삭제가 native browser <code>confirm()</code> 사용 — 차단형 모달 + Oxios 디자인 토큰 미적용</b> — Electron/내장 브라우저 환경에서 일관성 깨지고, 키보드 접근성/스타일링 통제 불가.<span class="ev">workspace/index.tsx:171-178</span></div></li>
+      <li class="med"><span class="fno">⑥</span><div class="ft"><span class="badge med">MED</span> <b>Save 버튼은 편집 모드일 때만 노출 + 변경 감지 없음</b> — 편집 시작 즉시 Save 가능하지만 dirty indicator가 없어 "수정 안 했는데 저장"과 "수정했는데 미저장" 구별 불가. 자동 저장도 없음.<span class="ev">workspace/index.tsx:334-346</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>좌측 트리가 고정 w-72이고 검색 기능 없음</b> — 12개 파일 정도면 OK지만, 실제 워크스페이스는 수십·수백 파일. 키보드 화살표 이동만 가능.<span class="ev">workspace/index.tsx:262</span></div></li>
+      <li class="low"><span class="fno">⑧</span><div class="ft"><span class="badge low">LOW</span> <b>헤더 Refresh 버튼이 icon-only — 새로고침 상태가 시각적 단서로만(spinner)</b> — disabled 상태와 fetching 상태가 같은 dimmed 아이콘으로 구분 어려움. 마지막 새로고침 시각도 노출되지 않음.<span class="ev">workspace/index.tsx:253-255 · :70</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>모드 토글을 segmented control로 통합:</b> Eye/Pencil 두 아이콘 버튼을 「뷰 | 편집」 segmented control로 교체. 현재 모드가 하나의 활성 배경으로 명확. 더블클릭 제스처는 toast/배너로 한 번만 안내. ①②③ 해소.</div></li>
+      <li><span></span><div><b>Dirty indicator + Cmd+S 단축키:</b> 에디터 진입 후 변경되면 breadcrumb 옆에 ● 표시 + Save 버튼 강조. ⌘S 핸들러 추가. ⑥ 해소.</div></li>
+      <li><span></span><div><b>Create 다이얼로그 정리:</b> '디렉토리 만들기' 토글을 select(파일/폴더)로 승격하고 다이얼로그 타이틀도 동적. ④ 해결.</div></li>
+      <li><span></span><div><b>삭제 확인을 Oxios Confirm 컴포넌트로 교체:</b> <code>window.confirm</code> → Dialog 기반 confirm. destructive 버튼 강조 + 파일명 echo. ⑤ 해결.</div></li>
+      <li><span></span><div><b>트리 헤더에 검색 인풋 추가:</b> Files 라벨 아래 얇은 ⌕ 인풋. 트리는 여전히 w-72이지만 대량 파일에서도 발견 가능. ⑦ 해결.</div></li>
+      <li><span></span><div><b>Refresh 상태 강화:</b> 아이콘 대신 「↻ 새로고침 · 15s 전」 같은 텍스트 배지 + 마지막 시각 표시. ⑧ 해결.</div></li>
+    </ul>
+  </div>
+</section>
+
+<section class="screen" id="screen-resources">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">09 · Console / System</div>
+      <h3>Resources</h3>
+      <div class="smeta">route <code>/resources</code> · <code>web/src/routes/resources.tsx</code> · 5초 폴링 · AreaChart 30 스냅샷 · CPU·메모리·디스크 3-카드</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">레이아웃</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">내비게이션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">접근성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">타이포</div><div class="val">4</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현 · 문제점 ①–⑦</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:30px;--px:280px" title="F1">①</span>
+          <span class="pin" style="--py:62px;--px:660px" title="F2">②</span>
+          <span class="pin" style="--py:78px;--px:14px" title="F3">③</span>
+          <span class="pin" style="--py:108px;--px:14px" title="F4">④</span>
+          <span class="pin" style="--py:170px;--px:14px" title="F5">⑤</span>
+          <span class="pin" style="--py:150px;--px:660px" title="F6">⑥</span>
+          <span class="pin" style="--py:200px;--px:660px" title="F7">⑦</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it active"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Resources</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">리소스</h1><p style="font-size:11px;color:var(--ox-muted)">CPU · 메모리 · 디스크 사용량 · 5초 자동 새로고침</p></div>
+                  <span style="width:24px;height:24px;border-radius:6px;background:var(--ox-accent)"></span>
+                </div>
+                <!-- 3 stat cards identical shape -->
+                <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+                  <div class="kpi">
+                    <div class="kl">CPU<span class="ki" style="background:var(--ox-info);width:0;height:0"></span></div>
+                    <div class="kv">42.0%</div>
+                    <div style="height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden;margin-top:6px"><i style="display:block;height:100%;width:42%;background:var(--ox-info)"></i></div>
+                  </div>
+                  <div class="kpi">
+                    <div class="kl">메모리<span class="ki" style="background:var(--ox-info);width:0;height:0"></span></div>
+                    <div class="kv">61.4%</div>
+                    <div style="height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden;margin-top:6px"><i style="display:block;height:100%;width:61%;background:var(--ox-info)"></i></div>
+                  </div>
+                  <div class="kpi">
+                    <div class="kl">디스크<span class="ki" style="background:var(--ox-info);width:0;height:0"></span></div>
+                    <div class="kv">78.2%</div>
+                    <div style="height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden;margin-top:6px"><i style="display:block;height:100%;width:78%;background:var(--ox-info)"></i></div>
+                  </div>
+                </div>
+                <!-- Chart -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-success)"></span>리소스 히스토리 · 30 스냅샷</div>
+                  <!-- recharts area chart (3 overlapping areas fillOpacity .1) -->
+                  <div style="position:relative;margin-top:6px;height:110px;border-radius:6px;background:var(--ox-card);overflow:hidden">
+                    <!-- y axis ticks -->
+                    <div style="position:absolute;left:2px;top:2px;bottom:14px;display:flex;flex-direction:column;justify-content:space-between;font-size:8px;color:var(--ox-muted)"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+                    <!-- gridlines -->
+                    <div style="position:absolute;left:18px;right:2px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:space-between"><span style="height:1px;background:var(--ox-border)"></span><span style="height:1px;background:var(--ox-border)"></span><span style="height:1px;background:var(--ox-border)"></span><span style="height:1px;background:var(--ox-border)"></span><span style="height:1px;background:var(--ox-border)"></span></div>
+                    <!-- area 1: cpu (low) -->
+                    <svg style="position:absolute;left:18px;right:2px;top:0;bottom:14px" viewBox="0 0 200 100" preserveAspectRatio="none">
+                      <path d="M0,60 L20,55 L40,58 L60,52 L80,55 L100,50 L120,53 L140,48 L160,52 L180,55 L200,50 L200,100 L0,100 Z" fill="var(--ox-info)" fill-opacity=".18"/>
+                      <path d="M0,60 L20,55 L40,58 L60,52 L80,55 L100,50 L120,53 L140,48 L160,52 L180,55 L200,50" fill="none" stroke="var(--ox-info)" stroke-width="1"/>
+                    </svg>
+                    <!-- area 2: memory (mid) -->
+                    <svg style="position:absolute;left:18px;right:2px;top:0;bottom:14px" viewBox="0 0 200 100" preserveAspectRatio="none">
+                      <path d="M0,40 L20,42 L40,38 L60,40 L80,42 L100,38 L120,40 L140,42 L160,40 L180,38 L200,40 L200,100 L0,100 Z" fill="var(--ox-warning)" fill-opacity=".18"/>
+                      <path d="M0,40 L20,42 L40,38 L60,40 L80,42 L100,38 L120,40 L140,42 L160,40 L180,38 L200,40" fill="none" stroke="var(--ox-warning)" stroke-width="1"/>
+                    </svg>
+                    <!-- area 3: disk (high + rising) -->
+                    <svg style="position:absolute;left:18px;right:2px;top:0;bottom:14px" viewBox="0 0 200 100" preserveAspectRatio="none">
+                      <path d="M0,32 L20,30 L40,28 L60,26 L80,24 L100,23 L120,21 L140,19 L160,17 L180,16 L200,14 L200,100 L0,100 Z" fill="var(--ox-error)" fill-opacity=".18"/>
+                      <path d="M0,32 L20,30 L40,28 L60,26 L80,24 L100,23 L120,21 L140,19 L160,17 L180,16 L200,14" fill="none" stroke="var(--ox-error)" stroke-width="1"/>
+                    </svg>
+                    <!-- x axis labels -->
+                    <div style="position:absolute;left:18px;right:2px;bottom:0;display:flex;justify-content:space-between;font-size:8px;color:var(--ox-muted)"><span>14:00</span><span>14:10</span><span>14:20</span><span>14:30</span></div>
+                  </div>
+                  <!-- legend -->
+                  <div style="display:flex;gap:10px;margin-top:6px;font-size:9px;color:var(--ox-muted)"><span><span style="display:inline-block;width:7px;height:7px;background:var(--ox-info);border-radius:2px;margin-right:3px"></span>CPU</span><span><span style="display:inline-block;width:7px;height:7px;background:var(--ox-warning);border-radius:2px;margin-right:3px"></span>메모리</span><span><span style="display:inline-block;width:7px;height:7px;background:var(--ox-error);border-radius:2px;margin-right:3px"></span>디스크</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">임계치 강조 · 영역 분리 · live 상태 표시</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it active"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Resources</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <!-- Alert strip when something crosses threshold -->
+                <div class="alert"><span class="ac"></span><span><b>디스크 78%</b> — 임계치(80%) 임박. 정리 후보 보기 →</span></div>
+
+                <div class="dash-title">
+                  <div><h1>리소스</h1><p>● live · 마지막 업데이트 14:32:08 · 5초 간격</p></div>
+                  <div class="v"><span class="b1">범위 1h</span><span class="b2">30 스냅샷</span></div>
+                </div>
+
+                <!-- 3 stat cards: each now has threshold context + color-coded bar -->
+                <div class="sect">
+                  <div class="clab">시스템 바이탈</div>
+                  <div class="kpis-2" style="grid-template-columns:repeat(3,1fr)">
+                    <div class="kpi"><div class="kl">CPU <span style="font-weight:400;color:var(--ox-muted)">· ≤80% OK</span><span class="ki" style="background:var(--ox-success)"></span></div><div class="kv">42.0%</div><div style="height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden;margin-top:6px"><i style="display:block;height:100%;width:42%;background:var(--ox-success)"></i></div><div class="kf"><span class="d dn">▼ -3% / 1m</span></div></div>
+                    <div class="kpi"><div class="kl">메모리 <span style="font-weight:400;color:var(--ox-muted)">· ≤80% OK</span><span class="ki" style="background:var(--ox-warning)"></span></div><div class="kv">61.4%</div><div style="height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden;margin-top:6px"><i style="display:block;height:100%;width:61%;background:var(--ox-warning)"></i></div><div class="kf"><span class="d up">▲ +1% / 1m</span></div></div>
+                    <div class="kpi clickable" style="border-color:var(--ox-error);background:oklch(0.97 0.014 27)"><div class="kl">디스크 <span style="font-weight:400;color:var(--ox-muted)">· ⚠ 80% 임계</span><span class="ki" style="background:var(--ox-error)"></span></div><div class="kv" style="color:var(--ox-error)">78.2%</div><div style="height:5px;background:var(--ox-accent);border-radius:3px;overflow:hidden;margin-top:6px"><i style="display:block;height:100%;width:78%;background:var(--ox-error)"></i></div><div class="kf"><span style="color:var(--ox-error)">▲ +0.4% / 1m</span></div></div>
+                  </div>
+                </div>
+
+                <!-- Chart with normalized split: each metric own row, x-axis shared -->
+                <div class="card">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <div class="ct"><span class="i" style="background:var(--ox-success)"></span>리소스 히스토리 · 30 스냅샷 · 라인</div>
+                    <div style="display:flex;gap:5px;font-size:9px"><span style="padding:2px 7px;background:var(--ox-accent);border-radius:9px;color:var(--ox-muted)">1h</span><span style="padding:2px 7px;border-radius:9px;color:var(--ox-muted)">6h</span><span style="padding:2px 7px;border-radius:9px;color:var(--ox-muted)">24h</span></div>
+                  </div>
+                  <!-- 3 small line panels stacked, x-axis shared -->
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <div style="display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center">
+                      <span style="font-size:9px;color:var(--ox-muted);font-weight:600">CPU</span>
+                      <svg viewBox="0 0 200 32" preserveAspectRatio="none" style="width:100%;height:30px"><path d="M0,18 L20,16 L40,19 L60,15 L80,17 L100,13 L120,16 L140,12 L160,14 L180,15 L200,13" fill="none" stroke="var(--ox-success)" stroke-width="1.5"/></svg>
+                    </div>
+                    <div style="display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center">
+                      <span style="font-size:9px;color:var(--ox-muted);font-weight:600">메모리</span>
+                      <svg viewBox="0 0 200 32" preserveAspectRatio="none" style="width:100%;height:30px"><path d="M0,12 L20,13 L40,11 L60,12 L80,13 L100,11 L120,12 L140,13 L160,12 L180,11 L200,12" fill="none" stroke="var(--ox-warning)" stroke-width="1.5"/><line x1="0" y1="6.4" x2="200" y2="6.4" stroke="var(--ox-border)" stroke-dasharray="2 2"/></svg>
+                    </div>
+                    <div style="display:grid;grid-template-columns:42px 1fr;gap:6px;align-items:center">
+                      <span style="font-size:9px;color:var(--ox-muted);font-weight:600">디스크</span>
+                      <svg viewBox="0 0 200 32" preserveAspectRatio="none" style="width:100%;height:30px"><path d="M0,9 L20,9 L40,8 L60,8 L80,7 L100,7 L120,6 L140,6 L160,5 L180,5 L200,4" fill="none" stroke="var(--ox-error)" stroke-width="1.5"/><line x1="0" y1="6.4" x2="200" y2="6.4" stroke="var(--ox-error)" stroke-dasharray="2 2"/></svg>
+                    </div>
+                    <div style="display:grid;grid-template-columns:42px 1fr;gap:6px;font-size:8px;color:var(--ox-muted);margin-top:2px"><span></span><div style="display:flex;justify-content:space-between"><span>14:00</span><span>14:15</span><span>14:30</span></div></div>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:9px;color:var(--ox-muted)"><span>범례: 점선 = 80% 임계치</span><span>↗ 풀 리포트</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">7건 · High 1 / Med 4 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>3개 stat 카드가 동일한 모양·컬러 — 어느 메트릭이 위험인지 즉시 파악 불가</b> — CPU 42%와 디스크 78%(임계치 80% 임박)이 똑같이 차분한 info 색 progress bar로 그려짐. 사용자는 디스크 상승을 인지하지 못한 채 페이지를 떠남.<span class="ev">resources.tsx:68-122</span></div></li>
+      <li class="med"><span class="fno">②</span><div class="ft"><span class="badge med">MED</span> <b>AreaChart의 3개 Area가 동일 0–100 스케일 + fillOpacity 0.1로 겹쳐 가독성 저하</b> — CPU(40%), 메모리(60%), 디스크(78%)가 한 차트에 누적되어 영역이 서로 가림. 임계치 라인도 없음. 디스크 추세는 보이지만 디스크와 메모리 구분이 어려움.<span class="ev">resources.tsx:133-173</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>5초 자동 폴링이 탭 비활성/숨김 상태에서도 계속 — 데이터/배터리 낭비</b> — <code>refetchInterval: 5000</code>가 document visibility와 무관하게 동작. 백그라운드 탭에서 의미 없는 fetch가 계속됨.<span class="ev">resources.tsx:40</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>임계치(80%) 라인이 차트/카드 어디에도 명시되지 않음</b> — 도메인 지식(80%에서 위험)에 의존. 색/배지로 시각화되지 않아 "왜 색이 바뀌는지"를 모름.<span class="ev">resources.tsx:74-122</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>'마지막 업데이트 시각'과 'live/연결 상태' 표시가 없음</b> — 5초마다 갱신되지만 사용자가 본 값이 언제 캡처된 값인지 모름. RefreshButton은 isFetching spinner만 돌리고 라벨 없음.<span class="ev">resources.tsx:63 · :31</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>툴팁 스타일을 inline <code>contentStyle</code> 객체로 주입 — 디자인 토큰 우회</b> — recharts가 디자인 시스템 컨텍스트를 모르므로 CSS 변수 미사용. 다크 모드 전환 시 색이 깨질 수 있음.<span class="ev">resources.tsx:139-147</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>스냅샷이 1개 이하일 때 'not enough data' 플레이스홀더만 노출 — '수집 중' 친화적 상태 없음</b> — 첫 진입 시 차트가 비어있어 시스템이 멈춘 것처럼 보임. 로딩 카운트다운이 있어야 함.<span class="ev">resources.tsx:174-178</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>임계치 기반 색/보더:</b> stat 카드의 progress bar 색을 % 구간별로 적용 — 0–60% info, 60–80% warning, 80%+ error + 카드 보더. 80% 임계치는 카드 라벨에 「⚠ 80% 임계」로 명시. ①④ 해소.</div></li>
+      <li><span></span><div><b>차트를 small-multiples로 분리:</b> AreaChart 한 덩어리 → 메트릭별 라인으로 스택. 같은 x축 공유하지만 y축은 메트릭 독립. 영역 채움 제거하여 라인 가독성 ↑ + 임계치 점선 라인. ② 해소.</div></li>
+      <li><span></span><div><b>Live 표시 + 마지막 업데이트:</b> 헤더에 「● live · 마지막 업데이트 14:32:08 · 5초 간격」 노출. RefreshButton은 텍스트 배지(「새로고침 · 15s 전」)로 교체. ⑤ 해소.</div></li>
+      <li><span></span><div><b>가시성 기반 폴링:</b> <code>refetchInterval</code>을 <code>visibilitychange</code>와 결합, 백그라운드 탭은 30초 간격으로 다운. ③ 해결.</div></li>
+      <li><span></span><div><b>디자인 토큰 정렬:</b> recharts <code>contentStyle</code>을 CSS 변수 기반으로(<code>var(--card)</code> 등) — 이미 일부 적용되어 있음. 다크/라이트 전환 시 자동 적응. ⑥ 해결.</div></li>
+      <li><span></span><div><b>수집 중 상태:</b> 차트 헤더에 「● 수집 중 · 다음 갱신 4초」 같은 부드러운 로딩 상태. ⑦ 해결.</div></li>
+    </ul>
+  </div>
+</section>

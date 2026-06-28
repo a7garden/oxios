@@ -265,6 +265,24 @@ function trajectoryToActivity(step: {
   }
 }
 
+function reasoningToActivity(record: {
+  content: string
+  source: string
+  timestamp: string
+}, turnIndex: number): ChatActivity {
+  // P4 (§7 persistence): one reasoning record per turn, restored to the
+  // matching agent message's activities so the ThinkingPanel can render
+  // it above the answer. `id` derives from the turn index so the existing
+  // activity-card reasoning rendering paths work unchanged.
+  return {
+    id: `reasoning-restored-${turnIndex}`,
+    type: 'reasoning',
+    timestamp: record.timestamp,
+    content: record.content,
+    reasoningSource: record.source,
+  }
+}
+
 function getToken(): string {
   return useAuthStore.getState().token || ''
 }
@@ -783,6 +801,11 @@ export const useChatStore = create<ChatStore>()(
             context?: ToolCallContext
           }> = data.trajectory_steps ?? []
           const trajectoryActivities = trajectorySteps.map(trajectoryToActivity)
+          const reasoningRecords: Array<{
+            content: string
+            source: string
+            timestamp: string
+          }> = data.reasoning_records ?? []
 
           const maxLen = Math.max(userMsgs.length, agentMsgs.length)
           for (let i = 0; i < maxLen; i++) {
@@ -797,21 +820,24 @@ export const useChatStore = create<ChatStore>()(
               })
             }
             if (agentMsg) {
-              // Per-turn trajectory mapping: if the backend provides
-              // trajectory_range on each AgentResponse, extract only the
-              // relevant slice. Fallback: attach all to last response.
               const range = agentMsg.trajectory_range
               let activitiesForThisTurn: ChatActivity[] | undefined
               if (range && trajectoryActivities.length > 0) {
                 activitiesForThisTurn = trajectoryActivities.slice(range.start, range.end)
                 if (activitiesForThisTurn.length === 0) activitiesForThisTurn = undefined
               } else {
-                // Fallback for sessions saved before trajectory_range was added:
-                // attach all activities to the last assistant message.
                 const isLast = i === maxLen - 1
                 if (isLast && trajectoryActivities.length > 0) {
                   activitiesForThisTurn = trajectoryActivities
                 }
+              }
+              // P4 (§7 persistence): restore reasoning record for this turn.
+              const reasoning = reasoningRecords[i]
+              if (reasoning && reasoning.content) {
+                const r = reasoningToActivity(reasoning, i)
+                activitiesForThisTurn = activitiesForThisTurn
+                  ? [...activitiesForThisTurn, r]
+                  : [r]
               }
               messages.push({
                 id: crypto.randomUUID(),

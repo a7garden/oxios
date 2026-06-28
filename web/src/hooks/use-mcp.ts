@@ -3,6 +3,7 @@ import { api } from '@/lib/api-client'
 import type {
   McpServer,
   McpServerRegisterRequest,
+  McpServerUpdateRequest,
   McpTool,
   McpToolCallRequest,
   McpToolCallResult,
@@ -87,6 +88,22 @@ export function useMcpCallTool() {
   return useMutation({
     mutationFn: async (req: McpToolCallRequest) => {
       return api.post<McpToolCallResult>('/api/mcp/tools', req)
+    },
+  })
+}
+
+export function useMcpUpdateServer() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ name, body }: { name: string; body: McpServerUpdateRequest }) => {
+      return api.put<{ status: string; name: string }>(
+        `/api/mcp/servers/${encodeURIComponent(name)}`,
+        body,
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mcp-servers'] })
+      queryClient.invalidateQueries({ queryKey: ['mcp-tools'] })
     },
   })
 }

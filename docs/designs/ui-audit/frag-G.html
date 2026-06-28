@@ -1,0 +1,313 @@
+<section class="screen" id="screen-knowledge">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">18 · Workspace / Knowledge</div>
+      <h3>Knowledge — Markdown Editor + Link Graph + Copilot</h3>
+      <div class="smeta">route <code>/knowledge</code>, <code>/knowledge/*</code> · <code>routes/knowledge/index.tsx</code> · KnowledgeLayout → EditorPanel → (EditorToolbar · MarkdownEditor · SplitEditor) + InfoPanel(Backlinks/Copilot/Graph/History) · KnowledgeNav sidebar · SearchModal ⌘K · MoveModal ⌘M</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">레이아웃</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">내비게이션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">인터랙션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">접근성</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">타이포</div><div class="val">3</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현, 문제점 ①–⑧</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:36px;--px:422px" title="F1">①</span>
+          <span class="pin" style="--py:36px;--px:458px" title="F2">②</span>
+          <span class="pin" style="--py:94px;--px:212px" title="F3">③</span>
+          <span class="pin" style="--py:36px;--px:206px" title="F4">④</span>
+          <span class="pin" style="--py:316px;--px:206px" title="F5">⑤</span>
+          <span class="pin" style="--py:108px;--px:304px" title="F6">⑥</span>
+          <span class="pin" style="--py:158px;--px:300px" title="F7">⑦</span>
+          <span class="pin" style="--py:328px;--px:200px" title="F8">⑧</span>
+          <div class="ox">
+            <!-- Knowledge-mode sidebar (KnowledgeNav: Views / Files / action bar) -->
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <!-- Views (sidebar.tsx:384-414) -->
+              <div class="grp">
+                <div class="gh">Views</div>
+                <div class="it"><span class="ic"></span>Quick Notes</div>
+                <div class="it"><span class="ic"></span>Journal</div>
+                <div class="it"><span class="ic"></span>Link Graph</div>
+              </div>
+              <!-- separator + Files (sidebar.tsx:416-428) -->
+              <div style="border-top:1px solid var(--ox-border);margin:6px 0"></div>
+              <div class="gh" style="padding:0 7px 4px">Files</div>
+              <div style="flex:1;overflow:hidden">
+                <div class="it" style="font-size:10px"><span class="ic"></span>journal/</div>
+                <div class="it active" style="font-size:10px"><span class="ic"></span>2026-06-27.md</div>
+                <div class="it" style="font-size:10px"><span class="ic"></span>refs/api.md</div>
+                <div class="it" style="font-size:10px"><span class="ic"></span>refs/adr-04.md</div>
+                <div class="it" style="font-size:10px"><span class="ic"></span>habits.md</div>
+              </div>
+              <!-- Bottom action bar (sidebar.tsx:430-483): 3 file ops + spacer + Habits + Settings + ⌘K badge -->
+              <div style="display:flex;align-items:center;gap:1px;padding:4px;border-top:1px solid var(--ox-border);margin-top:4px">
+                <div title="새 파일" style="width:18px;height:18px;border-radius:4px;background:var(--ox-muted);opacity:.35"></div>
+                <div title="새 폴더" style="width:18px;height:18px;border-radius:4px;background:var(--ox-muted);opacity:.35"></div>
+                <div title="삭제" style="width:18px;height:18px;border-radius:4px;background:var(--ox-error);opacity:.5"></div>
+                <div style="flex:1"></div>
+                <div title="습관" style="width:18px;height:18px;border-radius:4px;background:var(--ox-muted);opacity:.35"></div>
+                <div title="설정" style="width:18px;height:18px;border-radius:4px;background:var(--ox-muted);opacity:.35"></div>
+                <span style="font-size:8px;font-family:ui-monospace,monospace;color:var(--ox-muted);border:1px solid var(--ox-border);border-radius:3px;padding:0 3px;background:var(--ox-accent)">⌘K</span>
+              </div>
+            </aside>
+
+            <div class="main">
+              <div class="topbar">
+                <div class="crumb">Knowledge · journal/2026-06-27.md</div>
+                <div class="b"><span class="pill"></span><span class="pill"></span></div>
+              </div>
+
+              <!-- 2-pane body (InfoPanel is CLOSED by default per useKnowledgeStore:39). Toggle chevron shown collapsed at the right edge. -->
+              <div class="body" style="padding:0;display:grid;grid-template-columns:1fr 8px;gap:0">
+                <div style="display:grid;grid-template-rows:auto 1fr">
+                  <!-- EditorToolbar — show the SAME-file split bug + hidden-at-md split button -->
+                  <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid var(--ox-border);background:var(--ox-accent);min-height:30px">
+                    <!-- back/forward history buttons -->
+                    <div style="width:18px;height:18px;border-radius:4px;background:var(--ox-muted);opacity:.3"></div>
+                    <div style="width:18px;height:18px;border-radius:4px;background:var(--ox-muted);opacity:.3"></div>
+                    <div style="font-size:10px;font-weight:600;color:var(--ox-fg);margin-left:6px">2026-06-27</div>
+                    <div style="flex:1"></div>
+                    <div style="display:flex;gap:3px;align-items:center">
+                      <div title="저장" style="width:18px;height:18px;border-radius:4px;background:var(--ox-muted);opacity:.3"></div>
+                      <!-- ② split button (hidden md:inline-flex): rendered with strikethrough placeholder to mark 'absent below md' -->
+                      <div title="분할 (md 미만 숨김)" style="position:relative;width:18px;height:18px;border-radius:4px;background:repeating-linear-gradient(45deg,transparent 0 3px,var(--ox-muted) 3px 4px);opacity:.5"></div>
+                      <div title="정보 패널 토글" style="width:18px;height:18px;border-radius:4px;background:var(--ox-muted);opacity:.3"></div>
+                    </div>
+                  </div>
+
+                  <!-- main editor pane + split pane side by side -->
+                  <!-- ① BUG: both panes show the SAME note because openSplit(currentFilePath) -->
+                  <div style="display:grid;grid-template-columns:1fr 1fr;min-height:0">
+                    <div style="display:flex;flex-direction:column;border-right:1px solid var(--ox-border);padding:8px 14px">
+                      <div style="font-size:13px;font-weight:700;color:var(--ox-fg)">2026-06-27</div>
+                      <div style="font-size:10px;color:var(--ox-muted);margin-top:1px">Journal</div>
+                      <div style="margin-top:6px;font-size:10px;line-height:1.55;color:var(--ox-fg);font-family:ui-monospace,monospace">
+                        <div>- [x] 09:30 Codex 리뷰</div>
+                        <div>- [x] 10:15 API 토큰 갱신</div>
+                        <div>- [ ] 14:00 ADR-04 작성</div>
+                        <div style="height:3px"></div>
+                        <div>## 메모</div>
+                        <div>오늘 [[adr-04]] 결론…</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;padding:8px 14px;background:var(--ox-bg)">
+                      <!-- SAME basename, SAME content — openSplit(currentFilePath) duplicates active note -->
+                      <div style="font-size:10px;color:var(--ox-muted);padding-bottom:4px;border-bottom:1px solid var(--ox-border);margin-bottom:6px">2026-06-27</div>
+                      <div style="font-size:10px;line-height:1.55;color:var(--ox-fg);font-family:ui-monospace,monospace">
+                        <div>- [x] 09:30 Codex 리뷰</div>
+                        <div>- [x] 10:15 API 토큰 갱신</div>
+                        <div>- [ ] 14:00 ADR-04 작성</div>
+                        <div style="height:3px"></div>
+                        <div>## 메모</div>
+                        <div>오늘 [[adr-04]] 결론…</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- collapsed-info-panel chevron (infoPanelOpen defaults to false) -->
+                <div style="background:var(--ox-sidebar);border-left:1px solid var(--ox-border);display:flex;align-items:flex-start;justify-content:center;padding-top:8px">
+                  <div style="font-size:11px;color:var(--ox-muted)">‹</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">분할을 진짜 비교 뷰로 · 어포던스·그룹 정제 (동일 토큰)</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <!-- Same KnowledgeNav structure as current (no nav redesign needed) -->
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp">
+                <div class="gh">Views</div>
+                <div class="it"><span class="ic"></span>Quick Notes</div>
+                <div class="it"><span class="ic"></span>Journal</div>
+                <div class="it"><span class="ic"></span>Link Graph</div>
+              </div>
+              <div style="border-top:1px solid var(--ox-border);margin:6px 0"></div>
+              <div class="gh" style="padding:0 7px 4px">Files</div>
+              <div style="flex:1;overflow:hidden">
+                <div class="it" style="font-size:10px"><span class="ic"></span>journal/</div>
+                <div class="it active" style="font-size:10px"><span class="ic"></span>2026-06-27.md</div>
+                <div class="it" style="font-size:10px"><span class="ic"></span>refs/api.md</div>
+                <div class="it" style="font-size:10px"><span class="ic"></span>refs/adr-04.md</div>
+                <div class="it" style="font-size:10px"><span class="ic"></span>habits.md</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:1px;padding:4px;border-top:1px solid var(--ox-border);margin-top:4px">
+                <div title="새 파일" style="width:18px;height:18px;border-radius:4px;background:var(--ox-accent);color:var(--ox-primary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">＋</div>
+                <div title="새 폴더" style="width:18px;height:18px;border-radius:4px;background:var(--ox-accent);color:var(--ox-primary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">▤</div>
+                <div title="삭제" style="width:18px;height:18px;border-radius:4px;background:oklch(0.97 0.014 27);color:var(--ox-error);display:flex;align-items:center;justify-content:center;font-size:10px">×</div>
+                <div style="flex:1"></div>
+                <div title="습관" style="width:18px;height:18px;border-radius:4px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ox-primary)">▦</div>
+                <div title="설정" style="width:18px;height:18px;border-radius:4px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ox-primary)">⚙</div>
+                <span style="font-size:8px;font-family:ui-monospace,monospace;color:var(--ox-muted);border:1px solid var(--ox-border);border-radius:3px;padding:0 3px;background:var(--ox-accent)">⌘K</span>
+              </div>
+            </aside>
+
+            <div class="main">
+              <div class="topbar">
+                <div class="crumb">Knowledge · <b style="color:var(--ox-fg)">journal</b> / 2026-06-27.md ↔ refs/adr-04.md · 저장됨 14:02</div>
+                <div class="b"><span class="pill"></span><span class="pill"></span></div>
+              </div>
+
+              <!-- Three-pane: main editor · split · info (proportional, resizable implicit) -->
+              <div style="display:grid;grid-template-columns:1fr 6px 1fr 6px 220px;flex:1;min-height:0">
+                <!-- main editor -->
+                <div style="display:flex;flex-direction:column;min-width:0;background:var(--ox-card)">
+                  <!-- breadcrumb-style toolbar (label-rich, dirty chip inline) -->
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--ox-border);background:var(--ox-bg)">
+                    <div style="display:flex;gap:2px">
+                      <div title="뒤로" style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);color:var(--ox-primary);display:flex;align-items:center;justify-content:center;font-size:11px">←</div>
+                      <div title="앞으로" style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);color:var(--ox-primary);display:flex;align-items:center;justify-content:center;font-size:11px">→</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;line-height:1.1;margin-left:2px">
+                      <div style="font-size:11px;font-weight:700">2026-06-27.md</div>
+                      <div style="font-size:8px;color:var(--ox-muted)">journal/ · Journal · 6 줄 · 12 단어</div>
+                    </div>
+                    <div style="flex:1"></div>
+                    <!-- explicit Save chip with state -->
+                    <div style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--ox-border);border-radius:6px;font-size:10px;font-weight:600;color:var(--ox-success);background:oklch(0.97 0.02 163)">
+                      <span style="width:6px;height:6px;border-radius:50%;background:var(--ox-success)"></span>저장됨 · 14:02
+                    </div>
+                    <!-- "Compare with…" picker — replaces dumb openSplit(currentFilePath). Always visible (lg+), modal on smaller widths. -->
+                    <div style="display:flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--ox-primary);border-radius:6px;font-size:10px;font-weight:600;color:var(--ox-primary);background:oklch(0.97 0.02 265)">⇄ 비교…</div>
+                    <div title="정보 패널" style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:9px">Info</div>
+                  </div>
+                  <!-- editor body -->
+                  <div style="padding:10px 18px;overflow:hidden;flex:1">
+                    <div style="font-size:13px;font-weight:700">2026-06-27</div>
+                    <div style="font-size:9px;color:var(--ox-muted);margin-bottom:6px">Journal</div>
+                    <div style="font-size:10px;line-height:1.6;font-family:ui-monospace,monospace">
+                      <div>- [x] 09:30 Codex 리뷰</div>
+                      <div>- [x] 10:15 API 토큰 갱신</div>
+                      <div>- [ ] 14:00 ADR-04 작성</div>
+                      <div style="height:4px"></div>
+                      <div>## 메모</div>
+                      <div>오늘 <span style="color:var(--ox-primary);text-decoration:underline">[[adr-04]]</span> 결론…</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- drag handle -->
+                <div style="background:var(--ox-border);cursor:col-resize"></div>
+
+                <!-- split editor — ACTUALLY a different file, with full path and save state -->
+                <div style="display:flex;flex-direction:column;min-width:0;background:var(--ox-card)">
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--ox-border);background:var(--ox-bg)">
+                    <div style="font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:600">Split · 50%</div>
+                    <div style="display:flex;flex-direction:column;line-height:1.1">
+                      <div style="font-size:10px;font-weight:700">adr-04.md</div>
+                      <div style="font-size:8px;color:var(--ox-muted)">refs/ · ADR · 24 줄 · 312 단어</div>
+                    </div>
+                    <div style="flex:1"></div>
+                    <div style="display:flex;align-items:center;gap:4px;padding:2px 6px;border:1px solid var(--ox-border);border-radius:5px;font-size:9px;color:var(--ox-success)">● 저장됨</div>
+                    <div title="분할 닫기" style="font-size:9px;color:var(--ox-muted);padding:2px 6px">×</div>
+                  </div>
+                  <div style="padding:10px 18px;flex:1;overflow:hidden">
+                    <div style="font-size:13px;font-weight:700">ADR-04: Split</div>
+                    <div style="font-size:9px;color:var(--ox-muted);margin-bottom:6px">Status · Accepted</div>
+                    <div style="font-size:10px;line-height:1.6;font-family:ui-monospace,monospace">
+                      <div>## Context</div>
+                      <div>Side-by-side 편집 요구…</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- drag handle -->
+                <div style="background:var(--ox-border);cursor:col-resize"></div>
+
+                <!-- info panel: localised tabs -->
+                <div style="display:flex;flex-direction:column;background:var(--ox-sidebar);border-left:1px solid var(--ox-border);min-width:0">
+                  <div style="padding:8px 10px;border-bottom:1px solid var(--ox-border);font-weight:700;font-size:11px">정보</div>
+                  <div style="display:flex;gap:1px;padding:4px;background:var(--ox-card);border-bottom:1px solid var(--ox-border)">
+                    <div style="flex:1;text-align:center;padding:4px 0;border-radius:5px;background:var(--ox-primary);color:#fff;font-size:9px;font-weight:700">백링크</div>
+                    <div style="flex:1;text-align:center;padding:4px 0;font-size:9px;color:var(--ox-muted);font-weight:600">코파일럿</div>
+                    <div style="flex:1;text-align:center;padding:4px 0;font-size:9px;color:var(--ox-muted);font-weight:600">그래프</div>
+                    <div style="flex:1;text-align:center;padding:4px 0;font-size:9px;color:var(--ox-muted);font-weight:600">기록</div>
+                  </div>
+                  <div style="padding:8px 10px;overflow:hidden;flex:1">
+                    <div style="font-size:8px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:5px">3 노트가 이 페이지를 참조</div>
+                    <div style="display:flex;flex-direction:column;gap:5px">
+                      <div style="padding:6px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-border)">
+                        <div style="font-size:10px;color:var(--ox-primary);font-weight:600">adr-04.md</div>
+                        <div style="font-size:9px;color:var(--ox-muted);margin-top:1px">"…결론 참조"</div>
+                      </div>
+                      <div style="padding:6px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-border)">
+                        <div style="font-size:10px;color:var(--ox-primary);font-weight:600">api-tokens.md</div>
+                        <div style="font-size:9px;color:var(--ox-muted);margin-top:1px">"갱신 주기…"</div>
+                      </div>
+                      <div style="padding:6px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-border)">
+                        <div style="font-size:10px;color:var(--ox-primary);font-weight:600">habits.md</div>
+                        <div style="font-size:9px;color:var(--ox-muted);margin-top:1px">"2026-06 회고…"</div>
+                      </div>
+                    </div>
+                    <div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--ox-border);font-size:8px;color:var(--ox-muted)">↗ 그래프 탭에서 전체 보기</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- footer status bar: discoverability for ⌘K/⌘M/⌘S/⌘/ — visible at every breakpoint -->
+              <div style="display:flex;align-items:center;gap:10px;padding:4px 12px;border-top:1px solid var(--ox-border);background:var(--ox-bg);font-size:9px;color:var(--ox-muted)">
+                <span><kbd style="font-family:ui-monospace,monospace;border:1px solid var(--ox-border);padding:0 4px;border-radius:3px;background:var(--ox-card)">⌘K</kbd> 검색</span>
+                <span><kbd style="font-family:ui-monospace,monospace;border:1px solid var(--ox-border);padding:0 4px;border-radius:3px;background:var(--ox-card)">⌘M</kbd> 이동</span>
+                <span><kbd style="font-family:ui-monospace,monospace;border:1px solid var(--ox-border);padding:0 4px;border-radius:3px;background:var(--ox-card)">⌘S</kbd> 저장</span>
+                <span><kbd style="font-family:ui-monospace,monospace;border:1px solid var(--ox-border);padding:0 4px;border-radius:3px;background:var(--ox-card)">⌘/</kbd> 비교</span>
+                <span style="flex:1"></span>
+                <span style="color:var(--ox-success)">● 자동 저장 활성</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">8건 · High 3 / Med 3 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>분할이 같은 노트를 복제함 — 비교 불가</b> — Split 트리거는 `onClick={() => openSplit(currentFilePath)}`(`editor-toolbar.tsx:102`)로, 활성화된 노트의 path를 그대로 분할 패스에 넘김. SplitEditor가 같은 path를 `useKnowledgeFile`로 읽어(`split-editor.tsx:9,12-13`) 현재 노트의 사본을 띄움. 지식 베이스의 분할은 "두 노트를 나란히"여야 의미 있는데, 코드는 "활성 노트 두 창"이 됨. 현행 mockup의 좌·우 패스가 동일한 basename·본문인 것이 이 버그를 직접 시각화.<span class="ev">components/knowledge/editor-toolbar.tsx:102 · components/knowledge/split-editor.tsx:9,12-13</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>분할 버튼이 md 미만에서 통째로 숨겨짐</b> — Split 버튼은 `className="h-8 w-8 hidden md:inline-flex"`(`editor-toolbar.tsx:101`)로 데스크톱 중간 폭(<md, 768px) 구간에서 발견 불가. 비교 컨텍스트를 요구하는 핵심 기능의 어포던스가 사라짐 — 사용자가 데스크톱에서도 "왜 분할 버튼이 없지?"로 혼란. 현행 mockup의 분할 아이콘을 줄무늬 패턴으로 표시한 것이 이 부재 어포던스.<span class="ev">components/knowledge/editor-toolbar.tsx:98-107</span></div></li>
+      <li class="high"><span class="fno">③</span><div class="ft"><span class="badge high">HIGH</span> <b>분할 폭 50% 고정 + 리사이즈 핸들 부재</b> — SplitEditor는 `md:w-1/2 md:flex-none`(`split-editor.tsx:13`)로 폭이 50%로 박혀 있고, `resize-handle.tsx`는 모달 전용(`move-modal`/`search-modal`)이라 에디터 분할엔 재사용되지 않음. ①과 결합되어 사용자가 "동일 노트 + 동일 폭"의 무의미한 분할에서 갇힘. ③ 해결 전엔 ①②의 비교 picker도 효과가 제한됨.<span class="ev">components/knowledge/split-editor.tsx:13 · components/knowledge/resize-handle.tsx:1-30</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>저장 상태가 Save 버튼과 시각적으로 분리됨</b> — EditorToolbar 우측 Save 아이콘 옆(`editor-toolbar.tsx:80-91`)에 dirty/저장 시각이 없음. dirty 표시는 `absolute top-2 right-3 text-xs`(`markdown-editor.tsx:351-353`)로 에디터 안쪽 우상단에 떠 있어 본문 작성 중 커서와 겹침. 자동 저장은 1초 디바운스(`markdown-editor.tsx:399`)지만 그 사실이 어디에도 안내되지 않음.<span class="ev">components/knowledge/editor-toolbar.tsx:76-92 · components/knowledge/markdown-editor.tsx:350-353,399</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>InfoPanel 탭이 영문 문자열 하드코딩</b> — TabsTrigger 값이 `'backlinks' | 'copilot' | 'graph' | 'history'`(`info-panel.tsx:15,49-53`)로 영어 그대로 렌더링, i18n 키 미사용. 프로젝트 전반이 `t('knowledge.backlinks')` 패턴인데 InfoPanel만 예외. 다국어 모드에서 탭만 영어로 남아 본문과 비일관. (InfoPanel 기본값 닫힘 — `useKnowledgeStore:39` — 이라 평소엔 노출 안 되지만, 켰을 때 한국어 본문·영어 탭의 부조화 발생.)<span class="ev">components/knowledge/info-panel.tsx:15,49-53 · stores/knowledge.ts:39</span></div></li>
+      <li class="med"><span class="fno">⑥</span><div class="ft"><span class="badge med">MED</span> <b>분할 헤더에 풀 경로/저장 상태 없음</b> — SplitEditor 헤더는 `<span>{filePath.split('/').pop()…}</span>`(`split-editor.tsx:15`)만 보여줌. 본문은 topbar crumb로 풀 패스를 받는 반면 분할은 basename만 — ① 해결 후 좌·우 패스가 다른 노트가 되어도 같은 폴더인지 즉시 구분 불가.<span class="ev">components/knowledge/split-editor.tsx:14-16</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>Link Graph: 원형 배치 + 12자 절단, 정보 밀도 한계</b> — `(2π·i)/n` 원형(`link-graph.tsx:29-34`)에 반지름 120px 고정, 라벨 `12`자 절단(`link-graph.tsx:81`). 노트 5개 초과 시 라벨 충돌, 가중치/방향 없음. copilot의 `referenced_notes`도 그래프에 미반영.<span class="ev">components/knowledge/link-graph.tsx:21-86</span></div></li>
+      <li class="low"><span class="fno">⑧</span><div class="ft"><span class="badge low">LOW</span> <b>서브 라우트(/knowledge/graph)에서 InfoPanel 사라짐 단서 없음</b> — AppLayout이 `!isKnowledgeSubRoute && infoPanelOpen && <InfoPanel />`(`app-layout.tsx:98`)로 서브 라우트에서 InfoPanel을 강제 숨김. EditorToolbar의 Info 토글은 그대로 노출되어 사용자가 "버튼 고장?"으로 오해 가능. MoveModal도 마찬가지로 동일 폴더 선택 시 `writeFile→deleteFile` 사이클(`move-modal.tsx:81-98`)이 같은 이름 재쓰기를 유발.<span class="ev">components/layout/app-layout.tsx:92-99 · components/knowledge/move-modal.tsx:148-169</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>분할을 진짜 비교 뷰로:</b> Split 아이콘을 「⇄ 비교…」 라벨 버튼으로 교체. 클릭 시 SearchModal이 "비교할 노트 선택" 모드로 열리고, 사용자가 다른 노트를 고른 뒤에야 SplitEditor가 그 path로 분기. ① 해결.</div></li>
+      <li><span></span><div><b>분할 버튼을 모든 데스크톱 폭에서 노출:</b> `hidden md:inline-flex` → `hidden lg:inline-flex`로 임계값을 낮춰 md~lg 구간에서도 발견되게. 모바일(<lg)에서는 비교 picker가 modal로 열리도록 분기. ② 해결.</div></li>
+      <li><span></span><div><b>3패널 가변 그리드 + resize-handle 재사용:</b> main · 6px drag-handle · split · 6px drag-handle · info 컬럼 구조. resize-handle을 컬럼 사이에 끼워 폭 자유 조절, 모바일(<md)에서는 단일 컬럼 스택. ③ 해결.</div></li>
+      <li><span></span><div><b>저장 상태 칩 인라인:</b> Save 아이콘 자리에 「저장됨 · 14:02」「● 저장 중…」「● 변경됨 (⌘S)」 상태 칩. 자동 저장 활성 여부와 마지막 저장 시각을 같은 위치에서 보여줌. ④ 해결.</div></li>
+      <li><span></span><div><b>InfoPanel 탭 i18n:</b> `t('knowledge.tabBacklinks')` 등으로 교체. 본문과 어휘 일관성 회복. ⑤ 해결.</div></li>
+      <li><span></span><div><b>분할 헤더 정보 보강:</b> topbar crumb에 `2026-06-27.md ↔ refs/adr-04.md` 양쪽 풀 패스 통합 + 각 패널 헤더에 폴더/줄 수/저장 상태 칩. ⑥ 해결.</div></li>
+      <li><span></span><div><b>Link Graph 재배치:</b> 원형 → force-directed 시뮬레이션, 풀 라벨 + 호버 미리보기. copilot referenced_notes를 ghost-edge로. ⑦ 해결.</div></li>
+      <li><span></span><div><b>서브 라우트 Info 안내 + MoveModal 안전장치:</b> 서브 라우트에서 Info 토글 disabled + tooltip. MoveModal에 현재 폴더 표시 + 같은 폴더 선택 시 confirm. ⑧ 해결.</div></li>
+    </ul>
+  </div>
+</section>

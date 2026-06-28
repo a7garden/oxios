@@ -2,6 +2,7 @@ export interface McpServer {
   name: string
   command: string
   args: string[]
+  env?: Record<string, string>
   enabled: boolean
   initialized: boolean
 }
@@ -37,4 +38,12 @@ export interface McpServerRegisterRequest {
   name: string
   command: string
   args?: string[]
+  env?: Record<string, string>
+}
+
+export interface McpServerUpdateRequest {
+  command: string
+  args?: string[]
+  env?: Record<string, string>
+  enabled?: boolean
 }

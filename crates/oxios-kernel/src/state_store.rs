@@ -116,6 +116,22 @@ pub struct TrajectoryStepRecord {
     pub timestamp: DateTime<Utc>,
 }
 
+/// P4 (§7 persistence): persisted reasoning text for a single agent
+/// response. Captured from the runtime's `ThinkingDelta` accumulator at
+/// turn end, already capped to ~4 KB at runtime. Consumed by the Web
+/// UI's ThinkingPanel on session reopen.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReasoningRecord {
+    /// Concatenated reasoning text from the agent's ThinkingDelta stream.
+    /// Capped to ~4 KB at the runtime level (see
+    /// `AgentRuntime::run_agent`).
+    pub content: String,
+    /// Source label: "thinking" (live stream) or "compaction" (one-shot).
+    pub source: String,
+    /// Timestamp when the record was captured.
+    pub timestamp: DateTime<Utc>,
+}
+
 /// Arbitrary key-value metadata for a session.
 pub type SessionMetadata = std::collections::HashMap<String, serde_json::Value>;
 
@@ -141,7 +157,12 @@ pub struct Session {
     /// the execution timeline when the session is re-opened.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub trajectory_steps: Vec<TrajectoryStepRecord>,
-    /// Currently active persona ID (for future multi-persona support).
+    /// P4 (§7 persistence): reasoning text accumulated per turn. One
+    /// record per agent response, capped at ~4 KB at runtime so this
+    /// stays bounded. Consumed by the Web UI's ThinkingPanel on
+    /// session reopen.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasoning_records: Vec<ReasoningRecord>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_persona_id: Option<String>,
     /// RFC-025: Project this session belongs to (singular, grouping only).
@@ -167,6 +188,7 @@ impl Session {
             user_messages: Vec::new(),
             agent_responses: Vec::new(),
             trajectory_steps: Vec::new(),
+            reasoning_records: Vec::new(),
             active_persona_id: None,
             project_id: None,
             created_at: now,
@@ -184,6 +206,7 @@ impl Session {
             user_messages: Vec::new(),
             agent_responses: Vec::new(),
             trajectory_steps: Vec::new(),
+            reasoning_records: Vec::new(),
             active_persona_id: None,
             project_id: None,
             created_at: now,
@@ -222,6 +245,20 @@ impl Session {
     /// Returns the trajectory steps recorded in this session.
     pub fn trajectory(&self) -> &[TrajectoryStepRecord] {
         &self.trajectory_steps
+    }
+
+    /// Append a reasoning record to the session (P4 §7).
+    pub fn add_reasoning(&mut self, record: ReasoningRecord) {
+        if record.content.is_empty() {
+            return;
+        }
+        self.reasoning_records.push(record);
+        self.updated_at = Utc::now();
+    }
+
+    /// Returns the reasoning records recorded in this session.
+    pub fn reasonings(&self) -> &[ReasoningRecord] {
+        &self.reasoning_records
     }
 
     /// Sets the active persona ID.

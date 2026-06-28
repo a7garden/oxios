@@ -173,7 +173,7 @@ impl MountManager {
     /// Update a Mount's auto-enriched fields (agent-driven, RFC-025 Phase 3).
     ///
     /// Only `auto_description` and `auto_meta` are writable here — `name` and
-    /// `paths` are user-level and go through [`Self::rename`] / the web API.
+    /// `paths` are user-level and go through [`Self::update`].
     pub fn update_enrichment(
         &self,
         id: MountId,
@@ -201,27 +201,75 @@ impl MountManager {
         Ok(mount_clone)
     }
 
-    /// Rename a Mount.
-    pub fn rename(&self, id: MountId, new_name: String) -> Result<Mount> {
-        let new_name = validate_mount_name(&new_name)?;
+    /// Update a Mount's user-level fields: name and/or paths.
+    ///
+    /// Replaces the former rename-only path. When `paths` changes, the cached
+    /// enrichment (description, tech-stack, marker mtimes) is invalidated:
+    /// `enrichment_pending` is set so rescan or agent enrichment re-seeds it.
+    pub fn update(
+        &self,
+        id: MountId,
+        name: Option<String>,
+        paths: Option<Vec<PathBuf>>,
+    ) -> Result<Mount> {
+        // Validate before taking locks.
+        let new_name = match &name {
+            Some(n) => Some(validate_mount_name(n)?),
+            None => None,
+        };
+        if let Some(new_paths) = &paths {
+            if new_paths.is_empty() {
+                return Err(MountManagerError::Invalid(
+                    "a Mount requires at least one path".to_string(),
+                )
+                .into());
+            }
+            for p in new_paths {
+                validate_mount_path(p)?;
+            }
+        }
+
         let mut mounts = self.mounts.write();
         let mut name_index = self.name_index.write();
         let mount = mounts.get_mut(&id).ok_or(MountManagerError::NotFound(id))?;
+        let mut changed = false;
 
-        if new_name != mount.name {
+        if let Some(new_name) = new_name
+            && new_name != mount.name
+        {
             if name_index.contains_key(&new_name) {
                 return Err(MountManagerError::DuplicateName(new_name).into());
             }
             name_index.remove(&mount.name);
             name_index.insert(new_name.clone(), id);
             mount.name = new_name;
-            mount.updated_at = Utc::now();
+            changed = true;
         }
 
+        if let Some(new_paths) = paths {
+            // A path change invalidates the cached enrichment: the description,
+            // tech-stack tags, and marker mtimes all pointed at the old roots.
+            if new_paths != mount.paths {
+                mount.paths = new_paths;
+                mount.last_marker_snapshot.clear();
+                mount.enrichment_pending = true;
+                changed = true;
+            }
+        }
+
+        if changed {
+            mount.updated_at = Utc::now();
+            let mount_clone = mount.clone();
+            drop(mounts);
+            drop(name_index);
+            mount_db::save_mount(&self.db.conn(), &mount_clone)?;
+            tracing::info!(name = %mount_clone.name, id = %id, "Mount updated");
+            return Ok(mount_clone);
+        }
+        // No-op: skip the DB write.
         let mount_clone = mount.clone();
         drop(mounts);
         drop(name_index);
-        mount_db::save_mount(&self.db.conn(), &mount_clone)?;
         Ok(mount_clone)
     }
 
@@ -687,6 +735,104 @@ mod tests {
             .expect("update");
         assert_eq!(updated.auto_description.chars().count(), 500);
         assert!(updated.last_enriched_at.is_some());
+        assert!(!updated.enrichment_pending);
+    }
+
+    #[test]
+    fn test_update_renames_mount() {
+        let mgr = open_manager();
+        let m = mgr
+            .create_mount(
+                "oxios".to_string(),
+                vec![PathBuf::from("/a")],
+                MountSource::Manual,
+            )
+            .expect("create");
+        let updated = mgr
+            .update(m.id, Some("new-name".to_string()), None)
+            .expect("rename");
+        assert_eq!(updated.name, "new-name");
+        // name_index follows the rename.
+        assert!(mgr.get_mount_by_name("oxios").is_none());
+        assert_eq!(mgr.get_mount_by_name("new-name").unwrap().id, m.id);
+    }
+
+    #[test]
+    fn test_update_rejects_duplicate_name() {
+        let mgr = open_manager();
+        mgr.create_mount(
+            "alpha".to_string(),
+            vec![PathBuf::from("/a")],
+            MountSource::Manual,
+        )
+        .expect("first");
+        let b = mgr
+            .create_mount(
+                "beta".to_string(),
+                vec![PathBuf::from("/b")],
+                MountSource::Manual,
+            )
+            .expect("second");
+        let err = mgr
+            .update(b.id, Some("alpha".to_string()), None)
+            .unwrap_err();
+        assert!(err.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn test_update_paths_invalidates_enrichment() {
+        let mgr = open_manager();
+        let m = mgr
+            .create_mount(
+                "oxios".to_string(),
+                vec![PathBuf::from("/old")],
+                MountSource::Manual,
+            )
+            .expect("create");
+        // Seed enrichment so we can observe the invalidation.
+        let enriched = mgr
+            .update_enrichment(m.id, Some("a rust project".to_string()), None)
+            .expect("enrich");
+        assert!(!enriched.enrichment_pending);
+        // Seed a stale marker snapshot pointing at the old root.
+        {
+            let mut mounts = mgr.mounts.write();
+            mounts
+                .get_mut(&m.id)
+                .unwrap()
+                .last_marker_snapshot
+                .insert(PathBuf::from("/old/Cargo.toml"), SystemTime::now());
+        }
+        // Repoint the mount at a new path.
+        let updated = mgr
+            .update(m.id, None, Some(vec![PathBuf::from("/new")]))
+            .expect("update paths");
+        assert_eq!(updated.paths, vec![PathBuf::from("/new")]);
+        // The cached description/tech-stack/markers are now stale.
+        assert!(updated.enrichment_pending);
+        assert!(updated.last_marker_snapshot.is_empty());
+    }
+
+    #[test]
+    fn test_update_no_op_preserves_enrichment() {
+        let mgr = open_manager();
+        let m = mgr
+            .create_mount(
+                "oxios".to_string(),
+                vec![PathBuf::from("/a")],
+                MountSource::Manual,
+            )
+            .expect("create");
+        mgr.update_enrichment(m.id, Some("desc".to_string()), None)
+            .expect("enrich");
+        // Passing the unchanged name and paths must NOT mark enrichment stale.
+        let updated = mgr
+            .update(
+                m.id,
+                Some("oxios".to_string()),
+                Some(vec![PathBuf::from("/a")]),
+            )
+            .expect("noop");
         assert!(!updated.enrichment_pending);
     }
 

@@ -13,6 +13,7 @@ pub mod agent_lifecycle;
 pub mod agent_runtime;
 pub mod daemon;
 pub mod readiness;
+pub mod streaming_sink;
 pub mod supervisor;
 
 // ─── Agent History Log ──────────────────────────────────────────────
@@ -64,7 +65,6 @@ pub mod onboarding;
 pub mod persona;
 
 // ─── Tools & Skills ───────────────────────────────────────────────
-// 에이전트가 사용하는 도구, 스킬.
 pub mod skill;
 pub mod token_maxing;
 pub mod tools;

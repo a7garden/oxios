@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::agent_lifecycle::AgentLifecycleManager;
-use crate::event_bus::EventBus;
+use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
 use crate::mount::{MountId, MountManager};
@@ -465,8 +465,34 @@ impl Orchestrator {
         ctx: &oxios_ouroboros::MsgCtx,
     ) -> Result<HandleResponse> {
         // 1. assess — always called once, routes the message.
+        // P3: emit assess phase events so the Web UI timeline shows progress.
+        let _ = self.event_bus.publish(KernelEvent::PhaseStarted {
+            session_id: ctx.session_id.clone(),
+            phase: "assess".to_string(),
+            summary: None,
+        });
         let assessment = engine.assess(msg, ctx).await?;
 
+        let _ = self.event_bus.publish(KernelEvent::PhaseCompleted {
+            session_id: ctx.session_id.clone(),
+            phase: "assess".to_string(),
+        });
+
+        // P3: emit phase events (plan/execute/review) so the Web UI timeline
+        // shows progress through the orchestrator lifecycle.
+        let publish_phase = |phase: &'static str| {
+            let _ = self.event_bus.publish(KernelEvent::PhaseStarted {
+                session_id: ctx.session_id.clone(),
+                phase: phase.to_string(),
+                summary: None,
+            });
+        };
+        let complete_phase = |phase: &'static str| {
+            let _ = self.event_bus.publish(KernelEvent::PhaseCompleted {
+                session_id: ctx.session_id.clone(),
+                phase: phase.to_string(),
+            });
+        };
         match assessment {
             oxios_ouroboros::Assessment::Conversation(reply) => Ok(HandleResponse::Reply(reply)),
 
@@ -480,7 +506,12 @@ impl Orchestrator {
                     oxios_ouroboros::Scope::Trivial => {
                         oxios_ouroboros::Directive::from_message(msg)
                     }
-                    oxios_ouroboros::Scope::Substantial => engine.crystallize(msg, ctx).await?,
+                    oxios_ouroboros::Scope::Substantial => {
+                        publish_phase("plan");
+                        let d = engine.crystallize(msg, ctx).await?;
+                        complete_phase("plan");
+                        d
+                    }
                 };
 
                 // 3. Resolve the execution environment from MsgCtx.
@@ -488,15 +519,19 @@ impl Orchestrator {
 
                 // 4. Execute (always). Trivial tasks skip review; substantial
                 //    tasks go through verify_or_retry below.
+                publish_phase("execute");
                 let mut result = self.execute_directive(&directive, &env).await?;
+                complete_phase("execute");
 
                 // 5. Verify + optional retry (Substantial only).
                 let (verdict, evaluation_passed) = match scope {
                     oxios_ouroboros::Scope::Trivial => (None, None),
                     oxios_ouroboros::Scope::Substantial => {
+                        publish_phase("review");
                         let (r, v) = self
                             .verify_or_retry(engine, &mut directive, &env, result, msg, ctx)
                             .await?;
+                        complete_phase("review");
                         result = r;
                         let passed = v.all_passed();
                         (Some(v), Some(passed))
@@ -597,6 +632,7 @@ impl Orchestrator {
                 tool_calls: Vec::new(),
                 interview_questions: None,
                 interview_round: None,
+                reasoning_text: String::new(),
             },
             HandleResponse::Clarify(questions) => {
                 let questions_text = questions
@@ -637,6 +673,7 @@ impl Orchestrator {
                     tool_calls: Vec::new(),
                     interview_questions: structured,
                     interview_round: Some(((ctx.history.len() / 2) as u32).max(1)),
+                    reasoning_text: String::new(),
                 }
             }
             HandleResponse::Task {
@@ -679,6 +716,7 @@ impl Orchestrator {
                     tool_calls: result.tool_calls.clone(),
                     interview_questions: None,
                     interview_round: None,
+                    reasoning_text: result.reasoning_text.clone(),
                 }
             }
         }
@@ -913,6 +951,13 @@ pub struct OrchestrationResult {
     /// `interview_questions`. Drives the "Round N/M" indicator.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interview_round: Option<u32>,
+
+    /// P4 (§7 persistence): full concatenated reasoning text from the
+    /// agent's `ThinkingDelta` stream. Surfaced into the terminal
+    /// `OutgoingMessage` metadata so chat.rs can persist it alongside
+    /// `tool_calls` and restore on session reopen.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reasoning_text: String,
 }
 
 /// Render the body of the `## Workspace Context` prompt section (RFC-025).

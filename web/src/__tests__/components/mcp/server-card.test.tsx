@@ -40,6 +40,7 @@ const defaultProps = {
   onToggle: vi.fn(),
   onRefresh: vi.fn(),
   onDelete: vi.fn(),
+  onEdit: vi.fn(),
   isToggling: false,
   isRefreshing: false,
   isDeleting: false,

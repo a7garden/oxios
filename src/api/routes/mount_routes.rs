@@ -45,11 +45,12 @@ pub(crate) struct CreateMountRequest {
     pub paths: Vec<String>,
 }
 
-/// Update request. Renaming is the only user-level mutation besides
-/// enrichment (which is agent-driven via the `mount` tool).
+/// Update request. `name` and `paths` are the user-level mutations;
+/// enrichment (description/tech-stack) is agent-driven via the `mount` tool.
 #[derive(Debug, Deserialize)]
 pub(crate) struct UpdateMountRequest {
     pub name: Option<String>,
+    pub paths: Option<Vec<String>>,
 }
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -144,28 +145,40 @@ pub(crate) async fn handle_mount_create(
     Ok((StatusCode::CREATED, Json(mount)))
 }
 
-/// PUT /api/mounts/:id — Update a Mount (rename).
+/// PUT /api/mounts/:id — Update a Mount (name and/or paths).
 pub(crate) async fn handle_mount_update(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(body): Json<UpdateMountRequest>,
 ) -> Result<Json<MountInfo>, AppError> {
     let api = mount_api!(state);
-    let name_opt = body.name;
-    if let Some(ref name) = name_opt
+
+    // Reject an empty name if one was provided.
+    if let Some(name) = &body.name
         && name.trim().is_empty()
     {
         return Err(AppError::BadRequest("Mount name cannot be empty".into()));
     }
-    if let Some(name) = name_opt {
-        api.rename_mount(&id, name)
-            .map_err(|e| AppError::Internal(format!("Failed to update mount: {e}")))
-            .map(Json)
-    } else {
-        api.get_mount(&id)
-            .ok_or_else(|| AppError::NotFound("Mount not found".into()))
-            .map(Json)
+    // Reject an empty path list if paths were provided.
+    if let Some(paths) = &body.paths
+        && paths.is_empty()
+    {
+        return Err(AppError::BadRequest(
+            "Mount requires at least one path".into(),
+        ));
     }
+
+    // Nothing to update — return the current record unchanged.
+    if body.name.is_none() && body.paths.is_none() {
+        return api
+            .get_mount(&id)
+            .ok_or_else(|| AppError::NotFound("Mount not found".into()))
+            .map(Json);
+    }
+
+    api.update_mount(&id, body.name, body.paths)
+        .map_err(|e| AppError::Internal(format!("Failed to update mount: {e}")))
+        .map(Json)
 }
 
 /// DELETE /api/mounts/:id — Remove a Mount.

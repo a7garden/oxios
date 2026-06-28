@@ -1,0 +1,248 @@
+<section class="screen" id="screen-settings">
+<style>
+/* Settings fragment — scoped to #screen-settings. Defines 3-col .ox3
+   grid (Console sb | SettingsRail | pane), tokens, and screen-only
+   classes so the mockup renders correctly when merged. */
+#screen-settings .ox3{
+  --ox-bg:oklch(0.99 0 0);--ox-card:oklch(1 0 0);--ox-fg:oklch(0.141 0.005 285.823);
+  --ox-muted:oklch(0.552 0.016 285.938);--ox-border:oklch(0.92 0.004 286.32);
+  --ox-primary:oklch(0.23 0.025 265);--ox-accent:oklch(0.967 0.003 265);
+  --ox-success:oklch(0.596 0.145 163);--ox-warning:oklch(0.669 0.162 70);
+  --ox-error:oklch(0.577 0.245 27.325);--ox-info:oklch(0.623 0.214 259.815);
+  --ox-sidebar:oklch(0.978 0.002 265);
+  font-family:"Geist",system-ui,-apple-system,sans-serif;color:var(--ox-fg);font-size:13px;
+  display:grid;grid-template-columns:140px 156px 1fr;background:var(--ox-bg);
+  min-height:430px;overflow:hidden;
+}
+#screen-settings .ox3 .sb{background:var(--ox-sidebar);border-right:1px solid var(--ox-border);padding:12px 9px;font-size:11px}
+#screen-settings .ox3 .sb .brand{display:flex;align-items:center;gap:7px;padding:4px 6px 12px;font-weight:700;font-size:12px}
+#screen-settings .ox3 .sb .dot{width:15px;height:15px;border-radius:4px;background:var(--ox-primary)}
+#screen-settings .ox3 .grp{margin-bottom:11px}
+#screen-settings .ox3 .grp .gh{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);padding:0 6px 4px;font-weight:600}
+#screen-settings .ox3 .grp .it{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:6px;color:var(--ox-muted)}
+#screen-settings .ox3 .grp .it .ic{width:13px;height:13px;border-radius:3px;background:currentColor;opacity:.55;flex:none}
+#screen-settings .ox3 .grp .it.active{background:var(--ox-accent);color:var(--ox-primary);font-weight:600}
+#screen-settings .ox3 .grp .it.active .ic{opacity:1}
+#screen-settings .ox3 .sftr{display:flex;align-items:center;gap:8px;padding:5px 7px;border-top:1px solid var(--ox-border);margin-top:auto;border-radius:6px;background:var(--ox-accent);color:var(--ox-primary);font-size:11px}
+#screen-settings .ox3 .sftr .ic{width:13px;height:13px;border-radius:3px;background:currentColor;flex:none}
+#screen-settings .ox3 .sbadge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:14px;padding:0 4px;border-radius:7px;font-size:9px;font-weight:700;line-height:1}
+
+#screen-settings .ox3 .srail{background:var(--ox-sidebar);border-right:1px solid var(--ox-border);padding:10px 8px;font-size:11px;overflow:hidden}
+#screen-settings .ox3 .srch{position:relative;display:flex;align-items:center;gap:6px;background:var(--ox-card);border:1px solid var(--ox-border);border-radius:6px;padding:5px 7px;margin-bottom:8px}
+#screen-settings .ox3 .srch .ic{flex:none;border-radius:2px}
+#screen-settings .ox3 .srch-input{flex:1;color:var(--ox-muted);font-size:10px}
+#screen-settings .ox3 .sgrp{margin-bottom:6px}
+#screen-settings .ox3 .sgh{font-size:8px;letter-spacing:.07em;text-transform:uppercase;color:var(--ox-muted);font-weight:700;padding:4px 6px 3px}
+#screen-settings .ox3 .sit{position:relative;display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:5px;color:var(--ox-muted);font-size:10.5px;line-height:1.2}
+#screen-settings .ox3 .sit .ic{width:10px;height:10px;border-radius:2px;background:currentColor;opacity:.55;flex:none}
+#screen-settings .ox3 .sit .sbadge{margin-left:auto}
+#screen-settings .ox3 .sit.active{background:var(--ox-accent);color:var(--ox-primary);font-weight:600}
+#screen-settings .ox3 .sit.active .ic{opacity:1}
+#screen-settings .ox3 .sit.active .sbar{position:absolute;left:0;top:4px;bottom:4px;width:2px;border-radius:1px;background:var(--ox-primary)}
+#screen-settings .ox3 .sit.modified .sbar{background:var(--ox-warning)}
+
+#screen-settings .ox3 .smain{display:flex;flex-direction:column;min-width:0;background:var(--ox-bg);position:relative}
+#screen-settings .ox3 .stop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 14px 8px;border-bottom:1px solid var(--ox-border)}
+#screen-settings .ox3 .sh h1{font-size:16px;font-weight:600;letter-spacing:-.01em}
+#screen-settings .ox3 .sh p{font-size:11px;color:var(--ox-muted)}
+#screen-settings .ox3 .spill{font-size:10px}
+#screen-settings .ox3 .scard{background:var(--ox-card);border:1px solid var(--ox-border);border-radius:8px;margin:10px 14px 14px;overflow:hidden}
+#screen-settings .ox3 .shdr{display:flex;align-items:center;gap:8px;padding-bottom:6px}
+#screen-settings .ox3 .shdr b{font-size:12px}
+#screen-settings .ox3 .slabel{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700}
+#screen-settings .ox3 .prov{background:var(--ox-card);border:1px solid var(--ox-border);border-radius:6px;padding:7px 9px;display:flex;flex-direction:column;gap:5px}
+#screen-settings .ox3 .prov.modified{border-color:var(--ox-primary);background:oklch(0.97 0.02 265)}
+#screen-settings .ox3 .ph{display:flex;flex-direction:column;gap:1px}
+#screen-settings .ox3 .pl{font-size:11px;font-weight:600}
+#screen-settings .ox3 .pd{font-size:9.5px;color:var(--ox-muted)}
+#screen-settings .ox3 .pa{display:flex;gap:5px}
+#screen-settings .ox3 .kb{font-size:9px;color:var(--ox-primary);font-weight:600;padding:2px 5px;border-radius:3px;background:var(--ox-accent)}
+#screen-settings .ox3 .add-prov{font-size:10px}
+#screen-settings .ox3 .mrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--ox-border)}
+#screen-settings .ox3 .minput{border:1px solid var(--ox-border);border-radius:5px;padding:4px 7px;font-size:11px;font-family:var(--mono);background:var(--ox-card);text-align:right}
+#screen-settings .ox3 .msel{border:1px solid var(--ox-border);border-radius:5px;padding:4px 9px;font-size:10.5px;background:var(--ox-card);color:var(--ox-fg)}
+#screen-settings .ox3 .toggle{display:flex;align-items:center;gap:6px}
+
+#screen-settings .ox3 .sdock{position:absolute;right:14px;bottom:14px;display:flex;align-items:center;gap:9px;background:var(--ox-card);border:1px solid var(--ox-border);border-radius:9px;padding:7px 10px;box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:10px;z-index:4}
+#screen-settings .ox3 .sdock .dot{display:inline-block;width:7px;height:7px;border-radius:50%}
+#screen-settings .ox3 .sbtn-prim{background:var(--ox-primary);color:#fff;border-radius:5px;padding:4px 9px;font-size:10px;font-weight:600}
+#screen-settings .ox3 .sbtn-ghost{color:var(--ox-muted);border:1px solid var(--ox-border);border-radius:5px;padding:4px 8px;font-size:10px;font-weight:500;background:var(--ox-card)}
+</style>
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">19 · Console / Settings</div>
+      <h3>Settings (Rail + Pane)</h3>
+      <div class="smeta">route <code>/settings</code> · <code>web/src/routes/settings.tsx</code> · 3-zone (Console sb + SettingsRail + pane) · 22 sections across 5 groups · floating <code>SaveDock</code></div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">레이아웃</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">배치/발견</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">내비게이션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">인터랙션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">접근성</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">타이포</div><div class="val">3</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">3-zone: Console sb · SettingsRail · Engine panel</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:46px;--px:316px" title="F1">①</span>
+          <span class="pin" style="--py:382px;--px:294px" title="F2">②</span>
+          <span class="pin" style="--py:96px;--px:556px" title="F3">③</span>
+          <span class="pin" style="--py:160px;--px:546px" title="F4">④</span>
+          <span class="pin" style="--py:202px;--px:546px" title="F5">⑤</span>
+          <span class="pin" style="--py:316px;--px:298px" title="F6">⑥</span>
+          <span class="pin" style="--py:108px;--px:316px" title="F7">⑦</span>
+          <!-- triple-column .ox3 — Console sb | SettingsRail | main -->
+          <div class="ox3">
+            <!-- Console sidebar (persists from AppLayout) -->
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+              <!-- footer gear (the ONLY entry point to /settings) -->
+              <div class="sftr"><span class="ic" style="background:var(--ox-primary);opacity:.85"></span><span style="font-weight:600">Settings</span></div>
+            </aside>
+
+            <!-- SettingsRail (within main) -->
+            <aside class="srail">
+              <div class="srch"><span class="ic" style="width:11px;height:11px;background:var(--ox-muted);opacity:.7"></span><span class="srch-input">설정 검색…</span><span style="font-family:var(--mono);font-size:8px;color:var(--ox-muted);border:1px solid var(--ox-border);border-radius:3px;padding:1px 3px">⌘K</span></div>
+              <div class="sgrp"><div class="sgh">AI</div><div class="sit active"><span class="sbar"></span><span class="ic"></span>엔진<span class="sbadge" style="background:var(--ox-primary);color:#fff">1</span></div></div>
+              <div class="sgrp"><div class="sgh">System</div><div class="sit"><span class="ic"></span>커널</div><div class="sit"><span class="ic"></span>실행</div><div class="sit"><span class="ic"></span>오케스트레이터</div><div class="sit"><span class="ic"></span>컨텍스트</div><div class="sit"><span class="ic"></span>게이트웨이</div><div class="sit"><span class="ic"></span>세션</div><div class="sit"><span class="ic"></span>로깅</div><div class="sit"><span class="ic"></span>업데이트</div><div class="sit"><span class="ic"></span>OpenTelemetry</div><div class="sit"><span class="ic"></span>에이전트 로그</div><div class="sit"><span class="ic"></span>리소스 모니터</div><div class="sit"><span class="ic"></span>브라우저</div><div class="sit"><span class="ic"></span>예산</div><div class="sit"><span class="ic"></span>알림</div></div>
+              <div class="sgrp"><div class="sgh">Security</div><div class="sit"><span class="ic"></span>보안</div><div class="sit"><span class="ic"></span>감사</div><div class="sit"><span class="ic"></span>시크릿</div></div>
+              <div class="sgrp"><div class="sgh">Memory</div><div class="sit"><span class="ic"></span>메모리</div></div>
+              <div class="sgrp"><div class="sgh">Channels</div><div class="sit"><span class="ic"></span>텔레그램</div><div class="sit"><span class="ic"></span>캘린더</div></div>
+            </aside>
+
+            <!-- main: SettingsHeader + Engine panel -->
+            <div class="smain">
+              <div class="stop">
+                <div class="sh"><h1 style="font-size:18px;font-weight:600">설정</h1><p style="font-size:11px;color:var(--ox-muted);margin-top:2px">시스템 동작과 정책을 관리합니다</p></div>
+                <div class="spill" style="display:inline-flex;align-items:center;gap:5px;border:1px solid var(--ox-border);border-radius:99px;padding:3px 9px;font-size:10px;color:var(--ox-muted)"><span style="width:5px;height:5px;border-radius:50%;background:var(--ox-success)"></span>저장됨 · 14:08</div>
+              </div>
+              <!-- Engine Panel (custom — does NOT use SectionCard) -->
+              <div class="scard" style="padding:12px 14px">
+                <div class="shdr"><span class="sic" style="background:var(--ox-info);width:18px;height:18px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:10px">⚙</span><b style="font-size:13px">엔진</b><span style="font-size:11px;color:var(--ox-muted);margin-left:8px">AI 제공자, 기본 모델, 라우팅</span></div>
+                <div class="slabel" style="margin-top:11px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700">연결된 제공자</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px">
+                  <div class="prov"><div class="ph"><span class="pl">anthropic</span><span class="pd">기본 모델 · claude-sonnet-4</span></div><div class="pa"><span class="kb">API 키 변경</span><span class="kb" style="color:var(--ox-error)">제거</span></div></div>
+                  <div class="prov"><div class="ph"><span class="pl">openai</span><span class="pd">gpt-4o 연결됨</span></div><div class="pa"><span class="kb">API 키 변경</span><span class="kb" style="color:var(--ox-error)">제거</span></div></div>
+                </div>
+                <div class="add-prov" style="margin-top:6px;border:1px dashed var(--ox-border);border-radius:6px;padding:8px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;justify-content:center;gap:5px"><span style="font-size:14px;line-height:1">+</span>제공자 추가</div>
+                <div class="slabel" style="margin-top:12px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700">기본 모델</div>
+                <div class="mrow"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600">기본 모델</div><div style="font-size:10px;color:var(--ox-muted);margin-top:2px">현재 anthropic/claude-sonnet-4</div></div><div class="msel">anthropic · claude-sonnet-4 ▾</div></div>
+                <div class="slabel" style="margin-top:12px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700">고급 옵션</div>
+                <div class="mrow"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600">temperature</div><div style="font-size:10px;color:var(--ox-muted);margin-top:2px">응답의 무작위성</div></div><div class="minput" style="width:90px">0.7</div></div>
+                <div class="mrow"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600">max_tokens</div><div style="font-size:10px;color:var(--ox-muted);margin-top:2px">응답당 최대 토큰</div></div><div class="minput" style="width:90px">4096</div></div>
+                <div class="slabel" style="margin-top:12px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700">라우팅</div>
+                <div class="mrow"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600">저비용 라우팅</div><div style="font-size:10px;color:var(--ox-muted);margin-top:2px">간단한 작업은 저렴한 모델로</div></div><div class="toggle"><div style="font-size:9px;color:var(--ox-muted)">ON</div><div style="width:22px;height:12px;background:var(--ox-primary);border-radius:6px;position:relative"><div style="width:10px;height:10px;background:#fff;border-radius:50%;position:absolute;top:1px;right:1px"></div></div></div></div>
+              </div>
+
+              <!-- SaveDock (fixed, bottom-right) — occluding last row -->
+              <div class="sdock"><span class="dot" style="background:var(--ox-primary)"></span><b style="font-size:11px;font-variant-numeric:tabular-nums">1</b><span style="font-size:10px;color:var(--ox-muted)">변경 사항</span><span style="width:1px;height:18px;background:var(--ox-border)"></span><span style="font-size:10px;color:var(--ox-error);display:inline-flex;align-items:center;gap:3px">⚠ <b>1</b></span><span style="font-size:10px;color:var(--ox-success);display:inline-flex;align-items:center;gap:3px">✓ <b>0</b></span><span class="sbtn-ghost">되돌리기</span><span class="sbtn-prim">변경 검토</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">Settings를 Console nav에 명시 · restart-badges inline · 도크 → 인라인 CTA</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <!-- proposed: same 3-zone shape, settings promoted in Console nav -->
+          <div class="ox3 pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+              <!-- NEW: Settings in Console nav, badge showing unsaved aggregate -->
+              <div class="grp"><div class="gh">Settings</div><div class="it active"><span class="ic"></span>설정<span class="sbadge" style="background:var(--ox-primary);color:#fff;font-family:var(--mono)">1</span></div></div>
+            </aside>
+
+            <aside class="srail">
+              <!-- search hint with shortcut visible always -->
+              <div class="srch"><span class="ic" style="width:11px;height:11px;background:var(--ox-muted);opacity:.7"></span><span class="srch-input">설정 검색…</span><span style="font-family:var(--mono);font-size:8px;color:var(--ox-muted);border:1px solid var(--ox-border);border-radius:3px;padding:1px 3px">⌘K</span></div>
+              <!-- aggregate unsaved strip — at-a-glance for active section -->
+              <div style="margin:6px 0 4px;padding:6px 8px;border:1px solid oklch(0.91 0.05 27);background:oklch(0.97 0.014 27);border-radius:6px;font-size:9px;color:var(--ox-error);display:flex;align-items:center;gap:5px"><span style="width:5px;height:5px;border-radius:50%;background:var(--ox-error)"></span><b>엔진</b>에 저장 안 된 변경 1건</div>
+              <div class="sgrp"><div class="sgh">AI</div><div class="sit active modified"><span class="sbar"></span><span class="ic"></span>엔진</div></div>
+              <div class="sgrp"><div class="sgh">System</div><div class="sit"><span class="ic"></span>커널</div><div class="sit"><span class="ic"></span>실행</div><div class="sit"><span class="ic"></span>오케스트레이터</div><div class="sit"><span class="ic"></span>컨텍스트</div><div class="sit"><span class="ic"></span>게이트웨이</div><div class="sit"><span class="ic"></span>세션</div><div class="sit"><span class="ic"></span>로깅</div><div class="sit"><span class="ic"></span>업데이트</div><div class="sit"><span class="ic"></span>OpenTelemetry</div><div class="sit"><span class="ic"></span>에이전트 로그</div><div class="sit"><span class="ic"></span>리소스 모니터</div><div class="sit"><span class="ic"></span>브라우저</div><div class="sit"><span class="ic"></span>예산</div><div class="sit"><span class="ic"></span>알림</div></div>
+              <div class="sgrp"><div class="sgh">Security</div><div class="sit"><span class="ic"></span>보안</div><div class="sit"><span class="ic"></span>감사</div><div class="sit"><span class="ic"></span>시크릿</div></div>
+              <div class="sgrp"><div class="sgh">Memory</div><div class="sit"><span class="ic"></span>메모리</div></div>
+              <div class="sgrp"><div class="sgh">Channels</div><div class="sit"><span class="ic"></span>텔레그램</div><div class="sit"><span class="ic"></span>캘린더</div></div>
+            </aside>
+
+            <div class="smain">
+              <!-- header now shows: section breadcrumb + aggregate pill + inline CTA -->
+              <div class="stop">
+                <div class="sh"><div style="font-size:10px;color:var(--ox-muted);margin-bottom:3px">설정 · <span style="color:var(--ox-primary);font-weight:600">AI · 엔진</span></div><h1 style="font-size:18px;font-weight:600">엔진</h1><p style="font-size:11px;color:var(--ox-muted);margin-top:2px">AI 제공자, 기본 모델, 라우팅 정책</p></div>
+                <div style="display:flex;align-items:center;gap:8px"><div class="spill" style="display:inline-flex;align-items:center;gap:5px;border:1px solid var(--ox-border);border-radius:99px;padding:3px 9px;font-size:10px;color:var(--ox-muted)"><span style="width:5px;height:5px;border-radius:50%;background:var(--ox-warning)"></span>저장 안 됨 · 1</div><span class="sbtn-ghost">되돌리기</span><span class="sbtn-prim">변경 검토 · 1</span></div>
+              </div>
+              <!-- Engine panel: same surface; restart-badges added next to hot-reloadable rows -->
+              <div class="scard" style="padding:12px 14px">
+                <div class="shdr"><span class="sic" style="background:var(--ox-info);width:18px;height:18px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:10px">⚙</span><b style="font-size:13px">엔진</b><span style="font-size:10px;color:var(--ox-success);display:inline-flex;align-items:center;gap:3px;margin-left:8px;padding:1px 5px;border:1px solid oklch(0.91 0.05 163);border-radius:99px">✓ 즉시 적용</span></div>
+                <div class="slabel" style="margin-top:11px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700">연결된 제공자</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px">
+                  <div class="prov"><div class="ph"><span class="pl">anthropic</span><span class="pd">기본 · claude-sonnet-4</span></div><div class="pa"><span class="kb">키 변경</span><span class="kb" style="color:var(--ox-error)">제거</span></div></div>
+                  <div class="prov modified"><div class="ph"><span class="pl">openai</span><span class="pd" style="color:var(--ox-primary)">변경됨 · 새 키 저장 대기</span></div><div class="pa"><span class="kb">키 변경</span><span class="kb" style="color:var(--ox-error)">제거</span></div></div>
+                </div>
+                <div class="add-prov" style="margin-top:6px;border:1px dashed var(--ox-border);border-radius:6px;padding:8px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;justify-content:center;gap:5px"><span style="font-size:14px;line-height:1">+</span>제공자 추가</div>
+                <div class="slabel" style="margin-top:12px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700">기본 모델</div>
+                <div class="mrow"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px">기본 모델 <span style="font-size:9px;color:var(--ox-success);padding:1px 5px;border:1px solid oklch(0.91 0.05 163);border-radius:99px">✓ 즉시</span></div><div style="font-size:10px;color:var(--ox-muted);margin-top:2px">현재 anthropic/claude-sonnet-4</div></div><div class="msel">anthropic · claude-sonnet-4 ▾</div></div>
+                <div class="slabel" style="margin-top:12px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700">고급 옵션 <span style="font-weight:500;color:var(--ox-success);text-transform:none;letter-spacing:0;font-size:9px">(즉시 적용)</span></div>
+                <div class="mrow"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600">temperature</div><div style="font-size:10px;color:var(--ox-muted);margin-top:2px">응답의 무작위성</div></div><div class="minput" style="width:90px">0.7</div></div>
+                <div class="mrow"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600">max_tokens</div><div style="font-size:10px;color:var(--ox-muted);margin-top:2px">응답당 최대 토큰</div></div><div class="minput" style="width:90px">4096</div></div>
+                <div class="slabel" style="margin-top:12px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:700">라우팅</div>
+                <div class="mrow"><div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:600">저비용 라우팅</div><div style="font-size:10px;color:var(--ox-muted);margin-top:2px">간단한 작업은 저렴한 모델로</div></div><div class="toggle"><div style="font-size:9px;color:var(--ox-muted)">ON</div><div style="width:22px;height:12px;background:var(--ox-primary);border-radius:6px;position:relative"><div style="width:10px;height:10px;background:#fff;border-radius:50%;position:absolute;top:1px;right:1px"></div></div></div></div>
+              </div>
+              <!-- inline sticky save bar (replaces fixed dock) -->
+              <div style="position:sticky;bottom:0;margin:10px -14px -14px;padding:10px 14px;background:#fff;border-top:1px solid var(--ox-border);display:flex;align-items:center;gap:10px;box-shadow:0 -4px 12px rgba(0,0,0,.04);border-radius:0 0 8px 8px"><span style="font-size:11px;color:var(--ox-muted)"><b style="color:var(--ox-fg)">1건</b> 변경 · 즉시 적용 가능</span><div style="flex:1"></div><span class="sbtn-ghost">되돌리기</span><span class="sbtn-prim">검토 및 저장</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">7건 · High 3 / Med 1 / Low 3</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>Console nav에 Settings 항목 없음 — footer 기어로만 진입</b> — `consoleNavGroups`(sidebar.tsx:91-159)는 Main/Agents/Projects/Storage/Operations/Infra/System 7그룹이지만 Settings는 어디에도 없음. 유일한 진입점은 sidebar-footer.tsx:71,110의 톱니바퀴 링크. 시스템 설정이 정보구조상 운영·인프라와 동급인데 nav에서 보이지 않음. 발견 비용↑.<span class="ev">components/layout/sidebar.tsx:91-159 (consoleNavGroups) · components/layout/sidebar-footer.tsx:70-78</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>Engine 패널이 SectionCard를 우회 — 메타·modified-ring·restart-badges 일관성 깨짐</b> — EnginePanel(routes/settings.tsx:343-492)은 자체 Card로 렌더되어 SectionCard가 가진 ①fieldCount 메타 ②modified 시 1px ring ③reset 버튼 ④제목 옆 수정 dot이 없음. 다른 모든 섹션은 동일 SectionCard → Engine만 시각적으로 다름. 통일성 저하.<span class="ev">routes/settings.tsx:403-491 (EnginePanel) vs components/settings/section-card.tsx:56-134</span></div></li>
+      <li class="high"><span class="fno">③</span><div class="ft"><span class="badge high">HIGH</span> <b>restart-scope 정보가 SectionCard에는 안 보이고 DiffPreview 모달에서만 등장</b> — 22개 섹션 중 다수가 hotReload:false(restart 필요). SectionCard 주석은 "RestartBadge는 DiffPreview에만 — resting state는 깨끗하게" 명시(section-card.tsx:36-41). 사용자가 변경 전 어느 필드가 restart를 요구하는지 알 수 없고, "검토"를 눌러야 알게 됨. restartScope 필드 정의는 존재하지만 사용자에게 노출되지 않음.<span class="ev">components/settings/section-card.tsx:36-41 · components/settings/restart-badge.tsx:20-54 (정의만 됨) · field-defs.ts:93-156 (exec)</span></div></li>
+      <li class="low"><span class="fno">④</span><div class="ft"><span class="badge low">LOW</span> <b>내부 데이터 모순 — execSection.groupId='security' vs SECTION_META[exec].groupId='system'</b> — `execSection`(field-defs.ts:87-156) 정의의 groupId는 'security'이나 같은 파일의 SECTION_META[id='exec'](field-defs.ts:921-928)의 groupId는 'system'. rail은 SECTION_META를 쓰므로 사용자에게는 'System > 실행'으로 보이지만, 같은 식별자에 대해 두 출처가 다른 그룹을 가리킴. 향후 새 섹션 추가 시 그룹이 어긋날 위험 — rail은 SETTINGS_GROUPS.sectionKeys 목록(field-defs.ts:790-805)을 별도로 관리하므로 사실상 3중 출처. <span class="ev">components/settings/field-defs.ts:92 vs :921-928 vs :790-805</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>SaveDock fixed z-50 — 작은 뷰포트에서 마지막 필드 행을 가림</b> — `fixed bottom-5 right-5 z-50` + `shadow-xl`(save-dock.tsx:48-56). 마지막 필드(예: Engine 패널의 라우팅 토글) 바로 위에 떠 변경 의도와 무관하게 시각적 occlusion. 모달이 아니라 인라인 sticky 또는 마지막 카드 끝에 부착이 더 안전.<span class="ev">components/settings/save-dock.tsx:46-56</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>SettingsHeader에 현재 섹션 표시 없음 — '설정' 타이틀만 반복</b> — 헤더는 "설정/시스템 동작과 정책"만 표시, 활성 섹션(엔진·커널·...) 정보 없음. SettingsRail의 활성 아이템과 중복되어 효용 없음. breadcrumb 또는 섹션명이 들어가야 맥락 강화.<span class="ev">components/settings/settings-header.tsx:30-37 · routes/settings.tsx:770-784</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>SettingsRail 활성 항목에 `bg-primary/10` 외 hover·focus 시각적 변별 없음</b> — 다른 그룹 hover(`hover:bg-muted/60`)와 활성(`bg-primary/10`)이 색조만 다른 거의 같은 위계. 키보드 포커스 링(`focus-visible:ring-1 focus-visible:ring-ring`)도 없음 — j/k/g/G 단축키(settings-shell.tsx:148-174)는 있지만 포커스 이동 가이드 부재.<span class="ev">components/settings/settings-rail.tsx:133-139 (클래스), 154 (라벨) · settings-shell.tsx:148-174 (단축키)</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>Console nav에 'Settings' 그룹 신설:</b> sidebar.tsx consoleNavGroups에 settings 섹션을 추가. 톱니바퀴 라벨 + 미저장 카운트 배지로 discoverability↑. footer 기어는 보조 진입로로 유지. ① 해결.</div></li>
+      <li><span></span><div><b>execSection.groupId='security' → 'system'으로 정합성 수정:</b> field-defs.ts:92의 groupId 불일치 1건 수정. SETTINGS_GROUPS.sectionKeys·SECTION_META와 단일 출처로 통합. ④ 해결.</div></li>
+      <li><span></span><div><b>SaveDock: fixed → 카드 하단 sticky 인라인:</b> 마지막 SectionCard 내부 하단에 sticky bar로 부착. 모바일·좁은 viewport에서 occlusion 제거. ⑤ 해결.</div></li>
+      <li><span></span><div><b>SettingsHeader에 breadcrumb 추가:</b> "설정 · AI · 엔진" 같은 2-depth breadcrumb로 활성 섹션 표시. 콘솔 nav가 Settings 항목을 가지므로 redundant하지 않음. ⑥ 해소.</div></li>
+      <li><span></span><div><b>Rail 포커스 링 + 활성 modified 동시 표시:</b> active|modified 둘 다일 때 좌측 바를 두께 변화로, focus-visible:ring-1 추가. ⑦ 해소.</div></li>
+    </ul>
+  </div>
+</section>

@@ -1,4 +1,4 @@
-import { Power, RefreshCw, Trash2 } from 'lucide-react'
+import { Pencil, Power, RefreshCw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ interface ServerCardProps {
   onToggle: () => void
   onRefresh: () => void
   onDelete: () => void
+  onEdit: () => void
   isToggling: boolean
   isRefreshing: boolean
   isDeleting: boolean
@@ -19,6 +20,7 @@ export function ServerCard({
   onToggle,
   onRefresh,
   onDelete,
+  onEdit,
   isToggling,
   isRefreshing,
   isDeleting,
@@ -65,6 +67,15 @@ export function ServerCard({
           title={t('mcp.refresh', 'Refresh')}
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onEdit}
+          title={t('mcp.edit', 'Edit')}
+        >
+          <Pencil className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"

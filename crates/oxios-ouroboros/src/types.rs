@@ -63,6 +63,13 @@ pub struct ExecutionResult {
     /// the failure occurred before any state was accumulated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub restore_state: Option<serde_json::Value>,
+
+    /// P4 (§7 persistence): full concatenated reasoning text from
+    /// `AgentEvent::ThinkingDelta { text }`, capped at ~4 KB at runtime.
+    /// Surfaced in the terminal OutgoingMessage metadata so chat.rs can
+    /// persist it alongside `tool_calls` and restore on session reopen.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reasoning_text: String,
 }
 
 /// Single option for a structured interview question.

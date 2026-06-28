@@ -11,6 +11,7 @@ export interface CreateMountInput {
 
 export interface UpdateMountInput {
   name?: string
+  paths?: string[]
 }
 
 // ─── Hooks ────────────────────────────────────────────────────

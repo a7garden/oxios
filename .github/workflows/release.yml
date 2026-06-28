@@ -1,4 +1,4 @@
-name: Release (Web UI)
+name: Release
 
 on:
   push:
@@ -37,6 +37,46 @@ jobs:
         with:
           files: web-dist.zip
           generate_release_notes: true
+
+  # ── Build native macOS arm64 binary ───────────────────────────
+  #
+  # Runs on an Apple Silicon runner (macos-14 = M1). We do NOT
+  # cross-compile from Linux: oxios pulls in oxi-sdk/wasmtime with a
+  # native JIT and C dependencies that are painful to cross to
+  # aarch64-apple-darwin. The binary does NOT embed web assets
+  # (RFC-026 removed rust-embed) — it fetches web-dist.zip on first
+  # run into ~/.oxios/web/dist/ — so the tarball is just the
+  # standalone `oxios` executable.
+  #
+  # `needs: release` so this uploads to the release the `release` job
+  # already created — one owner of release creation, no upload race.
+  binary:
+    name: Build macOS arm64 binary
+    needs: release
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release binary
+        run: cargo build --release --locked
+      - name: Smoke test
+        run: ./target/release/oxios --version
+      - name: Package and checksum
+        run: |
+          set -euo pipefail
+          ASSET=oxios-aarch64-apple-darwin.tar.gz
+          tar -C target/release -czf "$ASSET" oxios
+          shasum -a 256 "$ASSET" > "$ASSET.sha256"
+          ls -lh "$ASSET" "$ASSET.sha256"
+      - name: Upload binary to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            oxios-aarch64-apple-darwin.tar.gz
+            oxios-aarch64-apple-darwin.tar.gz.sha256
 
   # ── Trigger crates.io publish ──────────────────────────────────
   # A Release created with GITHUB_TOKEN does NOT emit a `release: published`

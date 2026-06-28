@@ -110,6 +110,11 @@ pub struct Gateway {
     /// to each outgoing message and keeps a bounded ring buffer for replay.
     /// Cheap to clone; the inner state is `Sync`.
     reliability: Arc<ReliabilityLayer>,
+    /// RFC-015 P1: shared with `KernelHandle.streaming_sinks` so the runtime
+    /// callback's `TextChunk` lookup finds the gateway's collector sender
+    /// for the active session. The kernel assembler wires both sides to the
+    /// same `Arc<StreamingSinkRegistry>` at boot.
+    streaming_sinks: Arc<oxios_kernel::streaming_sink::StreamingSinkRegistry>,
 }
 
 /// F21: deliver a message through a channel with bounded retries and linear
@@ -168,12 +173,13 @@ impl Gateway {
             rx: Mutex::new(rx),
             tx,
             orchestrator,
+            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
+            streaming_sinks: Arc::new(oxios_kernel::streaming_sink::StreamingSinkRegistry::new()),
             engine_api: None,
             persona_api: None,
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
             in_flight: Arc::new(Mutex::new(Vec::new())),
-            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
         }
     }
 
@@ -190,13 +196,26 @@ impl Gateway {
             rx: Mutex::new(rx),
             tx,
             orchestrator,
+            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
+            streaming_sinks: Arc::new(oxios_kernel::streaming_sink::StreamingSinkRegistry::new()),
             engine_api: Some(engine_api),
             persona_api: Some(persona_api),
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
             in_flight: Arc::new(Mutex::new(Vec::new())),
-            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
         }
+    }
+
+    /// Attach the streaming-sink registry shared with `KernelHandle` so the
+    /// runtime callback's `TextChunk` lookup finds the gateway's collector
+    /// sender for the active session. Called by the kernel assembler after
+    /// both sides are constructed; both sides must point at the SAME `Arc`.
+    pub fn with_streaming_sinks(
+        mut self,
+        registry: Arc<oxios_kernel::streaming_sink::StreamingSinkRegistry>,
+    ) -> Self {
+        self.streaming_sinks = registry;
+        self
     }
 
     /// Signal the gateway to stop its event loop.
@@ -385,6 +404,7 @@ impl Gateway {
         let channels = self.channels.clone();
         let reliability = self.reliability.clone();
         let in_flight = self.in_flight.clone();
+        let streaming_sinks = self.streaming_sinks.clone();
 
         // F20: track the handle so shutdown can await it. Reap finished
         // handles to keep the vec bounded.
@@ -409,6 +429,117 @@ impl Gateway {
             let conn_id = msg.metadata.get("conn_id").cloned();
             let request_id = msg.id.to_string();
 
+            // ── Streaming sink collector (P1 chat transparency) ──────────
+            // Create the mpsc the runtime callback will push live text
+            // deltas into via the registry. Acquire the channel Arc here
+            // (one F22 release point) so the collector can deliver partials
+            // immediately. Register a Weak in the registry so the runtime
+            // callback's lookup finds the sender for this session.
+            //
+            // Sender-drop ordering is load-bearing: when we `drop(sender_arc)`
+            // after `handle_unified` returns and `collector.await` drains,
+            // all partials reach the WS BEFORE the terminal `done` is built
+            // (advisory: collector race). No async gap between sender drop
+            // and join — the JoinHandle completes when the receiver's last
+            // value is processed.
+            let channel_for_collector: Option<Arc<dyn Channel>> = {
+                let guard = channels.read().await;
+                guard.get(&channel_name).map(|e| e.channel.clone())
+            };
+            let collector = channel_for_collector.map(|channel| {
+                let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<
+                    oxios_kernel::agent_runtime::StreamDelta,
+                >();
+                let sender_arc: oxios_kernel::streaming_sink::StreamingSinkSender = Arc::new(tx);
+                if let Some(ref sid) = session_id {
+                    streaming_sinks.register(sid, &sender_arc);
+                }
+                let channel = channel.clone();
+                let conn_id = conn_id.clone();
+                let session_id_for_collector = session_id.clone();
+                let channel_name_for_collector = channel_name.clone();
+                let user_id = msg.user_id.clone();
+                let streaming_sinks_for_unregister = streaming_sinks.clone();
+                let handle = tokio::spawn(async move {
+                    while let Some(delta) = rx.recv().await {
+                        match delta {
+                            oxios_kernel::agent_runtime::StreamDelta::Text(text) => {
+                                let mut outgoing = OutgoingMessage::with_id(
+                                    uuid::Uuid::new_v4(),
+                                    channel_name_for_collector.clone(),
+                                    user_id.clone(),
+                                    text,
+                                );
+                                outgoing.target_conn_id = conn_id.clone();
+                                outgoing = outgoing.with_partial(true);
+                                if let Some(ref sid) = session_id_for_collector {
+                                    outgoing
+                                        .metadata
+                                        .insert(meta::SESSION_ID.to_string(), sid.clone());
+                                }
+                                // Skip `reliability.assign_seq` on partials:
+                                // `assign_seq` pushes into the replay buffer
+                                // (reliability.rs:81-88), and on WS reconnect
+                                // the buffer replays every delta. The frontend
+                                // would then re-merge all those text prefixes
+                                // into the assistant message, producing
+                                // duplicated/garbled output. Partials are
+                                // ephemeral: FIFO ordering comes from the
+                                // mpsc, each carries a unique `Uuid` for the
+                                // frontend's seen-id ring, and reconnect
+                                // recovery uses the terminal (seq'd, full
+                                // text) instead — no data lost (advisory).
+                                let _ = send_with_retry(&channel, outgoing).await;
+                            }
+                            oxios_kernel::agent_runtime::StreamDelta::Thinking => {
+                                // Signal only — LiveActivityBar reacts to
+                                // this via the local activity-stream arm in
+                                // chat.rs (existing RFC-015 ReasoningFragment
+                                // chunks). No WS chunk emitted here.
+                            }
+                            oxios_kernel::agent_runtime::StreamDelta::ThinkingDelta(text) => {
+                                // Batched reasoning fragment — same partial
+                                // delivery rules as Text (partial=true, no
+                                // assign_seq, conn_id scoped). Emitted as a
+                                // `reasoning` WS chunk (NOT `token`) so the
+                                // frontend's existing chunkToActivity routes
+                                // it into the activity timeline (reasoning
+                                // activity card) instead of the answer text.
+                                // The chat store merges consecutive
+                                // reasoning chunks into a single activity
+                                // (see chunkToActivity merge logic).
+                                let mut outgoing = OutgoingMessage::with_id(
+                                    uuid::Uuid::new_v4(),
+                                    channel_name_for_collector.clone(),
+                                    user_id.clone(),
+                                    text,
+                                );
+                                outgoing.target_conn_id = conn_id.clone();
+                                outgoing = outgoing.with_partial(true);
+                                outgoing
+                                    .metadata
+                                    .insert("stream_kind".to_string(), "reasoning".to_string());
+                                if let Some(ref sid) = session_id_for_collector {
+                                    outgoing
+                                        .metadata
+                                        .insert(meta::SESSION_ID.to_string(), sid.clone());
+                                }
+                                let _ = send_with_retry(&channel, outgoing).await;
+                            }
+                            _ => {}
+                        }
+                    }
+                    if let Some(sid) = session_id_for_collector {
+                        streaming_sinks_for_unregister.unregister(&sid);
+                    }
+                });
+                // Returned so outer code can drop the strong sender and
+                // await the JoinHandle — guarantees all partials reach the
+                // WS BEFORE the terminal `done` is built (advisory:
+                // collector race).
+                (sender_arc, handle)
+            });
+
             // RFC-027: unified path. Falls back to handle_message internally
             // if IntentEngine is not wired.
             let result = orchestrator
@@ -421,6 +552,19 @@ impl Gateway {
                     &request_id,
                 )
                 .await;
+
+            // RFC-015 P1: drop the strong sender and await the collector.
+            // This is load-bearing for ordering — when the runtime callback
+            // stops pushing (turn done), dropping the gateway's strong sender
+            // makes the collector's `rx.recv()` return None. Awaiting the
+            // JoinHandle guarantees every partial has been delivered to the
+            // channel before the terminal `done` is built below. Without
+            // this, the terminal message could arrive before the last text
+            // delta (advisory: collector race).
+            if let Some((sender, handle)) = collector {
+                drop(sender);
+                let _ = handle.await;
+            }
 
             let duration_ms = start.elapsed().as_millis() as u64;
 
@@ -463,6 +607,15 @@ impl Gateway {
                         && let Ok(json) = serde_json::to_string(&orchestration.tool_calls)
                     {
                         channel_meta.insert("tool_calls".to_owned(), json);
+                    }
+                    // P4 (§7 persistence): surface reasoning_text so chat.rs can
+                    // persist it alongside tool_calls and loadSession can
+                    // restore the reasoning activity on reopen.
+                    if !orchestration.reasoning_text.is_empty() {
+                        channel_meta.insert(
+                            "reasoning_text".to_owned(),
+                            orchestration.reasoning_text.clone(),
+                        );
                     }
                     // Typed orchestration metadata (RFC-014)
                     let response_meta = ResponseMeta {

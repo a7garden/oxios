@@ -72,20 +72,22 @@ pub(crate) async fn handle_session_get(
     let session_id = SessionId(id);
     match state.kernel.state.load_session(&session_id).await {
         Ok(Some(session)) => Ok(Json(serde_json::json!({
-            "id": session.id.0,
-            "user_id": session.user_id,
-            // RFC-025: top-level field first, legacy metadata fallbacks.
-            "project_id": session.project_id.clone()
-                .or_else(|| session.metadata.get("project_id").and_then(|v| v.as_str()).map(String::from))
-                .or_else(|| session.metadata.get("project_ids").and_then(|v| v.as_str()).map(String::from)),
-            "user_messages": session.user_messages,
-            "agent_responses": session.agent_responses,
-            "active_persona_id": session.active_persona_id,
-            "created_at": session.created_at.to_rfc3339(),
-            "updated_at": session.updated_at.to_rfc3339(),
-            "metadata": session.metadata,
-            // RFC-015: trajectory for chat transparency replay.
-            "trajectory_steps": session.trajectory_steps,
+           "id": session.id.0,
+           "user_id": session.user_id,
+           // RFC-025: top-level field first, legacy metadata fallbacks.
+           "project_id": session.project_id.clone()
+               .or_else(|| session.metadata.get("project_id").and_then(|v| v.as_str()).map(String::from))
+               .or_else(|| session.metadata.get("project_ids").and_then(|v| v.as_str()).map(String::from)),
+           "user_messages": session.user_messages,
+           "agent_responses": session.agent_responses,
+           "active_persona_id": session.active_persona_id,
+           "created_at": session.created_at.to_rfc3339(),
+           "updated_at": session.updated_at.to_rfc3339(),
+           "metadata": session.metadata,
+           // RFC-015: trajectory for chat transparency replay.
+           "trajectory_steps": session.trajectory_steps,
+           // P4 (§7 persistence): reasoning text for the ThinkingPanel.
+           "reasoning_records": session.reasoning_records,
         }))),
         Ok(None) => Err(StatusCode::NOT_FOUND),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -499,6 +501,15 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "id": id,
             "name": name,
             "source": source,
+        }),
+        KernelEvent::PhaseStarted { phase, summary, .. } => serde_json::json!({
+            "type": "phase_started",
+            "phase": phase,
+            "summary": summary,
+        }),
+        KernelEvent::PhaseCompleted { phase, .. } => serde_json::json!({
+            "type": "phase_completed",
+            "phase": phase,
         }),
     };
     // Merge payload into base

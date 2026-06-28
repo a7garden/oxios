@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { FolderPlus, RefreshCw, Sparkles, Trash2, Wrench } from 'lucide-react'
+import { FolderPlus, Pencil, RefreshCw, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { CreateMountDialog } from '@/components/mount/create-mount-dialog'
+import { EditMountDialog } from '@/components/mount/edit-mount-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -19,6 +20,7 @@ function MountsPage() {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [editingMount, setEditingMount] = useState<Mount | null>(null)
 
   const { data, isLoading, isError, refetch } = useMounts(search || undefined)
   const deleteMount = useDeleteMount()
@@ -104,6 +106,15 @@ function MountsPage() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
+                  onClick={() => setEditingMount(mount)}
+                  aria-label={t('common.edit', '편집')}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
                   onClick={() => handleRescan(mount)}
                   aria-label={t('mounts.rescan', '갱신')}
                 >
@@ -178,6 +189,8 @@ function MountsPage() {
 
       {/* Create dialog */}
       <CreateMountDialog open={showCreate} onOpenChange={setShowCreate} />
+      {/* Edit dialog */}
+      <EditMountDialog mount={editingMount} onOpenChange={setEditingMount} />
     </div>
   )
 }

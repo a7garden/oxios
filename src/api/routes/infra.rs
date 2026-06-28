@@ -207,6 +207,8 @@ pub(crate) struct McpServerResponse {
     name: String,
     command: String,
     args: Vec<String>,
+    #[serde(default)]
+    env: std::collections::HashMap<String, String>,
     enabled: bool,
     initialized: bool,
 }
@@ -218,17 +220,25 @@ pub(crate) async fn handle_mcp_servers_list(
     let servers = state.kernel.mcp.list_servers();
     let mut results = Vec::new();
     for name in servers {
-        let (command, args, enabled) = state
+        let (command, args, enabled, env) = state
             .kernel
             .mcp
             .get_server(&name)
-            .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
-            .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
+            .map(|s| (s.command.clone(), s.args.clone(), s.enabled, s.env.clone()))
+            .unwrap_or_else(|| {
+                (
+                    "unknown".to_string(),
+                    Vec::new(),
+                    false,
+                    std::collections::HashMap::new(),
+                )
+            });
         let initialized = state.kernel.mcp.client_status(&name).await.unwrap_or(false);
         results.push(McpServerResponse {
             name: name.to_string(),
             command,
             args,
+            env,
             enabled,
             initialized,
         });
@@ -243,6 +253,25 @@ pub(crate) struct McpServerRegisterRequest {
     command: String,
     #[serde(default)]
     args: Vec<String>,
+    #[serde(default)]
+    env: std::collections::HashMap<String, String>,
+}
+
+/// MCP server update request. The `name` is the key (from the URL path)
+/// and is not sent in the body — it is immutable.
+#[derive(Debug, Deserialize)]
+pub(crate) struct McpServerUpdateRequest {
+    command: String,
+    #[serde(default)]
+    args: Vec<String>,
+    #[serde(default)]
+    env: std::collections::HashMap<String, String>,
+    #[serde(default = "default_true")]
+    enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Shell interpreters that must never be spawned as an MCP server.
@@ -344,6 +373,7 @@ pub(crate) async fn handle_mcp_server_register(
 
     let mut server = oxios_kernel::McpServer::new(&name, &command);
     server.args = body.args;
+    server.env = body.env;
     server.enabled = true;
     state.kernel.mcp.register_server(server);
     if let Err(e) = state.kernel.mcp.init_server(&name).await {
@@ -459,6 +489,83 @@ pub(crate) async fn handle_mcp_server_delete(
     Ok(Json(
         serde_json::json!({ "status": "removed", "name": name }),
     ))
+}
+
+/// PUT /api/mcp/servers/{name} — Update a server's configuration in place.
+///
+/// Mirrors the register handler: validate the new command, overwrite the
+/// config entry, and re-initialize the running client. On init failure,
+/// roll back to the previous configuration so the server is not left
+/// half-configured (consistent with the register path).
+pub(crate) async fn handle_mcp_server_update(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(body): Json<McpServerUpdateRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    if let Err(reason) = validate_mcp_command(&body.command) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("Invalid command: {reason}"),
+        ));
+    }
+    // Snapshot the previous config for rollback. Reject the request if the
+    // server does not exist — PUT must replace, not create (use POST
+    // /api/mcp/servers to register a new one).
+    let previous = state.kernel.mcp.get_server(&name);
+    let was_connected = state.kernel.mcp.client_status(&name).await.is_some();
+    if previous.is_none() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            format!("MCP server '{name}' not found"),
+        ));
+    }
+
+    state
+        .kernel
+        .mcp
+        .update_server(
+            &name,
+            body.command.clone(),
+            body.args,
+            body.env,
+            body.enabled,
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(server = %name, error = %e, "Failed to apply MCP server update");
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
+
+    // Re-initialize if the server should be running. On failure, roll back
+    // the config so the running server keeps the old settings.
+    if body.enabled
+        && let Err(e) = state.kernel.mcp.init_server(&name).await
+    {
+        tracing::error!(server = %name, error = %e, "Failed to restart MCP server; rolling back update");
+        if let Some(prev) = &previous {
+            let _ = state
+                .kernel
+                .mcp
+                .update_server(
+                    &name,
+                    prev.command.clone(),
+                    prev.args.clone(),
+                    prev.env.clone(),
+                    prev.enabled,
+                )
+                .await;
+            if prev.enabled && was_connected {
+                let _ = state.kernel.mcp.init_server(&name).await;
+            }
+        }
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
+
+    tracing::info!(server = %name, "MCP server updated and restarted");
+    Ok(Json(serde_json::json!({
+        "status": "updated",
+        "name": name,
+    })))
 }
 
 /// POST /api/mcp/servers/{name}/toggle — Toggle MCP server enabled/disabled.

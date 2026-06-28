@@ -115,6 +115,7 @@ impl Supervisor for MockSupervisor {
             model_id: String::new(),
             failure_class: None,
             restore_state: None,
+            reasoning_text: String::new(),
         })
     }
 

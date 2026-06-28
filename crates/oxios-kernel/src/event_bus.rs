@@ -236,6 +236,28 @@ pub enum KernelEvent {
         source: String,
     },
 
+    // ── RFC-015 Chat Transparency: lifecycle phases (P3) ────────────────
+    // Real-time events emitted by the Orchestrator as it transitions
+    // between ouroboros phases (assess → crystallize → execute → review).
+    // The web channel converts these to WS `phase` chunks; the orchestrator
+    // is the single source of truth for phase boundaries.
+    /// A lifecycle phase has begun.
+    PhaseStarted {
+        /// Session this phase belongs to.
+        session_id: String,
+        /// Phase name: `"assess"` | `"plan"` (crystallize) | `"execute"` | `"review"`.
+        phase: String,
+        /// Optional human-readable summary for the timeline header.
+        summary: Option<String>,
+    },
+    /// A lifecycle phase has completed.
+    PhaseCompleted {
+        /// Session this phase belongs to.
+        session_id: String,
+        /// Phase name — same vocabulary as `PhaseStarted::phase`.
+        phase: String,
+    },
+
     // ── Calendar ──────────────────────────────────────────────
     /// A calendar event was created.
     CalendarEventCreated {
@@ -480,6 +502,12 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::PersonaUpdated { id, name, source } => AuditAction::Other {
             detail: format!("persona:updated:{id}:{name}:{source}"),
         },
+        KernelEvent::PhaseStarted { phase, .. } => AuditAction::Other {
+            detail: format!("phase_started:{phase}"),
+        },
+        KernelEvent::PhaseCompleted { phase, .. } => AuditAction::Other {
+            detail: format!("phase_completed:{phase}"),
+        },
     }
 }
 
@@ -501,6 +529,8 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         KernelEvent::MemoryRecallUsed { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::TokenUsageUpdate { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::ReasoningFragment { session_id, .. } => format!("session:{session_id}"),
+        KernelEvent::PhaseStarted { session_id, .. } => format!("session:{session_id}"),
+        KernelEvent::PhaseCompleted { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::KnowledgePersisted { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::KnowledgeRemoved { session_id, .. } => format!("session:{session_id}"),
         _ => "system".to_string(),

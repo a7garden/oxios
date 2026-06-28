@@ -87,6 +87,7 @@ impl Supervisor for FailingUntilOverrideSupervisor {
                 model_id: env.model_override.clone().unwrap_or_default(),
                 failure_class: None,
                 restore_state: None,
+                reasoning_text: String::new(),
             });
         }
 
@@ -101,6 +102,7 @@ impl Supervisor for FailingUntilOverrideSupervisor {
             model_id: "anthropic/claude-sonnet-4".into(),
             failure_class: Some(self.fail_class),
             restore_state: None,
+            reasoning_text: String::new(),
         })
     }
 

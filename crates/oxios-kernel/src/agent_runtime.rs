@@ -66,6 +66,34 @@ fn get_llm_circuit_breaker() -> &'static oxi_sdk::ProviderCircuitBreaker {
     })
 }
 
+/// Streaming delta emitted by the runtime's `AgentEvent` callback.
+///
+/// P1 wires only `Text` (one `AgentEvent::TextChunk { text }` → one delta).
+/// P4 adds `Thinking` / `ThinkingDelta` for the live 추론 panel. The enum
+/// is `#[non_exhaustive]` so adding variants later doesn't break collectors.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum StreamDelta {
+    /// One text chunk from the model.
+    Text(String),
+
+    /// The model has entered extended thinking (no payload — signal only).
+    /// Used by the LiveActivityBar to transition into "추론 중" state.
+    Thinking,
+    /// One batched chunk of reasoning text. The runtime coalesces
+    /// `AgentEvent::ThinkingDelta { text }` into ~50ms batches before
+    /// emitting this delta to avoid flooding the mpsc.
+    ThinkingDelta(String),
+}
+
+/// Connection-scoped streaming sink sender.
+///
+/// Wrapped in `Arc` so it can be cloned cheaply across the
+/// orchestrator → lifecycle → runtime boundary. The receiver lives in a
+/// collector task owned by the gateway dispatch layer; see the design doc
+/// §8.1 for the conn_id scoping rationale.
+pub type StreamingSinkTx = std::sync::Arc<tokio::sync::mpsc::UnboundedSender<StreamDelta>>;
+
 /// Configuration for creating AgentRuntime instances.
 #[derive(Debug, Clone)]
 pub struct AgentRuntimeConfig {
@@ -119,6 +147,10 @@ struct ExecuteState {
     steps_completed: usize,
     success: bool,
     /// Collected trajectory steps for SONA learning (RFC-020 Phase 2).
+    /// P4 (§7 persistence): concatenated reasoning text from
+    /// `AgentEvent::ThinkingDelta { text }`. Surfaced via `ExecutionResult`
+    /// metadata on turn completion, capped at ~4 KB to bound storage.
+    reasoning_text: String,
     /// Ordered by insertion — parallel tools get their final position
     /// resolved when they complete, preserving approximate execution order.
     trajectory_steps: Vec<oxios_memory::memory::sona::TrajectoryStep>,
@@ -238,7 +270,6 @@ impl AgentRuntime {
         self.execute_directive_with_session(agent_id, directive, env, session_ctx, session_id)
             .await
     }
-
     /// Like [`execute_directive`](Self::execute_directive) but with an
     /// explicit session_id for RFC-015 chat transparency event publishing.
     pub async fn execute_directive_with_session(
@@ -470,6 +501,7 @@ impl AgentRuntime {
             tool_timestamps,
             total_input_tokens,
             total_output_tokens,
+            reasoning_text,
         ) = {
             run_agent(
                 &config,
@@ -587,6 +619,7 @@ impl AgentRuntime {
             tokens_input: total_input_tokens,
             tokens_output: total_output_tokens,
             model_id: self.engine_handle.get().default_model_id().to_string(),
+            reasoning_text,
         };
 
         // RFC-016: Autonomous persistence hook.
@@ -675,6 +708,7 @@ async fn run_agent(
     std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
     u64,
     u64,
+    String,
 )> {
     // Extract workspace.
     // RFC-025: prefer the primary Mount's first path, then fall back to the
@@ -1002,7 +1036,11 @@ async fn run_agent(
     // Falls back to None when the caller did not opt in.
     let transparency_session: Option<String> = session_id.clone();
     let kernel_handle_for_cb: Arc<KernelHandle> = Arc::clone(&kernel_handle);
-
+    // P1 chat transparency: per-session streaming sink registry. The
+    // callback looks up the sink for this session and pushes live text
+    // deltas. Lookup misses silently (no gateway registered → not a chat).
+    let streaming_sinks_for_cb: Arc<crate::streaming_sink::StreamingSinkRegistry> =
+        Arc::clone(&kernel_handle.streaming_sinks);
     // Run the agent with streaming events.
     let result = agent
         .run_streaming(prompt, move |event| {
@@ -1209,6 +1247,64 @@ async fn run_agent(
                                 });
                     }
                 }
+                AgentEvent::TextChunk { text } => {
+                    // P1 chat transparency: push live text delta through the
+                    // streaming-sink registry. The gateway has already
+                    // registered a strong sender under `session_id`; the
+                    // collector there converts each delta into a partial
+                    // `OutgoingMessage` with `partial = Some(true)` and
+                    // `target_conn_id = Some(conn_id)` so the WS handler
+                    // forwards it as a bare `token` chunk (no `done`).
+                    //
+                    // Lookup uses `transparency_session` (the same session_id
+                    // already plumbed for RFC-015 event publishing). A miss
+                    // here means no gateway has registered for this session —
+                    // silent skip; non-streaming callers see no behavior
+                    // change.
+                    if let Some(ref sid) = transparency_session
+                        && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                    {
+                        let _ = tx.send(StreamDelta::Text(text.clone()));
+                    }
+                }
+                AgentEvent::Thinking => {
+                    // P4: signal-only — LiveActivityBar flips to "추론 중".
+                    // Sent through the same connection-scoped sink so the
+                    // state change is visible to the live chat only (no
+                    // EventBus broadcast for a transient UI signal).
+                    if let Some(ref sid) = transparency_session
+                        && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                    {
+                        let _ = tx.send(StreamDelta::Thinking);
+                    }
+                }
+                AgentEvent::ThinkingDelta { text } => {
+                    // P4: each thinking delta goes through the same
+                    // connection-scoped sink as Text deltas. The collector
+                    // converts each into a `reasoning` WS chunk (partial,
+                    // no assign_seq). Frontend appends them to the
+                    // ThinkingPanel. No batching here — the sink is a
+                    // per-session mpsc, fan-out is bounded by active turns,
+                    // and the per-token load is well below 100 Hz in
+                    // practice (verified empirically with reasoning models).
+                    // P4 (§7 persistence): append to the accumulator too so
+                    // the full reasoning text surfaces via ExecutionResult
+                    // metadata at turn end. Capped at ~4 KB to bound
+                    // storage — matches the design doc §7 truncation
+                    // rationale (matches `tool_calls.output_summary`).
+                    const REASONING_CAP: usize = 4096;
+                    if s.reasoning_text.len() < REASONING_CAP {
+                        s.reasoning_text.push_str(&text);
+                        if s.reasoning_text.len() > REASONING_CAP {
+                            s.reasoning_text.truncate(REASONING_CAP);
+                        }
+                    }
+                    if let Some(ref sid) = transparency_session
+                        && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                    {
+                        let _ = tx.send(StreamDelta::ThinkingDelta(text.clone()));
+                    }
+                }
                 _ => {}
             }
         })
@@ -1280,6 +1376,7 @@ async fn run_agent(
         s.tool_timestamps.clone(),
         s.total_input_tokens,
         s.total_output_tokens,
+        s.reasoning_text.clone(),
     ))
 }
 

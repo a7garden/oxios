@@ -122,10 +122,16 @@ impl MountApi {
         Ok(MountInfo::from(&mount))
     }
 
-    /// Rename a Mount.
-    pub fn rename_mount(&self, id: &str, new_name: String) -> Result<MountInfo> {
+    /// Update a Mount's user-level fields: name and/or paths.
+    pub fn update_mount(
+        &self,
+        id: &str,
+        name: Option<String>,
+        paths: Option<Vec<String>>,
+    ) -> Result<MountInfo> {
         let mount_id: MountId = Uuid::parse_str(id).context("Invalid mount ID")?;
-        let mount = self.mount_manager.rename(mount_id, new_name)?;
+        let paths = paths.map(|ps| ps.into_iter().map(PathBuf::from).collect());
+        let mount = self.mount_manager.update(mount_id, name, paths)?;
         Ok(MountInfo::from(&mount))
     }
 
@@ -138,7 +144,7 @@ impl MountApi {
     /// Record that a Mount was used (touch activity timestamp).
     ///
     /// Returns `Err` on an invalid mount ID — consistent with the other
-    /// mutation methods in this facade (update_enrichment, rename_mount,
+    /// mutation methods in this facade (update_enrichment, update_mount,
     /// remove_mount) which previously were the only ones that surfaced the
     /// parse error.
     pub fn touch_mount(&self, id: &str) -> Result<()> {

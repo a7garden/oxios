@@ -397,6 +397,7 @@ mod tests {
             model_id: "m".into(),
             failure_class: None,
             restore_state: None,
+            reasoning_text: String::new(),
         };
         let fail = ExecutionResult {
             success: false,
@@ -420,6 +421,7 @@ mod tests {
             model_id: String::new(),
             failure_class: Some(FailureClass::Transient),
             restore_state: None,
+            reasoning_text: String::new(),
         };
         let more = ExecutionResult {
             steps_completed: 3,

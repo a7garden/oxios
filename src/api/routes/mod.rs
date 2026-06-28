@@ -93,9 +93,9 @@ pub(crate) use git_routes::{
 };
 pub(crate) use infra::{
     handle_audit_log, handle_mcp_server_delete, handle_mcp_server_refresh,
-    handle_mcp_server_register, handle_mcp_server_toggle, handle_mcp_servers_list,
-    handle_mcp_tool_call, handle_mcp_tools_list, handle_metrics, handle_permissions_get,
-    handle_permissions_put, handle_security_permissions,
+    handle_mcp_server_register, handle_mcp_server_toggle, handle_mcp_server_update,
+    handle_mcp_servers_list, handle_mcp_tool_call, handle_mcp_tools_list, handle_metrics,
+    handle_permissions_get, handle_permissions_put, handle_security_permissions,
 };
 pub(crate) use knowledge_routes::{
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
@@ -355,7 +355,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/mcp/servers",
             get(handle_mcp_servers_list).post(handle_mcp_server_register),
         )
-        .route("/api/mcp/servers/{name}", delete(handle_mcp_server_delete))
+        .route(
+            "/api/mcp/servers/{name}",
+            delete(handle_mcp_server_delete).put(handle_mcp_server_update),
+        )
         .route(
             "/api/mcp/servers/{name}/toggle",
             post(handle_mcp_server_toggle),

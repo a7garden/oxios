@@ -1,0 +1,994 @@
+<!-- ════════════════ SCREEN 13 · TOKEN MAXING ════════════════ -->
+<section class="screen" id="screen-token-maxing">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">13 · Console / Operations</div>
+      <h3>Token Maxing — 구독 프로바이더 자율 소진 세션</h3>
+      <div class="smeta">route <code>/token-maxing</code> · <code>routes/token-maxing.tsx</code> · StatusHeader + Controls + ProviderCards + Sessions (Dialog)</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">레이아웃</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">내비게이션</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">접근성</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">타이포</div><div class="val">3</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현, 문제점 ①–⑥</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:36px;--px:188px" title="F1">①</span>
+          <span class="pin" style="--py:118px;--px:188px" title="F2">②</span>
+          <span class="pin" style="--py:184px;--px:188px" title="F3">③</span>
+          <span class="pin" style="--py:36px;--px:480px" title="F4">④</span>
+          <span class="pin" style="--py:78px;--px:300px" title="F5">⑤</span>
+          <span class="pin" style="--py:280px;--px:188px" title="F6">⑥</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it active"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Token Maxing</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>토큰 맥싱</h1><p>구독형 프로바이더의 할당량을 자율적으로 소진하는 세션 관리</p></div>
+                </div>
+
+                <!-- ① status header card -->
+                <div class="card">
+                  <div class="ct"><span class="i"></span>세션 상태<span style="margin-left:auto;font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-accent);color:var(--ox-success);font-weight:600">실행 중</span></div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:10px;margin-top:6px">
+                    <div><div style="color:var(--ox-muted);font-size:9px">현재 프로바이더</div><div style="font-weight:600">zai</div></div>
+                    <div><div style="color:var(--ox-muted);font-size:9px">현재 작업</div><div style="font-weight:600">summarize-docs</div></div>
+                    <div><div style="color:var(--ox-muted);font-size:9px">세션 토큰</div><div style="font-weight:600">128,400</div></div>
+                    <div><div style="color:var(--ox-muted);font-size:9px">세션 작업 수</div><div style="font-weight:600">12</div></div>
+                  </div>
+                  <!-- ④ WindowField takes lg:col-span-4 → full width strip -->
+                  <div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--ox-border);font-size:10px">
+                    <div style="color:var(--ox-muted);font-size:9px">윈도우</div>
+                    <div style="font-weight:600">2026-06-27 14:00 → 2026-06-27 19:00</div>
+                  </div>
+                </div>
+
+                <!-- ② controls card -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-info)"></span>제어</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
+                    <div><div style="color:var(--ox-muted);font-size:9px;margin-bottom:2px">시작</div><div style="height:22px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-accent);font-size:10px;padding:3px 6px">2026-06-27 14:00</div></div>
+                    <div><div style="color:var(--ox-muted);font-size:9px;margin-bottom:2px">종료</div><div style="height:22px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-accent);font-size:10px;padding:3px 6px">2026-06-27 19:00</div></div>
+                  </div>
+                  <!-- ⑤ three buttons, no disabled affordance -->
+                  <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">
+                    <div style="font-size:9px;padding:4px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">▶ 윈도우 시작</div>
+                    <div style="font-size:9px;padding:4px 9px;border-radius:5px;background:var(--ox-accent);color:var(--ox-fg);font-weight:600;border:1px solid var(--ox-border)">✋ 수동 실행</div>
+                    <div style="font-size:9px;padding:4px 9px;border-radius:5px;background:var(--ox-error);color:#fff;font-weight:600">■ 중지</div>
+                  </div>
+                </div>
+
+                <!-- ③ provider cards -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-warning)"></span>프로바이더 가용성</div>
+                  <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+                    <div style="display:flex;align-items:center;justify-content:between;padding:5px 8px;border:1px solid var(--ox-border);border-radius:6px">
+                      <div><div style="font-size:11px;font-weight:600">zai</div><div style="font-size:9px;color:var(--ox-muted)">사용 1,204 / 5,000,000 · 잔여 99.9% · 초기화 19:00</div></div>
+                      <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-success);color:#fff;font-weight:600">사용 가능</div>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:between;padding:5px 8px;border:1px solid var(--ox-border);border-radius:6px">
+                      <div><div style="font-size:11px;font-weight:600">anthropic</div><div style="font-size:9px;color:var(--ox-muted)">사용 48,210 / 50,000 · 잔여 3.6%</div></div>
+                      <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-warning);color:#fff;font-weight:600">⚠ 소진 중</div>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:between;padding:5px 8px;border:1px solid var(--ox-border);border-radius:6px">
+                      <div><div style="font-size:11px;font-weight:600">openai</div><div style="font-size:9px;color:var(--ox-muted)">19:00까지 쿨다운 · 원인: 429</div></div>
+                      <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-error);color:#fff;font-weight:600">⌛ 쿨다운</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ⑥ session rows -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>세션 기록</div>
+                  <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">
+                    <div style="padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="display:flex;gap:6px;align-items:center;font-size:10px"><b>2026-06-27 14:00</b><span style="font-size:9px;padding:2px 5px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted);font-weight:600">진행 중</span></div>
+                      <div style="font-size:9px;color:var(--ox-muted);margin-top:2px">12개 작업 · 128,400 토큰 · 2개 프로바이더 소진 · 초기화 3회</div>
+                    </div>
+                    <div style="padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="display:flex;gap:6px;align-items:center;font-size:10px"><b>2026-06-26 18:00</b><span style="font-size:9px;padding:2px 5px;border-radius:9px;background:var(--ox-warning);color:#fff;font-weight:600">중단됨</span></div>
+                      <div style="font-size:9px;color:var(--ox-muted);margin-top:2px">28개 작업 · 412,000 토큰 · 3개 프로바이더 소진 · 초기화 7회</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">실행 액션 승격 · 4개 카드 → 2개 섹션 · 어포던스 정제 (동일 토큰)</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it active"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Token Maxing</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>토큰 맥싱</h1><p>zai 실행 중 · 19:00까지 윈도우 · 12 작업 / 128,400 토큰</p></div>
+                </div>
+
+                <!-- promoted action strip (addresses ① ④): WindowField hoisted, no providers → degraded action visible -->
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:oklch(0.97 0.014 163);border:1px solid oklch(0.92 0.04 163);font-size:11px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:var(--ox-success)"></span>
+                  <span><b>zai 실행 중</b> · 윈도우 <b>14:00 → 19:00</b> · 현재 작업 <b>summarize-docs</b></span>
+                  <span style="flex:1"></span>
+                  <span style="font-size:10px;color:var(--ox-muted)">세션 128,400 토큰 · 12 작업</span>
+                  <span style="font-size:10px;padding:3px 8px;border-radius:5px;background:var(--ox-error);color:#fff;font-weight:600">■ 세션 중지</span>
+                </div>
+
+                <!-- Section 1: CONTROL — ②⑤ collapsed into a single config strip -->
+                <div class="sect">
+                  <div class="clab">세션 제어</div>
+                  <div class="card">
+                    <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+                      <span style="color:var(--ox-muted);font-size:10px">시작</span>
+                      <span style="padding:3px 7px;border:1px solid var(--ox-border);border-radius:5px;font-family:ui-monospace,monospace;font-size:10px;background:var(--ox-card)">2026-06-27 14:00</span>
+                      <span style="color:var(--ox-muted);font-size:10px">종료</span>
+                      <span style="padding:3px 7px;border:1px solid var(--ox-border);border-radius:5px;font-family:ui-monospace,monospace;font-size:10px;background:var(--ox-card)">2026-06-27 19:00</span>
+                      <span style="flex:1"></span>
+                      <span style="font-size:9px;color:var(--ox-muted);padding:2px 6px;border-radius:5px;background:var(--ox-accent)">✋ 수동 시작</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Section 2: PROVIDER + SESSIONS — ③⑥ grouped as activity stream -->
+                <div class="row2">
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-warning)"></span>프로바이더 가용성 <span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">3</span></div>
+                    <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+                      <div style="display:flex;align-items:center;justify-content:between;padding:5px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="min-width:0"><div style="font-size:11px;font-weight:600">zai</div><div style="font-size:9px;color:var(--ox-muted)">99.9% 잔여 · 초기화 19:00</div><div style="margin-top:3px;height:3px;background:var(--ox-accent);border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:0.1%;background:var(--ox-success)"></i></div></div>
+                        <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-success);color:#fff;font-weight:600;margin-left:8px">사용 가능</div>
+                      </div>
+                      <div style="display:flex;align-items:center;justify-content:between;padding:5px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="min-width:0"><div style="font-size:11px;font-weight:600">anthropic</div><div style="font-size:9px;color:var(--ox-muted)">3.6% 잔여 · 곧 소진</div><div style="margin-top:3px;height:3px;background:var(--ox-accent);border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:96%;background:var(--ox-warning)"></i></div></div>
+                        <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-warning);color:#fff;font-weight:600;margin-left:8px">소진 중</div>
+                      </div>
+                      <div style="display:flex;align-items:center;justify-content:between;padding:5px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card);opacity:.85">
+                        <div style="min-width:0"><div style="font-size:11px;font-weight:600">openai</div><div style="font-size:9px;color:var(--ox-muted)">19:00까지 쿨다운 · 원인: 429</div></div>
+                        <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-error);color:#fff;font-weight:600;margin-left:8px">쿨다운</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>세션 기록 <span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">최근 2 / 12</span></div>
+                    <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+                      <div style="padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="display:flex;gap:6px;align-items:center;font-size:10px"><b>2026-06-27 14:00</b><span style="font-size:9px;padding:2px 5px;border-radius:9px;background:var(--ox-accent);color:var(--ox-success);font-weight:600">● 진행 중</span></div>
+                        <div style="font-size:9px;color:var(--ox-muted);margin-top:2px">12 작업 · 128,400 토큰 · 2 프로바이더 소진 · 초기화 3회</div>
+                      </div>
+                      <div style="padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="display:flex;gap:6px;align-items:center;font-size:10px"><b>2026-06-26 18:00</b><span style="font-size:9px;padding:2px 5px;border-radius:9px;background:var(--ox-warning);color:#fff;font-weight:600">중단됨</span></div>
+                        <div style="font-size:9px;color:var(--ox-muted);margin-top:2px">28 작업 · 412,000 토큰 · 3 프로바이더 소진 · 초기화 7회</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">6건 · High 2 / Med 2 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>"지금 일어나는 세션" 정보가 페이지의 어디에도 시각적 우선순위가 없음</b> — StatusHeader는 `<Badge variant="success">실행 중</Badge>` 텍스트만으로 실행 여부를 전달. `running=true`이면 윈도우·현재 작업·세션 토큰이 동시에 의미가 있는데 Card 헤더의 작은 badge 하나에 묻혀있음. 사용자가 "지금 뭐가 돌고 있지?"를 1초 안에 답할 수 없다.<span class="ev">components/token-maxing/status-header.tsx:11-23,54-61</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>버튼 3개의 enabled/disabled 상태가 시각적으로 구별 불가</b> — `disabled={running || ...}`(`controls.tsx:98,106,114`) 셋 모두 동일 색·동일 모양. 실행 중일 때 「윈도우 시작」「수동 실행」은 회색 disabled여야 하는데, 같은 primary 버튼 색을 유지하면 사용자가 왜 클릭이 안되는지 발견 불가. destructive 「중지」만 유일하게 의미가 다른데 같은 시각적 무게.<span class="ev">components/token-maxing/controls.tsx:95-119</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>프로바이더 verdict가 색으로만 구분됨 — "3.6% 잔여" 위험 신호가 동등한 비중</b> — VerdictBadge는 success/warning/error 색만 다르고 라벨은 짧은 단어("사용 가능"/"소진 중"/"쿨다운"). `anthropic` 96% 소진은 빨강이 필요한데 warning(주황)에 머물러 있어 같은 카드 리스트 안에서 "곧 종료"라는 정보의 우선순위가 흐려짐. 잔여율 % 라벨의 위계도 없음.<span class="ev">components/token-maxing/provider-cards.tsx:72-103</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>WindowField가 StatusHeader 안에서 `lg:col-span-4`로 줄 전체 점유 — 비활성 윈도우 정보가 다른 필드를 덮어버림</b> — `WindowField`(`status-header.tsx:75-100`)는 `lg:col-span-4 sm:col-span-2`로 lg 폭에서 4컬럼 전체를 차지. 윈도우 정보가 "현재 작업/세션 토큰"과 동등한 무게로 한 줄 전체를 먹는 위계 역전. 또한 `manual=true`일 때는 `t('tokenMaxing.status.manual')`만 표시 — "Manual"이 무엇인지 사용자가 페이지에 들어와서 처음 보는 맥락에선 이해 불가.<span class="ev">components/token-maxing/status-header.tsx:75-100</span></div></li>
+      <li class="low"><span class="fno">⑤</span><div class="ft"><span class="badge low">LOW</span> <b>Controls 카드와 StatusHeader 카드 사이에 시간 컨트롤이 양쪽에 중복 가능</b> — StatusHeader는 `WindowField`로 윈도우를 보여주고 Controls는 `datetime-local` Input 2개로 윈도우를 편집. 사용자가 "현재 윈도우"와 "다음에 시작할 윈도우"를 같은 페이지에서 분리해서 인지하기 어려움.<span class="ev">components/token-maxing/controls.tsx:70-93 vs status-header.tsx:75-100</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>세션 행이 outline Button — 액션 affordance가 행 전체를 클릭 가능하게 만듦</b> — `<Button variant="outline" ... className="w-full justify-between h-auto py-3 px-4">`(`sessions.tsx:58-92`)로 각 행을 풀폭 outline 버튼으로 만듦. 사용자는 행을 "세부 보기"로 인지해야 하는데 outline 버튼 스타일은 "이 행이 어떤 부수 액션을 발동"하는 인상을 줌. 같은 카드 안에 정적 메타(중단 시각·작업 수)와 액션이 결합되어 정적/인터랙티브 경계가 흐림.<span class="ev">components/token-maxing/sessions.tsx:54-94</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>액션 스트립 승격:</b> StatusHeader의 badge를 풀폭 알림 스트립으로 교체. `running=true`이면 「zai 실행 중 · 윈도우 14:00 → 19:00 · 현재 작업 summarize-docs」가 상단에 떠 있고 우측에 「세션 중지」 빨강 버튼. `running=false`이면 회색 「세션 대기 — 윈도우/수동 시작 가능」 안내. ① 해결.</div></li>
+      <li><span></span><div><b>버튼 상태 시각화:</b> `disabled` 상태에서 outline + muted 색으로 강등. destructive 「중지」는 활성 상태에서만 빨강 — 비활성일 때 회색. primary 「윈도우 시작」은 enabled일 때 navy, disabled일 때 outline-muted. ② 해결.</div></li>
+      <li><span></span><div><b>잔여율 막대 + verdict 위계:</b> 각 프로바이더 행에 잔여율 progress bar (zai 99% 녹색, anthropic 4% 빨강, openai 회색). verdict badge는 잔여율에 따라 `사용 가능` / `곧 소진` / `쿨다운` / `비활성` 4단계로 어휘 정제. ③ 해결.</div></li>
+      <li><span></span><div><b>WindowField 분리·축소:</b> StatusHeader의 lg:col-span-4 점유를 해제하고 action strip 안에 한 줄로 합치거나, 별도 「다음 윈도우」 micro-row로 이동. ④ 해결.</div></li>
+      <li><span></span><div><b>Controls를 config strip으로 압축:</b> 윈도우 시작/종료 인풋과 수동 시작 한 줄. 시작/종료 datetime-local은 동일 폭의 인풋으로 통합하고, 활성 세션이 없을 때만 노출. ⑤ 해소.</div></li>
+      <li><span></span><div><b>세션 행 = 카드(클릭 가능 전체), 안의 메타는 정적:</b> 행 자체는 hover bg + 좌측 chevron, 메타 라인은 muted. dialog 트리거 affordance는 chevron과 카드 우측 「보기」 화살표로 명시. ⑥ 해결.</div></li>
+    </ul>
+  </div>
+</section>
+
+
+<!-- ════════════════ SCREEN 14 · MCP SERVERS ════════════════ -->
+<section class="screen" id="screen-mcp">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">14 · Console / Infra</div>
+      <h3>MCP Servers — 서버 등록 / 도구 카탈로그 / 도구 실행기</h3>
+      <div class="smeta">route <code>/mcp</code> · <code>routes/mcp.tsx</code> · Tabs(Servers·Tools·Test) + ServerList + ToolList + ToolTester + AddServerDialog</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">레이아웃</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">배치/발견</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">내비게이션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">일관성</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">접근성</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">타이포</div><div class="val">3</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현, 문제점 ①–⑦</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:32px;--px:188px" title="F1">①</span>
+          <span class="pin" style="--py:32px;--px:478px" title="F2">②</span>
+          <span class="pin" style="--py:78px;--px:188px" title="F3">③</span>
+          <span class="pin" style="--py:78px;--px:430px" title="F4">④</span>
+          <span class="pin" style="--py:124px;--px:220px" title="F5">⑤</span>
+          <span class="pin" style="--py:266px;--px:188px" title="F6">⑥</span>
+          <span class="pin" style="--py:344px;--px:188px" title="F7">⑦</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it active"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / MCP</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>MCP 서버</h1><p>Model Context Protocol 서버 및 도구 관리</p></div>
+                  <!-- ② add server button on the right -->
+                  <div style="font-size:10px;padding:5px 9px;border-radius:6px;background:var(--ox-primary);color:#fff;font-weight:600">＋ 서버 추가</div>
+                </div>
+
+                <!-- ① tab strip — plain tabs with no count -->
+                <div style="display:inline-flex;gap:0;padding:2px;background:var(--ox-accent);border-radius:6px;font-size:10px">
+                  <div style="padding:4px 9px;border-radius:4px;background:var(--ox-card);font-weight:600;color:var(--ox-primary)">▢ 서버</div>
+                  <div style="padding:4px 9px;color:var(--ox-muted)">🔧 도구</div>
+                  <div style="padding:4px 9px;color:var(--ox-muted)">▶ 테스트</div>
+                </div>
+
+                <!-- ③ server card row 1 (filesystem connected) -->
+                <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card)">
+                  <div style="width:8px;height:8px;border-radius:50%;background:var(--ox-success);flex:none"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:11px;font-weight:600">filesystem</div>
+                    <div style="font-size:9px;color:var(--ox-muted);font-family:ui-monospace,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">npx -y @modelcontextprotocol/server-filesystem /home</div>
+                  </div>
+                  <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-accent);color:var(--ox-success);font-weight:600;border:1px solid oklch(0.92 0.04 163)">연결됨</div>
+                  <!-- ④ ghost icon buttons -->
+                  <div style="display:flex;gap:1px">
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px">↻</div>
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px">⏻</div>
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ox-error)">🗑</div>
+                  </div>
+                </div>
+
+                <!-- server card row 2 (github disconnected) -->
+                <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card)">
+                  <div style="width:8px;height:8px;border-radius:50%;background:var(--ox-error);flex:none"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:11px;font-weight:600">github</div>
+                    <div style="font-size:9px;color:var(--ox-muted);font-family:ui-monospace,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">npx -y @modelcontextprotocol/server-github</div>
+                  </div>
+                  <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-accent);color:var(--ox-error);font-weight:600;border:1px solid oklch(0.92 0.05 27)">연결 끊김</div>
+                  <div style="display:flex;gap:1px">
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px">↻</div>
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px">⏻</div>
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ox-error)">🗑</div>
+                  </div>
+                </div>
+
+                <!-- server card row 3 (slack disabled) -->
+                <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card);opacity:.6">
+                  <div style="width:8px;height:8px;border-radius:50%;background:var(--ox-muted);flex:none"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:11px;font-weight:600">slack</div>
+                    <div style="font-size:9px;color:var(--ox-muted);font-family:ui-monospace,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">npx -y @modelcontextprotocol/server-slack</div>
+                  </div>
+                  <div style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted);font-weight:600;border:1px solid var(--ox-border)">비활성</div>
+                  <div style="display:flex;gap:1px">
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px;opacity:.5">↻</div>
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px">⏻</div>
+                    <div style="width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ox-error);opacity:.5">🗑</div>
+                  </div>
+                </div>
+
+                <!-- Tools tab preview — collapsed hint of ToolList ⑤ -->
+                <div class="card" style="margin-top:4px">
+                  <div class="ct"><span class="i" style="background:var(--ox-info)"></span>도구 카탈로그 미리보기</div>
+                  <div style="font-size:9px;padding:5px 8px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);font-family:ui-monospace,monospace;color:var(--ox-muted)">검색...</div>
+                  <div style="margin-top:5px;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:600;padding:0 4px">filesystem (5)</div>
+                  <div style="display:flex;flex-direction:column;gap:3px;margin-top:2px">
+                    <div style="font-size:10px;padding:4px 7px;border:1px solid var(--ox-border);border-radius:5px;display:flex;align-items:center;gap:6px"><span style="font-family:ui-monospace,monospace;font-weight:600">read_file</span><span style="color:var(--ox-muted);font-size:9px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">파일 읽기</span></div>
+                    <div style="font-size:10px;padding:4px 7px;border:1px solid var(--ox-border);border-radius:5px;display:flex;align-items:center;gap:6px"><span style="font-family:ui-monospace,monospace;font-weight:600">write_file</span><span style="color:var(--ox-muted);font-size:9px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">파일 쓰기</span></div>
+                    <div style="font-size:10px;padding:4px 7px;border:1px solid var(--ox-border);border-radius:5px;display:flex;align-items:center;gap:6px"><span style="font-family:ui-monospace,monospace;font-weight:600">list_directory</span><span style="color:var(--ox-muted);font-size:9px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">디렉터리 목록</span></div>
+                  </div>
+                </div>
+
+                <!-- ⑥ Test panel quick preview -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>도구 실행기 미리보기</div>
+                  <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+                    <div style="font-size:9px;color:var(--ox-muted)">서버</div>
+                    <div style="font-size:10px;padding:4px 7px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);color:var(--ox-muted)">선택...</div>
+                    <div style="font-size:9px;color:var(--ox-muted)">도구</div>
+                    <div style="font-size:10px;padding:4px 7px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);color:var(--ox-muted);opacity:.5">먼저 서버를 선택...</div>
+                    <div style="font-size:9px;color:var(--ox-muted)">인자 (JSON)</div>
+                    <div style="font-size:10px;padding:5px 7px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);font-family:ui-monospace,monospace;color:var(--ox-muted);min-height:32px;line-height:1.4">{}</div>
+                    <div style="font-size:10px;padding:4px 10px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600;width:fit-content">▶ 실행</div>
+                  </div>
+                </div>
+
+                <!-- ⑦ AddServerDialog footer hint (modal preview) -->
+                <div style="border:1px dashed var(--ox-border);border-radius:6px;padding:6px 8px;font-size:9px;color:var(--ox-muted);text-align:center">＋ 서버 추가 모달 — 이름/명령어/인자 (쉼표 구분)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">서버 상태 위계 · 도구 발견성 · 실행기 안전장치 (동일 토큰)</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it active"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / MCP</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>MCP 서버</h1><p>2 연결 · 1 끊김 · 1 비활성 · 도구 14</p></div>
+                  <div style="font-size:10px;padding:5px 9px;border-radius:6px;background:var(--ox-primary);color:#fff;font-weight:600">＋ 서버 추가</div>
+                </div>
+
+                <!-- promoted action strip — github disconnected ⑤ -->
+                <div style="display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;background:oklch(0.97 0.014 27);border:1px solid oklch(0.91 0.05 27);font-size:11px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:var(--ox-error)"></span>
+                  <span><b>github</b> 연결 끊김 — 마지막 시도 14:02. 토큰 만료 가능성. <span style="color:var(--ox-muted)">↻ 다시 연결</span></span>
+                  <span style="flex:1"></span>
+                  <span style="font-size:10px;color:var(--ox-muted)">다른 서버 정상</span>
+                </div>
+
+                <!-- Tab strip with counts (① fixed) -->
+                <div style="display:inline-flex;gap:0;padding:2px;background:var(--ox-accent);border-radius:6px;font-size:10px;align-items:center">
+                  <div style="padding:4px 9px;border-radius:4px;background:var(--ox-card);font-weight:600;color:var(--ox-primary);display:flex;align-items:center;gap:5px">▢ 서버 <span style="font-size:9px;background:var(--ox-accent);color:var(--ox-muted);padding:0 4px;border-radius:6px">3</span></div>
+                  <div style="padding:4px 9px;color:var(--ox-muted);display:flex;align-items:center;gap:5px">🔧 도구 <span style="font-size:9px;opacity:.7">14</span></div>
+                  <div style="padding:4px 9px;color:var(--ox-muted);display:flex;align-items:center;gap:5px">▶ 테스트</div>
+                </div>
+
+                <!-- server list — status dot promoted, command line de-emphasized (③④ fixed) -->
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card)">
+                    <div style="width:10px;height:10px;border-radius:50%;background:var(--ox-success);box-shadow:0 0 0 3px oklch(0.92 0.04 163 / .35);flex:none"></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="display:flex;align-items:center;gap:6px"><div style="font-size:12px;font-weight:600">filesystem</div><div style="font-size:9px;padding:1px 6px;border-radius:9px;background:oklch(0.95 0.04 163);color:var(--ox-success);font-weight:600">● 연결됨</div></div>
+                      <div style="font-size:9px;color:var(--ox-muted);font-family:ui-monospace,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-top:1px">npx -y @modelcontextprotocol/server-filesystem /home</div>
+                    </div>
+                    <div style="display:flex;gap:3px;align-items:center">
+                      <div style="font-size:9px;padding:4px 8px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-border);display:flex;align-items:center;gap:4px"><span>↻</span> 새로고침</div>
+                      <div style="font-size:9px;padding:4px 8px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-border);display:flex;align-items:center;gap:4px"><span>⏻</span> 비활성화</div>
+                      <div style="font-size:9px;padding:4px 8px;border-radius:5px;color:var(--ox-error);font-weight:600">제거</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid oklch(0.91 0.05 27);border-radius:7px;background:var(--ox-card)">
+                    <div style="width:10px;height:10px;border-radius:50%;background:var(--ox-error);flex:none"></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="display:flex;align-items:center;gap:6px"><div style="font-size:12px;font-weight:600">github</div><div style="font-size:9px;padding:1px 6px;border-radius:9px;background:oklch(0.95 0.04 27);color:var(--ox-error);font-weight:600">● 연결 끊김</div></div>
+                      <div style="font-size:9px;color:var(--ox-muted);font-family:ui-monospace,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-top:1px">npx -y @modelcontextprotocol/server-github</div>
+                    </div>
+                    <div style="display:flex;gap:3px;align-items:center">
+                      <div style="font-size:9px;padding:4px 8px;border-radius:5px;background:var(--ox-error);color:#fff;font-weight:600">↻ 다시 연결</div>
+                      <div style="font-size:9px;padding:4px 8px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-border)">제거</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card);opacity:.65">
+                    <div style="width:10px;height:10px;border-radius:50%;background:var(--ox-muted);flex:none"></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="display:flex;align-items:center;gap:6px"><div style="font-size:12px;font-weight:600">slack</div><div style="font-size:9px;padding:1px 6px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted);font-weight:600;border:1px solid var(--ox-border)">비활성</div></div>
+                      <div style="font-size:9px;color:var(--ox-muted);font-family:ui-monospace,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-top:1px">npx -y @modelcontextprotocol/server-slack</div>
+                    </div>
+                    <div style="display:flex;gap:3px;align-items:center">
+                      <div style="font-size:9px;padding:4px 8px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-border)">활성화</div>
+                      <div style="font-size:9px;padding:4px 8px;border-radius:5px;color:var(--ox-muted)">제거</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ⑦ Add server dialog preview as inline panel — collapsed affordance -->
+                <div style="border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card);padding:8px 10px">
+                  <div style="font-size:10px;font-weight:600;margin-bottom:6px">서버 추가</div>
+                  <div style="display:grid;grid-template-columns:1fr 2fr;gap:6px">
+                    <div><div style="font-size:9px;color:var(--ox-muted);margin-bottom:2px">서버 이름</div><div style="font-size:10px;padding:4px 7px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg)">예: filesystem</div></div>
+                    <div><div style="font-size:9px;color:var(--ox-muted);margin-bottom:2px">명령어</div><div style="font-size:10px;padding:4px 7px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);font-family:ui-monospace,monospace;color:var(--ox-muted)">예: npx -y @modelcontextprotocol/…</div></div>
+                  </div>
+                  <div style="font-size:9px;color:var(--ox-muted);margin-top:5px">인자(쉼표 구분)</div>
+                  <div style="display:flex;justify-content:flex-end;gap:5px;margin-top:6px">
+                    <div style="font-size:9px;padding:3px 9px;border:1px solid var(--ox-border);border-radius:5px">취소</div>
+                    <div style="font-size:9px;padding:3px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">등록</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">7건 · High 2 / Med 3 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>Tabs에 카운트·상태가 전혀 없음 — "몇 개 서버 / 도구가 있는지" 한 눈에 안 보임</b> — `<TabsList>` 안에 TabsTrigger 3개가 단순히 `Servers / Tools / Test`(`mcp.tsx:33-44`). 좌측 카드/리스트 페이지에서 즉시 답할 수 있어야 할 "연결된 서버 수"와 "사용 가능 도구 수"가 한 단계 더 들어가야 알 수 있다. 서버가 8개·도구가 50개일 때 카탈로그를 클릭해야 발견 가능.<span class="ev">routes/mcp.tsx:33-44</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>"＋ 서버 추가" 버튼이 헤더 우상단 부유 — 빈 상태일 때 발견 불가</b> — 첫 진입/연결 없을 때 `EmptyState`만 보여주고(`server-list.tsx:24-33`) 추가 버튼은 페이지 헤더에만 존재. "서버가 없다"는 빈 상태에서 "그럼 추가해"가 한 화면 안에서 명확히 연결되어야 하는데, 헤더까지 스크롤이 필요하거나 신규 사용자는 추가 경로를 못 찾는다.<span class="ev">routes/mcp.tsx:28-31 · components/mcp/server-list.tsx:24-33</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>서버 카드의 command 라인이 카드 제목과 동등한 시각 무게</b> — `flex items-center gap-4` 안에 server name과 command가 둘 다 text-sm/text-xs로 가로로 나열(`server-card.tsx:44-55`). command는 보조 정보인데 잘림 없이 한 줄 전체를 차지하면 name(첫인상)을 압도. 한 줄 truncate가 있어도 `font-mono`로 어두운 톤이라 시선이 분산.<span class="ev">components/mcp/server-card.tsx:44-55</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>서버 카드 액션 3개(↻/⏻/🗑)가 22×22 ghost-icon-button — destructive "제거"가 toggle/refresh와 같은 비중</b> — `<Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">`(`server-card.tsx:79-88`)로 모든 액션이 동일 32px 아이콘 버튼. "제거"는 복구 불가 destructive 액션인데 refresh·toggle과 같은 어포던스. 실수로 누르면 서버 + 도구 카탈로그가 통째로 사라짐.<span class="ev">components/mcp/server-card.tsx:58-89</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>서버 상태가 색 dot + 텍스트 badge로만 전달 — disabled(연결 끊김 vs 비활성) 구분이 미묘</b> — `statusColor`는 `!enabled ? 'bg-muted-foreground' : initialized ? 'bg-success' : 'bg-error'`(`server-card.tsx:28-32`). "비활성"(사용자 toggle off)과 "연결 끊김"(enabled인데 초기화 실패)을 같은 빨강/회색으로 다루기 쉬운데, statusText는 `Disabled/Connected/Disconnected`로만 분리. dot 색과 텍스트가 동시에 정확히 매핑되어야 즉시 판별 가능.<span class="ev">components/mcp/server-card.tsx:28-38</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>ToolTester가 도구 카탈로그와 분리 — 어떤 도구가 있는지 모르고 JSON 인자를 직접 작성해야 함</b> — ToolTester는 `Select`로 서버/도구 선택(`tool-tester.tsx:65-87`), 인자 JSON은 free-form textarea(`tool-tester.tsx:102-108`). 도구 카탈로그 탭(ToolList)에서 어떤 도구가 있는지 확인 후 다시 와야 호출 가능. 같은 정보를 두 탭에서 재진입.<span class="ev">components/mcp/tool-tester.tsx:62-118 vs tool-list.tsx:50-101</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>AddServerDialog의 args 입력이 "쉼표 구분" 단일 인풋 — 배열 의존성 숨김</b> — `args.trim() ? args.split(',').map(a=>a.trim()).filter(Boolean) : []`(`add-server-dialog.tsx:32-37`). 빈 입력은 OK, 공백 구분·따옴표 안 쉼표·길이가 긴 단일 인자(URL 등) 모두 깨짐. placeholder `"/path/to/dir, --verbose"`는 우연히 동작하는 케이스만 안내.<span class="ev">components/mcp/add-server-dialog.tsx:82-93</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>Tabs에 카운트 칩:</b> `서버 3 · 도구 14 · 테스트` 형태로 헤더 옆 카운트. 서버가 비어있을 때 `서버 0`이 빈 상태와 함께 노출되어 진입 즉시 "추가가 필요"를 인지. ① 해결.</div></li>
+      <li><span></span><div><b>빈 상태 안에 CTA:</b> `EmptyState` 안에 「서버 추가」 버튼을 인라인으로. 헤더 버튼도 유지하되 빈 상태에서만 prominent. ② 해결.</div></li>
+      <li><span></span><div><b>서버 카드 command → 서브라인:</b> name을 크게(text-sm → text-base + bold), command는 9px muted 폰트로 줄바꿈 가능한 보조 라인. dot을 10px + 글로우로 status가 가장 먼저 보이게. ③ 해결.</div></li>
+      <li><span></span><div><b>destructive affordance 분리:</b> ↻/⏻을 텍스트 라벨 버튼(「새로고침」「비활성화」)으로, 「제거」는 destructive 색의 텍스트 버튼 — destructive는 우측 끝에 모이되 시각 무게 ↓. confirm dialog는 필수. ④ 해결.</div></li>
+      <li><span></span><div><b>연결 끊김 alert strip 승격:</b> enabled + initialized=false이면 페이지 상단에 빨강 strip — 어느 서버가 끊겼는지·마지막 시도 시각·재시도. ⑤ 해결.</div></li>
+      <li><span></span><div><b>ToolTester에 도구 카탈로그 링크 + 인자 placeholder 자동 채움:</b> 선택한 도구의 `arguments` 스키마를 ToolDetail(`tool-detail.tsx:8-42`)에서 가져와 placeholder에 적용, required 필드는 빨강. ⑥ 해소.</div></li>
+      <li><span></span><div><b>AddServerDialog args를 repeatable row UI로:</b> 「＋ 인자 추가」로 한 줄당 하나의 인자. URL/공백 포함 안전. ⑦ 해결.</div></li>
+    </ul>
+  </div>
+</section>
+
+
+<!-- ════════════════ SCREEN 15 · EMAIL ════════════════ -->
+<section class="screen" id="screen-email">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">15 · Console / Infra</div>
+      <h3>Email — SMTP 설정 / 발신자 / 발송 기록 / 템플릿</h3>
+      <div class="smeta">route <code>/email</code> · <code>routes/email.tsx</code> · Tabs(Overview·Setup·History·Templates) + OverviewPanel + SetupPanel + HistoryPanel + SentEmailDialog + TemplatesPanel</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">레이아웃</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">내비게이션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">접근성</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">타이포</div><div class="val">3</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현, 문제점 ①–⑦</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:32px;--px:430px" title="F1">①</span>
+          <span class="pin" style="--py:88px;--px:188px" title="F2">②</span>
+          <span class="pin" style="--py:124px;--px:188px" title="F3">③</span>
+          <span class="pin" style="--py:88px;--px:478px" title="F4">④</span>
+          <span class="pin" style="--py:228px;--px:188px" title="F5">⑤</span>
+          <span class="pin" style="--py:280px;--px:320px" title="F6">⑥</span>
+          <span class="pin" style="--py:374px;--px:188px" title="F7">⑦</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it active"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Email</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>이메일</h1><p>이메일 발송 설정 및 관리</p></div>
+                  <!-- ① header badge — misaligned: configured/notConfigured badges in left edge (lines 174-185) -->
+                  <div style="display:flex;gap:5px;align-items:center">
+                    <div style="font-size:9px;padding:3px 7px;border-radius:9px;background:oklch(0.95 0.04 163);color:var(--ox-success);font-weight:600;border:1px solid oklch(0.92 0.04 163)">✓ 설정됨</div>
+                    <div style="width:26px;height:26px;border-radius:6px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:11px">↻</div>
+                  </div>
+                </div>
+
+                <!-- ② tab strip — 4 tabs, no count, no setup-needed indicator -->
+                <div style="display:inline-flex;gap:0;padding:2px;background:var(--ox-accent);border-radius:6px;font-size:10px">
+                  <div style="padding:4px 10px;border-radius:4px;background:var(--ox-card);font-weight:600;color:var(--ox-primary)">✉ 개요</div>
+                  <div style="padding:4px 10px;color:var(--ox-muted)">⚙ 설정</div>
+                  <div style="padding:4px 10px;color:var(--ox-muted)">⏱ 발송 기록</div>
+                  <div style="padding:4px 10px;color:var(--ox-muted)">▦ 템플릿</div>
+                </div>
+
+                <!-- ③ overview panel — 3 KPI cards in row (Status / Sender / Activity) at email.tsx:246-297 -->
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+                  <div style="border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card);padding:8px">
+                    <div style="font-size:9px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600">상태</div>
+                    <div style="display:flex;align-items:center;gap:5px;margin-top:5px"><div style="width:9px;height:9px;border-radius:50%;background:var(--ox-success)"></div><div style="font-size:12px;font-weight:700">준비됨</div></div>
+                  </div>
+                  <div style="border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card);padding:8px">
+                    <div style="font-size:9px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600">발신자</div>
+                    <div style="font-size:12px;font-weight:700;margin-top:5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">ops@mydomain.com</div>
+                    <div style="font-size:9px;color:var(--ox-muted);margin-top:1px">resend</div>
+                  </div>
+                  <div style="border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-card);padding:8px">
+                    <div style="font-size:9px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600">활동</div>
+                    <div style="font-size:18px;font-weight:700;line-height:1;margin-top:3px">128</div>
+                    <div style="font-size:9px;color:var(--ox-muted);margin-top:3px">총 발송 · 3 템플릿</div>
+                  </div>
+                </div>
+
+                <!-- ④ "Get started" CTA only when !configured — currently configured so the empty path is invisible here -->
+                <!-- shown only as small remark — when not configured, dashed-border card with arrow button -->
+
+                <!-- ⑤ setup panel preview (active only when !configured) — collapsed hint -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-info)"></span>이메일 설정 (미설정 시 표시)</div>
+                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:5px">
+                    <div style="font-size:9px;color:var(--ox-muted)">Provider</div>
+                    <div style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);display:flex;justify-content:space-between"><span>Resend</span><span style="color:var(--ox-muted)">▾</span></div>
+                    <div style="font-size:9px;color:var(--ox-muted)">이메일 주소</div>
+                    <div style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);color:var(--ox-muted);font-family:ui-monospace,monospace">hello@mydomain.com</div>
+                    <div style="font-size:9px;color:var(--ox-muted)">Resend API 키</div>
+                    <!-- ⑥ password field — has visible eye toggle but only 24px wide hit area -->
+                    <div style="position:relative">
+                      <div style="font-size:10px;padding:4px 28px 4px 8px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);font-family:ui-monospace,monospace;color:var(--ox-muted)">re_••••••••••</div>
+                      <div style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--ox-muted);width:16px;height:16px;display:flex;align-items:center;justify-content:center">👁</div>
+                    </div>
+                    <div style="font-size:9px;color:var(--ox-muted)">Resend 대시보드에서 인증된 도메인을 사용해야 합니다.</div>
+                    <div style="display:flex;gap:5px;margin-top:3px">
+                      <div style="font-size:10px;padding:5px 10px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">⚙ 저장 및 테스트</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ⑦ history panel preview (History tab content) -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>발송 기록 (최근 2 / 128) <span style="margin-left:auto;width:22px;height:22px;border-radius:5px;background:var(--ox-accent);display:flex;align-items:center;justify-content:center;font-size:10px">↻</span></div>
+                  <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="min-width:0;flex:1">
+                        <div style="font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">[Oxios] 일일 요약 — 2026-06-27</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">받는 사람: team@mydomain.com · 템플릿: daily-summary</div>
+                      </div>
+                      <div style="text-align:right;flex:none">
+                        <div style="font-size:9px;color:var(--ox-muted)">2026-06-27 14:02</div>
+                        <div style="font-size:9px;color:var(--ox-primary);text-decoration:underline">보기</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="min-width:0;flex:1">
+                        <div style="font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">주간 리포트 — W26</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">받는 사람: ops@mydomain.com · 템플릿: weekly</div>
+                      </div>
+                      <div style="text-align:right;flex:none">
+                        <div style="font-size:9px;color:var(--ox-muted)">2026-06-23 09:15</div>
+                        <div style="font-size:9px;color:var(--ox-primary);text-decoration:underline">보기</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">설정 CTA 가시화 · 활동·템플릿 메타 통합 · 4탭 → 2탭 정리 (동일 토큰)</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it active"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Email</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>이메일</h1><p>resend · ops@mydomain.com · 128 발송 / 3 템플릿</p></div>
+                </div>
+
+                <!-- promoted action strip — single status + actions inline (①② fixed) -->
+                <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:oklch(0.97 0.014 163);border:1px solid oklch(0.92 0.04 163);font-size:11px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:var(--ox-success)"></span>
+                  <span><b>이메일 준비됨</b> · resend · ops@mydomain.com</span>
+                  <span style="flex:1"></span>
+                  <span style="font-size:10px;padding:4px 9px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-card);font-weight:600">↻ 새로고침</span>
+                  <span style="font-size:10px;padding:4px 9px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-card);font-weight:600">📨 테스트 발송</span>
+                  <span style="font-size:10px;padding:4px 9px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-card);font-weight:600">↗ Resend Dashboard</span>
+                  <span style="font-size:10px;padding:4px 9px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-border);color:var(--ox-muted)">⚙ 재설정</span>
+                </div>
+
+                <!-- Tabs consolidated into 2 — Activity (overview+history+templates merged) + Setup -->
+                <div style="display:inline-flex;gap:0;padding:2px;background:var(--ox-accent);border-radius:6px;font-size:10px;align-items:center">
+                  <div style="padding:4px 10px;border-radius:4px;background:var(--ox-card);font-weight:600;color:var(--ox-primary);display:flex;align-items:center;gap:5px">📊 활동 <span style="font-size:9px;background:var(--ox-accent);color:var(--ox-muted);padding:0 4px;border-radius:6px">128</span></div>
+                  <div style="padding:4px 10px;color:var(--ox-muted);display:flex;align-items:center;gap:5px">⚙ 설정 <span style="font-size:9px;background:oklch(0.95 0.04 163);color:var(--ox-success);padding:0 4px;border-radius:6px">●</span></div>
+                </div>
+
+                <!-- 2-column activity: history (left, 2fr) + templates (right, 1fr) -->
+                <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px">
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>발송 기록 <span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">최근 2 / 128</span></div>
+                    <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+                      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="min-width:0;flex:1">
+                          <div style="font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">[Oxios] 일일 요약 — 2026-06-27</div>
+                          <div style="font-size:9px;color:var(--ox-muted)">받는 사람 team@mydomain.com · daily-summary · 14:02</div>
+                        </div>
+                        <div style="font-size:9px;color:var(--ox-primary);font-weight:600;align-self:center;padding:2px 7px;border-radius:5px;background:oklch(0.96 0.02 265)">↗ 보기</div>
+                      </div>
+                      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="min-width:0;flex:1">
+                          <div style="font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">주간 리포트 — W26</div>
+                          <div style="font-size:9px;color:var(--ox-muted)">받는 사람 ops@mydomain.com · weekly · 06-23</div>
+                        </div>
+                        <div style="font-size:9px;color:var(--ox-primary);font-weight:600;align-self:center;padding:2px 7px;border-radius:5px;background:oklch(0.96 0.02 265)">↗ 보기</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-warning)"></span>템플릿 <span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">3</span></div>
+                    <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+                      <div style="padding:5px 7px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="font-size:10px;font-weight:600">daily-summary</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">2.4 KB</div>
+                      </div>
+                      <div style="padding:5px 7px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="font-size:10px;font-weight:600">weekly</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">4.1 KB</div>
+                      </div>
+                      <div style="padding:5px 7px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                        <div style="font-size:10px;font-weight:600">alert</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">1.2 KB</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">7건 · High 2 / Med 3 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>헤더에 configured/notConfigured 두 Badge + 새로고침 버튼이 한쪽에 몰려 있음 — 빈 상태인지 / 정상인지 시각적 무게 차이 없음</b> — `<Badge variant="outline" className="gap-1">…✓ 설정됨</Badge>` + `<Badge variant="outline" className="gap-1 text-muted-foreground">…미설정</Badge>`(`email.tsx:174-185`)가 같은 outline 스타일. "미설정"은 막아야 할 상황인데 단순 outline badge로 표현되어 사용자가 설정 필요를 못 느낌. 새로고침 버튼과 같은 outline 행에 있어 액션과 정보가 뒤섞임.<span class="ev">routes/email.tsx:173-189</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>4개 Tabs에 카운트/상태가 전혀 없음 — 발송 기록이 비었는지 템플릿이 0인지 한 눈에 안 보임</b> — `<TabsTrigger value="overview|setup|history|templates">`(`email.tsx:193-209`). 활동 0건인 사용자가 History 탭을 클릭해서야 빈 상태를 인지. 발송 통계·미읽음 알림 등 어떤 탭이 "지금 관심 가져야 할 곳"인지 즉시 판단 불가.<span class="ev">routes/email.tsx:192-210</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>Overview 3-KPI 그리드가 등분 — 발신자 카드만 정보 밀도가 1줄인데 동등한 1/3 폭 점유</b> — `grid gap-4 md:grid-cols-3`(`email.tsx:246`)로 상태/발신자/활동 3등분. "상태"와 "활동"은 위계가 분명한데 "발신자" 이메일 주소 한 줄이 같은 카드 크기. 데스크톱 중간 폭에서 발신자가 truncate되어 도메인 일부가 잘림.<span class="ev">routes/email.tsx:246-296</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>미설정 상태의 "Get started" CTA가 페이지 안에 묻혀 있고, 설정 탭으로 가는 진입 경로가 두 갈래</b> — Overview 패널의 `!status.configured` 분기(`email.tsx:300-318`)에서만 dashed-border 카드 + 「설정」버튼이 노출. 동시에 Setup 탭도 클릭 가능. 설정 시작 안내가 두 위치에 있어 어디로 가야 할지 모호, 그리고 활성 탭의 기본값이 `status?.configured ? 'overview' : 'setup'`(`email.tsx:158`)로 처음 진입 시 의도와 무관하게 결정됨.<span class="ev">routes/email.tsx:158,299-318</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>Setup 폼에서 Provider 선택에 따라 비밀번호 라벨·placeholder·힌트가 모두 분기 — 사용자가 Gmail/iCloud 앱 비밀번호를 어디서 받는지 안내는 잘 하지만, "테스트 발송"이 Setup 안에 숨어있음</b> — `isResend ? 'Resend API 키' : 'SMTP 비밀번호 / 앱 비밀번호'`(`email.tsx:514-517`), 분기별 hint 3개(`email.tsx:537-580`), `custom` 분기 호스트/포트/유저(`email.tsx:585-624`). 이미 설정된 사용자가 "지금 동작하나?" 확인할 길이 Setup 안의 「저장 및 테스트」뿐. 활성화 후의 Send Test는 별도 분기(`email.tsx:419-433`)에 있어 화면 두 곳을 오가야 함.<span class="ev">routes/email.tsx:402-453,471-650</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>Setup 폼의 비밀번호 show/hide 토글 hit-area가 16×16 — 32px 입력 옆에 비례 어울리지 않음</b> — `<button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 ...">`(`email.tsx:528-535`)에 `<Eye className="h-4 w-4" />`만. 모바일 터치 영역 권장 44×44 미만. 비밀번호를 자주 토글하는 폼 UX에서 마찰.<span class="ev">routes/email.tsx:518-536</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>History의 "보기" 링크가 text-xs underline 텍스트 — destructive/secondary 액션과 구별 불가</b> — `<Button variant="link" size="sm" className="h-auto p-0 text-xs">…보기</Button>`(`email.tsx:732-734`). 행 안의 보조 텍스트와 시각적으로 구별이 약해서 클릭 가능 영역으로 인식하기 어려움. 액션 가중치가 없는 "메타"처럼 보임.<span class="ev">routes/email.tsx:727-735</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>상태 스트립 통합:</b> configured/notConfigured 두 badge를 페이지 상단 풀폭 상태 스트립으로 합치고, 「테스트 발송 / 새로고침 / Resend Dashboard / 재설정」 액션을 같은 줄에 인라인. 미설정이면 빨강 strip에 「지금 설정 →」 강조. ① 해결.</div></li>
+      <li><span></span><div><b>Tabs 카운트 + 2탭 압축:</b> 4탭 → 「활동(개요+기록+템플릿)」 「설정」 2탭. 활동 탭에 발송 수·템플릿 수·최근 발송 시간 카운트 칩. 설정 탭은 미설정 시 dot으로 알림. ②③④⑤ 부분 해결.</div></li>
+      <li><span></span><div><b>개요 3-KPI 재구성:</b> 3등분 → 「상태」(좁게, 1fr) + 「발신자+provider+테스트 발송」(중간, 2fr, 풀 폭) + 「활동」(좁게, 1fr). 발신자 카드 truncate 제거. ③ 해결.</div></li>
+      <li><span></span><div><b>Setup의 Send Test를 상시 노출:</b> 활성화 상태든 미설정 상태든 「테스트 발송」 버튼이 페이지 헤더/액션 줄에 항상 보이게. Setup 폼은 「저장 및 테스트」로 통합 유지. ⑤ 해결.</div></li>
+      <li><span></span><div><b>비밀번호 토글 hit-area 확대:</b> 토글 버튼에 `p-1` + min 28×28px hit-area, 시각적 어포던스 강화(eye 아이콘 색 muted → fg on hover). ⑥ 해결.</div></li>
+      <li><span></span><div><b>기록 행 액션 칩화:</b> "보기" underline 텍스트 → 우측 「↗ 보기」 칩(파란 배경 + 화살표). 어떤 행이 클릭 가능한지 즉시 인지. ⑦ 해결.</div></li>
+      <li><span></span><div><b>활동 탭 통합 시 발송 기록·템플릿을 2열 그리드로 동시 노출:</b> History와 Templates를 별도 탭이 아닌 같은 화면의 좌·우 컬럼으로 — 발송 128회면서 템플릿 3개인 상태에서 한눈에 비교. ② 해결 보강.</div></li>
+    </ul>
+  </div>
+</section>
+
+
+<!-- ════════════════ SCREEN 16 · GIT ════════════════ -->
+<section class="screen" id="screen-git">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">16 · Console / Infra</div>
+      <h3>Git — 인프로세스 버전 관리 (태그 / 복원 / 커밋 로그)</h3>
+      <div class="smeta">route <code>/git</code> · <code>routes/git.tsx</code> · TagsCard + RestoreCard + CommitLogCard + verifyMutation (in-process git)</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">정보구조</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">레이아웃</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">내비게이션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">일관성</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">접근성</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">타이포</div><div class="val">3</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현, 문제점 ①–⑥</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:32px;--px:430px" title="F1">①</span>
+          <span class="pin" style="--py:110px;--px:188px" title="F2">②</span>
+          <span class="pin" style="--py:110px;--px:300px" title="F3">③</span>
+          <span class="pin" style="--py:228px;--px:188px" title="F4">④</span>
+          <span class="pin" style="--py:228px;--px:300px" title="F5">⑤</span>
+          <span class="pin" style="--py:340px;--px:188px" title="F6">⑥</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it active"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Git</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>Git</h1><p>프로세스 내 버전 제어</p></div>
+                  <!-- ① header actions — Refresh + Verify sitting on the right with equal weight -->
+                  <div style="display:flex;gap:5px">
+                    <div style="font-size:10px;padding:4px 9px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-card);font-weight:600">↻ 새로고침</div>
+                    <div style="font-size:10px;padding:4px 9px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-card);font-weight:600">✓ 확인</div>
+                  </div>
+                </div>
+
+                <!-- ② Tags card -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-warning)"></span>태그</div>
+                  <div style="display:flex;gap:5px;margin-top:5px">
+                    <!-- ③ tag input + create tag button — equal weight, no clear hint that Create is destructive-ish -->
+                    <div style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);flex:1;font-family:ui-monospace,monospace;color:var(--ox-muted)">태그 이름...</div>
+                    <div style="font-size:10px;padding:4px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">태그 만들기</div>
+                  </div>
+                  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">
+                    <div style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-fg);border:1px solid var(--ox-border);font-family:ui-monospace,monospace">v0.3.1</div>
+                    <div style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-fg);border:1px solid var(--ox-border);font-family:ui-monospace,monospace">v0.3.0</div>
+                    <div style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-fg);border:1px solid var(--ox-border);font-family:ui-monospace,monospace">backup-pre-mcp</div>
+                  </div>
+                </div>
+
+                <!-- ④ Restore card — destructive button right next to a single text input -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-error)"></span>복원</div>
+                  <div style="display:flex;gap:5px;margin-top:5px">
+                    <div style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);font-family:ui-monospace,monospace;color:var(--ox-muted);width:170px">복원할 커밋 해시...</div>
+                    <!-- ⑤ destructive restore button — no confirmation, no preview of target commit -->
+                    <div style="font-size:10px;padding:4px 10px;border-radius:5px;background:var(--ox-error);color:#fff;font-weight:600">복원</div>
+                  </div>
+                </div>
+
+                <!-- ⑥ Commit log — plain rows with hash badge + message + author/time, no diff affordance -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>커밋 로그</div>
+                  <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
+                    <div style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="font-size:9px;padding:2px 5px;border-radius:5px;background:var(--ox-accent);color:var(--ox-fg);font-family:ui-monospace,monospace">a1b2c3d</div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:11px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">feat(git): 태그 추가</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">alice · 2026-06-27 14:02</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="font-size:9px;padding:2px 5px;border-radius:5px;background:var(--ox-accent);color:var(--ox-fg);font-family:ui-monospace,monospace">9f8e7d6</div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:11px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">fix(mcp): 재연결 시 핸들 누수</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">bob · 2026-06-27 13:48</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="font-size:9px;padding:2px 5px;border-radius:5px;background:var(--ox-accent);color:var(--ox-fg);font-family:ui-monospace,monospace">5c4b3a2</div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:11px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">chore: webhook 만료 정리</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">alice · 2026-06-27 13:21</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">상태 헤더 · destructive 안전장치 · diff affordance · 행 클릭 가능 (동일 토큰)</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it active"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Git</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div class="dash-title">
+                  <div><h1>Git</h1><p>3 태그 · 24 커밋 · a1b2c3d HEAD · 마지막 검증 14:01</p></div>
+                </div>
+
+                <!-- promoted status strip (① fixed) -->
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:oklch(0.97 0.014 163);border:1px solid oklch(0.92 0.04 163);font-size:11px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:var(--ox-success)"></span>
+                  <span><b>저장소 정상</b> · HEAD <code style="font-family:ui-monospace,monospace;background:var(--ox-accent);padding:1px 4px;border-radius:3px">a1b2c3d</code></span>
+                  <span style="flex:1"></span>
+                  <span style="font-size:10px;color:var(--ox-muted)">태그 3 · 커밋 24</span>
+                  <span style="font-size:10px;padding:4px 9px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-card);font-weight:600">↻ 새로고침</span>
+                  <span style="font-size:10px;padding:4px 9px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-card);font-weight:600">✓ 검증</span>
+                </div>
+
+                <!-- tags + restore side-by-side (②③ fixed) -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-warning)"></span>태그</div>
+                    <div style="display:flex;gap:5px;margin-top:5px">
+                      <div style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:5px;background:var(--ox-bg);flex:1;font-family:ui-monospace,monospace;color:var(--ox-muted)">태그 이름...</div>
+                      <div style="font-size:10px;padding:4px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">＋ 태그 만들기</div>
+                    </div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">
+                      <div style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-fg);border:1px solid var(--ox-border);font-family:ui-monospace,monospace">v0.3.1 · a1b2c3d</div>
+                      <div style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-fg);border:1px solid var(--ox-border);font-family:ui-monospace,monospace">v0.3.0 · 9f8e7d6</div>
+                      <div style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-fg);border:1px solid var(--ox-border);font-family:ui-monospace,monospace">backup-pre-mcp · 5c4b3a2</div>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <div class="ct"><span class="i" style="background:var(--ox-error)"></span>복원 <span style="margin-left:auto;font-size:9px;color:var(--ox-error);font-weight:600">● 되돌릴 수 없음</span></div>
+                    <div style="display:flex;gap:5px;margin-top:5px">
+                      <div style="font-size:10px;padding:4px 8px;border:1px solid oklch(0.91 0.05 27);border-radius:5px;background:var(--ox-bg);font-family:ui-monospace,monospace;color:var(--ox-muted);width:170px">해시 또는 태그 입력...</div>
+                      <div style="font-size:10px;padding:4px 10px;border-radius:5px;background:var(--ox-card);border:1px solid var(--ox-error);color:var(--ox-error);font-weight:600">복원</div>
+                    </div>
+                    <div style="font-size:9px;color:var(--ox-muted);margin-top:5px">선택 시 현재 작업 디렉토리 상태를 해시 시점으로 되돌립니다. 사전 백업 권장.</div>
+                  </div>
+                </div>
+
+                <!-- commit log — diff affordance + selectable (⑤⑥ fixed) -->
+                <div class="card">
+                  <div class="ct"><span class="i" style="background:var(--ox-primary)"></span>커밋 로그 <span style="margin-left:auto;font-size:9px;color:var(--ox-muted)">24 · 클릭하면 diff 미리보기</span></div>
+                  <div style="display:flex;flex-direction:column;gap:4px;margin-top:5px">
+                    <div style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border:1px solid var(--ox-primary);border-radius:6px;background:oklch(0.97 0.02 265)">
+                      <div style="font-size:9px;padding:2px 5px;border-radius:5px;background:var(--ox-primary);color:#fff;font-family:ui-monospace,monospace">a1b2c3d</div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">feat(git): 태그 추가</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">alice · 2026-06-27 14:02 · <span style="color:var(--ox-primary);font-weight:600">diff 미리보기 →</span></div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="font-size:9px;padding:2px 5px;border-radius:5px;background:var(--ox-accent);color:var(--ox-fg);font-family:ui-monospace,monospace">9f8e7d6</div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:11px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">fix(mcp): 재연결 시 핸들 누수</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">bob · 2026-06-27 13:48 · diff 미리보기</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px;background:var(--ox-card)">
+                      <div style="font-size:9px;padding:2px 5px;border-radius:5px;background:var(--ox-accent);color:var(--ox-fg);font-family:ui-monospace,monospace">5c4b3a2</div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:11px;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">chore: webhook 만료 정리</div>
+                        <div style="font-size:9px;color:var(--ox-muted)">alice · 2026-06-27 13:21 · diff 미리보기</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">6건 · High 2 / Med 3 / Low 1</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>페이지 전체에 "저장소 상태" 표시가 없음 — verifyMutation이 성공해도 그 사실이 어디에도 안 보임</b> — GitPage는 `useQuery({data: commits, isLoading, isError})`(`git.tsx:25-38`)만 사용하고, 저장소·브랜치·HEAD 해시·커밋 수 등 메타가 표시되지 않음. verify 버튼은 동작하지만 결과를 사용자가 페이지 내에서 확인할 수 있는 표시가 없음. 404 / corrupted repo를 조용히 통과할 수 있음.<span class="ev">routes/git.tsx:25-92</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>"복원" 버튼이 확인 절차 없이 즉시 실행 — destructive 액션의 안전장치 부재</b> — `restoreMutation.mutate(restoreHash)`(`git.tsx:150`)를 버튼 onClick에 직접 바인딩. 해시 입력이 잘못되어도 즉시 in-process git reset이 실행되어 작업 디렉토리가 되돌아감. 작업 디렉토리에 미커밋 변경이 있으면 그대로 손실.<span class="ev">routes/git.tsx:139-156</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>태그가 커밋과 연결되지 않은 단독 라벨로만 표시 — 어떤 커밋을 가리키는지 알 수 없음</b> — `<Badge key={t} variant="outline">{t}</Badge>`(`git.tsx:120-124`)에 태그 이름만. 어떤 커밋에 붙었는지, 누가 만들었는지, 언제 만들었는지 정보 없음. 태그가 많아지면 어떤 태그가 어떤 시점인지 분간 불가.<span class="ev">routes/git.tsx:118-128</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>커밋 로그가 정적 row — 클릭·diff·복사 affordance 없음</b> — `commitList.map(commit => <div key={commit.hash} className="flex items-start gap-3 rounded-lg border p-3">…)`(`git.tsx:175-189`). 각 row는 onClick 없이, diff 보기·해시 복사·체크아웃 같은 후속 액션이 어디에서도 제공되지 않음. 커밋 해시는 `slice(0, 7)`(`git.tsx:179`)로 짧게 보이고 풀 해시를 얻을 길이 없음.<span class="ev">routes/git.tsx:159-192</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>"새로고침"과 "확인" 버튼이 같은 outline 스타일로 동등한 시각 무게 — 정보·액션 구분 없음</b> — `<RefreshButton onClick={() => refetch()} isFetching={isFetching} />` + `<Button variant="outline" size="sm" onClick={() => verifyMutation.mutate()}>…확인</Button>`(`git.tsx:83-91`). 새로고침은 idempotent 리로드, 확인은 mutation. 같은 outline + 같은 size="sm" + 같은 h-4 w-4 mr-1. 사용자가 두 액션의 결과를 어떻게 다른 시각 신호로 받는지 불명.<span class="ev">routes/git.tsx:82-92</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>Restore 입력에 placeholder만 있고 예시/검증 피드백이 없음</b> — `placeholder={t('git.restorePlaceholder')}`(`git.tsx:144`)은 "복원할 커밋 해시..." 텍스트만. 7자 단축 해시 입력인지 풀 40자 SHA인지, 태그 이름도 받는지 placeholder가 모호. 잘못된 값을 넣어도 즉시 destructive 액션 발동.<span class="ev">routes/git.tsx:140-155</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>저장소 상태 헤더:</b> 페이지 상단에 「저장소 정상 · HEAD a1b2c3d · 태그 N · 커밋 N」 스트립. verify 성공 시 녹색 dot, 실패/로딩 시 상태 변형. ① 해결.</div></li>
+      <li><span></span><div><b>복원 안전장치:</b> 「복원」 클릭 시 confirm dialog — "현재 커밋 → 대상 커밋 · 변경 사항 손실 가능 · 백업 권장" + 미리보기. destructive 버튼은 outline-destructive로 약화. ② 해결.</div></li>
+      <li><span></span><div><b>태그 메타 부착:</b> 태그 chip에 「v0.3.1 · a1b2c3d」 형태로 짧은 해시 같이 표시. hover 시 풀 해시·작성자·시각. ③ 해결.</div></li>
+      <li><span></span><div><b>커밋 로그 인터랙티브화:</b> 각 row 클릭 시 diff 미리보기 패널(우측 슬라이드 또는 inline expand). hash 클릭 시 클립보드 복사, row에 「diff 미리보기 →」 라벨. ④ 해결.</div></li>
+      <li><span></span><div><b>헤더 액션 위계:</b> 새로고침은 icon-only ghost 버튼(작은 ↻), 검증은 텍스트 라벨 outline. 새로고침은 빈도 높음·결과 변화 적음 → 작게, 검증은 결과 변화 큼 → 라벨. ⑤ 해결.</div></li>
+      <li><span></span><div><b>Restore 입력 어포던스:</b> placeholder를 "해시(7자 이상) 또는 태그 이름"으로 구체화, 입력 길이 검증, 매칭되는 커밋이 있으면 옆에 미리보기 chip. ⑥ 해결.</div></li>
+    </ul>
+  </div>
+</section>

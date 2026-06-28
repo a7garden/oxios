@@ -1,0 +1,344 @@
+<section class="screen" id="screen-cron-jobs">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">10 · Console / Operations</div>
+      <h3>Cron Jobs</h3>
+      <div class="smeta">route <code>/cron-jobs</code> · <code>routes/cron-jobs.tsx</code> · 인라인 생성폼 + 잡 카드 리스트(toggle/delete)</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">레이아웃</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">배치/발견</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">내비게이션</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">접근성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">타이포</div><div class="val">4</div></div>
+    </div>
+  </div>
+  <div class="compare">
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">문제점 ①–⑤</span></div>
+      <div class="mock-frame"><div class="mock mock-wrap">
+        <span class="pin" style="--py:150px;--px:380px" title="F1">①</span>
+        <span class="pin" style="--py:88px;--px:300px" title="F2">②</span>
+        <span class="pin" style="--py:150px;--px:300px" title="F3">③</span>
+        <span class="pin" style="--py:30px;--px:14px" title="F4">④</span>
+        <span class="pin" style="--py:128px;--px:14px" title="F5">⑤</span>
+        <div class="ox">
+          <aside class="sb">
+            <div class="brand"><span class="dot"></span>Oxios</div>
+            <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+            <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+            <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+            <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+            <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it active"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+            <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+            <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+          </aside>
+          <div class="main">
+            <div class="topbar"><div class="crumb">Console / Cron Jobs</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+            <div class="body">
+              <div class="dash-title"><div><h1>Cron Jobs</h1><p>정기 실행 작업</p></div><div style="display:flex;gap:6px"><span style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:6px;color:var(--ox-muted)">↻</span><span style="font-size:10px;padding:4px 8px;background:var(--ox-primary);color:#fff;border-radius:6px">＋ 새 잡</span></div></div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div class="card" style="padding:11px;display:flex;justify-content:space-between;align-items:center">
+                  <div><div style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">⏱ daily-backup <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:oklch(0.97 0.014 163);color:var(--ox-success)">활성</span></div><div style="font-size:10px;color:var(--ox-muted);margin-top:3px"><code>0 3 * * *</code> → <code>backup.sh</code></div><div style="font-size:9px;color:var(--ox-muted);margin-top:3px">마지막 14:30 · 다음 03:00</div></div>
+                  <div style="display:flex;gap:3px"><span style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--ox-accent);font-size:11px">⏻</span><span style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--ox-accent);font-size:11px;color:var(--ox-error)">🗑</span></div>
+                </div>
+                <div class="card" style="padding:11px;display:flex;justify-content:space-between;align-items:center">
+                  <div><div style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">⏱ token-refresh <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--ox-accent);color:var(--ox-muted)">비활성</span></div><div style="font-size:10px;color:var(--ox-muted);margin-top:3px"><code>*/15 * * *</code> → <code>refresh.sh</code></div><div style="font-size:9px;color:var(--ox-muted);margin-top:3px">마지막 14:15</div></div>
+                  <div style="display:flex;gap:3px"><span style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--ox-accent);font-size:11px">⏻</span><span style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--ox-accent);font-size:11px;color:var(--ox-error)">🗑</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">확인 다이얼로그 · cron 검증/미리보기 · 결과 배지</span></div>
+      <div class="mock-frame"><div class="mock">
+        <div class="ox pro">
+          <aside class="sb">
+            <div class="brand"><span class="dot"></span>Oxios</div>
+            <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+            <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+            <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+            <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+            <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it active"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+            <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+            <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+          </aside>
+          <div class="main">
+            <div class="topbar"><div class="crumb">Console / Cron Jobs</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+            <div class="body">
+              <div class="dash-title"><div><h1>Cron Jobs</h1><p>정기 실행 작업 · 2개 실행중</p></div><div style="display:flex;gap:6px"><span style="font-size:10px;padding:4px 8px;background:var(--ox-primary);color:#fff;border-radius:6px">＋ 새 잡</span></div></div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div class="card" style="padding:11px;display:flex;justify-content:space-between;align-items:center">
+                  <div><div style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">⏱ daily-backup <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:oklch(0.97 0.014 163);color:var(--ox-success)">활성</span> <span style="font-size:9px;padding:1px 5px;border-radius:8px;background:oklch(0.97 0.014 163);color:var(--ox-success)">✓ 성공</span></div><div style="font-size:10px;color:var(--ox-muted);margin-top:3px"><code>0 3 * * *</code> → <code>backup.sh</code></div><div style="font-size:9px;color:var(--ox-muted);margin-top:3px">마지막 14:30 ✓ · 다음 03:00</div></div>
+                  <div style="display:flex;gap:4px"><span style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:6px;color:var(--ox-muted)">비활성화</span><span style="font-size:10px;padding:4px 8px;border:1px solid oklch(0.91 0.05 27);color:var(--ox-error);border-radius:6px">삭제…</span></div>
+                </div>
+                <div class="card" style="padding:11px;border:1px solid oklch(0.91 0.05 27)">
+                  <div style="font-size:11px;font-weight:600;margin-bottom:5px;color:var(--ox-error)">🗑 daily-backup 삭제 확인</div>
+                  <div style="font-size:10px;color:var(--ox-muted);margin-bottom:6px">이 예약 작업을 영구 삭제합니다. 되돌릴 수 없습니다.</div>
+                  <div style="display:flex;gap:5px"><span style="font-size:10px;padding:4px 8px;background:var(--ox-accent);border-radius:6px">취소</span><span style="font-size:10px;padding:4px 8px;background:var(--ox-error);color:#fff;border-radius:6px">삭제</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">5건 · High 2 / Med 2 / Low 1</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>잡 삭제에 확인·되돌림 없이 즉시 API 호출</b> — Trash2 아이콘 클릭만으로 deleteMutation.mutate(job.id). 예약 작업이 영구 삭제되며, 운영 중인 백업/동기화가 조용히 멈춤. (Personas와 동일한 파괴적 액션 패턴)<span class="ev">routes/cron-jobs.tsx:161-168</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>cron schedule 입력이 자유 텍스트 — 검증·미리보기·문법 도움말 없음</b> — Input placeholder만 있고 실제 cron 신택스 검증도, "다음 3회 실행" 미리보기도 없음. 잘못된 스케줄이 조용히 등록됨.<span class="ev">routes/cron-jobs.tsx:90-94</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>toggle/delete가 ghost icon-only 버튼 — 파괴(delete)와 일반(toggle)이 시각적으로 동등</b> — 두 버튼이 같은 ghost 스타일, delete만 색으로 구분. 아이콘 인식에 의존.<span class="ev">routes/cron-jobs.tsx:152-169</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>refetchInterval 10초가 탭 가시성과 무관하게 폴링</b> — 백그라운드 탭에서 의미 없는 fetch 지속 (Resources 화면과 동일 패턴).<span class="ev">routes/cron-jobs.tsx:33</span></div></li>
+      <li class="low"><span class="fno">⑤</span><div class="ft"><span class="badge low">LOW</span> <b>잡에 마지막 실행 결과(성공/실패) 표시 없음</b> — last_run 타임스탬프만 있고 성공 여부 미상. 실패한 잡을 눈치채기 어려움.<span class="ev">routes/cron-jobs.tsx:139-150</span></div></li>
+    </ul>
+  </div>
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>삭제 확인 다이얼로그:</b> icon → "삭제…" 라벨 버튼 + 확인 모달. ① 해결 (전 앱 파괴적 액션 가이드라인 적용).</div></li>
+      <li><span></span><div><b>cron 검증 + 미리보기:</b> schedule 입력 하단에 문법 도움말 + "다음 실행: 03:00, 03:15, 03:30" 미리보기. ② 해결.</div></li>
+      <li><span></span><div><b>액션 라벨화:</b> toggle/delete를 icon-only에서 라벨 버튼으로, destructive는 경계 색. ③ 해결.</div></li>
+      <li><span></span><div><b>가시성 인식 폴링 + 결과 배지:</b> document.hidden 시 폴링 중지, 잡 카드에 ✓/✗ 결과 배지. ④⑤ 해결.</div></li>
+    </ul>
+  </div>
+</section>
+
+<section class="screen" id="screen-budget">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">11 · Console / Operations</div>
+      <h3>Cost / Budget</h3>
+      <div class="smeta">route <code>/budget</code> · <code>routes/budget.tsx</code> · SpendLimit + 기간 Tabs + Summary + Chart + ByModel/Project + ProviderQuota + BudgetMgmt (7개 섹션)</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">레이아웃</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">내비게이션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">일관성</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">인터랙션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">접근성</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">타이포</div><div class="val">4</div></div>
+    </div>
+  </div>
+  <div class="compare">
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">문제점 ①–⑤</span></div>
+      <div class="mock-frame"><div class="mock mock-wrap">
+        <span class="pin" style="--py:60px;--px:14px" title="F1">①</span>
+        <span class="pin" style="--py:88px;--px:60px" title="F2">②</span>
+        <span class="pin" style="--py:118px;--px:300px" title="F3">③</span>
+        <span class="pin" style="--py:30px;--px:300px" title="F4">④</span>
+        <span class="pin" style="--py:330px;--px:14px" title="F5">⑤</span>
+        <div class="ox">
+          <aside class="sb">
+            <div class="brand"><span class="dot"></span>Oxios</div>
+            <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+            <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+            <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+            <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+            <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it active"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+            <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+            <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+          </aside>
+          <div class="main">
+            <div class="topbar"><div class="crumb">Console / Cost</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+            <div class="body">
+              <div class="dash-title"><div><h1>비용</h1><p>사용량 및 예산</p></div><span style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:6px;color:var(--ox-muted)">↻</span></div>
+              <div style="display:grid;grid-template-columns:1fr 3fr;gap:8px">
+                <div class="card" style="padding:10px"><div style="font-size:9px;text-transform:uppercase;color:var(--ox-muted);letter-spacing:.04em">지출 한도</div><div style="font-size:16px;font-weight:700;margin-top:4px">$12.4<span style="font-size:10px;color:var(--ox-muted)"> / $50</span></div><div style="height:4px;background:var(--ox-accent);border-radius:3px;margin-top:5px;overflow:hidden"><i style="display:block;height:100%;width:25%;background:var(--ox-warning)"></i></div></div>
+                <div style="display:flex;align-items:end"><div style="display:flex;gap:0;border:1px solid var(--ox-border);border-radius:7px;overflow:hidden;width:100%"><span style="flex:1;padding:6px;text-align:center;font-size:10px;color:var(--ox-muted)">오늘</span><span style="flex:1;padding:6px;text-align:center;font-size:10px;color:var(--ox-muted)">주</span><span style="flex:1;padding:6px;text-align:center;font-size:10px;background:var(--ox-primary);color:#fff">월</span><span style="flex:1;padding:6px;text-align:center;font-size:10px;color:var(--ox-muted)">전체</span></div></div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+                <div class="card" style="padding:8px"><div style="font-size:8px;color:var(--ox-muted);text-transform:uppercase">총비용</div><div style="font-size:13px;font-weight:700">$12.40</div></div>
+                <div class="card" style="padding:8px"><div style="font-size:8px;color:var(--ox-muted);text-transform:uppercase">호출</div><div style="font-size:13px;font-weight:700">1,284</div></div>
+                <div class="card" style="padding:8px"><div style="font-size:8px;color:var(--ox-muted);text-transform:uppercase">토큰</div><div style="font-size:13px;font-weight:700">2.1M</div></div>
+                <div class="card" style="padding:8px"><div style="font-size:8px;color:var(--ox-muted);text-transform:uppercase">일평균</div><div style="font-size:13px;font-weight:700">$0.41</div></div>
+              </div>
+              <div class="card" style="padding:9px"><div style="font-size:9px;color:var(--ox-muted);text-transform:uppercase;margin-bottom:5px">일별 지출 (30일)</div><div style="height:34px;background:linear-gradient(180deg,oklch(0.623 0.214 259.815/.3),transparent);border-radius:4px"></div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><div class="card" style="padding:8px"><div style="font-size:9px;color:var(--ox-muted);text-transform:uppercase">모델별</div><div style="font-size:10px;margin-top:3px">gpt-4o 62%</div></div><div class="card" style="padding:8px"><div style="font-size:9px;color:var(--ox-muted);text-transform:uppercase">프로젝트별</div><div style="font-size:10px;margin-top:3px">oxios 71%</div></div></div>
+              <div class="card" style="padding:8px;opacity:.7"><div style="font-size:9px;color:var(--ox-muted);text-transform:uppercase">프로바이더 할당량</div><div style="font-size:10px;color:var(--ox-muted);margin-top:3px">… 하단으로 밀림</div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">한도 강제화 · 위계 정립 · 섹션 앵커</span></div>
+      <div class="mock-frame"><div class="mock">
+        <div class="ox pro">
+          <aside class="sb">
+            <div class="brand"><span class="dot"></span>Oxios</div>
+            <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+            <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+            <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+            <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+            <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it active"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+            <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+            <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+          </aside>
+          <div class="main">
+            <div class="topbar"><div class="crumb">Console / Cost</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+            <div class="body">
+              <!-- spend-limit promoted to hero with enforcement -->
+              <div class="card" style="padding:11px;border:1px solid oklch(0.91 0.05 70);background:oklch(0.97 0.014 70)">
+                <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ox-warning);letter-spacing:.04em">⚠ 월 한도 80% 임박</div><span style="font-size:9px;padding:2px 6px;border:1px solid oklch(0.91 0.05 70);border-radius:5px;color:var(--ox-warning)">강제: 켜짐</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:end;margin-top:6px"><div><span style="font-size:18px;font-weight:700">$12.40</span><span style="font-size:11px;color:var(--ox-muted)"> / $50.00 · 75% 남음</span></div><span style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:6px">한도 편집</span></div>
+                <div style="height:6px;background:#fff;border-radius:3px;margin-top:6px;overflow:hidden"><i style="display:block;height:100%;width:25%;background:var(--ox-warning)"></i></div>
+              </div>
+              <!-- period inline with the $ amount -->
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div><span style="font-size:16px;font-weight:700">$12.40</span> <span style="font-size:10px;color:var(--ox-muted)">이번 달</span></div>
+                <div style="display:flex;gap:0;border:1px solid var(--ox-border);border-radius:7px;overflow:hidden"><span style="padding:4px 8px;font-size:9px;color:var(--ox-muted)">오늘</span><span style="padding:4px 8px;font-size:9px;color:var(--ox-muted)">주</span><span style="padding:4px 8px;font-size:9px;background:var(--ox-primary);color:#fff">월</span><span style="padding:4px 8px;font-size:9px;color:var(--ox-muted)">전체</span></div>
+              </div>
+              <!-- section anchors -->
+              <div style="display:flex;gap:5px;flex-wrap:wrap"><span style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted)">요약</span><span style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted)">추이</span><span style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted)">모델별</span><span style="font-size:9px;padding:2px 7px;border-radius:9px;background:oklch(0.97 0.014 27);color:var(--ox-error)">할당량 ⚠</span><span style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted)">에이전트 예산</span></div>
+              <div class="card" style="padding:8px"><div style="font-size:9px;color:var(--ox-muted);text-transform:uppercase">일별 추이</div><div style="height:30px;background:linear-gradient(180deg,oklch(0.623 0.214 259.815/.3),transparent);border-radius:4px;margin-top:4px"></div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">5건 · High 2 / Med 2 / Low 1</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>지출 한도가 "모니터링 + 시각 경고 전용" — 실제 지출을 막지 않음</b> — 컴포넌트 주석이 명시: "Phase 1: monitoring + visual alert only. Phase 2 will add pre-execution enforcement." 사용자는 한도가 자신을 보호한다고 믿지만, 한도 초과 시 그냥 진행됨.<span class="ev">components/cost/spend-limit-card.tsx:21-22</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>가장 중요한 통제(지출 한도)가 1/4 폭으로 축소, 수동 기간 선택자가 3/4 차지</b> — 같은 행에서 SpendLimitCard(sm:col-span-1) vs 기간 Tabs(lg:col-span-3). 중요도와 시각 무게가 반전.<span class="ev">routes/budget.tsx:39-52</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>기간 Tabs가 그것이 제어하는 $ 금액과 분리</b> — Tabs는 추상 시간 범위, 실제 $는 아래 CostSummaryCards에. 제어와 결과가 한 영역에 있지 않음.<span class="ev">routes/budget.tsx:42-55</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>7개 섹션이 세로로 적재 — 점프/앵커 없는 긴 스크롤</b> — 한도·요약·차트·모델별·프로젝트별·할당량·에이전트 예산이 한 페이지에 평탄 적재. "할당량"로 바로 가기 불가.<span class="ev">routes/budget.tsx:38-73</span></div></li>
+      <li class="low"><span class="fno">⑤</span><div class="ft"><span class="badge low">LOW</span> <b>프로바이더 할당량·에이전트 예산이 페이지 맨 아래 — 임계 상태일 때 묻힘</b> — 할당량 임박은 행동이 필요한데 가장 아래.<span class="ev">routes/budget.tsx:67-73</span></div></li>
+    </ul>
+  </div>
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>한도 강제 토글 + 히어로 승격:</b> SpendLimitCard를 풀폭 히어어로로, 한도 도달 시 차단 옵션(Phase 2)을 명시적 토글로 노출. ①② 해결.</div></li>
+      <li><span></span><div><b>금액과 기간을 한 영역으로:</b> $ 금액 옆에 기간 선택자 인라인. ③ 해결.</div></li>
+      <li><span></span><div><b>섹션 앵커 칩:</b> 상단에 요약/추이/모델별/할당량/예약 점프 칩. ④ 해결.</div></li>
+      <li><span></span><div><b>임계 항목 상단 부상:</b> 할당량 임박 시 해당 섹션이 상단으로/강조. ⑤ 해결.</div></li>
+    </ul>
+  </div>
+</section>
+
+<section class="screen" id="screen-security">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">12 · Console / System</div>
+      <h3>Security</h3>
+      <div class="smeta">route <code>/security</code> · <code>routes/security.tsx</code> · 권한 정책 카드 + 감사 추적(페이지네이션)</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">레이아웃</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">내비게이션</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">인터랙션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">접근성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">타이포</div><div class="val">4</div></div>
+    </div>
+  </div>
+  <div class="compare">
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">문제점 ①–⑥</span></div>
+      <div class="mock-frame"><div class="mock mock-wrap">
+        <span class="pin" style="--py:90px;--px:300px" title="F1">①</span>
+        <span class="pin" style="--py:230px;--px:14px" title="F2">②</span>
+        <span class="pin" style="--py:210px;--px:300px" title="F3">③</span>
+        <span class="pin" style="--py:75px;--px:14px" title="F4">④</span>
+        <span class="pin" style="--py:300px;--px:300px" title="F5">⑤</span>
+        <span class="pin" style="--py:30px;--px:300px" title="F6">⑥</span>
+        <div class="ox">
+          <aside class="sb">
+            <div class="brand"><span class="dot"></span>Oxios</div>
+            <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+            <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+            <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+            <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+            <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+            <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+            <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it active"><span class="ic"></span>Security</div></div>
+          </aside>
+          <div class="main">
+            <div class="topbar"><div class="crumb">Console / Security</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+            <div class="body">
+              <div class="dash-title"><div><h1>보안</h1><p>권한 정책 및 감사 추적</p></div><span style="font-size:10px;padding:4px 8px;border:1px solid var(--ox-border);border-radius:6px;color:var(--ox-muted)">↻</span></div>
+              <div class="card" style="padding:9px"><div style="font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px">🔑 admin <span style="font-size:9px;color:var(--ox-muted)">12 권한</span></div><div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:5px"><span style="font-size:9px;padding:1px 5px;background:var(--ox-accent);border-radius:4px">file:read</span><span style="font-size:9px;padding:1px 5px;background:var(--ox-accent);border-radius:4px">file:write</span><span style="font-size:9px;padding:1px 5px;background:var(--ox-accent);border-radius:4px">exec</span></div></div>
+              <div class="card" style="padding:9px"><div style="font-size:10px;font-weight:600;margin-bottom:5px">⚠ 감사 추적</div>
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between;border:1px solid var(--ox-border);border-radius:6px;padding:6px"><div style="display:flex;gap:6px;align-items:center"><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:oklch(0.97 0.014 163);color:var(--ox-success)">허용</span><div><div style="font-size:10px;font-weight:500">file:read</div><div style="font-size:8px;color:var(--ox-warning)">정책 매칭</div></div></div><span style="font-size:8px;color:var(--ox-muted)">14:32</span></div>
+                  <div style="display:flex;justify-content:space-between;border:1px solid var(--ox-border);border-radius:6px;padding:6px"><div style="display:flex;gap:6px;align-items:center"><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:oklch(0.97 0.014 27);color:var(--ox-error)">거부</span><div><div style="font-size:10px;font-weight:500">exec:rm</div><div style="font-size:8px;color:var(--ox-warning)">경로 제한 위반</div></div></div><span style="font-size:8px;color:var(--ox-muted)">14:30</span></div>
+                  <div style="display:flex;justify-content:space-between;border:1px solid var(--ox-border);border-radius:6px;padding:6px"><div style="display:flex;gap:6px;align-items:center"><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:oklch(0.97 0.014 163);color:var(--ox-success)">허용</span><div><div style="font-size:10px;font-weight:500">file:write</div><div style="font-size:8px;color:var(--ox-muted)">agent: a3f2c1...</div></div></div><span style="font-size:8px;color:var(--ox-muted)">14:28</span></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;border-top:1px solid var(--ox-border);padding-top:6px;margin-top:6px"><span style="font-size:8px;color:var(--ox-muted)">1–3 / 47</span><div style="display:flex;gap:3px"><span style="font-size:8px;padding:3px 6px;border:1px solid var(--ox-border);border-radius:5px;color:var(--ox-muted)">이전</span><span style="font-size:8px;padding:3px 6px;border:1px solid var(--ox-border);border-radius:5px;color:var(--ox-muted)">다음</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">거부 요약 · 필터 · 시맨틱 색</span></div>
+      <div class="mock-frame"><div class="mock">
+        <div class="ox pro">
+          <aside class="sb">
+            <div class="brand"><span class="dot"></span>Oxios</div>
+            <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+            <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+            <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+            <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+            <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+            <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+            <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it active"><span class="ic"></span>Security</div></div>
+          </aside>
+          <div class="main">
+            <div class="topbar"><div class="crumb">Console / Security</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+            <div class="body">
+              <div class="dash-title"><div><h1>보안</h1><p>권한 정책 및 감사 추적</p></div></div>
+              <!-- denies summary metric promoted -->
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+                <div class="card" style="padding:8px;border:1px solid oklch(0.91 0.05 27)"><div style="font-size:8px;color:var(--ox-error);text-transform:uppercase;font-weight:700">거부 (24h)</div><div style="font-size:15px;font-weight:700;color:var(--ox-error)">3</div></div>
+                <div class="card" style="padding:8px"><div style="font-size:8px;color:var(--ox-muted);text-transform:uppercase">허용 (24h)</div><div style="font-size:15px;font-weight:700">128</div></div>
+                <div class="card" style="padding:8px"><div style="font-size:8px;color:var(--ox-muted);text-transform:uppercase">정책</div><div style="font-size:15px;font-weight:700">4</div></div>
+              </div>
+              <!-- filter chips -->
+              <div style="display:flex;gap:5px;flex-wrap:wrap"><span style="font-size:9px;padding:3px 8px;border-radius:9px;background:var(--ox-primary);color:#fff">전체</span><span style="font-size:9px;padding:3px 8px;border-radius:9px;background:oklch(0.97 0.014 27);color:var(--ox-error)">거부만 ⚠</span><span style="font-size:9px;padding:3px 8px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted)">에이전트별</span><span style="font-size:9px;padding:3px 8px;border-radius:9px;border:1px solid var(--ox-border);color:var(--ox-muted)">🔍 검색</span></div>
+              <div class="card" style="padding:9px"><div style="font-size:10px;font-weight:600;margin-bottom:5px">감사 추적</div>
+                <div style="display:flex;justify-content:space-between;border:1px solid oklch(0.91 0.05 27);border-radius:6px;padding:6px;background:oklch(0.97 0.014 27)"><div style="display:flex;gap:6px;align-items:center"><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-error);color:#fff">거부</span><div><div style="font-size:10px;font-weight:500">exec:rm</div><div style="font-size:8px;color:var(--ox-error)">경로 제한 위반</div></div></div><span style="font-size:8px;color:var(--ox-muted)">14:30</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">6건 · High 2 / Med 3 / Low 1</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>감사 추적이 추가 전용 표시 — 필터/검색 불가</b> — 보안상 가장 중요한 거부(deny) 항목이 허용과 섞여 있고 "거부만" 필터가 없음. 보안 페이지에서 거부를 빠르게 찾을 수 없다.<span class="ev">routes/security.tsx:141-171</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>reason이 허용·거부 무관 모두 text-warning으로 렌더 — 색 시맨틱 붕괴</b> — reason이 있는 모든 항목이 경고색. 허용 항목에 경고색이 떠서 잘못된 경보. 거부만 붉게, 허용은 중립이어야.<span class="ev">routes/security.tsx:161</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>agent_id가 8자 + "..."로 잘림 — 복사/툴팁 없음</b> — 어떤 에이전트인지 식별 불가, 전체 id 확인 불가.<span class="ev">routes/security.tsx:156-160</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>권한 정책이 resource 개수 역순 정렬 — 역할 위계 표시 없음</b> — admin이 맨 위가 아닐 수 있고, 역할 간 위계가 안 보임.<span class="ev">routes/security.tsx:87-91</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>페이지네이션이 이전/다음 전용 — 페이지 번호/점프 없음</b> — 큰 감사 로그에서 탐색이 느림.<span class="ev">routes/security.tsx:183-201</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>"최근 24시간 거부 N건" 요약 메트릭 부재</b> — 행동이 필요한 신호(거부)가 상단에 요약되지 않음.<span class="ev">routes/security.tsx:72-81</span></div></li>
+    </ul>
+  </div>
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>거부 요약 메트릭 + 필터 칩:</b> 상단에 "24h 거부 N" + 거부만/에이전트별/검색 필터. ①⑥ 해결.</div></li>
+      <li><span></span><div><b>시맨틱 색 수정:</b> reason 색을 allow/deny에 연동(거부=적, 허용=중립). ② 해결.</div></li>
+      <li><span></span><div><b>agent_id 복사/툴팁 + 역할 위계 정렬:</b> ③④ 해결.</div></li>
+      <li><span></span><div><b>번호 페이지네이션:</b> 이전/다음 + 페이지 점프. ⑤ 해결.</div></li>
+    </ul>
+  </div>
+</section>

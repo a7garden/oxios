@@ -190,6 +190,17 @@ pub(crate) async fn handle_chat(
                     // Capture existing trajectory length before extending
                     let traj_start = session.trajectory_steps.len();
                     session.extend_trajectory(trajectory_steps);
+                    // P4 (§7 persistence): persist reasoning text from
+                    // terminal OutgoingMessage metadata alongside trajectory.
+                    if let Some(rt) = response.metadata.get("reasoning_text").cloned()
+                        && !rt.is_empty()
+                    {
+                        session.add_reasoning(oxios_kernel::state_store::ReasoningRecord {
+                            content: rt,
+                            source: "thinking".to_string(),
+                            timestamp: chrono::Utc::now(),
+                        });
+                    }
                     let traj_end = session.trajectory_steps.len();
                     session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                         content: response.content.clone(),
@@ -224,6 +235,17 @@ pub(crate) async fn handle_chat(
                     // New session: trajectory starts at 0
                     let traj_start = 0usize;
                     session.extend_trajectory(trajectory_steps);
+                    // P4 (§7 persistence): persist reasoning text from
+                    // terminal OutgoingMessage metadata alongside trajectory.
+                    if let Some(rt) = response.metadata.get("reasoning_text").cloned()
+                        && !rt.is_empty()
+                    {
+                        session.add_reasoning(oxios_kernel::state_store::ReasoningRecord {
+                            content: rt,
+                            source: "thinking".to_string(),
+                            timestamp: chrono::Utc::now(),
+                        });
+                    }
                     let traj_end = session.trajectory_steps.len();
                     session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                         content: response.content.clone(),
@@ -507,6 +529,16 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             continue;
                         }
 
+                        // RFC-015 P1: partial streaming deltas (per-delta text
+                        // chunks from the runtime). They carry only a fragment
+                        // of the response, so we must skip persistence (which
+                        // would write the fragment as a "full response") and
+                        // skip the terminal `done` chunk (which the gateway
+                        // emits separately on the terminal OutgoingMessage).
+                        // The token chunk itself still forwards so the
+                        // frontend's `flushPendingTokens` can accumulate.
+                        let is_partial = msg.partial == Some(true);
+
                         // ── Persist session to disk FIRST ──
                         // Always persist, even if WS send fails later. This ensures
                         // the exchange is durable even if the connection drops mid-stream.
@@ -515,7 +547,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         // lock so there is no TOCTOU window between peeking the
                         // pending slot and taking it. The lock is released before
                         // the async persist_session call.
-                        if let Some(ref sid) = session_id {
+                        if !is_partial && let Some(ref sid) = session_id {
                             let pm = {
                                 let mut guard = pending_user_msg.lock().await;
                                 guard.remove(&msg_id)
@@ -544,6 +576,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         // carried by the interview payload. When absent, fall
                         // back to the existing token + done sequence.
                         let has_interview = msg.meta.as_ref().and_then(|m| m.interview_questions.as_ref()).is_some();
+                        let is_reasoning = msg.metadata.get("stream_kind").map(|v| v.as_str()) == Some("reasoning");
 
                         if has_interview {
                             // Send interview chunk with structured questions
@@ -559,6 +592,30 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 Ok(j) => j,
                                 Err(e) => {
                                     tracing::error!(error = %e, "Failed to serialize interview chunk");
+                                    continue;
+                                }
+                            };
+                            if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                break;
+                            }
+                        } else if is_reasoning {
+                            // P4: reasoning deltas routed as `reasoning` chunks so
+                            // the chat store's existing chunkToActivity creates a
+                            // reasoning activity (not a token-flushed answer chunk).
+                            // No persistence — terminal still carries the full
+                            // answer; reasoning is ephemeral like other partials.
+                            let reasoning_chunk = serde_json::json!({
+                                "type": "reasoning",
+                                "seq": msg.seq,
+                                "content": msg.content,
+                                "source": "thinking",
+                                "session_id": session_id,
+                                "project_id": project_id,
+                            });
+                            let json = match serde_json::to_string(&reasoning_chunk) {
+                                Ok(j) => j,
+                                Err(e) => {
+                                    tracing::error!(error = %e, "Failed to serialize reasoning chunk");
                                     continue;
                                 }
                             };
@@ -586,29 +643,31 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             }
                         }
 
-                        let done_chunk = serde_json::json!({
-                            "type": "done",
-                            "seq": msg.seq,
-                            "session_id": session_id,
-                            "project_id": project_id,
-                            "phase": phase,
-                            "evaluation_passed": evaluation_passed,
-                            "project_tag": project_tag,
-                            "duration_ms": duration_ms,
-                            // RFC-025: surface detected mount info to the frontend.
-                            "mount_tag": msg.metadata.get("mount_tag"),
-                            "mount_ids": msg.metadata.get("mount_ids"),
-                            // TODO: populate tool_calls from trajectory_steps once kernel provides it
-                            "tool_calls": msg.metadata.get("tool_calls")
-                                .and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok())
-                                .unwrap_or(serde_json::json!([])),
-                        });
-                        let done_json = match serde_json::to_string(&done_chunk) {
-                            Ok(j) => j,
-                            Err(_) => break,
-                        };
-                        if ws_tx.lock().await.send(Message::Text(done_json.into())).await.is_err() {
-                            break; // WS closed — session was already persisted above
+                        if !is_partial {
+                            let done_chunk = serde_json::json!({
+                                "type": "done",
+                                "seq": msg.seq,
+                                "session_id": session_id,
+                                "project_id": project_id,
+                                "phase": phase,
+                                "evaluation_passed": evaluation_passed,
+                                "project_tag": project_tag,
+                                "duration_ms": duration_ms,
+                                // RFC-025: surface detected mount info to the frontend.
+                                "mount_tag": msg.metadata.get("mount_tag"),
+                                "mount_ids": msg.metadata.get("mount_ids"),
+                                // TODO: populate tool_calls from trajectory_steps once kernel provides it
+                                "tool_calls": msg.metadata.get("tool_calls")
+                                    .and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok())
+                                    .unwrap_or(serde_json::json!([])),
+                            });
+                            let done_json = match serde_json::to_string(&done_chunk) {
+                                Ok(j) => j,
+                                Err(_) => break,
+                            };
+                            if ws_tx.lock().await.send(Message::Text(done_json.into())).await.is_err() {
+                                break; // WS closed — session was already persisted above
+                            }
                         }
                     }
                     event_result = kernel_event_rx.recv() => {
@@ -952,6 +1011,17 @@ async fn persist_session(
             // Capture existing trajectory length before extending
             let traj_start = session.trajectory_steps.len();
             session.extend_trajectory(trajectory_steps);
+            // P4 (§7 persistence): persist reasoning text from terminal
+            // OutgoingMessage metadata alongside trajectory.
+            if let Some(rt) = metadata.get("reasoning_text").cloned()
+                && !rt.is_empty()
+            {
+                session.add_reasoning(oxios_kernel::state_store::ReasoningRecord {
+                    content: rt,
+                    source: "thinking".to_string(),
+                    timestamp: chrono::Utc::now(),
+                });
+            }
             let traj_end = session.trajectory_steps.len();
             session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                 content: agent_content.to_string(),
@@ -986,6 +1056,17 @@ async fn persist_session(
             // New session: trajectory starts at 0
             let traj_start = 0usize;
             session.extend_trajectory(trajectory_steps);
+            // P4 (§7 persistence): persist reasoning text from
+            // terminal OutgoingMessage metadata alongside trajectory.
+            if let Some(rt) = metadata.get("reasoning_text").cloned()
+                && !rt.is_empty()
+            {
+                session.add_reasoning(oxios_kernel::state_store::ReasoningRecord {
+                    content: rt,
+                    source: "thinking".to_string(),
+                    timestamp: chrono::Utc::now(),
+                });
+            }
             let traj_end = session.trajectory_steps.len();
             session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                 content: agent_content.to_string(),
@@ -1146,10 +1227,22 @@ fn kernel_event_to_ws_chunk(
             "content": content,
             "source": source,
         })),
-        // PhaseStarted / PhaseCompleted are not included in the WS stream
-        // here because the orchestrator already publishes them with extra
-        // metadata (result_summary) and we don't want to double-emit. The
-        // global /api/events SSE channel carries them for the events page.
+        KernelEvent::PhaseStarted { phase, summary, .. } => {
+            let mut obj = serde_json::json!({
+                "type": "phase",
+                "phase": phase,
+                "status": "started",
+            });
+            if let Some(s) = summary {
+                obj["summary"] = serde_json::json!(s);
+            }
+            Some(obj)
+        }
+        KernelEvent::PhaseCompleted { phase, .. } => Some(serde_json::json!({
+            "type": "phase",
+            "phase": phase,
+            "status": "completed",
+        })),
         KernelEvent::ApprovalRequested {
             id,
             tool_name,

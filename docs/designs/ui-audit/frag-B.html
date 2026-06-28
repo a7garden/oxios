@@ -1,0 +1,738 @@
+<!-- ─────────────── SCREEN 04 · SKILLS ─────────────── -->
+<section class="screen" id="screen-skills">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">04 · Console / Agents</div>
+      <h3>Skills</h3>
+      <div class="smeta">route <code>/skills</code> · <code>routes/skills.tsx</code> · Installed + ClawHub/Skills.sh Marketplace, side detail panel</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">정보구조</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">레이아웃</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">배치/발견</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">내비게이션</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">인터랙션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">접근성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">타이포</div><div class="val">4</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">Installed 탭 — 문제점 ①–⑦</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:38px;--px:152px" title="F1">①</span>
+          <span class="pin" style="--py:96px;--px:370px" title="F2">②</span>
+          <span class="pin" style="--py:144px;--px:160px" title="F3">③</span>
+          <span class="pin" style="--py:188px;--px:430px" title="F4">④</span>
+          <span class="pin" style="--py:208px;--px:300px" title="F5">⑤</span>
+          <span class="pin" style="--py:236px;--px:170px" title="F6">⑥</span>
+          <span class="pin" style="--py:296px;--px:175px" title="F7">⑦</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it active"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Skills</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">Skills</h1><p style="font-size:11px;color:var(--ox-muted)">에이전트 능력 확장</p></div>
+                  <span style="font-size:9px;font-family:var(--mono);padding:2px 5px;border-radius:9px;font-weight:600;background:var(--ox-accent);color:var(--ox-muted)">↻ 새로고침</span>
+                </div>
+                <!-- Tab switcher -->
+                <div id="screen-skills" style="display:inline-flex;height:9px;align-items:center;border-radius:7px;background:var(--ox-accent);padding:2px;font-size:11px;font-family:var(--mono);color:var(--ox-muted);gap:2px;width:fit-content">
+                  <div style="padding:3px 9px;border-radius:5px;background:var(--ox-card);color:var(--ox-fg);font-weight:600">⚡ 설치됨 · 12</div>
+                  <div style="padding:3px 9px;color:var(--ox-muted)">🛒 마켓</div>
+                </div>
+                <!-- Filter row -->
+                <div style="display:flex;gap:8px;align-items:center">
+                  <div style="display:inline-flex;height:24px;align-items:center;border-radius:6px;background:var(--ox-accent);padding:2px;font-size:10px;color:var(--ox-muted);gap:1px">
+                    <span style="padding:2px 8px;border-radius:4px;background:var(--ox-card);color:var(--ox-fg);font-weight:600">전체 12</span>
+                    <span style="padding:2px 8px">ready 9</span>
+                    <span style="padding:2px 8px">needs-setup 2</span>
+                    <span style="padding:2px 8px">disabled 1</span>
+                  </div>
+                  <div style="margin-left:auto;height:24px;border:1px solid var(--ox-border);border-radius:5px;padding:0 8px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;width:160px">🔍 검색…</div>
+                </div>
+                <!-- Skill card -->
+                <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:8px;padding:11px">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                    <div style="min-width:0;flex:1">
+                      <div style="display:flex;align-items:center;gap:6px"><b style="font-size:12px">code-reviewer</b></div>
+                      <p style="font-size:10px;color:var(--ox-muted);margin-top:2px;line-height:1.35">PR diff 분석, 변경점 요약, 잠재 리스크 플래깅.</p>
+                    </div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:55%">
+                      <span style="font-size:9px;padding:1px 6px;border-radius:9px;background:var(--ox-warning);color:#fff;font-weight:600">▲ 업데이트</span>
+                      <span style="font-size:9px;padding:1px 6px;border-radius:9px;background:var(--ox-accent);color:var(--ox-fg);border:1px solid var(--ox-border)">Oxios</span>
+                      <span style="font-size:9px;padding:1px 6px;border-radius:9px;background:var(--ox-success);color:#fff">● ready</span>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:8px;font-size:10px;color:var(--ox-muted);margin-top:6px;align-items:center">
+                    <span style="font-family:var(--mono)">v1.4.0</span>
+                    <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--ox-accent)">bundled</span>
+                    <span>by oxios-team</span>
+                  </div>
+                  <!-- Claude compat notice -->
+                  <div style="margin-top:6px;padding:5px 8px;border-radius:5px;background:oklch(0.95 0.04 250);border:1px solid oklch(0.85 0.08 250);font-size:9px;color:var(--ox-info)">Claude Code 호환 — 일부 기능 미적용 가능</div>
+                  <!-- REQUIREMENTS section -->
+                  <div style="margin-top:7px;padding-top:6px;border-top:1px dashed var(--ox-border)">
+                    <div style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:600">요구사항</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:3px;font-size:10px">
+                      <div style="display:flex;gap:5px"><span style="color:var(--ox-muted);width:48px">bins</span><span style="color:var(--ox-success)">✓ git</span><span style="color:var(--ox-success)">✓ ripgrep</span></div>
+                      <div style="display:flex;gap:5px"><span style="color:var(--ox-muted);width:48px">env</span><span style="color:var(--ox-error)">✗ GITHUB_TOKEN <b style="font-size:8px">누락</b></span></div>
+                      <div style="display:flex;gap:5px"><span style="color:var(--ox-muted);width:48px">config</span><span style="color:var(--ox-success)">✓ reviewers.json</span></div>
+                    </div>
+                  </div>
+                  <!-- INSTALL section -->
+                  <div style="margin-top:5px">
+                    <div style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);font-weight:600">설치</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;font-size:10px">
+                      <span style="font-family:var(--mono);font-size:9px;background:var(--ox-accent);padding:1px 5px;border-radius:3px">clone</span><span style="color:var(--ox-muted)">github.com/oxios-team/code-reviewer</span>
+                      <span style="font-family:var(--mono);font-size:9px;background:var(--ox-accent);padding:1px 5px;border-radius:3px">symlink</span><span style="color:var(--ox-muted)">~/.oxios/skills/code-reviewer</span>
+                    </div>
+                  </div>
+                  <!-- Inline actions -->
+                  <div style="display:flex;gap:6px;margin-top:9px;padding-top:7px;border-top:1px solid var(--ox-border)">
+                    <span style="font-size:10px;padding:3px 9px;border-radius:5px;border:1px solid var(--ox-border);color:var(--ox-fg);font-weight:600">⏻ 비활성</span>
+                    <span style="font-size:10px;padding:3px 9px;border-radius:5px;color:var(--ox-error)">🗑 삭제</span>
+                  </div>
+                </div>
+                <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:8px;padding:11px;display:flex;justify-content:space-between;align-items:center">
+                  <div><b style="font-size:12px">summarizer</b><p style="font-size:10px;color:var(--ox-muted)">긴 문서를 토큰 친화적으로 요약.</p></div>
+                  <div style="display:flex;gap:4px"><span style="font-size:9px;padding:1px 6px;border-radius:9px;background:var(--ox-accent);border:1px solid var(--ox-border)">OpenClaw</span><span style="font-size:9px;padding:1px 6px;border-radius:9px;background:var(--ox-success);color:#fff">● ready</span></div>
+                </div>
+                <div style="text-align:center;font-size:10px;color:var(--ox-muted)">… +10 more</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">동일 토큰 · 액션 분리 · 상태 색 일관 · 정보 밀도 평탄화</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it active"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Skills</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">Skills</h1><p style="font-size:11px;color:var(--ox-muted)">12 설치 · 1 업데이트 가능 · 에이전트 능력 확장</p></div>
+                  <div style="display:flex;gap:5px"><span style="font-size:9px;padding:3px 7px;border-radius:5px;background:var(--ox-warning);color:#fff;font-weight:600">▲ 1 업데이트</span><span style="font-size:9px;padding:3px 7px;border-radius:5px;border:1px solid var(--ox-border);color:var(--ox-fg)">↻</span></div>
+                </div>
+                <!-- Tab + filters in single toolbar -->
+                <div style="display:flex;gap:6px;align-items:center;border:1px solid var(--ox-border);border-radius:7px;padding:3px 6px;background:var(--ox-card)">
+                  <div style="display:inline-flex;background:var(--ox-accent);border-radius:5px;padding:2px;font-size:10px">
+                    <span style="padding:2px 8px;border-radius:3px;background:var(--ox-bg);color:var(--ox-fg);font-weight:600">⚡ 설치됨 12</span>
+                    <span style="padding:2px 8px;color:var(--ox-muted)">🛒 마켓</span>
+                  </div>
+                  <div style="width:1px;height:18px;background:var(--ox-border)"></div>
+                  <span style="font-size:10px;padding:3px 7px;border-radius:4px;background:var(--ox-bg);border:1px solid var(--ox-border);font-weight:600">전체 12</span>
+                  <span style="font-size:10px;padding:3px 7px;color:var(--ox-muted)">ready 9</span>
+                  <span style="font-size:10px;padding:3px 7px;color:var(--ox-success);font-weight:600">needs-setup 2</span>
+                  <span style="font-size:10px;padding:3px 7px;color:var(--ox-muted)">disabled 1</span>
+                  <div style="margin-left:auto;height:22px;border:1px solid var(--ox-border);border-radius:4px;padding:0 7px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;width:130px">🔍 검색…</div>
+                </div>
+                <!-- Card with separated regions -->
+                <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:8px;padding:11px;display:flex;flex-direction:column;gap:8px">
+                  <!-- Header -->
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                    <div style="min-width:0;flex:1">
+                      <div style="display:flex;align-items:center;gap:6px"><b style="font-size:13px">code-reviewer</b><span style="font-family:var(--mono);font-size:9px;color:var(--ox-muted)">v1.4.0 → v1.5.0</span></div>
+                      <p style="font-size:10px;color:var(--ox-muted);margin-top:2px;line-height:1.35;max-width:38ch">PR diff 분석, 변경점 요약, 잠재 리스크 플래깅.</p>
+                    </div>
+                    <div style="display:flex;gap:3px">
+                      <span style="font-size:9px;padding:2px 6px;border-radius:9px;font-weight:600;background:var(--ox-success);color:#fff">● ready</span>
+                      <span style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-accent);color:var(--ox-fg);border:1px solid var(--ox-border)">Oxios</span>
+                      <span style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted)">bundled</span>
+                    </div>
+                  </div>
+                  <!-- Status row — single horizontal line of three concerns -->
+                  <div style="display:flex;gap:6px;align-items:center;padding:5px 8px;border-radius:5px;background:oklch(0.97 0.04 80);border:1px solid oklch(0.9 0.08 80);font-size:10px">
+                    <span style="color:var(--ox-warning);font-weight:600">⚠ 1개 누락</span>
+                    <span style="color:var(--ox-muted)">·</span>
+                    <span style="color:var(--ox-error)">env: GITHUB_TOKEN</span>
+                    <span style="margin-left:auto;color:var(--ox-info);font-weight:600">설정 →</span>
+                  </div>
+                  <!-- Actions row -->
+                  <div style="display:flex;gap:5px;align-items:center;padding-top:6px;border-top:1px solid var(--ox-border)">
+                    <span style="font-size:10px;padding:3px 9px;border-radius:5px;border:1px solid var(--ox-border);color:var(--ox-fg);font-weight:600">⏻ 비활성</span>
+                    <span style="font-size:10px;padding:3px 9px;border-radius:5px;color:var(--ox-error);font-weight:600">🗑 삭제</span>
+                    <span style="margin-left:auto;font-size:10px;padding:4px 10px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">▲ 업데이트</span>
+                  </div>
+                </div>
+                <!-- Second card simpler -->
+                <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:8px;padding:11px;display:flex;justify-content:space-between;align-items:center">
+                  <div><b style="font-size:12px">summarizer</b><p style="font-size:10px;color:var(--ox-muted)">긴 문서를 토큰 친화적으로 요약.</p></div>
+                  <div style="display:flex;gap:3px"><span style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-success);color:#fff">● ready</span><span style="font-size:9px;padding:2px 6px;border-radius:9px;background:var(--ox-accent);border:1px solid var(--ox-border)">OpenClaw</span></div>
+                </div>
+                <div style="text-align:center;font-size:10px;color:var(--ox-muted)">… +10 more</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">7건 · High 2 / Med 3 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>업데이트 가능 여부가 KPI 무게로 표시되지 않음</b> — 1개 업데이트가 `<span style="font-family:var(--mono)">updateAvailable</span>` 배지로 개별 카드에만 박혀있고, 상단 요약 카운트/배지가 없음. 사용자가 마켓 탭을 열어야만 전체 업데이트 수를 알 수 있고, 그 신호도 marketplace 탭 카운트 한 곳뿐.<span class="ev">skills.tsx:179-180 · :253-254 (UpdateBadge count)</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>카드 어포던스 모호 — 카드 전체가 클릭 가능 + 인라인 액션이 같은 평면에 존재</b> — Card 자체가 `cursor-pointer select-none`이고 CardContent에 onClick이 헤더에만 걸려있지만, 인라인 액션 버튼 행이 `stopPropagation`으로 분리. 시각적으로 둘 다 버튼처럼 보이지 않아 "자세히 보기 = 카드 클릭 / 액션 = 버튼"의 분리가 사용자 학습을 요구.<span class="ev">skills.tsx:712-716 · :839</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>카드가 4개 영역(이름/메타/요구사항/설치)으로 적층, 정보 밀도 가파름</b> — '요구사항'과 '설치'는 길게 펼쳐져 카드를 길게 만들고, 같은 데이터가 두 번(요구사항 = 무엇이 필요, 설치 = 어떻게 배치) 분리되어 표시. 한 카드당 스크롤이 길어져 12개 전체 한 눈에 안 들어옴.<span class="ev">skills.tsx:764-823 (requirements+install)</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>상태 칩 색상이 success/warning/destructive로 일관되지만, 항상/번들/Oxios/OpenClaw 칩이 모두 outline/secondary로 시각적 충돌</b> — 'ready'(green)와 'Oxios format badge'(outline)·'bundled source badge'(secondary)가 같은 줄에 3개 → 어떤 게 상태고 어떤 게 메타인지 한눈에 분리 안 됨.<span class="ev">skills.tsx:66-70 (SOURCE_VARIANT) · :732-745</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>Requirements 섹션이 매칭 색으로만 신호 — 누락 env가 텍스트 끝의 'missing' 라벨로 한참 뒤늦게 표시</b> — `text-error` 색과 `<X>` 아이콘은 보이지만 "GITHUB_TOKEN missing"이 한 줄 안에 동등한 비중. 시각적 강조 부족, 클릭 액션 없음.<span class="ev">skills.tsx:824-836 (missingWarning) · 1132-1149 (ReqRow)</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>검색/필터/탭이 위→아래 세 행으로 분리 — 한 줄 툴바 가능</b> — Tab switcher(231), filter chips(407), search input(434) 모두 별도 flex row. 좁은 화면에서 3행 차지.<span class="ev">skills.tsx:231-256 · :406-440</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>'Oxios' / 'OpenClaw' / 'Claude' 형식 배지에 description 툴팁은 있지만 영문 label 그대로 노출</b> — 'claude_code'가 'Claude'로 짧아지지만 'agent_skills'는 'Standard'로 추상화, format이 4종인데 카드를 가로지르는 비교가 어려움. 색·배지 variant가 항상 outline/secondary/default 혼합.<span class="ev">skills.tsx:72-88 (FORMAT_META)</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>업데이트 카운트 헤더 승격:</b> 설치 탭 헤더 우측에 "N 업데이트" 배지 + 마켓 탭으로 가는 링크. 마켓 탭에 숨어있던 정보가 1차 발견 가능. ① 해결.</div></li>
+      <li><span></span><div><b>카드 액션 분리 — 헤더(클릭=상세) / 상태배너 / 액션바 3-tier:</b> 어포던스를 시각적으로 평탄화. 헤더는 정보, 가운데는 상태, 하단은 일관된 버튼 행. ② 해결.</div></li>
+      <li><span></span><div><b>요구사항/설치 → 한 줄 통합 상태배너:</b> missing이 있으면 '⚠ N개 누락 · env: GITHUB_TOKEN · 설정 →' 단일 행으로 평탄화. 카드 길이 1/3 단축. ③⑤ 해결.</div></li>
+      <li><span></span><div><b>상태 칩 일관성:</b> status는 solid color pill(format/source는 outline neutral). 한 카드 안에서 'ready'만 시각적 강조점이 됨. ④ 해결.</div></li>
+      <li><span></span><div><b>탭·필터·검색 한 줄 툴바 통합:</b> 한 행 안에서 좌측 탭 → 상태 필터 → 우측 검색. 좁은 화면에서 1행 차지. ⑥ 해결.</div></li>
+      <li><span></span><div><b>포맷 라벨 한국어 통일:</b> Oxios / OpenClaw / Claude / Standard → 일관된 variant(초기 1개만 default, 나머지 outline). ⑦ 해소.</div></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─────────────── SCREEN 05 · PROJECTS ─────────────── -->
+<section class="screen" id="screen-projects">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">05 · Console / Projects</div>
+      <h3>Projects</h3>
+      <div class="smeta">route <code>/projects</code> · <code>routes/projects/index.tsx</code> · 카드 그리드 + Create/Edit/Delete 다이얼로그 3종</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">레이아웃</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">배치/발견</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">내비게이션</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">접근성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">타이포</div><div class="val">3</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">Projects 리스트 + Edit 다이얼로그 — 문제점 ①–⑥</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:38px;--px:155px" title="F1">①</span>
+          <span class="pin" style="--py:96px;--px:430px" title="F2">②</span>
+          <span class="pin" style="--py:130px;--px:430px" title="F3">③</span>
+          <span class="pin" style="--py:158px;--px:160px" title="F4">④</span>
+          <span class="pin" style="--py:186px;--px:430px" title="F5">⑤</span>
+          <span class="pin" style="--py:260px;--px:170px" title="F6">⑥</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it active"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Projects</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">Projects</h1><p style="font-size:11px;color:var(--ox-muted)">Registered work contexts with paths and associated memories</p></div>
+                  <div style="display:flex;gap:5px"><span style="font-size:10px;padding:4px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">+ New Project</span><span style="font-size:10px;padding:4px 9px;border-radius:5px;border:1px solid var(--ox-border)">↻</span></div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <div style="height:24px;border:1px solid var(--ox-border);border-radius:5px;padding:0 8px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;width:230px">🔍 Search by name, description, or tag...</div>
+                </div>
+                <!-- Card grid -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:7px;padding:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+                      <div style="display:flex;gap:5px;align-items:center;min-width:0">
+                        <span style="font-size:14px">⚙</span>
+                        <b style="font-size:12px">oxios</b>
+                        <span style="font-size:9px;padding:1px 5px;border-radius:9px;background:var(--ox-success);color:#fff;font-weight:600">manual</span>
+                      </div>
+                      <div style="display:flex;gap:3px;opacity:.4"><span style="font-size:10px;color:var(--ox-muted)">✎</span><span style="font-size:10px;color:var(--ox-error)">🗑</span></div>
+                    </div>
+                    <p style="font-size:10px;color:var(--ox-muted);margin-top:5px;line-height:1.35">Oxios Agent Operating System — Rust-based kernel, AI runtime.</p>
+                    <p style="font-family:var(--mono);font-size:9px;color:var(--ox-muted);margin-top:4px">📁 /Volumes/MERCURY/PROJECTS/oxios</p>
+                    <div style="display:flex;gap:3px;margin-top:5px;flex-wrap:wrap">
+                      <span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">rust</span>
+                      <span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">kernel</span>
+                      <span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">async</span>
+                      <span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">agents</span>
+                      <span style="font-size:8px;color:var(--ox-muted)">+3</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--ox-muted);margin-top:6px;padding-top:5px;border-top:1px solid var(--ox-border)">
+                      <span>2시간 전 활성</span><span style="color:var(--ox-primary);font-weight:600">View →</span>
+                    </div>
+                  </div>
+                  <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:7px;padding:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+                      <div style="display:flex;gap:5px;align-items:center;min-width:0">
+                        <span style="font-size:14px">📊</span>
+                        <b style="font-size:12px">web-analytics</b>
+                        <span style="font-size:9px;padding:1px 5px;border-radius:9px;background:var(--ox-warning);color:#fff;font-weight:600">auto_detected</span>
+                      </div>
+                      <div style="display:flex;gap:3px;opacity:.4"><span style="font-size:10px;color:var(--ox-muted)">✎</span><span style="font-size:10px;color:var(--ox-error)">🗑</span></div>
+                    </div>
+                    <p style="font-size:10px;color:var(--ox-muted);margin-top:5px;line-height:1.35">Next.js + ClickHouse 대시보드.</p>
+                    <p style="font-family:var(--mono);font-size:9px;color:var(--ox-muted);margin-top:4px">📁 /Users/dev/work/web-analytics</p>
+                    <div style="display:flex;gap:3px;margin-top:5px;flex-wrap:wrap">
+                      <span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">nextjs</span>
+                      <span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">clickhouse</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--ox-muted);margin-top:6px;padding-top:5px;border-top:1px solid var(--ox-border)">
+                      <span>방금 활성</span><span style="color:var(--ox-primary);font-weight:600">View →</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Create Dialog overlay -->
+                <div style="margin-top:10px;border:2px dashed var(--ox-warning);border-radius:7px;padding:11px;background:var(--ox-card);position:relative">
+                  <div style="position:absolute;top:-8px;left:8px;font-size:8px;background:var(--ox-warning);color:#fff;padding:1px 5px;border-radius:3px;font-weight:600">EDIT DIALOG</div>
+                  <div style="font-size:13px;font-weight:600;margin-bottom:2px">Edit Project</div>
+                  <p style="font-size:10px;color:var(--ox-muted);margin-bottom:9px">Update "oxios"</p>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div><label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">Name</label><div style="height:22px;border:1px solid var(--ox-border);border-radius:5px;padding:0 7px;font-size:11px;display:flex;align-items:center">oxios</div></div>
+                    <div><label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">Icon</label><div style="display:flex;gap:3px;flex-wrap:wrap">
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--ox-primary);background:var(--ox-accent);font-size:10px">📦</span>
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;font-size:10px;color:var(--ox-muted)">🔧</span>
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;font-size:10px;color:var(--ox-muted)">📄</span>
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;font-size:10px;color:var(--ox-muted)">🎮</span>
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;font-size:10px;color:var(--ox-muted)">🌐</span>
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;font-size:10px;color:var(--ox-muted)">📖</span>
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;font-size:10px;color:var(--ox-muted)">🎨</span>
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;font-size:10px;color:var(--ox-muted)">⚡</span>
+                      <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;font-size:10px;color:var(--ox-muted)">🎯</span>
+                    </div></div>
+                    <div><label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">Description</label><div style="height:30px;border:1px solid var(--ox-border);border-radius:5px;padding:3px 7px;font-size:10px;color:var(--ox-muted)">Oxios Agent Operating System</div></div>
+                    <div><label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">Tags <span style="color:var(--ox-muted);font-weight:400">Comma-separated</span></label><div style="height:22px;border:1px solid var(--ox-border);border-radius:5px;padding:0 7px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center">rust, kernel, async</div></div>
+                    <div><label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">Paths <span style="color:var(--ox-muted);font-weight:400">One per line</span></label><div style="height:36px;border:1px solid var(--ox-border);border-radius:5px;padding:3px 7px;font-family:var(--mono);font-size:9px;color:var(--ox-muted);display:flex;align-items:center">/Volumes/MERCURY/PROJECTS/oxios</div></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:3px"><label style="font-size:10px;font-weight:600">Memory Visible</label><span style="font-size:9px;width:24px;height:14px;border-radius:9px;background:var(--ox-primary);position:relative;display:inline-block"><span style="position:absolute;right:1px;top:1px;width:12px;height:12px;border-radius:50%;background:#fff"></span></span></div>
+                    <!-- Mounts row -->
+                    <div><label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">Mounts</label><div style="display:flex;gap:3px;flex-wrap:wrap">
+                      <span style="font-size:9px;padding:2px 7px;border-radius:4px;background:var(--ox-accent);border:1.5px solid var(--ox-primary);color:var(--ox-primary);font-weight:600">📁 oxios</span>
+                      <span style="font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid transparent;background:var(--ox-accent);color:var(--ox-muted)">📁 docs</span>
+                      <span style="font-size:9px;padding:2px 7px;border-radius:4px;border:1px solid transparent;color:var(--ox-muted)">+ Mount 추가</span>
+                    </div></div>
+                    <div><label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">Instructions</label><div style="height:42px;border:1px solid var(--ox-border);border-radius:5px;padding:3px 7px;font-size:9px;color:var(--ox-muted);display:flex;align-items:flex-start">이 Project에서 항상 지켜야 할 규칙. 시스템 프롬프트에 주입됩니다.</div></div>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:9px;padding-top:7px;border-top:1px solid var(--ox-border)">
+                    <span style="font-size:10px;padding:3px 9px;border-radius:5px;border:1px solid var(--ox-border);color:var(--ox-fg)">Cancel</span>
+                    <span style="font-size:10px;padding:3px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">Save</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">동일 토큰 · 액션 가시화 · 다이얼로그 위계 · 카드 어포던스</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it active"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Projects</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">Projects</h1><p style="font-size:11px;color:var(--ox-muted)">8 프로젝트 · 1 자동감지 · 2 활성</p></div>
+                  <div style="display:flex;gap:5px"><span style="font-size:10px;padding:4px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">+ New Project</span></div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <div style="height:24px;border:1px solid var(--ox-border);border-radius:5px;padding:0 8px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;width:200px">🔍 Search...</div>
+                  <span style="font-size:9px;color:var(--ox-muted)">sort: 최근 활성 ▾</span>
+                </div>
+                <!-- Cards with always-visible actions -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:7px;padding:10px;display:flex;flex-direction:column;gap:5px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+                      <div style="display:flex;gap:5px;align-items:center;min-width:0"><span style="font-size:14px">⚙</span><b style="font-size:12px">oxios</b></div>
+                      <div style="display:flex;gap:2px">
+                        <span style="font-size:8px;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ox-border);color:var(--ox-muted)" title="Edit">✎</span>
+                        <span style="font-size:8px;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ox-border);color:var(--ox-error)" title="Delete">🗑</span>
+                      </div>
+                    </div>
+                    <div style="display:flex;gap:3px;align-items:center"><span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-success);color:#fff;font-weight:600">수동</span><span style="font-size:9px;color:var(--ox-muted)">8 tags · 3 paths</span></div>
+                    <p style="font-size:10px;color:var(--ox-muted);line-height:1.35">Oxios Agent Operating System — Rust-based kernel.</p>
+                    <p style="font-family:var(--mono);font-size:9px;color:var(--ox-muted)">📁 /Volumes/MERCURY/PROJECTS/oxios</p>
+                    <div style="display:flex;gap:3px;flex-wrap:wrap"><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">rust</span><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">kernel</span><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">async</span><span style="font-size:8px;color:var(--ox-muted)">+3</span></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--ox-muted);padding-top:5px;border-top:1px solid var(--ox-border)">
+                      <span>2시간 전</span>
+                      <span style="font-size:9px;padding:3px 8px;border-radius:4px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600">열기 →</span>
+                    </div>
+                  </div>
+                  <div style="background:var(--ox-card);border:1px solid var(--ox-warning);border-radius:7px;padding:10px;display:flex;flex-direction:column;gap:5px;position:relative">
+                    <div style="position:absolute;top:-7px;left:8px;font-size:8px;background:var(--ox-warning);color:#fff;padding:1px 6px;border-radius:3px;font-weight:600">⚡ 자동감지</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+                      <div style="display:flex;gap:5px;align-items:center;min-width:0"><span style="font-size:14px">📊</span><b style="font-size:12px">web-analytics</b></div>
+                      <div style="display:flex;gap:2px">
+                        <span style="font-size:8px;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ox-border);color:var(--ox-muted)">✎</span>
+                        <span style="font-size:8px;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ox-border);color:var(--ox-error)">🗑</span>
+                      </div>
+                    </div>
+                    <div style="display:flex;gap:3px;align-items:center"><span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-warning);color:#fff;font-weight:600">자동감지</span><span style="font-size:9px;color:var(--ox-muted)">2 tags · 1 path</span></div>
+                    <p style="font-size:10px;color:var(--ox-muted);line-height:1.35">Next.js + ClickHouse 대시보드.</p>
+                    <p style="font-family:var(--mono);font-size:9px;color:var(--ox-muted)">📁 /Users/dev/work/web-analytics</p>
+                    <div style="display:flex;gap:3px;flex-wrap:wrap"><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">nextjs</span><span style="font-size:8px;padding:1px 4px;border-radius:3px;background:var(--ox-accent)">clickhouse</span></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--ox-muted);padding-top:5px;border-top:1px solid var(--ox-border)">
+                      <span>방금</span>
+                      <span style="font-size:9px;padding:3px 8px;border-radius:4px;background:var(--ox-warning);color:#fff;font-weight:600">승인 →</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Edit Dialog — collapsed/structured -->
+                <div style="margin-top:9px;border:1px solid var(--ox-border);border-radius:7px;padding:0;background:var(--ox-card);overflow:hidden">
+                  <div style="background:var(--ox-accent);padding:6px 11px;display:flex;justify-content:space-between;align-items:center">
+                    <span style="font-size:12px;font-weight:600">Edit Project — oxios</span>
+                    <span style="font-size:10px;color:var(--ox-muted);font-family:var(--mono)">esc</span>
+                  </div>
+                  <div style="padding:10px 11px;display:flex;flex-direction:column;gap:6px">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                      <div><label style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.04em">Name</label><div style="height:22px;border:1px solid var(--ox-border);border-radius:5px;padding:0 7px;font-size:11px;display:flex;align-items:center;background:var(--ox-bg)">oxios</div></div>
+                      <div><label style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.04em">Icon</label><div style="display:flex;gap:2px">
+                        <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--ox-primary);background:var(--ox-accent);font-size:9px">📦</span>
+                        <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--ox-muted)">🔧</span>
+                        <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--ox-muted)">📄</span>
+                        <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--ox-muted)">🎮</span>
+                        <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--ox-muted)">🌐</span>
+                        <span style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--ox-muted)">📖</span>
+                      </div></div>
+                    </div>
+                    <div><label style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.04em">Description</label><div style="height:28px;border:1px solid var(--ox-border);border-radius:5px;padding:3px 7px;font-size:10px;color:var(--ox-muted);background:var(--ox-bg)">Oxios Agent Operating System</div></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                      <div><label style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.04em">Tags</label><div style="height:22px;border:1px solid var(--ox-border);border-radius:5px;padding:0 7px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;background:var(--ox-bg)">rust, kernel, async</div></div>
+                      <div><label style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;color:var(--ox-muted);text-transform:uppercase;letter-spacing:.04em">Paths</label><div style="height:22px;border:1px solid var(--ox-border);border-radius:5px;padding:0 7px;font-family:var(--mono);font-size:9px;color:var(--ox-muted);display:flex;align-items:center;background:var(--ox-bg)">/Volumes/MERCURY/PROJECTS/oxios</div></div>
+                    </div>
+                    <!-- Advanced collapsible -->
+                    <details style="border:1px solid var(--ox-border);border-radius:5px;padding:5px 8px;font-size:10px">
+                      <summary style="font-weight:600;color:var(--ox-muted);cursor:pointer;list-style:none">고급 · Mounts · Memory · Instructions</summary>
+                      <div style="display:flex;flex-direction:column;gap:5px;padding-top:6px;margin-top:6px;border-top:1px solid var(--ox-border)">
+                        <div><span style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;color:var(--ox-muted);text-transform:uppercase">Mounts</span><div style="display:flex;gap:3px;flex-wrap:wrap"><span style="font-size:9px;padding:2px 7px;border-radius:4px;background:var(--ox-accent);border:1px solid var(--ox-primary);color:var(--ox-primary);font-weight:600">📁 oxios</span><span style="font-size:9px;padding:2px 7px;border-radius:4px;background:var(--ox-accent);color:var(--ox-muted)">+ 추가</span></div></div>
+                        <div style="display:flex;justify-content:space-between;align-items:center"><label style="font-size:9px;font-weight:700;color:var(--ox-muted);text-transform:uppercase">Memory Visible</label><span style="font-size:9px;width:22px;height:13px;border-radius:9px;background:var(--ox-primary);position:relative;display:inline-block"><span style="position:absolute;right:1px;top:1px;width:11px;height:11px;border-radius:50%;background:#fff"></span></span></div>
+                        <div><span style="font-size:9px;font-weight:700;display:block;margin-bottom:2px;color:var(--ox-muted);text-transform:uppercase">Instructions</span><div style="height:36px;border:1px solid var(--ox-border);border-radius:5px;padding:3px 7px;font-size:9px;color:var(--ox-muted);background:var(--ox-bg)">이 Project에서 항상 지켜야 할 규칙. 시스템 프롬프트에 주입됩니다.</div></div>
+                      </div>
+                    </details>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;padding:7px 11px;border-top:1px solid var(--ox-border);background:var(--ox-accent)">
+                    <span style="font-size:10px;padding:4px 11px;border-radius:5px;border:1px solid var(--ox-border);color:var(--ox-fg)">Cancel</span>
+                    <span style="font-size:10px;padding:4px 11px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">Save</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">6건 · High 2 / Med 2 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>카드 액션 버튼이 hover에서만 보임 — 키보드/터치 사용자에게 보이지 않음</b> — `<span style="font-family:var(--mono)">opacity-0 group-hover:opacity-100</span>` 패턴. 모바일 터치, 키보드 내비게이션, 스크린리더 모두 Edit/Delete 버튼을 발견할 방법이 카드 우상단을 정확히 hover하는 것뿐. 키보드 tab 순서에서도 제외될 가능성.<span class="ev">project-card.tsx:40-57</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>Edit 다이얼로그에 7개 필드가 동등한 비중으로 펼쳐져 필수/선택 구분 없음</b> — Name/Description/Tags/Paths는 매번 입력, Mounts/Instructions는 고급 설정. 모든 필드가 같은 font-medium 라벨, 같은 space-y-4 간격. 첫 진입 사용자 필수 필드를 식별하기 어려움.<span class="ev">edit-project-dialog.tsx:111-215</span></div></li>
+      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>'auto_detected' 프로젝트가 일반 카드와 시각적으로 동일 — 처리 흐름이 다르다는 신호 없음</b> — 자동감지 배지 색(노랑)만 다름. 사용자는 이 프로젝트가 '승인 대기 중'인지 알 길이 없고, 승인 UI는 별도 AiDetectionBadge에서 chat-input 옆에 슬라이드인. Cards 리스트 자체는 아무 action prompt 없음.<span class="ev">project-card.tsx:14-17 (SOURCE_COLORS) · ai-detection-badge.tsx:13-41</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>Cards의 'View →' 링크와 카드 자체 클릭 타겟이 중복</b> — Card 컨테이너는 onClick 없는 div이지만 그 안의 이름/View가 둘 다 `<span style="font-family:var(--mono)">/projects/$projectId</span>` Link. 사용자는 카드 클릭이 가능한지 확신 불가, 동시에 'View →'의 존재 의문. 어포던스 모호.<span class="ev">project-card.tsx:29-35,97-103</span></div></li>
+      <li class="low"><span class="fno">⑤</span><div class="ft"><span class="badge low">LOW</span> <b>Tags +N 표기 — 가독성 떨어지는 정보 밀도</b> — tags.slice(0, 4) + '+N' 오버플로. 4개까지 잘라 보여주지만 어떤 태그가 숨겨졌는지 모름. <span class="ev">project-card.tsx:75-86</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>icon picker 15개 옵션이 동일 사이즈 — 검색/카테고리 없음</b> — 14개 lucide 아이콘이 `<span style="font-family:var(--mono)">w-8 h-8</span>` flex-wrap. 더 추가될수록 시각적 노이즈, 카테고리(tech/design/game) 구분 없음.<span class="ev">create-project-dialog.tsx:41-56 (ICON_OPTIONS) · 135-151</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>카드 액션 상시 노출:</b> Edit/Delete 아이콘 버튼을 hover-only에서 always-visible로. `aria-label` 부여 + 키보드 tab 순서 진입. ① 해결.</div></li>
+      <li><span></span><div><b>Edit 다이얼로그 2단 구조:</b> 상단 필수 필드(Name/Description/Tags/Paths) + 하단 `<details>` 접힘 (Mounts/Instructions/Memory visible). 첫 사용자 인지 부담 50%↓. ② 해결.</div></li>
+      <li><span></span><div><b>auto_detected 카드 별도 트리트먼트:</b> 좌측 보더를 warning 색으로 + 카드 자체에 "⚡ 자동감지" 코너 배지 + 푸터의 '열기 →' 대신 '승인 →' 액션. 자동감지 프로젝트에 즉시 행동 신호. ③ 해결.</div></li>
+      <li><span></span><div><b>카드 어포던스 단일화:</b> 카드 전체를 Link로 감싸고 인라인 Edit/Delete는 stopPropagation. 'View →' 별도 링크 제거 — 카드 = View. ④ 해결.</div></li>
+      <li><span></span><div><b>태그 overflow hover로 펼치기:</b> '+N'을 hover 시 전체 펼침으로. 또는 처음부터 6개까지 line-clamp-1. ⑤ 해소.</div></li>
+      <li><span></span><div><b>icon picker 카테고리 구분:</b> 15개를 카테고리(파일/도구/장소/감정) 4그룹으로 묶고, 카테고리 헤더 추가. ⑥ 해소.</div></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─────────────── SCREEN 06 · MOUNTS ─────────────── -->
+<section class="screen" id="screen-mounts">
+  <div class="screen-head">
+    <div class="left">
+      <div class="num">06 · Console / Projects</div>
+      <h3>Mounts</h3>
+      <div class="smeta">route <code>/mounts</code> · <code>routes/mounts/index.tsx</code> · 경로 별칭 카드 그리드 + Create 다이얼로그 + chat용 detection 배지</div>
+    </div>
+    <div class="rubric">
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">정보구조</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">레이아웃</div><div class="val">4</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">내비게이션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">일관성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">접근성</div><div class="val">3</div></div>
+      <div class="cell"><div class="bar"><i style="height:60%"></i></div><div class="lbl">타이포</div><div class="val">3</div></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- ───── CURRENT ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">Mounts 리스트 + chat detection 배지 — 문제점 ①–⑦</span></div>
+      <div class="mock-frame">
+        <div class="mock mock-wrap">
+          <span class="pin" style="--py:34px;--px:155px" title="F1">①</span>
+          <span class="pin" style="--py:96px;--px:430px" title="F2">②</span>
+          <span class="pin" style="--py:140px;--px:170px" title="F3">③</span>
+          <span class="pin" style="--py:140px;--px:430px" title="F4">④</span>
+          <span class="pin" style="--py:194px;--px:160px" title="F5">⑤</span>
+          <span class="pin" style="--py:222px;--px:430px" title="F6">⑥</span>
+          <span class="pin" style="--py:278px;--px:170px" title="F7">⑦</span>
+          <div class="ox">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it active"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Mounts</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">Mounts</h1><p style="font-size:11px;color:var(--ox-muted)">경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.</p></div>
+                  <div style="display:flex;gap:5px"><span style="font-size:10px;padding:4px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">📁 Mount 만들기</span></div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <div style="height:24px;border:1px solid var(--ox-border);border-radius:5px;padding:0 8px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;width:230px">🔍 이름, 설명, 언어로 검색...</div>
+                  <span style="font-size:9px;color:var(--ox-muted);font-family:var(--mono)">↻</span>
+                </div>
+                <!-- Cards grid -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <!-- auto_promoted -->
+                  <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:7px;padding:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                      <div style="display:flex;gap:5px;align-items:center"><span style="color:oklch(0.55 0.18 290);font-size:13px">✨</span><b style="font-size:12px">oxios</b><span style="font-size:8px;padding:1px 5px;border-radius:9px;background:oklch(0.55 0.18 290 / .15);color:oklch(0.55 0.18 290);font-weight:600">자동 생성</span></div>
+                      <div style="display:flex;gap:2px;opacity:.4"><span style="font-size:10px;color:var(--ox-muted)">↻</span><span style="font-size:10px;color:var(--ox-error)">🗑</span></div>
+                    </div>
+                    <p style="font-family:var(--mono);font-size:9px;color:var(--ox-muted);margin-top:5px">📁 /Volumes/MERCURY/PROJECTS/oxios</p>
+                    <p style="font-size:10px;color:var(--ox-muted);margin-top:5px;line-height:1.35">Rust-based agent operating system kernel with async runtime.</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600">rust</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600">tokio</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600">typescript</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600">react</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-muted)">turborepo</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-muted)">cloudflare-workers</span>
+                    </div>
+                  </div>
+                  <!-- needs refresh -->
+                  <div style="background:var(--ox-card);border:1px solid var(--ox-border);border-radius:7px;padding:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                      <div style="display:flex;gap:5px;align-items:center"><span style="font-size:13px">🔧</span><b style="font-size:12px">docs</b><span style="font-size:8px;padding:1px 5px;border-radius:9px;background:oklch(0.75 0.18 70 / .15);color:oklch(0.55 0.18 70);font-weight:600">갱신 필요</span></div>
+                      <div style="display:flex;gap:2px;opacity:.4"><span style="font-size:10px;color:var(--ox-muted)">↻</span><span style="font-size:10px;color:var(--ox-error)">🗑</span></div>
+                    </div>
+                    <p style="font-family:var(--mono);font-size:9px;color:var(--ox-muted);margin-top:5px">📁 /Users/dev/work/docs</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600">markdown</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-primary);font-weight:600">mdx</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Detection badge shown in chat (illustrated as inset) -->
+                <div style="margin-top:9px;padding:7px 9px;border:1px dashed var(--ox-primary);border-radius:7px;font-size:10px;color:var(--ox-muted)">
+                  <div style="font-size:8px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--ox-primary);margin-bottom:4px">Chat 입력창 — mount-detection-badge.tsx</div>
+                  <div style="display:inline-flex;align-items:center;gap:5px;border-radius:9px;background:oklch(0.95 0.04 250);border:1px solid oklch(0.85 0.08 250);padding:3px 9px;font-size:11px;font-weight:600;color:var(--ox-primary)">
+                    <span>📁</span>
+                    <span>oxios</span>
+                    <span style="color:oklch(0.5 0.05 250);font-weight:400">적용됨</span>
+                    <span style="margin-left:3px;padding:0 5px;border-radius:3px;background:var(--ox-accent);font-size:10px">확인</span>
+                    <span style="padding:0 3px;border-radius:3px;color:oklch(0.5 0.05 250)">✕</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───── PROPOSED ───── -->
+    <div class="panel">
+      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">동일 토큰 · 발견성 · navigation · 액션 가시화</span></div>
+      <div class="mock-frame">
+        <div class="mock">
+          <div class="ox pro">
+            <aside class="sb">
+              <div class="brand"><span class="dot"></span>Oxios</div>
+              <div class="grp"><div class="gh">Main</div><div class="it"><span class="ic"></span>Dashboard</div></div>
+              <div class="grp"><div class="gh">Agents</div><div class="it"><span class="ic"></span>Agents</div><div class="it"><span class="ic"></span>Personas</div><div class="it"><span class="ic"></span>Skills</div></div>
+              <div class="grp"><div class="gh">Projects</div><div class="it"><span class="ic"></span>Projects</div><div class="it active"><span class="ic"></span>Mounts</div></div>
+              <div class="grp"><div class="gh">Storage</div><div class="it"><span class="ic"></span>Memory</div><div class="it"><span class="ic"></span>Workspace</div></div>
+              <div class="grp"><div class="gh">Operations</div><div class="it"><span class="ic"></span>Cron</div><div class="it"><span class="ic"></span>Cost</div><div class="it"><span class="ic"></span>Token Maxing</div></div>
+              <div class="grp"><div class="gh">Infra</div><div class="it"><span class="ic"></span>MCP</div><div class="it"><span class="ic"></span>Email</div><div class="it"><span class="ic"></span>Git</div></div>
+              <div class="grp"><div class="gh">System</div><div class="it"><span class="ic"></span>Resources</div><div class="it"><span class="ic"></span>Security</div></div>
+            </aside>
+            <div class="main">
+              <div class="topbar"><div class="crumb">Console / Mounts</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
+              <div class="body">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                  <div><h1 style="font-size:17px;font-weight:600">Mounts</h1><p style="font-size:11px;color:var(--ox-muted)">6 마운트 · 2 자동생성 · 1 갱신필요 · 채팅에서 이름만 입력하면 자동 주입</p></div>
+                  <div style="display:flex;gap:5px"><span style="font-size:10px;padding:4px 9px;border-radius:5px;background:var(--ox-primary);color:#fff;font-weight:600">📁 Mount 만들기</span></div>
+                </div>
+                <!-- Inline guidance strip — solves ① -->
+                <div style="display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;background:oklch(0.97 0.014 250);border:1px solid oklch(0.91 0.05 250);font-size:10px">
+                  <span style="font-size:11px">💡</span>
+                  <span style="flex:1"><b>Mount란?</b> 경로에 붙이는 별칭. 채팅에서 <code style="font-family:var(--mono);font-size:9px;background:var(--ox-bg);padding:1px 5px;border-radius:3px;color:var(--ox-primary)">@oxios</code>처럼 이름만 쓰면 컨텍스트에 자동 주입됩니다.</span>
+                  <span style="color:var(--ox-info);font-weight:600">자세히 →</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <div style="height:24px;border:1px solid var(--ox-border);border-radius:5px;padding:0 8px;font-size:10px;color:var(--ox-muted);display:flex;align-items:center;width:200px">🔍 이름, 설명, 언어로 검색...</div>
+                  <span style="font-size:9px;padding:2px 7px;border-radius:9px;background:var(--ox-accent);color:var(--ox-muted)">전체</span>
+                  <span style="font-size:9px;padding:2px 7px;border-radius:9px;color:var(--ox-muted)">자동생성 2</span>
+                  <span style="font-size:9px;padding:2px 7px;border-radius:9px;color:oklch(0.55 0.18 70);font-weight:600">갱신 필요 1</span>
+                </div>
+                <!-- Cards with always-visible actions -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div style="background:var(--ox-card);border:1px solid oklch(0.55 0.18 290 / .35);border-radius:7px;padding:10px;display:flex;flex-direction:column;gap:5px">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                      <div style="display:flex;gap:5px;align-items:center"><span style="color:oklch(0.55 0.18 290);font-size:13px">✨</span><b style="font-size:12px">oxios</b><span style="font-size:8px;padding:1px 5px;border-radius:9px;background:oklch(0.55 0.18 290 / .15);color:oklch(0.55 0.18 290);font-weight:600">자동 생성</span></div>
+                      <div style="display:flex;gap:2px">
+                        <span style="font-size:8px;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ox-border);color:var(--ox-muted)" title="Rescan">↻</span>
+                        <span style="font-size:8px;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ox-border);color:var(--ox-error)" title="Delete">🗑</span>
+                      </div>
+                    </div>
+                    <p style="font-family:var(--mono);font-size:9px;color:var(--ox-muted)">📁 /Volumes/MERCURY/PROJECTS/oxios</p>
+                    <p style="font-size:10px;color:var(--ox-muted);line-height:1.35">Rust-based agent operating system kernel.</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:3px">
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:oklch(0.55 0.18 250 / .15);color:var(--ox-primary);font-weight:600">rust</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:oklch(0.55 0.18 250 / .15);color:var(--ox-primary);font-weight:600">tokio</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:oklch(0.55 0.18 250 / .15);color:var(--ox-primary);font-weight:600">typescript</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:var(--ox-accent);color:var(--ox-muted)">+3</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--ox-muted);padding-top:5px;border-top:1px solid var(--ox-border)">
+                      <span>chat에서 <code style="font-family:var(--mono);font-size:8px;background:var(--ox-accent);padding:0 3px;border-radius:2px;color:var(--ox-primary)">@oxios</code> 사용</span>
+                      <span style="color:oklch(0.55 0.18 290);font-weight:600">소스 보기 →</span>
+                    </div>
+                  </div>
+                  <!-- needs refresh card highlighted -->
+                  <div style="background:var(--ox-card);border:1px solid oklch(0.7 0.18 70 / .5);border-radius:7px;padding:10px;display:flex;flex-direction:column;gap:5px;position:relative">
+                    <div style="position:absolute;top:-7px;right:8px;font-size:8px;background:oklch(0.7 0.18 70);color:#fff;padding:1px 6px;border-radius:3px;font-weight:600">⚠ 액션 필요</div>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                      <div style="display:flex;gap:5px;align-items:center"><span style="font-size:13px">🔧</span><b style="font-size:12px">docs</b><span style="font-size:8px;padding:1px 5px;border-radius:9px;background:oklch(0.75 0.18 70 / .2);color:oklch(0.55 0.18 70);font-weight:600">갱신 필요</span></div>
+                      <div style="display:flex;gap:2px">
+                        <span style="font-size:8px;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid oklch(0.7 0.18 70);color:oklch(0.55 0.18 70);font-weight:600" title="Rescan now">↻</span>
+                        <span style="font-size:8px;width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ox-border);color:var(--ox-error)">🗑</span>
+                      </div>
+                    </div>
+                    <p style="font-family:var(--mono);font-size:9px;color:var(--ox-muted)">📁 /Users/dev/work/docs</p>
+                    <p style="font-size:10px;color:oklch(0.55 0.18 70);font-weight:600">에이전트 메타 자동 갱신 대기</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:3px">
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:oklch(0.55 0.18 250 / .15);color:var(--ox-primary);font-weight:600">markdown</span>
+                      <span style="font-size:8px;padding:1px 5px;border-radius:3px;background:oklch(0.55 0.18 250 / .15);color:var(--ox-primary);font-weight:600">mdx</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--ox-muted);padding-top:5px;border-top:1px solid var(--ox-border)">
+                      <span>2일 전 스캔</span>
+                      <span style="font-size:9px;padding:3px 8px;border-radius:4px;background:oklch(0.7 0.18 70);color:#fff;font-weight:600">지금 갱신</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Detection badge with explicit action labels -->
+                <div style="margin-top:9px;padding:7px 9px;border:1px dashed var(--ox-primary);border-radius:7px;font-size:10px;color:var(--ox-muted)">
+                  <div style="font-size:8px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--ox-primary);margin-bottom:4px">Chat 입력창 (mount-detection-badge.tsx)</div>
+                  <div style="display:flex;align-items:center;gap:6px;border-radius:7px;background:oklch(0.96 0.02 250);border:1px solid oklch(0.85 0.06 250);padding:5px 9px;font-size:11px">
+                    <span>📁</span>
+                    <b style="color:var(--ox-primary)">oxios</b>
+                    <span style="color:var(--ox-muted);font-size:9px">detected in your message · 컨텍스트에 자동 주입됨</span>
+                    <span style="margin-left:auto;display:flex;gap:4px">
+                      <span style="padding:3px 9px;border-radius:4px;background:var(--ox-primary);color:#fff;font-weight:600">채팅에 적용</span>
+                      <span style="padding:3px 9px;border-radius:4px;border:1px solid var(--ox-border);color:var(--ox-muted)">무시</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="findings">
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">7건 · High 3 / Med 2 / Low 2</span></h4>
+    <ul class="flist">
+      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>'Mount'가 무엇인지 페이지 어디에도 설명 없음 — 첫 사용자 onboarding 부재</b> — `<span style="font-family:var(--mono)">mounts.title</span>`='Mounts', `<span style="font-family:var(--mono)">mounts.desc</span>`='경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.' 한 줄. Mount와 Project/Skill의 차이, 어떻게 쓰이는지(chat input), 어떻게 활성화되는지 알 수 없음.<span class="ev">mounts/index.tsx:52-55</span></div></li>
+      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>카드 액션 버튼이 hover-only — Projects와 동일 문제</b> — `<span style="font-family:var(--mono)">opacity-0 group-hover:opacity-100</span>` 패턴으로 rescan/delete가 항상 보이지 않음. Mount를 rescan해야 하는 시점이 있는데 사용자가 그 액션을 발견할 수 없음.<span class="ev">mounts/index.tsx:102-121</span></div></li>
+      <li class="high"><span class="fno">③</span><div class="ft"><span class="badge high">HIGH</span> <b>'enrichment_pending'/'auto_promoted' 상태가 카드 안 작은 배지로만 표시 — 페이지 정렬·필터링 불가</b> — Mounts 리스트에 상태 필터가 없음(전체 마운트만 표시). 갱신 필요 항목이 섞여있고, 자동생성과 수동 생성이 구분 불가. 자동 갱신/스캔 워크플로우가 페이지에서 영구히 묻힘.<span class="ev">mounts/index.tsx:131-140 · :63-72 (no status filter)</span></div></li>
+      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>Detection badge '적용됨' 라벨이 발견자에게 무엇을 의미하는지 불명확</b> — `<span style="font-family:var(--mono)">mounts.applied</span>`='적용됨' + '확인'/'✕' 버튼. 두 버튼 모두 destructive/positive 의 구분이 안 되고, "적용됨"의 현재 상태(채팅에 주입됨? binding 됨? dismiss?) 모호.<span class="ev">mount-detection-badge.tsx:38-65</span></div></li>
+      <li class="med"><span class="fno">⑤</span><div class="ft"><span class="badge med">MED</span> <b>Mount 카드의 언어/스택 칩이 primary 색상으로 동일 강조 — 정보 구분 약함</b> — `<span style="font-family:var(--mono)">bg-primary/10 text-primary</span>`이 languages, `<span style="font-family:var(--mono)">bg-muted text-muted-foreground</span>`가 stack. 색 차이는 있지만 둘 다 'tag'로 인식되어 무엇이 어떤 카테고리인지 카드 안에서 즉시 구분 어려움.<span class="ev">mounts/index.tsx:156-173</span></div></li>
+      <li class="low"><span class="fno">⑥</span><div class="ft"><span class="badge low">LOW</span> <b>'Mount 만들기' 다이얼로그가 2필드(name, path)뿐 — 너무 단순 vs Mount 카드의 풍부한 메타(languages, stack, auto_description) 사이 인지 불일치</b> — 입력은 2개, 카드는 6+ 메타. "에이전트가 자동으로 채운다"는 안내가 한 줄(desc)뿐이라 사용자가 왜 자기 입력이 부족한지 모름.<span class="ev">create-mount-dialog.tsx:49-95 · mounts/index.tsx:54</span></div></li>
+      <li class="low"><span class="fno">⑦</span><div class="ft"><span class="badge low">LOW</span> <b>사이드바에서 Mounts가 'Projects' 그룹에 속함 — Mount가 무엇인지 모르는 사용자에게 더 혼란</b> — Skill은 Agents 그룹, Memory는 Storage 그룹인데 Mount만 Projects 그룹. Mount가 Project의 하위 개념이 아니라면 그룹 자체가 오해의 소스.<span class="ev">sidebar (route group) · _context sidebar template</span></div></li>
+    </ul>
+  </div>
+
+  <!-- CHANGES -->
+  <div class="changes" style="margin-top:22px">
+    <h4>개선안 — 무엇이 바뀌는가</h4>
+    <ul>
+      <li><span></span><div><b>온보딩 스트립 삽입:</b> 헤더 아래 "💡 Mount란? — 채팅에서 <code>@oxios</code>처럼 이름만 쓰면 컨텍스트에 자동 주입됩니다." 안내 카드. 첫 사용자 학습 비용 0에 수렴. ① 해결.</div></li>
+      <li><span></span><div><b>카드 액션 상시 노출:</b> Rescan/Delete 아이콘 버튼 always-visible + aria-label. ② 해결.</div></li>
+      <li><span></span><div><b>상태 필터 칩 + 갱신필요 카드 별도 트리트먼트:</b> "전체/자동생성/갱신필요" 필터 칩. 갱신필요 카드는 노란 보더 + 코너 '⚠ 액션 필요' 배지 + '지금 갱신' 액션 버튼. ③ 해결.</div></li>
+      <li><span></span><div><b>Detection badge 액션 라벨 명시화:</b> '적용됨' → "detected · 컨텍스트에 자동 주입됨", '확인' → '채팅에 적용', '✕' → '무시'. primary 강조 + outline 무시. ④ 해결.</div></li>
+      <li><span></span><div><b>언어/스택 칩 색 분리:</b> languages = primary 칩(지금), stack = muted(지금). 카테고리 헤더 "Languages" / "Stack" 추가. ⑤ 해결.</div></li>
+      <li><span></span><div><b>Mount 만들기 다이얼로그 — 자동 채움 안내 강화:</b> "이름 + 경로만 입력하면, 설명과 언어/스택은 에이전트가 자동 분석" 본문에 명시. ⑥ 해소.</div></li>
+      <li><span></span><div><b>사이드바 그룹 이동 제안:</b> Mounts를 Projects에서 별도 'Context' 그룹 또는 'Infra' 그룹으로 이동. ⑦ 해소.</div></li>
+    </ul>
+  </div>
+</section>

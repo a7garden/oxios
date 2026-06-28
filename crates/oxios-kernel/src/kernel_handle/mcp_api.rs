@@ -1,7 +1,6 @@
-//! MCP API — external tool server bridge.
-
 use crate::mcp::{self, McpBridge, McpServer, McpToolCallResult};
 use crate::tools::tool_types::ToolDef;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// MCP system calls.
@@ -27,6 +26,23 @@ impl McpApi {
     /// Register an MCP server.
     pub fn register_server(&self, server: McpServer) {
         self.mcp_bridge.register_server(server);
+    }
+    /// Overwrite a registered MCP server's configuration in place. The `name`
+    /// is the key and cannot be changed. The old client is stopped before
+    /// the config is mutated; callers (the route handler) are responsible
+    /// for re-initializing the server afterwards so they can roll back on
+    /// failure — same pattern as the register path.
+    pub async fn update_server(
+        &self,
+        name: &str,
+        command: String,
+        args: Vec<String>,
+        env: HashMap<String, String>,
+        enabled: bool,
+    ) -> anyhow::Result<McpServer> {
+        self.mcp_bridge
+            .update_server(name, command, args, env, enabled)
+            .await
     }
 
     /// Initialize a specific MCP server.

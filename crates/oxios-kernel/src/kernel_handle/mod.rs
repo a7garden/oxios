@@ -105,6 +105,14 @@ pub struct KernelHandle {
     pub token_maxing: Option<TokenMaxingApi>,
     /// RFC-024 SP4: subsystem readiness gate.
     pub readiness: Arc<ReadinessGate>,
+    /// Per-session streaming sink registry (P1 chat transparency).
+    ///
+    /// The agent runtime callback looks up the sink by `session_id` (which
+    /// it already has via `transparency_session`) and pushes live text
+    /// deltas. The gateway registers a strong sender before invoking
+    /// the orchestrator and drops it after the collector completes; the
+    /// `Weak` entries auto-clean.
+    pub streaming_sinks: Arc<crate::streaming_sink::StreamingSinkRegistry>,
 }
 
 impl KernelHandle {
@@ -154,6 +162,7 @@ impl KernelHandle {
             // (src/kernel.rs) sets the actual state and deadline during
             // startup via `readiness.set_*` / a background task.
             readiness: Arc::new(ReadinessGate::new(0)),
+            streaming_sinks: Arc::new(crate::streaming_sink::StreamingSinkRegistry::new()),
         }
     }
 
@@ -182,6 +191,18 @@ impl KernelHandle {
     /// Set the TokenMaxing facade in place (post-construction wiring).
     pub fn set_token_maxing(&mut self, api: TokenMaxingApi) {
         self.token_maxing = Some(api);
+    }
+
+    /// Attach the shared streaming-sink registry. Called by the kernel
+    /// assembler to make the runtime callback's per-session `TextChunk`
+    /// lookup find the gateway's collector sender. The same `Arc` must be
+    /// passed to the gateway via `Gateway::with_streaming_sinks`.
+    pub fn with_streaming_sinks(
+        mut self,
+        registry: Arc<crate::streaming_sink::StreamingSinkRegistry>,
+    ) -> Self {
+        self.streaming_sinks = registry;
+        self
     }
 
     // ═══════════════════════════════════════════════════════════════════════

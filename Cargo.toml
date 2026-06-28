@@ -37,6 +37,8 @@ members = [
     "crates/oxios-calendar",
     "crates/oxios-kernel",
     "crates/oxios-markdown",
+    "crates/oxios-ouroboros",
+    "crates/oxios-gateway",
 ]
 
 [workspace.dependencies]

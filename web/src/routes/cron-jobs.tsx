@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Plus, Power, PowerOff, Timer, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Power, PowerOff, Timer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { EditCronDialog } from '@/components/cron/edit-cron-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -20,9 +21,10 @@ function CronJobsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const [editingJob, setEditingJob] = useState<CronJob | null>(null)
   const [name, setName] = useState('')
   const [schedule, setSchedule] = useState('')
-  const [command, setCommand] = useState('')
+  const [goal, setGoal] = useState('')
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['cron-jobs'],
@@ -34,14 +36,14 @@ function CronJobsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (job: { name: string; schedule: string; command: string }) =>
+    mutationFn: (job: { name: string; schedule: string; goal: string }) =>
       api.post('/api/cron-jobs', job),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cron-jobs'] })
       setShowCreate(false)
       setName('')
       setSchedule('')
-      setCommand('')
+      setGoal('')
     },
   })
 
@@ -52,8 +54,17 @@ function CronJobsPage() {
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      api.put(`/api/cron-jobs/${id}`, { enabled }),
+      api.post(`/api/cron-jobs/${id}/edit`, { enabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cron-jobs'] }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (job: { id: string; name: string; schedule: string; goal: string }) =>
+      api.post(`/api/cron-jobs/${job.id}/edit`, job),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cron-jobs'] })
+      setEditingJob(null)
+    },
   })
 
   if (isLoading) return <LoadingCards count={4} />
@@ -93,15 +104,15 @@ function CronJobsPage() {
               placeholder={t('cronJobs.cronSchedulePlaceholder')}
             />
             <Input
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              placeholder={t('cronJobs.commandPlaceholder')}
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder={t('cronJobs.goalPlaceholder', 'Goal or prompt for the agent')}
             />
             <div className="flex gap-2">
               <Button
                 size="sm"
-                onClick={() => createMutation.mutate({ name, schedule, command })}
-                disabled={!name || !schedule || !command || createMutation.isPending}
+                onClick={() => createMutation.mutate({ name, schedule, goal })}
+                disabled={!name || !schedule || !goal || createMutation.isPending}
               >
                 {t('common.create')}
               </Button>
@@ -134,7 +145,7 @@ function CronJobsPage() {
                   <p className="text-sm text-muted-foreground mt-1">
                     <code className="text-xs bg-muted px-1 py-0.5 rounded">{job.schedule}</code>
                     {' → '}
-                    <code className="text-xs bg-muted px-1 py-0.5 rounded">{job.command}</code>
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded">{job.goal}</code>
                   </p>
                   <div className="flex gap-4 text-xs text-muted-foreground mt-1">
                     {job.last_run && (
@@ -150,6 +161,14 @@ function CronJobsPage() {
                   </div>
                 </div>
                 <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEditingJob(job)}
+                    aria-label={t('common.edit', '편집')}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -172,6 +191,20 @@ function CronJobsPage() {
           ))}
         </div>
       )}
+      <EditCronDialog
+        job={editingJob}
+        onOpenChange={(open) => !open && setEditingJob(null)}
+        onSave={(patch) => {
+          if (!editingJob) return
+          updateMutation.mutate({
+            id: editingJob.id,
+            name: patch.name,
+            schedule: patch.schedule,
+            goal: patch.goal,
+          })
+        }}
+        isPending={updateMutation.isPending}
+      />
     </div>
   )
 }

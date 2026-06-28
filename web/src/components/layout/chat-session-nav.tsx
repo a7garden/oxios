@@ -1,11 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ChevronRight, FolderKanban, Inbox, Plus, RefreshCw } from 'lucide-react'
+import { ChevronRight, FolderKanban, FolderPlus, HardDrive, Inbox, List, MoreHorizontal, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { CreateProjectDialog } from '@/components/project/create-project-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useMoveSession } from '@/hooks/use-sessions'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
@@ -14,7 +21,6 @@ import { useSidebarStore } from '@/stores/sidebar'
 import type { Project, Session } from '@/types'
 import {
   itemActive,
-  itemBase,
   itemCollapsedBase,
   itemDense,
   itemInactive,
@@ -51,6 +57,7 @@ function ExpandedChatNav() {
 
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set())
   const [dragOverProject, setDragOverProject] = useState<string | null>(null)
+  const [createProjectOpen, setCreateProjectOpen] = useState(false)
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
@@ -58,7 +65,7 @@ function ExpandedChatNav() {
     refetchInterval: 30_000,
   })
 
-  const { data: sessionsData, refetch: refetchSessions } = useQuery({
+  const { data: sessionsData } = useQuery({
     queryKey: ['sessions'],
     queryFn: () => api.get<{ items: Session[]; total: number }>('/api/sessions'),
     refetchInterval: 10_000,
@@ -129,9 +136,19 @@ function ExpandedChatNav() {
           <span className={sectionHeader.replace('mb-1 ', '')}>
             {t('chat.sessionsLabel', 'Sessions')}
           </span>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => refetchSessions()}>
-            <RefreshCw className="h-3 w-3" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setCreateProjectOpen(true)}
+              >
+                <FolderPlus className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">{t('chat.newProjectButton')}</TooltipContent>
+          </Tooltip>
         </div>
 
         {/* ── Project folders ── */}
@@ -242,19 +259,41 @@ function ExpandedChatNav() {
         {projects.length > 0 && <div className={sectionSeparator} />}
       </div>
 
-      {/* Footer links */}
-      <div className={sectionSeparator.replace('my-2', 'mt-2 mb-0')} />
-      <div className="space-y-0.5">
-        <Link to="/sessions" className={cn(itemBase, itemInactive)}>
-          {t('chat.manageSessions')}
-        </Link>
-        <Link to="/projects" className={cn(itemBase, itemInactive)}>
-          {t('chat.manageProjects', 'Manage Projects')}
-        </Link>
-        <Link to="/mounts" className={cn(itemBase, itemInactive)}>
-          {t('common.mounts', 'Mounts')}
-        </Link>
-      </div>
+      {/* Footer: management actions */}
+      <div className={sectionSeparator.replace('my-2', 'mt-2 mb-1')} />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
+            <MoreHorizontal className="h-4 w-4" />
+            {t('chat.moreActions')}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          side="top"
+          align="start"
+          className="w-(--radix-dropdown-menu-trigger-width)"
+        >
+          <DropdownMenuItem asChild>
+            <Link to="/sessions">
+              <List className="h-4 w-4" />
+              {t('chat.manageSessions')}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/projects">
+              <FolderKanban className="h-4 w-4" />
+              {t('chat.manageProjects', 'Manage Projects')}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/mounts">
+              <HardDrive className="h-4 w-4" />
+              {t('chat.manageMounts', '마운트 관리')}
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <CreateProjectDialog open={createProjectOpen} onOpenChange={setCreateProjectOpen} />
     </>
   )
 }

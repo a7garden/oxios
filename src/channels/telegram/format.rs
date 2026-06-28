@@ -88,6 +88,7 @@ mod tests {
             meta,
             target_conn_id: None,
             seq: None,
+            partial: None,
         }
     }
 
