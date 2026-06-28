@@ -1017,7 +1017,7 @@ checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.2.2",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
@@ -5308,7 +5308,7 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "1.13.1"
+version = "1.13.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5360,7 +5360,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-calendar"
-version = "1.13.1"
+version = "1.13.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5381,7 +5381,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-gateway"
-version = "1.13.1"
+version = "1.13.2"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -5401,7 +5401,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-kernel"
-version = "1.13.1"
+version = "1.13.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5461,7 +5461,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-markdown"
-version = "1.13.1"
+version = "1.13.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5490,7 +5490,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-mcp"
-version = "1.13.1"
+version = "1.13.2"
 dependencies = [
  "anyhow",
  "parking_lot",
@@ -5502,7 +5502,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-memory"
-version = "1.13.1"
+version = "1.13.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5524,7 +5524,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-ouroboros"
-version = "1.13.1"
+version = "1.13.2"
 dependencies = [
  "anyhow",
  "async-trait",

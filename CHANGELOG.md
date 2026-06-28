@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-06-28
+
+### Changed
+- **Structural/tool-output localization** — All tool and structural output (CLI `--help`, error messages, permission-denial reasons, Telegram & gateway messages, config output) is now English, aligning with the AGENTS.md convention that structural output is English for a global product. Agent conversational replies still follow the user's language.
+
 ## [1.13.1] - 2026-06-27
 
 ### Fixed
