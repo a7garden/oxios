@@ -407,7 +407,7 @@ impl Supervisor for BasicSupervisor {
                     let mut agents = self.agents.write();
                     if let Some(agent) = agents.get_mut(&id) {
                         agent.status = if result.success {
-                            AgentStatus::Idle
+                            AgentStatus::Completed
                         } else {
                             AgentStatus::Failed
                         };
