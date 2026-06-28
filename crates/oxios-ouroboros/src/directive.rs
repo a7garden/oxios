@@ -97,6 +97,15 @@ pub struct ExecEnv {
     /// `None` on initial runs or when no state was accumulated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub restore_state: Option<serde_json::Value>,
+
+    /// RFC-033: the chat session key the gateway registered its streaming
+    /// sink under. The orchestrator sets this to `ctx.session_id` (which is
+    /// the WS session id, or the request id for a session's first message).
+    /// The agent runtime uses it as `transparency_session` so token/tool/
+    /// thinking deltas and RFC-015 events correlate with the live WS sink.
+    /// `#[serde(skip)]` — it is transient (per-execution), never persisted.
+    #[serde(skip)]
+    pub session_id: Option<String>,
 }
 
 /// The result of reviewing an execution against a directive's criteria.

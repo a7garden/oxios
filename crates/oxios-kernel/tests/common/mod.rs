@@ -10,22 +10,19 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use parking_lot::RwLock;
 
-use oxios_ouroboros::{
-    Assessment, Directive, ExecutionResult, IntentEngineOps, MsgCtx, Scope, Verdict,
-};
+use oxios_ouroboros::{Directive, ExecutionResult, IntentEngineOps, Verdict};
 
-/// Mock IntentEngine that returns configurable responses.
+/// Mock IntentEngine that returns configurable review verdicts (RFC-033).
+///
+/// RFC-033 removed `assess`/`crystallize`, so the mock only configures
+/// `review` — the sole surviving external intent call.
 pub struct MockIntentEngine {
-    pub assess_response: RwLock<Assessment>,
-    pub crystallize_response: RwLock<Directive>,
     pub review_response: RwLock<Verdict>,
 }
 
 impl MockIntentEngine {
     pub fn new() -> Self {
         Self {
-            assess_response: RwLock::new(Assessment::Task(Scope::Substantial)),
-            crystallize_response: RwLock::new(Directive::from_message("")),
             review_response: RwLock::new(Verdict {
                 passed: true,
                 score: 1.0,
@@ -33,16 +30,6 @@ impl MockIntentEngine {
                 gaps: vec![],
             }),
         }
-    }
-
-    pub fn with_assess(self, assessment: Assessment) -> Self {
-        *self.assess_response.write() = assessment;
-        self
-    }
-
-    pub fn with_crystallize(self, directive: Directive) -> Self {
-        *self.crystallize_response.write() = directive;
-        self
     }
 
     pub fn with_review(self, verdict: Verdict) -> Self {
@@ -63,32 +50,6 @@ impl Default for MockIntentEngine {
 
 #[async_trait]
 impl IntentEngineOps for MockIntentEngine {
-    async fn assess(&self, msg: &str, _ctx: &MsgCtx) -> anyhow::Result<Assessment> {
-        let resp = self.assess_response.read().clone();
-        Ok(match resp {
-            Assessment::Clarify { questions } if questions.is_empty() => Assessment::Clarify {
-                questions: vec![oxios_ouroboros::Question {
-                    id: "q1".into(),
-                    text: format!("Clarify: {msg}"),
-                    kind: oxios_ouroboros::QuestionKind::FreeText,
-                    options: vec![],
-                }],
-            },
-            other => other,
-        })
-    }
-
-    async fn crystallize(&self, msg: &str, _ctx: &MsgCtx) -> anyhow::Result<Directive> {
-        let mut resp = self.crystallize_response.read().clone();
-        if resp.goal.is_empty() {
-            resp.goal = msg.to_string();
-        }
-        if resp.original_request.is_empty() {
-            resp.original_request = msg.to_string();
-        }
-        Ok(resp)
-    }
-
     async fn review(
         &self,
         _directive: &Directive,

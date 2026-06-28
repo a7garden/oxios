@@ -887,6 +887,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                         },
                                     );
                                 }
+                                // RFC-033: dispatch the regular chat message to
+                                // the gateway so it reaches the orchestrator.
+                                // Without this the WS default branch only
+                                // recorded the message in `pending` and never
+                                // forwarded it — regular chat never executed.
+                                if incoming_tx.send(incoming).await.is_err() {
+                                    break;
+                                }
                             }
                         }
                     }

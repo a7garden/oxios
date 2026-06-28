@@ -384,46 +384,12 @@ async fn test_orchestrator_happy_path() {
 
     assert!(result.session_id.is_some());
     assert_eq!(result.phase_reached, "execute");
-    assert_eq!(result.evaluation_passed, Some(true));
+    assert_eq!(result.evaluation_passed, None);
     assert!(!result.response.is_empty());
 
     // Verify supervisor was called.
     assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 1);
     assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 1);
-}
-
-#[tokio::test]
-async fn test_orchestrator_evolution_loop() {
-    let supervisor = Arc::new(MockSupervisor::new(EventBus::new(64)));
-    let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
-    let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
-
-    let (orchestrator, mock) =
-        common::build_test_orchestrator(supervisor.clone(), state_store, event_bus);
-
-    // Configure mock to fail review first call, pass on retry.
-    *mock.review_response.write() = common::failing_verdict(vec!["missing tests".into()]);
-
-    let result = orchestrator
-        .handle_unified(
-            "test-user",
-            "Do something tricky",
-            None,
-            None,
-            None,
-            None, // RFC-032: role
-            "test-req",
-        )
-        .await
-        .unwrap();
-
-    // Retry was attempted.
-    assert!(result.evaluation_passed.is_some());
-
-    // Verify supervisor was called for initial + retry.
-    assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 2);
-    assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]

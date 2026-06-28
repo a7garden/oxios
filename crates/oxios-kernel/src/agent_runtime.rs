@@ -263,10 +263,15 @@ impl AgentRuntime {
         env: &ExecEnv,
         session_ctx: &mut SessionContext,
     ) -> Result<ExecutionResult> {
-        // Directive has no stable per-execution ID yet (Phase 6). Derive a
-        // session_id from the agent_id so chat transparency events still
-        // correlate.
-        let session_id: Option<String> = Some(agent_id.to_string());
+        // RFC-033: prefer the chat session id the gateway registered its
+        // streaming sink under (set by the orchestrator from ctx.session_id)
+        // so token/tool/thinking deltas and RFC-015 events correlate with the
+        // live WS sink. Fall back to the agent id for non-chat callers
+        // (token-maxing, A2A) that leave env.session_id unset.
+        let session_id: Option<String> = env
+            .session_id
+            .clone()
+            .or_else(|| Some(agent_id.to_string()));
         self.execute_directive_with_session(agent_id, directive, env, session_ctx, session_id)
             .await
     }
@@ -1661,22 +1666,28 @@ fn build_system_prompt_inner(
     // Execution environment guidance
     prompt.push_str(
         "\n## Execution Protocol\n\
-         1. UNDERSTAND — Read the Seed completely before acting.\n\
-         2. PLAN — Determine the minimal set of actions needed.\n\
-         3. EXECUTE — Use tools to accomplish the goal. Prefer the simplest approach.\n\
+         1. UNDERSTAND — Read the user's request carefully. If it is a simple\n\
+            greeting, small talk, or a question you can answer from knowledge,\n\
+            respond naturally and conversationally — no tools needed.\n\
+         2. PLAN — For complex tasks, outline your approach before acting.\n\
+         3. EXECUTE — Use tools only when the task actually requires them.\n\
+            Prefer the simplest approach. Simple requests need no tools.\n\
          4. VERIFY — After each action, check the result: created a file? read it back.\n\
          5. REPORT — Summarize how each acceptance criterion was met, with evidence.\n\n\
+         If the request is ambiguous, use the `ask_user` tool (free-text question)\n\
+         or the `pi-questionnaire` tool (structured choices) to clarify before\n\
+         executing — do not guess when a single question would resolve the intent.\n\n\
          ## Hard Boundaries\n\
          - NEVER modify files outside the workspace scope\n\
          - NEVER execute destructive commands without confirming scope\n\
          - NEVER claim completion without evidence — show the output, not your opinion\n\
-         - NEVER add features or improvements beyond the Seed scope\n\
-         - If you cannot complete the Seed, say so and explain WHY\n\n\
+         - NEVER add features or improvements beyond the goal's scope\n\
+         - If you cannot complete the task, say so and explain WHY\n\n\
          ## Scope Guard\n\
-         The Seed defines your universe. Do not:\n\
-         - Refactor code the Seed didn't mention\n\
-         - Add tests the Seed didn't require\n\
-         - Change configuration the Seed didn't specify\n\
+         The goal defines your universe. Do not:\n\
+         - Refactor code the goal didn't mention\n\
+         - Add tests the goal didn't require\n\
+         - Change configuration the goal didn't specify\n\
          - \"Improve\" anything beyond what the acceptance criteria demand\n\n\
          ## Error Handling\n\
          - If a tool fails, read the error message carefully before retrying\n\

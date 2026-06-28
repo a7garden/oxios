@@ -452,12 +452,20 @@ impl Gateway {
                     oxios_kernel::agent_runtime::StreamDelta,
                 >();
                 let sender_arc: oxios_kernel::streaming_sink::StreamingSinkSender = Arc::new(tx);
-                if let Some(ref sid) = session_id {
-                    streaming_sinks.register(sid, &sender_arc);
-                }
+                // RFC-033: register under the same key the agent runtime will
+                // look up — the chat session id, or the request id for a
+                // session's first message (the WS client sends no session_id
+                // until the server returns one). The orchestrator sets
+                // ExecEnv.session_id to ctx.session_id (the same value), so
+                // token/tool/thinking deltas reach this collector.
+                let sink_session_key = session_id.clone().unwrap_or_else(|| request_id.clone());
+                streaming_sinks.register(&sink_session_key, &sender_arc);
                 let channel = channel.clone();
                 let conn_id = conn_id.clone();
-                let session_id_for_collector = session_id.clone();
+                // RFC-033: partial token messages + unregister use the same
+                // resolved key as registration, so the runtime's sink lookup
+                // and the chat.rs event filter (active_session_id) all agree.
+                let session_id_for_collector = sink_session_key;
                 let channel_name_for_collector = channel_name.clone();
                 let user_id = msg.user_id.clone();
                 let streaming_sinks_for_unregister = streaming_sinks.clone();
@@ -473,11 +481,10 @@ impl Gateway {
                                 );
                                 outgoing.target_conn_id = conn_id.clone();
                                 outgoing = outgoing.with_partial(true);
-                                if let Some(ref sid) = session_id_for_collector {
-                                    outgoing
-                                        .metadata
-                                        .insert(meta::SESSION_ID.to_string(), sid.clone());
-                                }
+                                outgoing.metadata.insert(
+                                    meta::SESSION_ID.to_string(),
+                                    session_id_for_collector.clone(),
+                                );
                                 // Skip `reliability.assign_seq` on partials:
                                 // `assign_seq` pushes into the replay buffer
                                 // (reliability.rs:81-88), and on WS reconnect
@@ -520,19 +527,16 @@ impl Gateway {
                                 outgoing
                                     .metadata
                                     .insert("stream_kind".to_string(), "reasoning".to_string());
-                                if let Some(ref sid) = session_id_for_collector {
-                                    outgoing
-                                        .metadata
-                                        .insert(meta::SESSION_ID.to_string(), sid.clone());
-                                }
+                                outgoing.metadata.insert(
+                                    meta::SESSION_ID.to_string(),
+                                    session_id_for_collector.clone(),
+                                );
                                 let _ = send_with_retry(&channel, outgoing).await;
                             }
                             _ => {}
                         }
                     }
-                    if let Some(sid) = session_id_for_collector {
-                        streaming_sinks_for_unregister.unregister(&sid);
-                    }
+                    streaming_sinks_for_unregister.unregister(&session_id_for_collector);
                 });
                 // Returned so outer code can drop the strong sender and
                 // await the JoinHandle — guarantees all partials reach the

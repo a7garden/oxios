@@ -166,7 +166,7 @@ fn build_rfc027_orchestrator(
 
 // ---------------------------------------------------------------------------
 // Tests
-/// Verifies the happy path: assess (Substantial) → crystallize → execute → review.
+/// Verifies the happy path (RFC-033): every message streams straight to execute.
 #[tokio::test]
 async fn test_orchestrator_happy_path() {
     let (supervisor, event_bus, state_store) = build_test_parts();
@@ -186,46 +186,15 @@ async fn test_orchestrator_happy_path() {
         .await
         .unwrap();
 
-    // Substantial task → reaches Execute. Review passes (default mock).
+    // Reaches Execute. No external review — Directive::from_message carries no criteria.
     assert!(result.session_id.is_some());
     assert_eq!(result.phase_reached, "execute");
-    assert_eq!(result.evaluation_passed, Some(true));
+    assert_eq!(result.evaluation_passed, None);
     assert!(!result.response.is_empty());
 
     // Mock supervisor fork+run were called.
     assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 1);
     assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 1);
-}
-
-/// Verifies retry behavior: review(fail) → execute_with_feedback → re-review.
-#[tokio::test]
-async fn test_orchestrator_evolution_loop() {
-    let (supervisor, event_bus, state_store) = build_test_parts();
-    let (orchestrator, mock) =
-        build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
-
-    // Configure mock to fail review on first call, pass on second.
-    *mock.review_response.write() = common::failing_verdict(vec!["missing tests".into()]);
-
-    let result = orchestrator
-        .handle_unified(
-            "test-user",
-            "Something that needs evolution",
-            None,
-            None,
-            None,
-            None, // RFC-032: role
-            "test-req",
-        )
-        .await
-        .unwrap();
-
-    // Retry was attempted (2 executions).
-    assert!(result.evaluation_passed.is_some());
-
-    // Mock supervisor fork+run were called twice (initial + retry).
-    assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 2);
-    assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 2);
 }
 
 /// Verifies session ID is preserved across messages in the same session.

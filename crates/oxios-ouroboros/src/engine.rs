@@ -1,11 +1,10 @@
-//! IntentEngine: LLM-backed implementation of the unified intent protocol.
+//! IntentEngine: external review for directives that carry acceptance criteria.
 //!
-//! Three methods, one engine:
-//! 1. **assess** — classify the message (conversation / clarify / task + scope)
-//! 2. **crystallize** — turn substantial tasks into a structured Directive
-//! 3. **review** — check the result against acceptance criteria
-//!
-//! See RFC-027 (`docs/rfc-027-unified-intent-handling.md`) for the full design.
+//! RFC-033 removed the `assess` and `crystallize` external LLM gates.
+//! Every message now streams through the agent loop directly (see
+//! `Orchestrator::handle`); the agent's own UNDERSTAND → PLAN → EXECUTE
+//! → VERIFY → REPORT protocol replaces them. The only surviving external
+//! call is `review`, gated on a Directive that carries acceptance criteria.
 
 use anyhow::Result;
 use futures::StreamExt;
@@ -14,78 +13,16 @@ use parking_lot::Mutex;
 use serde::Deserialize;
 use std::sync::Arc;
 
-use crate::assessment::{Assessment, Question, QuestionKind, QuestionOption, Scope};
 use crate::directive::{Directive, Verdict};
 use crate::fallback;
 use crate::fallback::MechanicalEvalResult;
 use crate::model_resolver::{ModelResolver, ResolvedModel};
-use crate::prompts::{ASSESS_SYSTEM_PROMPT, CRYSTALLIZE_SYSTEM_PROMPT, REVIEW_SYSTEM_PROMPT};
+use crate::prompts::REVIEW_SYSTEM_PROMPT;
 use crate::types::ExecutionResult;
 
 // ---------------------------------------------------------------------------
 // JSON response shapes
 // ---------------------------------------------------------------------------
-
-/// Expected LLM response shape for the assess phase.
-#[derive(Debug, Deserialize)]
-struct AssessResponse {
-    /// "conversation" | "clarify" | "task"
-    kind: String,
-    /// Conversational reply (when kind=conversation)
-    #[serde(default)]
-    reply: String,
-    /// Clarification questions (when kind=clarify)
-    #[serde(default)]
-    questions: Vec<AssessQuestion>,
-    /// "trivial" | "substantial" (when kind=task)
-    #[serde(default)]
-    scope: String,
-    /// Ambiguity scores (when kind=task)
-    #[serde(default)]
-    #[allow(dead_code)]
-    scores: Option<AmbiguityScores>,
-}
-
-/// Question with optional structured options.
-#[derive(Debug, Deserialize)]
-struct AssessQuestion {
-    id: String,
-    text: String,
-    #[serde(default = "default_kind")]
-    kind: String,
-    #[serde(default)]
-    options: Vec<AssessOption>,
-}
-
-fn default_kind() -> String {
-    "free_text".to_string()
-}
-
-#[derive(Debug, Deserialize)]
-struct AssessOption {
-    value: String,
-    label: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct AmbiguityScores {
-    goal_clarity: f64,
-    constraint_clarity: f64,
-    success_criteria: f64,
-}
-
-/// Expected LLM response shape for the crystallize phase.
-#[derive(Debug, Deserialize)]
-struct CrystallizeResponse {
-    goal: String,
-    #[serde(default)]
-    constraints: Vec<String>,
-    #[serde(default)]
-    acceptance_criteria: Vec<String>,
-    #[serde(default)]
-    output_schema: Option<serde_json::Value>,
-}
 
 /// Expected LLM response shape for the review phase.
 #[derive(Debug, Deserialize)]
@@ -102,18 +39,15 @@ struct ReviewResponse {
 // Engine
 // ---------------------------------------------------------------------------
 
-/// Trait for the intent engine's three core operations (RFC-027).
+/// External review operation for the intent engine (RFC-033).
 ///
-/// Exists so tests can provide a mock implementation without making
-/// real LLM calls. Production code uses [`IntentEngine`].
+/// RFC-033 removed the `assess` and `crystallize` gates — every message
+/// now streams through the agent loop, so the only remaining external
+/// LLM call is `review`, which fires when a Directive carries acceptance
+/// criteria (see `Directive::needs_review`). Exists so tests can provide
+/// a mock implementation without real LLM calls.
 #[async_trait::async_trait]
 pub trait IntentEngineOps: Send + Sync {
-    /// Classify a user message and decide what should happen next.
-    async fn assess(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Assessment>;
-
-    /// Turn a substantial task into a structured Directive.
-    async fn crystallize(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Directive>;
-
     /// Check execution output against a Directive's acceptance criteria.
     async fn review(&self, directive: &Directive, result: &ExecutionResult) -> Result<Verdict>;
 }
@@ -267,60 +201,6 @@ impl IntentEngine {
     }
 
     // -----------------------------------------------------------------------
-    // assess
-    // -----------------------------------------------------------------------
-
-    /// Classify a user message and decide what should happen next.
-    pub async fn assess(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Assessment> {
-        let user_message = build_assess_prompt(msg, ctx);
-
-        let parsed: AssessResponse = match self
-            .llm_json::<AssessResponse>(ASSESS_SYSTEM_PROMPT, &user_message)
-            .await
-        {
-            Ok(p) => p,
-            Err(e) => {
-                tracing::warn!(error = %e, "assess JSON parse failed after retry, using degraded fallback");
-                return Ok(fallback::degraded_assessment(msg));
-            }
-        };
-
-        Ok(map_assess_response(parsed, msg))
-    }
-
-    // -----------------------------------------------------------------------
-    // crystallize
-    // -----------------------------------------------------------------------
-
-    /// Turn a substantial task into a structured Directive.
-    pub async fn crystallize(
-        &self,
-        msg: &str,
-        ctx: &crate::directive::MsgCtx,
-    ) -> Result<Directive> {
-        let user_message = build_crystallize_prompt(msg, ctx);
-
-        let parsed: CrystallizeResponse = match self
-            .llm_json::<CrystallizeResponse>(CRYSTALLIZE_SYSTEM_PROMPT, &user_message)
-            .await
-        {
-            Ok(p) => p,
-            Err(e) => {
-                tracing::warn!(error = %e, "crystallize JSON parse failed after retry, using degraded fallback");
-                return Ok(fallback::degraded_directive(msg));
-            }
-        };
-
-        Ok(Directive {
-            goal: parsed.goal,
-            original_request: msg.to_string(),
-            constraints: parsed.constraints,
-            acceptance_criteria: parsed.acceptance_criteria,
-            output_schema: parsed.output_schema,
-        })
-    }
-
-    // -----------------------------------------------------------------------
     // review
     // -----------------------------------------------------------------------
 
@@ -394,14 +274,6 @@ impl std::fmt::Debug for IntentEngine {
 
 #[async_trait::async_trait]
 impl IntentEngineOps for IntentEngine {
-    async fn assess(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Assessment> {
-        IntentEngine::assess(self, msg, ctx).await
-    }
-
-    async fn crystallize(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Directive> {
-        IntentEngine::crystallize(self, msg, ctx).await
-    }
-
     async fn review(&self, directive: &Directive, result: &ExecutionResult) -> Result<Verdict> {
         IntentEngine::review(self, directive, result).await
     }
@@ -410,63 +282,6 @@ impl IntentEngineOps for IntentEngine {
 // ---------------------------------------------------------------------------
 // Prompt builders
 // ---------------------------------------------------------------------------
-
-fn build_assess_prompt(msg: &str, ctx: &crate::directive::MsgCtx) -> String {
-    let mut parts = Vec::new();
-
-    if !ctx.history.is_empty() {
-        let history = ctx
-            .history
-            .iter()
-            .map(|e| format!("User: {}\nAgent: {}", e.user, e.agent))
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        parts.push(format!("## Conversation History\n{history}\n"));
-    }
-
-    parts.push(format!(
-        "## The user just said\n\"{msg}\"\n\n\
-         LANGUAGE: Write ALL text output (questions, chat_response, structured question \
-         labels and descriptions) in the SAME language as the user's message above.\n\n\
-         Analyze this message and produce a JSON object with:\n\
-         - \"kind\": \"conversation\" | \"clarify\" | \"task\"\n\
-         - \"reply\": (only when kind=conversation) A natural, friendly response in the user's language. Empty array when kind!=conversation.\n\
-         - \"questions\": (only when kind=clarify) Up to 3 Socratic clarifying questions in the user's language.\n\
-         - \"scope\": (only when kind=task) \"trivial\" for clear single-action requests, \"substantial\" for multi-step tasks.\n\
-         - \"scores\": (only when kind=task) {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}."
-    ));
-
-    parts.join("\n")
-}
-
-fn build_crystallize_prompt(msg: &str, ctx: &crate::directive::MsgCtx) -> String {
-    let mut parts = Vec::new();
-
-    parts.push(format!("## Original Request\n{msg}"));
-
-    // Include Q&A from clarify history if present
-    if !ctx.history.is_empty() {
-        let qa = ctx
-            .history
-            .iter()
-            .map(|e| format!("Q: {}\nA: {}", e.user, e.agent))
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        parts.push(format!("## Clarification Q&A\n{qa}"));
-    }
-
-    parts.push(
-        "\nLANGUAGE: Write the goal and all text fields in the SAME language as the user's original request above.\n\n\
-         Generate a Directive specification. Produce a JSON object with:\n\
-         - \"goal\": a single clear goal in the user's language\n\
-         - \"constraints\": list of constraints\n\
-         - \"acceptance_criteria\": list of measurable acceptance criteria\n\
-         - \"output_schema\": optional JSON Schema if the task requires structured output"
-            .to_string(),
-    );
-
-    parts.join("\n")
-}
 
 fn build_review_prompt(directive: &Directive, result: &ExecutionResult) -> String {
     let criteria = if directive.acceptance_criteria.is_empty() {
@@ -497,65 +312,4 @@ fn build_review_prompt(directive: &Directive, result: &ExecutionResult) -> Strin
         criteria,
         result.output,
     )
-}
-
-// ---------------------------------------------------------------------------
-// Response mapping
-// ---------------------------------------------------------------------------
-
-fn map_assess_response(parsed: AssessResponse, original_msg: &str) -> Assessment {
-    match parsed.kind.as_str() {
-        "conversation" => {
-            let reply = if parsed.reply.is_empty() {
-                "Hello! How can I help you today?".to_string()
-            } else {
-                parsed.reply
-            };
-            Assessment::Conversation(reply)
-        }
-        "clarify" => {
-            let questions = parsed
-                .questions
-                .into_iter()
-                .map(|q| {
-                    let kind = match q.kind.as_str() {
-                        "single_choice" => QuestionKind::SingleChoice,
-                        "multi_choice" => QuestionKind::MultiChoice,
-                        "yes_no" => QuestionKind::YesNo,
-                        _ => QuestionKind::FreeText,
-                    };
-                    let options = q
-                        .options
-                        .into_iter()
-                        .map(|o| QuestionOption {
-                            value: o.value,
-                            label: o.label,
-                        })
-                        .collect();
-                    Question {
-                        id: if q.id.is_empty() {
-                            "q1".to_string()
-                        } else {
-                            q.id
-                        },
-                        text: q.text,
-                        kind,
-                        options,
-                    }
-                })
-                .collect();
-            Assessment::Clarify { questions }
-        }
-        "task" => {
-            let scope = match parsed.scope.as_str() {
-                "trivial" => Scope::Trivial,
-                _ => Scope::Substantial,
-            };
-            Assessment::Task(scope)
-        }
-        _ => {
-            // Unknown kind — treat as conversation
-            Assessment::Conversation(format!("I'm not sure how to handle: {original_msg}"))
-        }
-    }
 }

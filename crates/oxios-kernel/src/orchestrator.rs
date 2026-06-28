@@ -420,42 +420,38 @@ impl Orchestrator {
     }
 
     // ──────────────────────────────────────────────────────────────────
-    // RFC-027 §3 — Unified intent handler
+    // RFC-033 — Unified streaming orchestration
     // ──────────────────────────────────────────────────────────────────
     //
-    // Phase 5 entry point. Routes a single user message through:
-    //   assess → (crystallize) → execute → (review + retry) → Response
-    //
-    // The legacy `handle_message()` and `chat()` paths remain intact;
-    // this method coexists alongside them until Phase 6 cuts over.
+    // The assess/crystallize external LLM gates were removed. Every message
+    // streams through the agent loop directly — the agent's own
+    // UNDERSTAND → PLAN → EXECUTE → VERIFY → REPORT protocol classifies and
+    // plans inline. The only surviving external call is `review`, which
+    // fires when a Directive carries acceptance criteria.
 
-    /// Unified entry point for every user message (RFC-027 §3).
+    /// Unified entry point for every user message (RFC-033).
     ///
-    /// One method, one match — depth falls out of [`Scope`]:
+    /// A single path with no routing gate: build a [`Directive`] verbatim
+    /// from the message, resolve the [`ExecEnv`], execute via the agent
+    /// loop (which streams every token/tool/thinking event), and — only
+    /// when the directive carries acceptance criteria — run an external
+    /// [`IntentEngineOps::review`] with one retry.
     ///
-    /// 1. [`IntentEngine::assess`] classifies the message (conversation /
-    ///    clarify / task + scope). Always called once.
-    /// 2. For `Assessment::Task(scope)` we build a [`Directive`]:
-    ///    - `Scope::Trivial` — `Directive::from_message(msg)` verbatim.
-    ///    - `Scope::Substantial` — [`IntentEngine::crystallize`] produces a
-    ///      structured directive with goal, constraints, and acceptance
-    ///      criteria.
-    /// 3. The [`ExecEnv`] is resolved from [`MsgCtx`] independently of the
-    ///    directive (Mount workspace context, paths, project ID, cspace hint).
-    /// 4. Execution delegates to the existing [`AgentLifecycleManager`].
-    ///    In Phase 5 the Directive is shimmed into a [`Seed`] for the
-    ///    current pipeline; Phase 6 will replace this with
-    ///    `lifecycle.execute_directive(&Directive, &ExecEnv)`.
-    /// 5. For `Scope::Substantial` we call [`IntentEngine::review`] and, if
-    ///    the verdict fails, retry once with the verdict's gaps folded back
-    ///    into the directive as additional constraints.
+    /// Conversation, clarification, and task depth are all decided *inside*
+    /// the agent loop now (simple chat → plain streaming reply; ambiguity →
+    /// `ask_user` / `pi-questionnaire` tool; complex work → tool calls).
+    /// This matches Claude.ai / Gemini Web, where the model's intelligence
+    /// is the classifier and there is no pre-classification step.
     ///
-    /// Does not modify or call the legacy `handle_message()` / `chat()`
-    /// paths — they remain the canonical entry points until Phase 6 cuts
-    /// the gateway over to `handle()`.
+    /// # Why `review` is gated on `needs_review()`
+    /// `Directive::from_message` (used for interactive chat) carries no
+    /// acceptance criteria, so interactive chat never triggers external
+    /// review — the agent's internal VERIFY step replaces it. The review
+    /// path survives for any future/automated producer of criteria-bearing
+    /// directives; until one is wired, `verify_or_retry` is dormant.
     ///
     /// # Parameters
-    /// - `engine` — the LLM-backed intent engine (assess/crystallize/review).
+    /// - `engine` — the LLM-backed intent engine (review only, RFC-033).
     /// - `msg` — the user's raw message text.
     /// - `ctx` — per-message context (session, history, project/mount hints).
     pub async fn handle(
@@ -464,22 +460,6 @@ impl Orchestrator {
         msg: &str,
         ctx: &oxios_ouroboros::MsgCtx,
     ) -> Result<HandleResponse> {
-        // 1. assess — always called once, routes the message.
-        // P3: emit assess phase events so the Web UI timeline shows progress.
-        let _ = self.event_bus.publish(KernelEvent::PhaseStarted {
-            session_id: ctx.session_id.clone(),
-            phase: "assess".to_string(),
-            summary: None,
-        });
-        let assessment = engine.assess(msg, ctx).await?;
-
-        let _ = self.event_bus.publish(KernelEvent::PhaseCompleted {
-            session_id: ctx.session_id.clone(),
-            phase: "assess".to_string(),
-        });
-
-        // P3: emit phase events (plan/execute/review) so the Web UI timeline
-        // shows progress through the orchestrator lifecycle.
         let publish_phase = |phase: &'static str| {
             let _ = self.event_bus.publish(KernelEvent::PhaseStarted {
                 session_id: ctx.session_id.clone(),
@@ -493,61 +473,42 @@ impl Orchestrator {
                 phase: phase.to_string(),
             });
         };
-        match assessment {
-            oxios_ouroboros::Assessment::Conversation(reply) => Ok(HandleResponse::Reply(reply)),
 
-            oxios_ouroboros::Assessment::Clarify { questions } => {
-                Ok(HandleResponse::Clarify(questions))
-            }
+        // 1. Build the Directive verbatim from the message (no crystallize).
+        let mut directive = oxios_ouroboros::Directive::from_message(msg);
 
-            oxios_ouroboros::Assessment::Task(scope) => {
-                // 2. Build the Directive based on scope.
-                let mut directive = match scope {
-                    oxios_ouroboros::Scope::Trivial => {
-                        oxios_ouroboros::Directive::from_message(msg)
-                    }
-                    oxios_ouroboros::Scope::Substantial => {
-                        publish_phase("plan");
-                        let d = engine.crystallize(msg, ctx).await?;
-                        complete_phase("plan");
-                        d
-                    }
-                };
+        // 2. Resolve the execution environment from MsgCtx.
+        let env = self.resolve_exec_env(ctx, msg);
 
-                // 3. Resolve the execution environment from MsgCtx.
-                let env = self.resolve_exec_env(ctx, msg);
+        // 3. Execute — every message streams through the agent loop.
+        publish_phase("execute");
+        let mut result = self.execute_directive(&directive, &env).await?;
+        complete_phase("execute");
 
-                // 4. Execute (always). Trivial tasks skip review; substantial
-                //    tasks go through verify_or_retry below.
-                publish_phase("execute");
-                let mut result = self.execute_directive(&directive, &env).await?;
-                complete_phase("execute");
+        // 4. Optional external review — only when the directive carries
+        //    acceptance criteria (RFC-033 §3.5). Interactive chat uses
+        //    Directive::from_message (no criteria), so this is skipped and
+        //    the agent's internal VERIFY step stands in for review.
+        let (verdict, evaluation_passed) = if directive.needs_review() {
+            publish_phase("review");
+            let (r, v) = self
+                .verify_or_retry(engine, &mut directive, &env, result, msg, ctx)
+                .await?;
+            complete_phase("review");
+            result = r;
+            let passed = v.all_passed();
+            (Some(v), Some(passed))
+        } else {
+            (None, None)
+        };
 
-                // 5. Verify + optional retry (Substantial only).
-                let (verdict, evaluation_passed) = match scope {
-                    oxios_ouroboros::Scope::Trivial => (None, None),
-                    oxios_ouroboros::Scope::Substantial => {
-                        publish_phase("review");
-                        let (r, v) = self
-                            .verify_or_retry(engine, &mut directive, &env, result, msg, ctx)
-                            .await?;
-                        complete_phase("review");
-                        result = r;
-                        let passed = v.all_passed();
-                        (Some(v), Some(passed))
-                    }
-                };
-
-                Ok(HandleResponse::Task {
-                    scope,
-                    directive: Box::new(directive),
-                    env: Box::new(env),
-                    result: Box::new(result),
-                    verdict,
-                    evaluation_passed,
-                })
-            }
-        }
+        Ok(HandleResponse {
+            directive: Box::new(directive),
+            env: Box::new(env),
+            result: Box::new(result),
+            verdict,
+            evaluation_passed,
+        })
     }
 
     /// Unified entry point that accepts legacy-style parameters and returns
@@ -620,118 +581,54 @@ impl Orchestrator {
         let metrics = get_metrics();
         metrics.orch_duration.observe(duration_ms as f64 / 1000.0);
 
-        match response {
-            HandleResponse::Reply(reply) => OrchestrationResult {
-                session_id: Some(ctx.session_id.clone()),
-                primary_project_id: None,
-                project_tag: None,
-                active_mount_ids: Vec::new(),
-                mount_tag: None,
-                response: reply,
-                agent_id: None,
-                phase_reached: "interview".to_string(),
-                evaluation_passed: None,
-                output: None,
-                tool_calls: Vec::new(),
-                interview_questions: None,
-                interview_round: None,
-                failure_class: None,
-                reasoning_text: String::new(),
-            },
-            HandleResponse::Clarify(questions) => {
-                let questions_text = questions
-                    .iter()
-                    .map(|q| q.text.clone())
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                let structured = Some(
-                    questions
-                        .iter()
-                        .map(|q| oxios_ouroboros::InterviewQuestionOutput {
-                            id: q.id.clone(),
-                            text: q.text.clone(),
-                            kind: format!("{:?}", q.kind).to_lowercase(),
-                            options: q
-                                .options
-                                .iter()
-                                .map(|o| oxios_ouroboros::InterviewOptionOutput {
-                                    value: o.value.clone(),
-                                    label: o.label.clone(),
-                                    description: String::new(),
-                                })
-                                .collect(),
-                        })
-                        .collect(),
-                );
-                OrchestrationResult {
-                    session_id: Some(ctx.session_id.clone()),
-                    primary_project_id: None,
-                    project_tag: None,
-                    active_mount_ids: Vec::new(),
-                    mount_tag: None,
-                    response: questions_text,
-                    agent_id: None,
-                    phase_reached: "interview".to_string(),
-                    evaluation_passed: None,
-                    output: None,
-                    tool_calls: Vec::new(),
-                    interview_questions: structured,
-                    interview_round: Some(((ctx.history.len() / 2) as u32).max(1)),
-                    failure_class: None,
-                    reasoning_text: String::new(),
-                }
+        let HandleResponse {
+            directive,
+            env,
+            result,
+            verdict,
+            evaluation_passed,
+        } = response;
+
+        // RFC-032: when execution failed (budget/quota/auth/etc) and the
+        // output is empty, generate a user-friendly error message so the WS
+        // handler can relay it as an `type: "error"` chunk.
+        let failure_class: Option<oxios_ouroboros::FailureClass> = result.failure_class;
+        let response_text = if !result.success && result.output.trim().is_empty() {
+            failure_class_to_user_message(failure_class.as_ref())
+        } else if directive.acceptance_criteria.is_empty() {
+            result.output.clone()
+        } else {
+            match &verdict {
+                Some(v) if v.all_passed() => result.output.clone(),
+                Some(v) => format!(
+                    "{}\n\n⚠ Review notes:\n{}",
+                    result.output,
+                    v.notes.join("\n")
+                ),
+                None => result.output.clone(),
             }
-            HandleResponse::Task {
-                scope: _,
-                directive,
-                env,
-                result,
-                verdict,
-                evaluation_passed,
-            } => {
-                // RFC-032: when execution failed (budget/quota/auth/etc) and
-                // RFC-032: when execution failed (budget/quota/auth/etc) and
-                // the output is empty, generate a user-friendly error message
-                // so the WS handler can relay it as an `type: "error"` chunk.
-                let failure_class: Option<oxios_ouroboros::FailureClass> = result.failure_class;
-                let response_text = if !result.success && result.output.trim().is_empty() {
-                    failure_class_to_user_message(failure_class.as_ref())
-                } else if directive.acceptance_criteria.is_empty() {
-                    result.output.clone()
-                } else {
-                    match &verdict {
-                        Some(v) if v.all_passed() => result.output.clone(),
-                        Some(v) => format!(
-                            "{}\n\n⚠ Review notes:\n{}",
-                            result.output,
-                            v.notes.join("\n")
-                        ),
-                        None => result.output.clone(),
-                    }
-                };
-                if evaluation_passed.unwrap_or(false) {
-                    metrics.agents_completed.inc();
-                } else {
-                    metrics.agents_failed.inc();
-                }
-                OrchestrationResult {
-                    session_id: Some(ctx.session_id.clone()),
-                    primary_project_id: env.project_id,
-                    project_tag: None,
-                    active_mount_ids: Vec::new(),
-                    mount_tag: None,
-                    response: response_text,
-                    agent_id: None,
-                    phase_reached: "execute".to_string(),
-                    evaluation_passed,
-                    output: Some(result.output.clone()),
-                    tool_calls: result.tool_calls.clone(),
-                    failure_class,
-                    interview_questions: None,
-                    interview_round: None,
-                    reasoning_text: result.reasoning_text.clone(),
-                }
-            }
+        };
+        if evaluation_passed.unwrap_or(false) {
+            metrics.agents_completed.inc();
+        } else {
+            metrics.agents_failed.inc();
+        }
+        OrchestrationResult {
+            session_id: Some(ctx.session_id.clone()),
+            primary_project_id: env.project_id,
+            project_tag: None,
+            active_mount_ids: Vec::new(),
+            mount_tag: None,
+            response: response_text,
+            agent_id: None,
+            phase_reached: "execute".to_string(),
+            evaluation_passed,
+            output: Some(result.output.clone()),
+            tool_calls: result.tool_calls.clone(),
+            failure_class,
+            interview_questions: None,
+            interview_round: None,
+            reasoning_text: result.reasoning_text.clone(),
         }
     }
     ///
@@ -788,6 +685,7 @@ impl Orchestrator {
             model_override: None,
             role: ctx.role.clone(),
             restore_state: None,
+            session_id: Some(ctx.session_id.clone()),
         }
     }
 
@@ -816,9 +714,14 @@ impl Orchestrator {
     /// Review the result against the directive's criteria; on failure,
     /// retry once with the verdict's gaps folded back as constraints.
     ///
-    /// Phase 5 caps retries at one explicit attempt; once IntentConfig
-    /// lands (Phase 5 sibling subtask) this will read the configured
-    /// `max_retries` instead.
+    /// RFC-033: this is the sole surviving external LLM gate. It is reached
+    /// only when `Directive::needs_review()` is true (acceptance criteria or
+    /// output schema present). `Orchestrator::handle` builds directives via
+    /// `Directive::from_message` for interactive chat, which carries no
+    /// criteria — so for interactive chat this method is **dormant** and the
+    /// agent's internal VERIFY step stands in for review. It remains wired so
+    /// any future/automated producer of criteria-bearing directives gets
+    /// impartial post-execution review. Retries are capped at one attempt.
     async fn verify_or_retry(
         &self,
         engine: &dyn oxios_ouroboros::IntentEngineOps,
@@ -879,38 +782,25 @@ impl Orchestrator {
     }
 }
 
-/// Response envelope for [`Orchestrator::handle`] (RFC-027 §3).
+/// Response envelope for [`Orchestrator::handle`] (RFC-033).
 ///
-/// One variant per terminal state of the unified handler:
-///
-/// - [`HandleResponse::Reply`] — conversational answer, no agent spawned.
-/// - [`HandleResponse::Clarify`] — the message was ambiguous; ask these
-///   structured questions before acting.
-/// - [`HandleResponse::Task`] — an agent executed the task. Carries the
-///   scope, the directive that was run, the resolved environment, the
-///   execution result, and (for substantial tasks) the review verdict +
-///   pass/fail.
+/// RFC-033 collapsed the former `Reply` / `Clarify` / `Task` variants into a
+/// single shape: every message now executes through the agent loop, so there
+/// is only ever one terminal state. The agent's reply text, tool calls, and
+/// reasoning live in `result`; `verdict` / `evaluation_passed` are `Some`
+/// only when an external review ran (a criteria-bearing directive).
 #[derive(Debug, Clone)]
-pub enum HandleResponse {
-    /// Conversational reply — no agent was spawned.
-    Reply(String),
-    /// Structured clarifying questions to ask before acting.
-    Clarify(Vec<oxios_ouroboros::Question>),
-    /// A task was executed by an agent.
-    Task {
-        /// The scope decided by `assess` — Trivial skips review.
-        scope: oxios_ouroboros::Scope,
-        /// The directive that was executed (post-retry if a retry ran).
-        directive: Box<oxios_ouroboros::Directive>,
-        /// The execution environment resolved for this message.
-        env: Box<oxios_ouroboros::ExecEnv>,
-        /// The execution result.
-        result: Box<ExecutionResult>,
-        /// The review verdict — `None` for `Scope::Trivial`.
-        verdict: Option<oxios_ouroboros::Verdict>,
-        /// Whether the (final) verdict passed — `None` for `Scope::Trivial`.
-        evaluation_passed: Option<bool>,
-    },
+pub struct HandleResponse {
+    /// The directive that was executed (post-retry if a retry ran).
+    pub directive: Box<oxios_ouroboros::Directive>,
+    /// The execution environment resolved for this message.
+    pub env: Box<oxios_ouroboros::ExecEnv>,
+    /// The execution result (agent reply text, tool calls, reasoning).
+    pub result: Box<ExecutionResult>,
+    /// The external review verdict — `None` when no review ran.
+    pub verdict: Option<oxios_ouroboros::Verdict>,
+    /// Whether the (final) verdict passed — `None` when no review ran.
+    pub evaluation_passed: Option<bool>,
 }
 
 /// Result of a full orchestration cycle.

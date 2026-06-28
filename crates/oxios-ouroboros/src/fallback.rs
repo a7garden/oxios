@@ -5,31 +5,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::assessment::{Assessment, Scope};
-use crate::directive::{Directive, Verdict};
+use crate::directive::Verdict;
 
 // ---------------------------------------------------------------------------
 // Degraded fallbacks (LLM parse failure)
 // ---------------------------------------------------------------------------
-
-/// Produce a degraded [`Assessment`] when the assess LLM call fails.
-///
-/// Falls back to Conversation for non-action messages, or Task(Substantial)
-/// when the message looks like a task (contains action verbs).
-pub fn degraded_assessment(msg: &str) -> Assessment {
-    if contains_action_verb(msg) {
-        Assessment::Task(Scope::Substantial)
-    } else {
-        Assessment::Conversation("Hello! How can I help you today?".to_string())
-    }
-}
-
-/// Produce a degraded [`Directive`] when the crystallize LLM call fails.
-///
-/// Uses the user message verbatim as both goal and original_request.
-pub fn degraded_directive(msg: &str) -> Directive {
-    Directive::from_message(msg)
-}
 
 /// Produce a degraded [`Verdict`] when the review LLM call fails.
 ///
@@ -152,39 +132,4 @@ pub fn key_tokens(criterion: &str) -> Vec<String> {
         })
         .map(str::to_string)
         .collect()
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Check if the message contains action verbs indicating a task.
-fn contains_action_verb(text: &str) -> bool {
-    let verbs = [
-        "create",
-        "make",
-        "build",
-        "fix",
-        "find",
-        "deploy",
-        "analyze",
-        "review",
-        "write",
-        "read",
-        "run",
-        "execute",
-        "delete",
-        "update",
-        "move",
-        "copy",
-        "implement",
-        "refactor",
-        "debug",
-        "test",
-        "install",
-        "configure",
-        "setup",
-    ];
-    let lower = text.to_lowercase();
-    verbs.iter().any(|v| lower.contains(v))
 }
