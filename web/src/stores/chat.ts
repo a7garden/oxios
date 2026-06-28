@@ -120,6 +120,8 @@ interface ChatActions {
   setDetectedProject: (project: Project | null) => void
   /** Dismiss a detection badge (don't show again for this project). */
   dismissDetection: (projectId: string) => void
+  /** Remove a single message by id. Used by the inline error retry flow (RFC-032). */
+  removeMessage: (id: string) => void
   /** Clear persisted state (e.g. on logout). */
   clearPersist: () => void
   /** Submit interview answers and send them as a message. */
@@ -269,11 +271,14 @@ function trajectoryToActivity(step: {
   }
 }
 
-function reasoningToActivity(record: {
-  content: string
-  source: string
-  timestamp: string
-}, turnIndex: number): ChatActivity {
+function reasoningToActivity(
+  record: {
+    content: string
+    source: string
+    timestamp: string
+  },
+  turnIndex: number,
+): ChatActivity {
   // P4 (§7 persistence): one reasoning record per turn, restored to the
   // matching agent message's activities so the ThinkingPanel can render
   // it above the answer. `id` derives from the turn index so the existing
@@ -739,7 +744,15 @@ export const useChatStore = create<ChatStore>()(
       },
 
       sendMessage(content: string) {
-        const { activeSessionId, activeProjectId, activeMountIds, activeRole, connected, connect, _ws } = get()
+        const {
+          activeSessionId,
+          activeProjectId,
+          activeMountIds,
+          activeRole,
+          connected,
+          connect,
+          _ws,
+        } = get()
 
         // Ensure WS is connected first
         if (!connected || !_ws || _ws.readyState !== WebSocket.OPEN) {
@@ -842,9 +855,7 @@ export const useChatStore = create<ChatStore>()(
               const reasoning = reasoningRecords[i]
               if (reasoning && reasoning.content) {
                 const r = reasoningToActivity(reasoning, i)
-                activitiesForThisTurn = activitiesForThisTurn
-                  ? [...activitiesForThisTurn, r]
-                  : [r]
+                activitiesForThisTurn = activitiesForThisTurn ? [...activitiesForThisTurn, r] : [r]
               }
               messages.push({
                 id: crypto.randomUUID(),
@@ -906,6 +917,22 @@ export const useChatStore = create<ChatStore>()(
         set({ activeRole: role })
       },
 
+      removeMessage(id: string) {
+        // F9: discard any buffered tokens so they don't leak into the next
+        // streaming turn when the user retries an errored message.
+        discardPendingTokens()
+        set((s) => {
+          const target = s.messages.find((m) => m.id === id)
+          const wasStreaming = target?.role === 'assistant' && s.isStreaming
+          return {
+            messages: s.messages.filter((m) => m.id !== id),
+            // If we just removed the streaming assistant placeholder, drop
+            // isStreaming so the input is re-enabled and the user can retry.
+            isStreaming: wasStreaming ? false : s.isStreaming,
+          }
+        })
+      },
+
       setDetectedMountTag(tag: string | null) {
         set({ detectedMountTag: tag })
       },
@@ -942,7 +969,14 @@ export const useChatStore = create<ChatStore>()(
       },
 
       submitInterviewResponse(answers: InterviewAnswer[]) {
-        const { _ws, activeInterview, activeSessionId, activeProjectId, activeRole, interviewRound } = get()
+        const {
+          _ws,
+          activeInterview,
+          activeSessionId,
+          activeProjectId,
+          activeRole,
+          interviewRound,
+        } = get()
         if (!activeInterview) return
 
         // Build answer summary for user message bubble
@@ -1172,7 +1206,6 @@ export const useChatStore = create<ChatStore>()(
                 : chunk.evaluation_passed === false || chunk.evaluation_passed === 'false'
                   ? false
                   : undefined
-            const seedId = chunk.seed_id
             const durationMs = chunk.duration_ms
 
             set((s) => {
@@ -1226,7 +1259,6 @@ export const useChatStore = create<ChatStore>()(
                   metadata: {
                     phase,
                     evaluation_passed: evaluationPassed,
-                    seed_id: seedId,
                     duration_ms: durationMs,
                     tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
                   },
@@ -1262,7 +1294,6 @@ export const useChatStore = create<ChatStore>()(
                   metadata: {
                     phase,
                     evaluation_passed: evaluationPassed,
-                    seed_id: seedId,
                     duration_ms: durationMs,
                     tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
                   },
@@ -1294,9 +1325,20 @@ export const useChatStore = create<ChatStore>()(
             // RFC-032: create an assistant message with the error text
             // so the user sees the failure inline rather than just a
             // loading spinner that silently stops.
-            const errMsg = (chunk as unknown as Record<string, unknown>).message as string | undefined
-            const errKind = (chunk as unknown as Record<string, unknown>).kind as string | undefined
-            const errSuggestion = (chunk as unknown as Record<string, unknown>).suggestion as string | undefined
+            const errMsg = (chunk as unknown as Record<string, unknown>).message as
+              | string
+              | undefined
+            // RFC-032: narrow the chunk's `kind` to the errorKind union so the
+            // bubble can render kind-specific copy. Anything unrecognized
+            // falls back to 'unknown' rather than an unchecked cast.
+            const rawKind = (chunk as unknown as Record<string, unknown>).kind
+            const errKind: 'quota_exceeded' | 'auth' | 'routing' | 'unknown' =
+              rawKind === 'quota_exceeded' || rawKind === 'auth' || rawKind === 'routing'
+                ? rawKind
+                : 'unknown'
+            const errSuggestion = (chunk as unknown as Record<string, unknown>).suggestion as
+              | string
+              | undefined
             const errorContent = errSuggestion
               ? `${errMsg}\n\n${errSuggestion}`
               : (errMsg ?? 'An error occurred')

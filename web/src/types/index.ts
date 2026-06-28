@@ -4,7 +4,6 @@ export interface Agent {
   name: string
   status: string // Backend sends Debug format: "Running", "Idle", "Stopped", "Starting", "Error"
   created_at?: string
-  seed_id?: string
 }
 
 export interface AgentListResponse {
@@ -19,7 +18,6 @@ export interface Session {
   id: string
   user_id?: string
   project_id?: string
-  active_seed_id?: string
   created_at: string
   updated_at?: string
   message_count?: number
@@ -38,12 +36,10 @@ export interface SessionDetail {
     session_id: string
     // Web-m6: these fields are nullable on the backend (chat-only sessions
     // never run the Ouroboros pipeline), so type them optional.
-    seed_id?: string | null
     phase_reached?: string | null
     evaluation_passed?: boolean | null
     timestamp: string
   }[]
-  active_seed_id?: string
   active_persona_id?: string
   /// P4 (§7 persistence): reasoning text per turn. One record per turn
   /// (when reasoning was emitted), same indexing as `agent_responses`.
@@ -179,9 +175,14 @@ export interface ChatMessage {
   metadata?: {
     phase?: string
     evaluation_passed?: boolean
-    seed_id?: string
     duration_ms?: number
     tool_calls?: ToolCallSummary[]
+    /// RFC-032: rendered as an inline error card with a retry action.
+    /// Populated by the chat store's `error` chunk handler.
+    isError?: boolean
+    /// Optional error category ('quota_exceeded' | 'auth' | 'routing' | 'unknown').
+    /// Drives the copy + icon in the inline error card.
+    errorKind?: 'quota_exceeded' | 'auth' | 'routing' | 'unknown'
   }
   // RFC-015: real-time activity timeline attached to an assistant turn.
   // Populated as the agent executes tools, recalls memories, emits reasoning
@@ -317,7 +318,6 @@ export interface StreamChunk {
   project_id?: string
   phase?: string
   evaluation_passed?: boolean | string
-  seed_id?: string
   duration_ms?: number
   tool_calls?: ToolCallSummary[]
   // RFC-015 chunk fields

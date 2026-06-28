@@ -202,13 +202,20 @@ export function Sidebar() {
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
       </div>
-
-      {/* Mobile only: mode tabs inside sidebar overlay */}
+      {/* Mobile only: mode tabs inside sidebar overlay (kept as-is) */}
       {mobileOpen && (
         <div className="lg:hidden px-2 py-1.5">
           <ModeTabs variant="sidebar" />
         </div>
       )}
+
+      {/* Desktop sidebar: compact mode tabs under brand so users always
+          know which top-level surface (Console / Knowledge / Chat) they're
+          on. Without this the chat mode hides the indicator and the
+          Knowledge session tree replaces the console nav with no signal. */}
+      <div className="hidden lg:block px-2 pb-2">
+        <ModeTabs variant="sidebar" />
+      </div>
 
       <Separator />
 

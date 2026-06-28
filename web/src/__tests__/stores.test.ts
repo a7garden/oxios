@@ -320,4 +320,61 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     expect(last.activities).toHaveLength(1)
     expect(last.metadata?.phase).toBe('execute')
   })
+
+  it('error chunk appends an error message with isError metadata and resets streaming', () => {
+    // Pre-seed a user message so the error path can place the assistant
+    // error after it (mirrors the production layout).
+    useChatStore.setState({
+      messages: [
+        { id: 'u1', role: 'user' as const, content: 'hello', timestamp: new Date().toISOString() },
+      ],
+      isStreaming: true,
+    })
+    const errorChunk = {
+      type: 'error',
+      message: 'rate limit exceeded',
+      kind: 'quota_exceeded',
+      suggestion: 'try a different model',
+    }
+    useChatStore.getState().handleChunk(errorChunk as unknown as Parameters<ReturnType<typeof useChatStore.getState>['handleChunk']>[0])
+    const state = useChatStore.getState()
+    expect(state.isStreaming).toBe(false)
+    const errMsg = state.messages.at(-1)!
+    expect(errMsg.role).toBe('assistant')
+    expect(errMsg.metadata?.isError).toBe(true)
+    expect(errMsg.metadata?.errorKind).toBe('quota_exceeded')
+    expect(errMsg.content).toContain('rate limit exceeded')
+    expect(errMsg.content).toContain('try a different model')
+  })
+
+  it('removeMessage drops a single message by id and leaves siblings intact', () => {
+    useChatStore.setState({
+      messages: [
+        { id: 'u1', role: 'user' as const, content: 'first', timestamp: new Date().toISOString() },
+        { id: 'a1', role: 'assistant' as const, content: 'first reply', timestamp: new Date().toISOString() },
+        { id: 'u2', role: 'user' as const, content: 'second', timestamp: new Date().toISOString() },
+      ],
+      isStreaming: false,
+    })
+    useChatStore.getState().removeMessage('a1')
+    const ids = useChatStore.getState().messages.map((m) => m.id)
+    expect(ids).toEqual(['u1', 'u2'])
+  })
+
+  it('removeMessage resets isStreaming when removing the streaming target', () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: 'a1',
+          role: 'assistant' as const,
+          content: '',
+          timestamp: new Date().toISOString(),
+        },
+      ],
+      isStreaming: true,
+    })
+    useChatStore.getState().removeMessage('a1')
+    expect(useChatStore.getState().isStreaming).toBe(false)
+    expect(useChatStore.getState().messages).toHaveLength(0)
+  })
 })

@@ -110,6 +110,23 @@ function ChatPage() {
     setTimeout(() => connect(), 100)
   }
 
+  // RFC-032: retry the message that produced an error card. Pop the error
+  // bubble AND the user message that preceded it (the store will append a
+  // fresh user message when we resend, so leaving the original in place
+  // would duplicate it on screen). After removal, scroll the user back to
+  // the bottom and re-fire the same send pipeline as their original tap.
+  const handleRetry = (errorMessageId: string) => {
+    const errIdx = messages.findIndex((m) => m.id === errorMessageId)
+    if (errIdx < 0) return
+    const precedingUser = [...messages.slice(0, errIdx)].reverse().find((m) => m.role === 'user')
+    if (!precedingUser) return
+    const { removeMessage } = useChatStore.getState()
+    removeMessage?.(errorMessageId)
+    removeMessage?.(precedingUser.id)
+    handleSend(precedingUser.content, [])
+    setUserScrolledUp(false)
+  }
+
   return (
     <div className="flex h-full">
       <div className="flex flex-1 flex-col min-w-0">
@@ -156,6 +173,7 @@ function ChatPage() {
                     message={msg}
                     sessionId={activeSessionId ?? undefined}
                     assistantIndex={assistantIndex}
+                    onRetry={msg.metadata?.isError ? () => handleRetry(msg.id) : undefined}
                   />
                 )
               })}

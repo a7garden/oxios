@@ -1,4 +1,13 @@
-import { Bot, ClipboardList, User, Wrench } from 'lucide-react'
+import {
+  AlertCircle,
+  Bot,
+  ClipboardList,
+  KeyRound,
+  RefreshCw,
+  Route,
+  User,
+  Wrench,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -15,9 +24,11 @@ interface MessageBubbleProps {
   sessionId?: string
   /** Index of this message among assistant messages only (RFC-016). */
   assistantIndex?: number
+  /** RFC-032: retry the last failed send. Called from the inline error card. */
+  onRetry?: () => void
 }
 
-export function MessageBubble({ message, sessionId, assistantIndex }: MessageBubbleProps) {
+export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: MessageBubbleProps) {
   const { t } = useTranslation()
   const isUser = message.role === 'user'
   const isTool = message.role === 'tool'
@@ -93,7 +104,47 @@ export function MessageBubble({ message, sessionId, assistantIndex }: MessageBub
               </div>
             </div>
           )}
-          {isUser ? (
+          {/* RFC-032: inline error card — visible when the assistant message was
+              emitted from the chat store's `error` chunk handler. Replaces the
+              silent-streaming problem where users saw "loading forever" with no
+              indication of what failed. */}
+          {!isUser && message.metadata?.isError ? (
+            <div className="flex items-start gap-2 rounded-md border border-error/30 bg-error/5 px-3 py-2 text-sm">
+              {message.metadata.errorKind === 'auth' ? (
+                <KeyRound className="h-4 w-4 mt-0.5 shrink-0 text-error" />
+              ) : message.metadata.errorKind === 'routing' ? (
+                <Route className="h-4 w-4 mt-0.5 shrink-0 text-error" />
+              ) : (
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-error" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-error">
+                  {message.metadata.errorKind === 'quota_exceeded'
+                    ? '선택한 프로바이더에 토큰이 남아있지 않습니다.'
+                    : message.metadata.errorKind === 'auth'
+                      ? '프로바이더 인증에 실패했습니다.'
+                      : message.metadata.errorKind === 'routing'
+                        ? '라우팅 가능한 프로바이더가 없습니다.'
+                        : '응답을 생성하지 못했습니다.'}
+                </p>
+                {message.content && (
+                  <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">
+                    {message.content}
+                  </p>
+                )}
+                {onRetry && (
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-error/30 bg-background px-2.5 py-1 text-xs font-medium text-error hover:bg-error/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    다시 시도
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : isUser ? (
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
           ) : message.content ? (
             <div className="text-sm prose prose-sm dark:prose-invert max-w-none [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">

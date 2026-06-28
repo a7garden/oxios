@@ -6,6 +6,7 @@ import { useIsTouch } from '@/hooks/use-is-touch'
 import { useKnowledgeSearch } from '@/hooks/use-knowledge'
 import { useMemorySemanticSearch } from '@/hooks/use-memory'
 import { cn } from '@/lib/utils'
+import { RolePill } from './role-pill'
 
 // ── Context item attached via @mention ────────────────────────
 
@@ -62,8 +63,10 @@ export function ChatInput({
   disabled,
   isStreaming,
   connected,
+  roles = [],
+  activeRole = null,
+  setActiveRole = () => {},
 }: ChatInputProps) {
-  const { roles = [], activeRole = null, setActiveRole = () => {} } = props
   const { t } = useTranslation()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isComposing, setIsComposing] = useState(false)
@@ -368,24 +371,15 @@ export function ChatInput({
 
         {/* ── Bottom bar ── */}
         <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-2 px-2 pb-2 pt-1">
-          {/* Left: role selector (RFC-032) */}
-          {roles && roles.length > 0 ? (
-            <select
-              value={activeRole ?? ''}
-              onChange={(e) => setActiveRole(e.target.value || null)}
-              className="h-7 max-w-[180px] truncate rounded-md border border-input bg-background px-2 text-2xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              title={t('chat.roleHint', 'Select a role to route this message to a specific model')}
-            >
-              <option value="">{t('chat.roleDefault', 'Default model')}</option>
-              {roles.map((r) => (
-                <option key={r.name} value={r.name}>
-                  {r.name} → {r.model.split('/').pop() ?? r.model}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div />
-          )}
+          {/* Left: role selector (RFC-032) — RolePill replaces the prior bare
+              <select>. Reads useRoles() + useProviderQuotas() to surface
+              per-role provider status (configured/not) and a quota badge. */}
+          <RolePill
+            roles={roles}
+            activeRole={activeRole}
+            onChange={setActiveRole}
+            hasRoles={roles.length > 0}
+          />
           {/* Right: send / stop */}
           <div className="flex items-center">
             {isStreaming ? (
