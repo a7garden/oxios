@@ -61,17 +61,12 @@ export function RolePill({ roles, activeRole, onChange, hasRoles }: RolePillProp
   const currentProvider = currentProviderId ? providerMap.get(currentProviderId) : undefined
 
   // "Default model" — no roles configured OR user explicitly picked default.
+  // The chat input now has a dedicated `ModelPicker` for actual model
+  // routing; this pill exists solely for role switching. When no roles
+  // are configured, render nothing so the bottom bar doesn't show a
+  // dead placeholder next to the active `ModelPicker`.
   if (!hasRoles || roles.length === 0) {
-    return (
-      <div
-        className="inline-flex items-center gap-1.5 h-7 max-w-[200px] truncate rounded-md border border-dashed border-input bg-muted/30 px-2 text-2xs text-muted-foreground"
-        title={t('chat.roleUnavailable', 'No roles configured. Set them in Settings → Engine.')}
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-        <KeyRound className="h-3 w-3 shrink-0" />
-        <span className="truncate font-medium">{t('chat.roleDefault', 'Default model')}</span>
-      </div>
-    )
+    return null
   }
 
   const isConfigured = currentProvider?.configured ?? false

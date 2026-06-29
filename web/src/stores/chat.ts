@@ -25,6 +25,8 @@ interface PersistedState {
   activeMountIds: string | null
   /** RFC-032: Active role hint (null = no role; uses default model). */
   activeRole: string | null
+  /** Model override id (null = follow default / role). Persisted across reloads. */
+  activeModelId: string | null
 }
 
 const PERSIST_KEY = 'oxios-chat-persist'
@@ -82,10 +84,9 @@ interface ChatRuntimeState {
    *  resume the stream from the next message. */
   _lastSeq: number
   /** RFC-024 SP2 (C3): ring of recently-seen `msg.id` values for
-   *  dedup. The replay buffer can return the same message twice
-   *  (e.g. a server restart that lost the in-memory state) — we
-   *  silently drop the second copy. Bounded so memory does not grow
-   *  unbounded for long-lived connections. */
+  *  dedup. The replay buffer can return the same message twice
+  *  (e.g. during a fast reconnect), so we drop ids we've already
+  *  applied. Capacitied at `DEDUP_RING_MAX`. */
   _seenMsgIds: string[]
 }
 
@@ -108,15 +109,14 @@ interface ChatActions {
   newSession: () => void
   /** Set the active project explicitly. */
   setActiveProject: (projectId: string | null) => void
-  /** RFC-025: Set active Mount IDs (comma-separated, primary first). */
-  setActiveMountIds: (mountIds: string[] | null) => void
   /** RFC-032: Set the active role hint. */
   setActiveRole: (role: string | null) => void
-  /** RFC-025: Set the detected mount tag from the orchestrator response. */
-  setDetectedMountTag: (tag: string | null) => void
+  /** Set the per-message model override id (null = no override). */
+  setActiveModelId: (modelId: string | null) => void
+  /** RFC-025: accept detected mount IDs into the active binding. */
+  setActiveMountIds: (mountIds: string[] | null) => void
   /** RFC-025: Clear detected mount tag and IDs (e.g. on badge accept/dismiss). */
   clearDetectedMount: () => void
-  /** Set the detected project (Phase 2: called from WS response). */
   setDetectedProject: (project: Project | null) => void
   /** Dismiss a detection badge (don't show again for this project). */
   dismissDetection: (projectId: string) => void
@@ -516,11 +516,11 @@ function discardPendingTokens(): void {
 export const useChatStore = create<ChatStore>()(
   persist(
     (set, get) => ({
-      // ── Persisted ──
       activeSessionId: null,
       activeProjectId: null,
       activeMountIds: null,
       activeRole: null,
+      activeModelId: null,
 
       // ── Runtime ──
       messages: [],
@@ -550,7 +550,6 @@ export const useChatStore = create<ChatStore>()(
       _lastSeq: loadLastSeq(),
       _seenMsgIds: loadSeenIds(),
       // ── Actions ──
-
       async connect() {
         const currentWs = get()._ws
 
@@ -749,6 +748,7 @@ export const useChatStore = create<ChatStore>()(
           activeProjectId,
           activeMountIds,
           activeRole,
+          activeModelId,
           connected,
           connect,
           _ws,
@@ -774,6 +774,9 @@ export const useChatStore = create<ChatStore>()(
         set((s) => ({ messages: [...s.messages, userMsg], isStreaming: true }))
 
         // Send via WebSocket with session context.
+        // The backend WS handler reads `model` and writes it into
+        // `model_override` metadata, which the orchestrator honours
+        // at priority 1 (above role routing and default).
         const payload: Record<string, unknown> = {
           type: 'message',
           content,
@@ -783,6 +786,8 @@ export const useChatStore = create<ChatStore>()(
           mount_ids: activeMountIds ?? '',
           // RFC-032: role hint for model routing
           role: activeRole ?? '',
+          // Per-message model override (or last-picked persistent one).
+          model: activeModelId ?? '',
         }
         _ws.send(JSON.stringify(payload))
       },
@@ -917,6 +922,10 @@ export const useChatStore = create<ChatStore>()(
         set({ activeRole: role })
       },
 
+      setActiveModelId(modelId: string | null) {
+        set({ activeModelId: modelId })
+      },
+
       removeMessage(id: string) {
         // F9: discard any buffered tokens so they don't leak into the next
         // streaming turn when the user retries an errored message.
@@ -958,6 +967,7 @@ export const useChatStore = create<ChatStore>()(
           activeProjectId: null,
           activeMountIds: null,
           activeRole: null,
+          activeModelId: null,
           messages: [],
           activeInterview: null,
           interviewRound: 0,
@@ -975,6 +985,7 @@ export const useChatStore = create<ChatStore>()(
           activeSessionId,
           activeProjectId,
           activeRole,
+          activeModelId,
           interviewRound,
         } = get()
         if (!activeInterview) return
@@ -1002,7 +1013,6 @@ export const useChatStore = create<ChatStore>()(
           _interviewQuestions: activeInterview,
           _interviewRound: interviewRound,
         }
-
         // Send via WebSocket as interview_response
         if (_ws && _ws.readyState === WebSocket.OPEN) {
           _ws.send(
@@ -1011,6 +1021,8 @@ export const useChatStore = create<ChatStore>()(
               session_id: activeSessionId ?? '',
               project_id: activeProjectId ?? '',
               role: activeRole ?? '',
+              // Per-message model override (or last-picked persistent one).
+              model: activeModelId ?? '',
               answers,
               text: answerText,
             }),
@@ -1369,6 +1381,7 @@ export const useChatStore = create<ChatStore>()(
         activeProjectId: state.activeProjectId,
         activeMountIds: state.activeMountIds,
         activeRole: state.activeRole,
+        activeModelId: state.activeModelId,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
@@ -1380,5 +1393,5 @@ export const useChatStore = create<ChatStore>()(
         }
       },
     },
-  ),
-)
+   ),
+ )

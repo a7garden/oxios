@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChatInput, type ContextAttachment } from '@/components/chat/chat-input'
@@ -9,16 +10,17 @@ import { MessageBubble } from '@/components/chat/message-bubble'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
 import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useRoles } from '@/hooks/use-engine'
 import { useChatStore } from '@/stores/chat'
+import { useMounts } from '@/hooks/use-mounts'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
 
 // ---------------------------------------------------------------------------
 // Chat UI — Claude-inspired centered layout
 // ---------------------------------------------------------------------------
-
 function ChatPage() {
   const { t } = useTranslation()
   const {
@@ -32,9 +34,13 @@ function ChatPage() {
     interviewRound,
     interviewAmbiguity,
     activeRole,
+    activeModelId,
+    activeMountIds,
+    setActiveMountIds,
     sendMessage,
     setActiveProject,
     setActiveRole,
+    setActiveModelId,
     dismissDetection,
     submitInterviewResponse,
     activeToolApproval,
@@ -45,6 +51,24 @@ function ChatPage() {
   } = useChatStore()
   const { data: rolesData } = useRoles()
   const roles = Object.entries(rolesData?.roles ?? {}).map(([name, model]) => ({ name, model }))
+  const { data: mountsData } = useMounts()
+  const activeMountIdsArr = activeMountIds ? activeMountIds.split(',').filter(Boolean) : []
+  const activeMounts = activeMountIdsArr
+    .map((id) => {
+      const m = mountsData?.items?.find((x) => x.id === id)
+      return m ? { id: m.id, label: m.name } : null
+    })
+    .filter((x): x is { id: string; label: string } => x !== null)
+
+  const handleAttachMount = (id: string) => {
+    const cur = activeMountIds ? activeMountIds.split(',').filter(Boolean) : []
+    if (cur.includes(id)) return
+    setActiveMountIds([...cur, id])
+  }
+  const handleRemoveMount = (id: string) => {
+    const cur = activeMountIds ? activeMountIds.split(',').filter(Boolean) : []
+    setActiveMountIds(cur.filter((x) => x !== id))
+  }
 
   const [input, setInput] = useState('')
   const [userScrolledUp, setUserScrolledUp] = useState(false)
@@ -53,7 +77,6 @@ function ChatPage() {
 
   // Auto-scroll to bottom on new messages, but only if user hasn't scrolled up
   useEffect(() => {
-    if (userScrolledUp) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isStreaming, userScrolledUp])
 
@@ -134,7 +157,19 @@ function ChatPage() {
         {!connected && (
           <div className="flex items-center gap-2 px-4 py-2 bg-warning/10 text-warning text-xs border-b">
             <span className="h-2 w-2 rounded-full bg-warning animate-pulse shrink-0" />
-            <span>{t('chat.reconnecting', 'Reconnecting...')}</span>
+            <span className="flex-1">{t('chat.reconnecting', 'Reconnecting...')}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-warning hover:text-warning"
+              onClick={() => {
+                disconnect()
+                connect()
+              }}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              {t('chat.retry', 'Retry')}
+            </Button>
           </div>
         )}
 
@@ -218,10 +253,15 @@ function ChatPage() {
               roles={roles}
               activeRole={activeRole}
               setActiveRole={setActiveRole}
+              activeModelId={activeModelId}
+              setActiveModelId={setActiveModelId}
               onCancel={handleCancel}
               disabled={isStreaming}
               isStreaming={isStreaming}
               connected={connected}
+              activeMounts={activeMounts}
+              onAttachMount={handleAttachMount}
+              onRemoveMount={handleRemoveMount}
             />
           </div>
         )}

@@ -1,15 +1,16 @@
-import { BookOpen, Brain, FileText, Send, Square, X } from 'lucide-react'
+import { BookOpen, Brain, FileText, HardDrive, Send, Square, X } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useIsTouch } from '@/hooks/use-is-touch'
 import { useKnowledgeSearch } from '@/hooks/use-knowledge'
 import { useMemorySemanticSearch } from '@/hooks/use-memory'
+import { useMounts } from '@/hooks/use-mounts'
 import { cn } from '@/lib/utils'
 import { RolePill } from './role-pill'
+import { ModelPickerContainer } from './model-picker'
 
 // ── Context item attached via @mention ────────────────────────
-
 export interface ContextAttachment {
   type: 'knowledge' | 'memory'
   id: string
@@ -21,7 +22,7 @@ export interface ContextAttachment {
 // ── Unified search result for the popover ─────────────────────
 
 interface MentionResult {
-  type: 'knowledge' | 'memory'
+  type: 'mount' | 'knowledge' | 'memory'
   id: string
   label: string
   snippet: string
@@ -44,8 +45,16 @@ interface ChatInputProps {
   activeRole?: string | null
   /** RFC-032: setter for active role. */
   setActiveRole?: (role: string | null) => void
-}
-
+  /** Per-message model override id (null = no override). */
+  activeModelId?: string | null
+  setActiveModelId?: (id: string | null) => void
+  /** RFC-025: mounts bound to the active session (session-sticky chips). */
+  activeMounts?: { id: string; label: string }[]
+  /** RFC-025: bind a Mount to the active session (@mount or drag-drop). */
+  onAttachMount?: (id: string) => void
+  /** RFC-025: unbind a Mount from the active session. */
+  onRemoveMount?: (id: string) => void
+ }
 // ── Component ─────────────────────────────────────────────────
 
 /**
@@ -66,6 +75,11 @@ export function ChatInput({
   roles = [],
   activeRole = null,
   setActiveRole = () => {},
+  activeModelId = null,
+  setActiveModelId = () => {},
+  activeMounts = [],
+  onAttachMount = () => {},
+  onRemoveMount = () => {},
 }: ChatInputProps) {
   const { t } = useTranslation()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -81,6 +95,7 @@ export function ChatInput({
 
   const knowledgeSearch = useKnowledgeSearch()
   const memorySearch = useMemorySemanticSearch()
+  const { data: mountsData } = useMounts()
 
   // ── Auto-grow ──
   const adjustHeight = useCallback(() => {
@@ -144,9 +159,31 @@ export function ChatInput({
         // Memory search not available
       }
 
-      // Sort: knowledge first, then by score
+      // Search mounts (client-side filter — mounts are few). RFC-025: a Mount
+      // is the addressable filesystem concept; @mount binds it to the session
+      // (path access + CWD + workspace context), NOT a per-message text ref.
+      const mq = mentionQuery.toLowerCase()
+      for (const m of mountsData?.items ?? []) {
+        if (
+          m.name.toLowerCase().includes(mq) ||
+          m.auto_description.toLowerCase().includes(mq) ||
+          m.paths.some((p) => p.toLowerCase().includes(mq))
+        ) {
+          results.push({
+            type: 'mount',
+            id: m.id,
+            label: m.name,
+            snippet: m.auto_description.slice(0, 80),
+          })
+        }
+      }
+
+      // Sort: mounts first (heaviest/most intentional), then knowledge, then
+      // memory, with semantic score breaking ties within a kind.
+      const kindRank = (t: MentionResult['type']) =>
+        t === 'mount' ? 0 : t === 'knowledge' ? 1 : 2
       results.sort((a, b) => {
-        if (a.type !== b.type) return a.type === 'knowledge' ? -1 : 1
+        if (a.type !== b.type) return kindRank(a.type) - kindRank(b.type)
         return (b.score ?? 0) - (a.score ?? 0)
       })
 
@@ -180,14 +217,24 @@ export function ChatInput({
       const newValue = `${before}${mentionToken}${after}`
       onChange(newValue)
 
-      // Add to context attachments (dedup by id)
-      setContextAttachments((prev) => {
-        if (prev.some((a) => a.id === result.id && a.type === result.type)) return prev
-        return [
-          ...prev,
-          { type: result.type, id: result.id, label: result.label, snippet: result.snippet },
-        ]
-      })
+      if (result.type === 'mount') {
+        // RFC-025: @mount binds to the session (path access + CWD + workspace
+        // context), not a per-message text ref. Route to the session binding.
+        onAttachMount(result.id)
+      } else {
+        // Narrow: in this branch result is knowledge | memory, not mount.
+        const nonMount: ContextAttachment = {
+          type: result.type,
+          id: result.id,
+          label: result.label,
+          snippet: result.snippet,
+        }
+        setContextAttachments((prev) =>
+          prev.some((a) => a.id === nonMount.id && a.type === nonMount.type)
+            ? prev
+            : [...prev, nonMount],
+        )
+      }
 
       setMentionQuery(null)
       setMentionResults([])
@@ -199,7 +246,7 @@ export function ChatInput({
         textarea.focus()
       })
     },
-    [value, onChange],
+    [value, onChange, onAttachMount],
   )
 
   // ── Remove attachment ──
@@ -292,7 +339,9 @@ export function ChatInput({
                   i === mentionIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
                 )}
               >
-                {result.type === 'knowledge' ? (
+                {result.type === 'mount' ? (
+                  <HardDrive className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />
+                ) : result.type === 'knowledge' ? (
                   <FileText className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
                 ) : (
                   <Brain className="h-4 w-4 mt-0.5 shrink-0 text-purple-500" />
@@ -304,7 +353,7 @@ export function ChatInput({
                   )}
                 </div>
                 <span className="text-2xs text-muted-foreground/60 shrink-0 mt-0.5">
-                  {result.type === 'knowledge' ? 'KB' : 'Memory'}
+                  {result.type === 'mount' ? 'Mount' : result.type === 'knowledge' ? 'KB' : 'Memory'}
                 </span>
               </button>
             ))}
@@ -312,24 +361,43 @@ export function ChatInput({
         </div>
       )}
 
-      {/* ── Active context attachments (chips) ── */}
-      {contextAttachments.length > 0 && (
+      {/* ── Context chips (unified: mounts first, then attachments) ── */}
+      {(activeMounts.length > 0 || contextAttachments.length > 0) && (
         <div className="flex flex-wrap gap-1.5 mb-2">
+          {activeMounts.map((m) => (
+            <span
+              key={`mount-${m.id}`}
+              className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs text-primary"
+              title={t('chat.mountBound', 'Bound to this session')}
+            >
+              <HardDrive className="h-3 w-3" />
+              <span className="truncate max-w-[140px]">{m.label}</span>
+              <button
+                type="button"
+                onClick={() => onRemoveMount(m.id)}
+                className="ml-0.5 -mr-1 rounded-full p-0.5 hover:bg-primary/20 transition-colors"
+                aria-label={t('chat.removeMount', 'Remove mount')}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
           {contextAttachments.map((ctx) => (
             <span
               key={`${ctx.type}-${ctx.id}`}
-              className="inline-flex items-center gap-1 rounded-lg bg-muted/80 px-2 py-0.5 text-xs text-foreground"
+              className="inline-flex items-center gap-1 rounded-full bg-muted/80 px-2.5 py-0.5 text-xs text-foreground"
             >
               {ctx.type === 'knowledge' ? (
                 <BookOpen className="h-3 w-3 text-blue-500" />
               ) : (
                 <Brain className="h-3 w-3 text-purple-500" />
               )}
-              <span className="truncate max-w-[120px]">{ctx.label}</span>
+              <span className="truncate max-w-[140px]">{ctx.label}</span>
               <button
                 type="button"
                 onClick={() => removeAttachment(ctx.id)}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
+                className="ml-0.5 -mr-1 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
+                aria-label={t('chat.removeAttachment', 'Remove attachment')}
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -341,7 +409,7 @@ export function ChatInput({
       {/* ── Input container ── */}
       <div
         className={cn(
-          'relative rounded-2xl border bg-background shadow-sm transition-all',
+          'rounded-2xl border bg-background shadow-sm transition-all',
           'focus-within:shadow-md focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-ring/30',
           !connected && 'opacity-60',
           isStreaming && 'border-destructive/30',
@@ -356,39 +424,44 @@ export function ChatInput({
           onCompositionEnd={() => setIsComposing(false)}
           placeholder={
             connected
-              ? t('chat.inputPlaceholder', 'Type a message... (@ to add context)')
+              ? t('chat.inputPlaceholder', 'Message Oxios… (@ to add context)')
               : t('chat.waitingForConnection', 'Waiting for connection...')
           }
           disabled={disabled || !connected}
           rows={1}
           className={cn(
-            'w-full resize-none bg-transparent px-4 pt-3.5 pb-10 text-sm',
+            'block w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm',
             'placeholder:text-muted-foreground/70',
             'focus:outline-none disabled:cursor-not-allowed',
             'max-h-[280px] overflow-y-auto',
           )}
         />
 
-        {/* ── Bottom bar ── */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-2 px-2 pb-2 pt-1">
-          {/* Left: role selector (RFC-032) — RolePill replaces the prior bare
-              <select>. Reads useRoles() + useProviderQuotas() to surface
-              per-role provider status (configured/not) and a quota badge. */}
-          <RolePill
-            roles={roles}
-            activeRole={activeRole}
-            onChange={setActiveRole}
-            hasRoles={roles.length > 0}
-          />
-          {/* Right: send / stop */}
-          <div className="flex items-center">
+        {/* ── Bottom bar (flex, not absolute) ── */}
+        <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1 border-t border-transparent">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            {roles.length > 0 && (
+              <RolePill
+                roles={roles}
+                activeRole={activeRole}
+                onChange={setActiveRole}
+                hasRoles={roles.length > 0}
+              />
+            )}
+            <ModelPickerContainer
+              activeModelId={activeModelId}
+              setActiveModelId={setActiveModelId}
+            />
+          </div>
+          <div className="flex items-center shrink-0">
             {isStreaming ? (
               <Button
                 onClick={onCancel}
                 variant="destructive"
                 size="sm"
                 className="h-8 rounded-lg px-3 text-xs gap-1.5"
-                aria-label={t('chat.cancel', 'Cancel')}
+                aria-label={t('chat.stop', 'Stop')}
+                title={t('chat.stop', 'Stop')}
               >
                 <Square className="h-3 w-3 fill-current" />
                 {t('chat.stop', 'Stop')}
@@ -399,14 +472,15 @@ export function ChatInput({
                 disabled={!canSend}
                 size="icon"
                 className={cn(
-                  'h-11 w-11 rounded-lg transition-all sm:h-9 sm:w-9',
+                  'h-8 w-8 rounded-lg transition-all',
                   canSend
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
                     : 'bg-muted text-muted-foreground',
                 )}
                 aria-label={t('common.sendMessage', 'Send')}
+                title={t('common.sendMessage', 'Send')}
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
@@ -414,20 +488,22 @@ export function ChatInput({
       </div>
 
       {/* ── Hint ── */}
-      <p className="mt-1.5 text-center text-2xs text-muted-foreground/70 hidden sm:block">
-        <kbd className="rounded border bg-muted/60 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground">
-          Enter
-        </kbd>
-        {' send · '}
-        <kbd className="rounded border bg-muted/60 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground">
-          Shift+Enter
-        </kbd>
-        {' new line · '}
-        <kbd className="rounded border bg-muted/60 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground">
-          ⌘⇧N
-        </kbd>
-        {' new chat'}
-      </p>
+      <div className="mt-1.5 flex items-center justify-center gap-3 text-2xs text-muted-foreground/70 hidden sm:flex">
+        <Hint kbd="Enter" label={t('chat.send', 'send')} />
+        <Hint kbd="Shift+Enter" label={t('chat.newline', 'new line')} />
+        <Hint kbd="⌘⇧N" label={t('chat.newConversation', 'new chat')} />
+      </div>
     </div>
+  )
+}
+
+function Hint({ kbd, label }: { kbd: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <kbd className="rounded border bg-muted/60 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground">
+        {kbd}
+      </kbd>
+      <span>{label}</span>
+    </span>
   )
 }
