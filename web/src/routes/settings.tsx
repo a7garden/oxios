@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { ModelSelect } from '@/components/engine/model-select'
 import { AddProviderCard, ProviderCard } from '@/components/engine/provider-card'
 import { ProviderOptionsPanel } from '@/components/engine/provider-options'
+import { RoleSection } from '@/components/engine/role-section'
 import { RoutingSection } from '@/components/engine/routing-section'
 import { ChannelsSection } from '@/components/settings/channels-section'
 import { DiffPreview } from '@/components/settings/diff-preview'
@@ -48,8 +49,6 @@ import {
   useSetModel,
   useSetProviderOptions,
 } from '@/hooks/use-engine'
-import { api } from '@/lib/api-client'
-import type { ProviderModelsResponse } from '@/types/engine'
 
 export const Route = createFileRoute('/settings')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -350,12 +349,16 @@ function EnginePanel() {
   const setProviderOptions = useSetProviderOptions()
 
   const currentModel = engineConfig?.default_model ?? ''
-  const defaultProvider = currentModel.includes('/') ? (currentModel.split('/')[0] ?? null) : null
+  const currentModelProvider = currentModel.includes('/') ? (currentModel.split('/')[0] ?? null) : null
 
-  const { data: models = [] } = useModels(defaultProvider)
+  const { data: models = [] } = useModels(null)
 
   const connected = providers.filter((p) => p.hasKey)
   const available = providers.filter((p) => !p.hasKey)
+  const providersById = useMemo(
+    () => new Map(providers.map((p) => [p.id, p.name] as const)),
+    [providers],
+  )
   const isMutating = setApiKey.isPending || deleteApiKey.isPending || setModel.isPending
 
   const handleAdd = (provider: string, apiKey: string) => {
@@ -378,26 +381,13 @@ function EnginePanel() {
     })
   }
 
-  const handleSetDefault = async (providerId: string) => {
-    try {
-      const res = await api.get<ProviderModelsResponse>(
-        `/api/engine/models?provider=${encodeURIComponent(providerId)}`,
-      )
-      const first = res.models[0]
-      if (first) {
-        setModel.mutate(first.id)
-      }
-    } catch {
-      toast.error(t('common.error'))
-    }
-  }
 
   const handleModelChange = (modelId: string) => {
     setModel.mutate(modelId)
   }
 
   const handleOptionsSave = (options: Record<string, unknown>) => {
-    setProviderOptions.mutate({ provider: defaultProvider ?? 'unknown', options })
+    setProviderOptions.mutate({ provider: currentModelProvider ?? 'unknown', options })
   }
 
   return (
@@ -423,8 +413,6 @@ function EnginePanel() {
               <ProviderCard
                 key={p.id}
                 provider={p}
-                isDefault={p.id === defaultProvider}
-                onSetDefault={() => handleSetDefault(p.id)}
                 onChangeKey={(key) => handleChangeKey(p.id, key)}
                 onRemove={() => handleRemove(p.id)}
                 isPending={isMutating}
@@ -449,7 +437,7 @@ function EnginePanel() {
         <Separator />
 
         {/* ── Default Model ── */}
-        {defaultProvider && (
+        {connected.length > 0 && (
           <div className="flex items-start justify-between gap-6">
             <div className="flex-1 min-w-0 pt-0.5">
               <label className="text-sm font-medium">{t('engine.defaultModel')}</label>
@@ -460,32 +448,37 @@ function EnginePanel() {
               </p>
             </div>
             <div className="shrink-0 w-64">
-              <ModelSelect models={models} value={currentModel} onValueChange={handleModelChange} />
+              <ModelSelect
+                models={models}
+                value={currentModel}
+                onValueChange={handleModelChange}
+                providersById={providersById}
+              />
             </div>
           </div>
         )}
 
         {/* ── Advanced Options ── */}
-        {defaultProvider && ['anthropic', 'openai', 'google'].includes(defaultProvider) && (
+        {currentModelProvider && ['anthropic', 'openai', 'google'].includes(currentModelProvider) && (
           <>
             <Separator />
             <div>
               <div className="mb-3">
                 <label className="text-sm font-medium">{t('settings.advancedOptions')}</label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {t('settings.advancedOptionsDescription', { provider: defaultProvider })}
+                  {t('settings.advancedOptionsDescription', { provider: currentModelProvider })}
                 </p>
               </div>
               <ProviderOptionsPanel
-                provider={defaultProvider}
+                provider={currentModelProvider}
                 onSave={handleOptionsSave}
                 isPending={setProviderOptions.isPending}
               />
             </div>
           </>
         )}
-
         <RoutingSection />
+        <RoleSection />
       </CardContent>
     </Card>
   )

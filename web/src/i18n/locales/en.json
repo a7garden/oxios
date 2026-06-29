@@ -412,7 +412,19 @@
       "fallbacksDesc": "Models to try in order when the primary model fails",
       "excludedModels": "Excluded Models",
       "excludedModelsDesc": "Models never to use in routing",
-      "addModel": "Add"
+      "addModel": "Add",
+      "roles": {
+        "title": "Roles",
+        "desc": "Named model aliases you can route a chat to. Pick a role in the chat input to switch models for that conversation.",
+        "empty": "No roles yet. Add one below.",
+        "addRole": "Add role",
+        "namePlaceholder": "role-name (e.g. fast, careful)",
+        "selectModelPlaceholder": "Select a model",
+        "duplicateName": "A role named \"{{name}}\" already exists.",
+        "emptyName": "Pick a unique role name.",
+        "noModel": "Pick a model for the new role.",
+        "failedSave": "Failed to save roles. Check the server logs."
+      }
     },
     "allowedCommands": "Allowed Commands",
     "allowedCommandsDescription": "Commands agents may run on the host (one per line, or comma-separated). Leave empty to allow all in Permissive mode.",

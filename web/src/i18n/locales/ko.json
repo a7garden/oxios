@@ -412,7 +412,19 @@
       "fallbacksDesc": "기본 모델 실패 시 순서대로 시도할 모델",
       "excludedModels": "제외 모델",
       "excludedModelsDesc": "라우팅에서 절대 사용하지 않을 모델",
-      "addModel": "추가"
+      "addModel": "추가",
+      "roles": {
+        "title": "역할",
+        "desc": "채팅을 라우팅할 모델의 이름 있는 별칭. 채팅 입력에서 역할을 선택하면 해당 대화에 사용할 모델이 바뀝니다.",
+        "empty": "아직 역할이 없습니다. 아래에서 추가하세요.",
+        "addRole": "역할 추가",
+        "namePlaceholder": "역할 이름 (예: 빠른, 신중한)",
+        "selectModelPlaceholder": "모델 선택",
+        "duplicateName": "\"{{name}}\" 이름의 역할이 이미 존재합니다.",
+        "emptyName": "고유한 역할 이름을 입력하세요.",
+        "noModel": "새 역할에 사용할 모델을 선택하세요.",
+        "failedSave": "역할 저장에 실패했습니다. 서버 로그를 확인하세요."
+      }
     },
     "allowedCommands": "허용 명령",
     "allowedCommandsDescription": "에이전트가 호스트에서 실행할 수 있는 명령 (한 줄에 하나 또는 쉼표로 구분). 빈 값은 Permissive 모드에서 모두 허용.",
