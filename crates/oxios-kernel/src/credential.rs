@@ -386,7 +386,10 @@ mod tests {
         let mut map = serde_json::Map::new();
         map.insert("openai".into(), serde_json::to_value(&bundle).unwrap());
         let raw = serde_json::to_string(&map).unwrap();
-        assert_eq!(extract_credential("openai", &raw).as_deref(), Some("sk-bundle"));
+        assert_eq!(
+            extract_credential("openai", &raw).as_deref(),
+            Some("sk-bundle")
+        );
     }
 
     #[test]

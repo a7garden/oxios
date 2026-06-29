@@ -118,13 +118,9 @@ impl ProjectApi {
     ) -> Result<ProjectInfo> {
         let project_id = Uuid::parse_str(id).context("Invalid project ID")?;
 
-        let mut project = self.project_manager.update_project(
-            project_id,
-            name,
-            tags,
-            emoji,
-            description,
-        )?;
+        let mut project =
+            self.project_manager
+                .update_project(project_id, name, tags, emoji, description)?;
 
         // memory_visible requires separate save (not part of update_project signature)
         if let Some(visible) = memory_visible {

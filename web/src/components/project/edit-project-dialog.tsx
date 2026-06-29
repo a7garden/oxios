@@ -1,5 +1,6 @@
 import { FolderOpen } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -13,7 +14,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { useMountDropZone } from '@/hooks/use-mount-drop-zone'
 import { useMounts } from '@/hooks/use-mounts'
 import { useUpdateProject } from '@/hooks/use-projects'
 import type { Project } from '@/types'
@@ -43,9 +43,6 @@ export function EditProjectDialog({
   const [instructions, setInstructions] = useState('')
   const { data: mountsData } = useMounts()
   const availableMounts = useMemo(() => mountsData?.items ?? [], [mountsData?.items])
-  const attachMount = (id: string) =>
-    setMountIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
-  const { isOver, dropProps } = useMountDropZone({ onDropMount: attachMount })
 
   // Sync state when the project prop or open state changes.
   useEffect(() => {
@@ -119,11 +116,10 @@ export function EditProjectDialog({
             </div>
           </div>
 
-
-          {/* RFC-025: Mount references — click-toggle chips + drag-drop zone */}
+          {/* RFC-025: Mount references — click-toggle chips */}
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('projects.mounts', 'Mounts')}</label>
-            {availableMounts.length > 0 && (
+            {availableMounts.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {availableMounts.map((m) => (
                   <button
@@ -146,22 +142,21 @@ export function EditProjectDialog({
                   </button>
                 ))}
               </div>
+            ) : (
+              <div className="rounded-md border border-dashed p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-2">
+                  {t('projects.noMountsYet', '마운트가 없습니다. 마운트를 먼저 만들어주세요.')}
+                </p>
+                <Link
+                  to="/mounts"
+                  onClick={() => onOpenChange(false)}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <FolderOpen className="h-3 w-3" />
+                  {t('mounts.create', 'Mount 만들기')}
+                </Link>
+              </div>
             )}
-            <div
-              {...dropProps}
-              className={`mt-2 rounded-md border-2 border-dashed p-3 transition-colors ${
-                isOver
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/30 bg-muted/30'
-              }`}
-            >
-              <p className="text-xs text-muted-foreground text-center py-1">
-                {t(
-                  'projects.mountDropHint',
-                  'Mount 카드를 여기로 드래그해 첨부하세요.',
-                )}
-              </p>
-            </div>
           </div>
 
           {/* RFC-025: Custom instructions */}

@@ -136,7 +136,10 @@ function PersonasPage() {
           <DialogHeader>
             <DialogTitle>{t('personas.createPersona')}</DialogTitle>
             <DialogDescription>
-              {t('personas.createPersonaDescription', 'Create a new persona for agent customization.')}
+              {t(
+                'personas.createPersonaDescription',
+                'Create a new persona for agent customization.',
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -159,7 +162,9 @@ function PersonasPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="persona-prompt">{t('personas.systemPromptLabel', 'System prompt')}</Label>
+              <Label htmlFor="persona-prompt">
+                {t('personas.systemPromptLabel', 'System prompt')}
+              </Label>
               <Textarea
                 id="persona-prompt"
                 value={systemPrompt}
@@ -262,15 +267,10 @@ function PersonasPage() {
         }}
       />
 
-      <Dialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {t('personas.deletePersonaConfirmTitle', 'Delete persona?')}
-            </DialogTitle>
+            <DialogTitle>{t('personas.deletePersonaConfirmTitle', 'Delete persona?')}</DialogTitle>
             <DialogDescription>
               {t(
                 'personas.deletePersonaConfirmDescription',

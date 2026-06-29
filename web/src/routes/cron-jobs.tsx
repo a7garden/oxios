@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Pencil, Plus, Power, PowerOff, Timer, Trash2 } from 'lucide-react'
+import { CalendarClock, List, Pencil, Plus, Power, PowerOff, Timer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CronScheduleEditor } from '@/components/cron/cron-schedule-editor'
+import { CronTimelineView } from '@/components/cron/cron-timeline-view'
 import { EditCronDialog } from '@/components/cron/edit-cron-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -15,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
 import { DEFAULT_CRON } from '@/lib/cron-utils'
+import { cn } from '@/lib/utils'
 import type { CronJob } from '@/types'
 
 export const Route = createFileRoute('/cron-jobs')({ component: CronJobsPage })
@@ -27,6 +29,7 @@ function CronJobsPage() {
   const [name, setName] = useState('')
   const [schedule, setSchedule] = useState(DEFAULT_CRON)
   const [goal, setGoal] = useState('')
+  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('timeline')
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['cron-jobs'],
@@ -81,7 +84,35 @@ function CronJobsPage() {
           <h1 className="text-2xl font-bold">{t('cronJobs.title')}</h1>
           <p className="text-muted-foreground">{t('cronJobs.subtitle')}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          <div className="inline-flex gap-0.5 rounded-lg border bg-muted/50 p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                viewMode === 'list'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <List className="h-3.5 w-3.5" />
+              {t('cronJobs.timeline.viewList')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('timeline')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                viewMode === 'timeline'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+              {t('cronJobs.timeline.viewTimeline')}
+            </button>
+          </div>
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
           <Button size="sm" onClick={() => setShowCreate(true)}>
             <Plus className="h-4 w-4 mr-1" /> {t('cronJobs.newJob')}
@@ -128,18 +159,20 @@ function CronJobsPage() {
           title={t('cronJobs.noCronJobs')}
           description={t('cronJobs.description')}
         />
+      ) : viewMode === 'timeline' ? (
+        <CronTimelineView jobs={jobs} />
       ) : (
         <div className="space-y-3">
           {jobs.map((job) => (
             <Card key={job.id}>
               <CardContent className="flex items-center justify-between p-4">
                 <div>
-                  <p className="font-medium flex items-center gap-2">
+                  <div className="font-medium flex items-center gap-2">
                     <Timer className="h-4 w-4" /> {job.name}
                     <Badge variant={job.enabled ? 'success' : 'secondary'}>
                       {job.enabled ? t('common.enabled') : t('common.disabled')}
                     </Badge>
-                  </p>
+                  </div>
                   <p className="text-sm text-muted-foreground mt-1">
                     <code className="text-xs bg-muted px-1 py-0.5 rounded">{job.schedule}</code>
                     {' → '}

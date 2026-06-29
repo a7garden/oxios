@@ -349,7 +349,9 @@ function EnginePanel() {
   const setProviderOptions = useSetProviderOptions()
 
   const currentModel = engineConfig?.default_model ?? ''
-  const currentModelProvider = currentModel.includes('/') ? (currentModel.split('/')[0] ?? null) : null
+  const currentModelProvider = currentModel.includes('/')
+    ? (currentModel.split('/')[0] ?? null)
+    : null
 
   const { data: models = [] } = useModels(null)
 
@@ -380,7 +382,6 @@ function EnginePanel() {
       onSuccess: () => toast.success(t('common.success')),
     })
   }
-
 
   const handleModelChange = (modelId: string) => {
     setModel.mutate(modelId)
@@ -459,24 +460,25 @@ function EnginePanel() {
         )}
 
         {/* ── Advanced Options ── */}
-        {currentModelProvider && ['anthropic', 'openai', 'google'].includes(currentModelProvider) && (
-          <>
-            <Separator />
-            <div>
-              <div className="mb-3">
-                <label className="text-sm font-medium">{t('settings.advancedOptions')}</label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {t('settings.advancedOptionsDescription', { provider: currentModelProvider })}
-                </p>
+        {currentModelProvider &&
+          ['anthropic', 'openai', 'google'].includes(currentModelProvider) && (
+            <>
+              <Separator />
+              <div>
+                <div className="mb-3">
+                  <label className="text-sm font-medium">{t('settings.advancedOptions')}</label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {t('settings.advancedOptionsDescription', { provider: currentModelProvider })}
+                  </p>
+                </div>
+                <ProviderOptionsPanel
+                  provider={currentModelProvider}
+                  onSave={handleOptionsSave}
+                  isPending={setProviderOptions.isPending}
+                />
               </div>
-              <ProviderOptionsPanel
-                provider={currentModelProvider}
-                onSave={handleOptionsSave}
-                isPending={setProviderOptions.isPending}
-              />
-            </div>
-          </>
-        )}
+            </>
+          )}
         <RoutingSection />
         <RoleSection />
       </CardContent>

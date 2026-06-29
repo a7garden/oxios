@@ -306,7 +306,7 @@ impl ProviderSnapshot {
     }
 }
 
- /// Errors from [`ProviderBudget::reserve`].
+/// Errors from [`ProviderBudget::reserve`].
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum ReserveError {
     /// Provider has no budget configured (ineligible).

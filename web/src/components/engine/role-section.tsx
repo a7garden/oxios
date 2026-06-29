@@ -51,9 +51,9 @@ export function RoleSection() {
   const { data: models = [] } = useModels(null)
   const setRoles = useSetRoles()
 
-  const roles: Array<{ name: string; model: string }> = Object.entries(
-    rolesData?.roles ?? {},
-  ).map(([name, model]) => ({ name, model }))
+  const roles: Array<{ name: string; model: string }> = Object.entries(rolesData?.roles ?? {}).map(
+    ([name, model]) => ({ name, model }),
+  )
 
   const [newName, setNewName] = useState('')
   const [newModel, setNewModel] = useState<string | null>(null)
@@ -63,7 +63,8 @@ export function RoleSection() {
     const normalized = normalizeRoleName(name)
     if (!normalized) return t(tKeys.emptyName)
     if (RESERVED_ROLE_NAMES.has(normalized)) return t(tKeys.emptyName)
-    if (roles.some((r) => r.name === normalized)) return t(tKeys.duplicateName, { name: normalized })
+    if (roles.some((r) => r.name === normalized))
+      return t(tKeys.duplicateName, { name: normalized })
     if (!model) return t(tKeys.noModel)
     return null
   }
@@ -120,9 +121,7 @@ export function RoleSection() {
         <p className="text-sm text-muted-foreground">{t(tKeys.rolesDesc)}</p>
 
         {roles.length === 0 ? (
-          <p className="text-xs text-muted-foreground/70 italic">
-            {t(tKeys.rolesEmpty)}
-          </p>
+          <p className="text-xs text-muted-foreground/70 italic">{t(tKeys.rolesEmpty)}</p>
         ) : (
           <div className="space-y-2">
             {roles.map((r) => (

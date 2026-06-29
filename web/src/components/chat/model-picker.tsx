@@ -1,5 +1,3 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import {
   Check,
   ChevronDown,
@@ -12,10 +10,12 @@ import {
   Tag,
   X,
 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useEngineConfig, useModels, useSetModel } from '@/hooks/use-engine'
-import type { ModelInfo } from '@/types/engine'
 import { cn } from '@/lib/utils'
+import type { ModelInfo } from '@/types/engine'
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -111,12 +111,8 @@ export function ModelPicker({
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const selected = activeModelId
-    ? (models.find((m) => m.id === activeModelId) ?? null)
-    : null
-  const defaultModel = defaultModelId
-    ? (models.find((m) => m.id === defaultModelId) ?? null)
-    : null
+  const selected = activeModelId ? (models.find((m) => m.id === activeModelId) ?? null) : null
+  const defaultModel = defaultModelId ? (models.find((m) => m.id === defaultModelId) ?? null) : null
 
   // Resolve the active role entry and the model it routes to.
   const activeRoleEntry = activeRole ? (roles.find((r) => r.name === activeRole) ?? null) : null
@@ -205,8 +201,7 @@ export function ModelPicker({
 
   const hasNoModels = models.length === 0
   const hasNoMatches = !hasNoModels && flatRows.length === 0
-  const isCurrentDefault =
-    !!activeModelId && !!defaultModelId && activeModelId === defaultModelId
+  const isCurrentDefault = !!activeModelId && !!defaultModelId && activeModelId === defaultModelId
 
   const onPickRow = (row: (typeof flatRows)[number]) => {
     if (row.kind === 'default' || !row.model) {
@@ -296,9 +291,7 @@ export function ModelPicker({
             )}
             aria-hidden
           />
-          {activeRoleEntry && (
-            <Tag className="h-3 w-3 shrink-0 text-primary" aria-hidden />
-          )}
+          {activeRoleEntry && <Tag className="h-3 w-3 shrink-0 text-primary" aria-hidden />}
           <span className="truncate font-medium">{triggerLabel}</span>
           {triggerProvider && (
             <span className="text-muted-foreground/70 text-2xs truncate hidden sm:inline">
@@ -376,7 +369,10 @@ export function ModelPicker({
           <div className="border-t border-border px-3 py-1.5 bg-muted/20">
             <p className="text-2xs text-muted-foreground/70 flex items-center gap-1.5">
               <Tag className="h-3 w-3 shrink-0" />
-              {t('chat.modelPicker.noRolesHint', 'No roles yet. Add them in Settings → Engine → Roles.')}
+              {t(
+                'chat.modelPicker.noRolesHint',
+                'No roles yet. Add them in Settings → Engine → Roles.',
+              )}
             </p>
           </div>
         )}
@@ -417,7 +413,8 @@ export function ModelPicker({
 
           <div className="flex items-center gap-2 text-2xs text-muted-foreground/80">
             <span>
-              {t('chat.modelPicker.kbd.navigate', '↑↓')} {t('chat.modelPicker.kbd.select', '↵')} {t('chat.modelPicker.kbd.close', 'esc')}
+              {t('chat.modelPicker.kbd.navigate', '↑↓')} {t('chat.modelPicker.kbd.select', '↵')}{' '}
+              {t('chat.modelPicker.kbd.close', 'esc')}
             </span>
           </div>
         </div>
@@ -508,7 +505,9 @@ function ListRows({
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Sparkles className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="text-xs font-medium truncate">
-              {row.model ? shortModelId(row.model.id) : t('chat.modelPicker.defaultLabel', 'Default model')}
+              {row.model
+                ? shortModelId(row.model.id)
+                : t('chat.modelPicker.defaultLabel', 'Default model')}
             </span>
             <span className="text-2xs text-muted-foreground/70 shrink-0">
               {t('chat.modelPicker.isDefault', 'Default')}
@@ -564,9 +563,7 @@ function ListRows({
               onClick={() => onPick(rows[g.idx]!)}
             />
           ))}
-        {hasStandard && (
-          <SubHeader>{t('chat.modelPicker.standard', 'Standard')}</SubHeader>
-        )}
+        {hasStandard && <SubHeader>{t('chat.modelPicker.standard', 'Standard')}</SubHeader>}
         {groupRows
           .filter((g) => !g.model.reasoning)
           .map((g) => (
@@ -675,7 +672,9 @@ function ModelRow({
       <div className="flex items-center gap-2 text-2xs text-muted-foreground/80 shrink-0 tabular-nums">
         <span>{formatContextWindow(model.contextWindow)}</span>
         <span className="text-muted-foreground/40">·</span>
-        <span>${formatCost(model.costInput)}/${formatCost(model.costOutput)}</span>
+        <span>
+          ${formatCost(model.costInput)}/${formatCost(model.costOutput)}
+        </span>
       </div>
       {selected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
     </RowButton>
@@ -711,7 +710,9 @@ function RoleRow({
         {shortModel}
       </span>
       {roleModelInfo?.reasoning && (
-        <span className="text-warning text-2xs shrink-0" title="reasoning">✦</span>
+        <span className="text-warning text-2xs shrink-0" title="reasoning">
+          ✦
+        </span>
       )}
       {selected && <Check className="h-3.5 w-3.5 text-primary shrink-0 ml-auto" />}
     </RowButton>

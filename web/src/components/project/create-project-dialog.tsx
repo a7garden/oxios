@@ -13,7 +13,6 @@ import {
   Target,
   Tent,
   Wrench,
-  X,
   Zap,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -30,9 +29,9 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { useMountDropZone } from '@/hooks/use-mount-drop-zone'
 import { useMounts } from '@/hooks/use-mounts'
 import { useCreateProject, useUpdateProject } from '@/hooks/use-projects'
+import { Link } from '@tanstack/react-router'
 
 interface CreateProjectDialogProps {
   open: boolean
@@ -99,15 +98,6 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     setMountIds([])
   }
 
-  const attachMount = (id: string) => {
-    setMountIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
-  }
-  const detachMount = (id: string) => {
-    setMountIds((prev) => prev.filter((m) => m !== id))
-  }
-
-  const { isOver, dropProps } = useMountDropZone({ onDropMount: attachMount })
-
   const handleNameChange = (value: string) => {
     setName(value)
     // Auto-suggest only while the user hasn't manually picked a non-default icon.
@@ -164,10 +154,6 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       },
     )
   }
-
-  const attachedMounts = mountIds
-    .map((id) => availableMounts.find((m) => m.id === id))
-    .filter((m): m is NonNullable<typeof m> => Boolean(m))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -228,46 +214,50 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             />
           </div>
 
-          {/* Mount drop-zone */}
+          {/* RFC-025: Mount references — click-toggle chips */}
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('projects.mounts', 'Mounts')}</label>
-            <div
-              {...dropProps}
-              className={`rounded-md border-2 border-dashed p-3 transition-colors ${
-                isOver
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/30 bg-muted/30'
-              }`}
-            >
-              {attachedMounts.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-2">
-                  {t(
-                    'projects.mountDropHint',
-                    'Mount 카드를 여기로 드래그해 첨부하세요.',
-                  )}
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-1">
-                  {attachedMounts.map((m) => (
-                    <span
+            {availableMounts.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {availableMounts.map((m) => {
+                  const selected = mountIds.includes(m.id)
+                  return (
+                    <button
                       key={m.id}
-                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs border border-primary bg-primary/10 text-primary"
+                      type="button"
+                      onClick={() =>
+                        setMountIds((prev) =>
+                          selected ? prev.filter((id) => id !== m.id) : [...prev, m.id],
+                        )
+                      }
+                      className={`rounded px-2 py-1 text-xs border transition-colors ${
+                        selected
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-transparent hover:bg-muted'
+                      }`}
                     >
-                      <FolderOpen className="h-3 w-3" />
-                      {m.name}
-                      <button
-                        type="button"
-                        onClick={() => detachMount(m.id)}
-                        className="ml-0.5 rounded hover:bg-primary/20"
-                        aria-label={t('common.remove', '제거')}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+                      <span className="inline-flex items-center gap-1">
+                        <FolderOpen className="h-3 w-3" /> {m.name}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed p-3 text-center">
+                <p className="text-xs text-muted-foreground mb-2">
+                  {t('projects.noMountsYet', '마운트가 없습니다. 마운트를 먼저 만들어주세요.')}
+                </p>
+                <Link
+                  to="/mounts"
+                  onClick={() => onOpenChange(false)}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <FolderOpen className="h-3 w-3" />
+                  {t('mounts.create', 'Mount 만들기')}
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 

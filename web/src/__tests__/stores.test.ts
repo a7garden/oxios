@@ -336,7 +336,13 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       kind: 'quota_exceeded',
       suggestion: 'try a different model',
     }
-    useChatStore.getState().handleChunk(errorChunk as unknown as Parameters<ReturnType<typeof useChatStore.getState>['handleChunk']>[0])
+    useChatStore
+      .getState()
+      .handleChunk(
+        errorChunk as unknown as Parameters<
+          ReturnType<typeof useChatStore.getState>['handleChunk']
+        >[0],
+      )
     const state = useChatStore.getState()
     expect(state.isStreaming).toBe(false)
     const errMsg = state.messages.at(-1)!
@@ -351,7 +357,12 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     useChatStore.setState({
       messages: [
         { id: 'u1', role: 'user' as const, content: 'first', timestamp: new Date().toISOString() },
-        { id: 'a1', role: 'assistant' as const, content: 'first reply', timestamp: new Date().toISOString() },
+        {
+          id: 'a1',
+          role: 'assistant' as const,
+          content: 'first reply',
+          timestamp: new Date().toISOString(),
+        },
         { id: 'u2', role: 'user' as const, content: 'second', timestamp: new Date().toISOString() },
       ],
       isStreaming: false,

@@ -84,9 +84,9 @@ interface ChatRuntimeState {
    *  resume the stream from the next message. */
   _lastSeq: number
   /** RFC-024 SP2 (C3): ring of recently-seen `msg.id` values for
-  *  dedup. The replay buffer can return the same message twice
-  *  (e.g. during a fast reconnect), so we drop ids we've already
-  *  applied. Capacitied at `DEDUP_RING_MAX`. */
+   *  dedup. The replay buffer can return the same message twice
+   *  (e.g. during a fast reconnect), so we drop ids we've already
+   *  applied. Capacitied at `DEDUP_RING_MAX`. */
   _seenMsgIds: string[]
 }
 
@@ -1393,5 +1393,5 @@ export const useChatStore = create<ChatStore>()(
         }
       },
     },
-   ),
- )
+  ),
+)

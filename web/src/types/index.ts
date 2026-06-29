@@ -429,6 +429,10 @@ export interface CronJob {
   enabled: boolean
   last_run?: string
   next_run?: string
+  run_count: number
+  last_result?: string
+  last_success?: boolean
+  source: 'config' | 'api'
 }
 
 // Budget — moved to types/budget.ts

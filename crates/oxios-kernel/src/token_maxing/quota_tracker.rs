@@ -159,7 +159,8 @@ impl QuotaTracker {
             .and_then(|l| if l > 0.0 { Some(l as u64) } else { None })
             .or_else(|| {
                 live.rate_windows.iter().find_map(|w| {
-                    w.limit.and_then(|l| if l > 0.0 { Some(l as u64) } else { None })
+                    w.limit
+                        .and_then(|l| if l > 0.0 { Some(l as u64) } else { None })
                 })
             })
             .unwrap_or(0);
@@ -170,13 +171,7 @@ impl QuotaTracker {
         } else {
             0
         };
-        ProviderSnapshot::from_parts(
-            &live.provider,
-            tokens_used,
-            token_limit,
-            resets_at,
-            floor,
-        )
+        ProviderSnapshot::from_parts(&live.provider, tokens_used, token_limit, resets_at, floor)
     }
 
     /// The verdict for a single provider (v2 — live snapshot first).
@@ -199,9 +194,7 @@ impl QuotaTracker {
             if matches!(snap.plan_type, PlanType::Metered) {
                 return Availability::Ineligible;
             }
-            if matches!(snap.plan_type, PlanType::Subscription)
-                && snap.is_subscription_signal()
-            {
+            if matches!(snap.plan_type, PlanType::Subscription) && snap.is_subscription_signal() {
                 let rem_pct = snap.best_remaining_percent();
                 let resets_at = snap.best_resets_at();
                 let floor = self.config.read().default_min_remaining_percent;
@@ -490,14 +483,26 @@ mod tests {
         let t = QuotaTracker::new(cfg("zai", 1000, 3600));
         t.reserve("zai", 200).unwrap();
         let past = Utc::now() - chrono::Duration::seconds(1);
-        t.apply_recalibration("zai", Some(100.0), Some(past), None, RecalibrationOutcome::Ok);
+        t.apply_recalibration(
+            "zai",
+            Some(100.0),
+            Some(past),
+            None,
+            RecalibrationOutcome::Ok,
+        );
         assert_eq!(t.snapshot("zai").unwrap().tokens_used, 0);
     }
 
     #[test]
     fn recalibrate_unknown_provider_returns_false() {
         let t = QuotaTracker::new(cfg("zai", 1000, 3600));
-        let ok = t.apply_recalibration("anthropic", Some(100.0), None, None, RecalibrationOutcome::Ok);
+        let ok = t.apply_recalibration(
+            "anthropic",
+            Some(100.0),
+            None,
+            None,
+            RecalibrationOutcome::Ok,
+        );
         assert!(!ok);
     }
 

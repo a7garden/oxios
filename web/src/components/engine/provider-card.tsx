@@ -45,12 +45,7 @@ interface ProviderCardProps {
   isPending?: boolean
 }
 
-export function ProviderCard({
-  provider,
-  onChangeKey,
-  onRemove,
-  isPending,
-}: ProviderCardProps) {
+export function ProviderCard({ provider, onChangeKey, onRemove, isPending }: ProviderCardProps) {
   const { t } = useTranslation()
   const [showKeyInput, setShowKeyInput] = useState(false)
   const [keyValue, setKeyValue] = useState('')

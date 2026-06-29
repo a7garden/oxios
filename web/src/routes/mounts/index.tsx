@@ -1,4 +1,3 @@
-import { MOUNT_DRAG_MIME } from '@/hooks/use-mount-drop-zone'
 import { createFileRoute } from '@tanstack/react-router'
 import { FolderPlus, Pencil, RefreshCw, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { useState } from 'react'
@@ -107,13 +106,7 @@ function MountsPage() {
           {mounts.map((mount) => (
             <div
               key={mount.id}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.effectAllowed = 'copy'
-                e.dataTransfer.setData(MOUNT_DRAG_MIME, mount.id)
-                e.dataTransfer.setData('text/plain', mount.name)
-              }}
-              className="group relative rounded-lg border bg-card p-4 transition-all hover:shadow-sm cursor-grab active:cursor-grabbing"
+              className="group relative rounded-lg border bg-card p-4 transition-all hover:shadow-sm"
             >
               {/* Action buttons: rescan + delete (top-right) */}
 

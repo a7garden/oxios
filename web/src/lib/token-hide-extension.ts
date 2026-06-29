@@ -47,6 +47,11 @@ const MARKUP_NODE_NAMES = new Set([
   'ListMark',
   'CodeMark',
   'CodeInfo',
+  // GFM strikethrough mark (paired with livePreviewHighlight line-through)
+  'StrikethroughMark',
+  'StrikethroughDelim',
+  // GFM table delimiters (paired with tableFoldExtension grid widget)
+  'TableDelimiter',
 ])
 
 function buildDecorations(view: EditorView): DecorationSet {

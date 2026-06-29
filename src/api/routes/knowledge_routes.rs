@@ -489,6 +489,31 @@ pub(crate) async fn handle_knowledge_file_get(
         .into_response())
 }
 
+/// GET /api/knowledge/asset/{*path} — Read a binary knowledge asset (image,
+/// etc.) as raw bytes with a guessed MIME type. Path sandboxing is identical
+/// to the file route: `note_read_bytes` → `VirtualFs::safe_path` →
+/// `verify_under_root` (canonicalize + must-be-under-root), plus the same
+/// `MAX_READ_SIZE` cap. Unlike the file endpoint (which returns text), this
+/// serves bytes so images render correctly.
+pub(crate) async fn handle_knowledge_asset_get(
+    state: State<Arc<AppState>>,
+    Path(path): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let bytes = state
+        .kernel
+        .knowledge
+        .note_read_bytes(&path)
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("asset not found".into()))?;
+    let mime = guess_knowledge_mime(&path);
+    Ok((
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, mime)],
+        bytes,
+    )
+        .into_response())
+}
+
 /// PUT /api/knowledge/file/{*path} — Write/update a knowledge file.
 pub(crate) async fn handle_knowledge_file_put(
     state: State<Arc<AppState>>,
@@ -541,7 +566,7 @@ pub(crate) async fn handle_knowledge_file_or_sub(
     state: State<Arc<AppState>>,
     axum::extract::Path(path): axum::extract::Path<String>,
     method: axum::http::Method,
-    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+    body: String,
 ) -> Result<axum::response::Response<axum::body::Body>, AppError> {
     // Strip trailing slash if present
     let path = path.trim_end_matches('/');
@@ -559,7 +584,9 @@ pub(crate) async fn handle_knowledge_file_or_sub(
             }
             // POST /file/{path}/restore → git restore
             ("POST", "restore") => {
-                let hash = body
+                let value: serde_json::Value = serde_json::from_str(&body)
+                    .map_err(|e| AppError::BadRequest(format!("invalid JSON body: {e}")))?;
+                let hash = value
                     .get("hash")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default();
@@ -574,7 +601,16 @@ pub(crate) async fn handle_knowledge_file_or_sub(
         }
     }
 
-    // No known sub-path suffix — inline the file CRUD operations
+    // No known sub-path suffix — inline the file CRUD operations.
+    //
+    // `body` is extracted as a raw `String`. axum's `String` extractor reads the
+    // request body as UTF-8 bytes WITHOUT enforcing a Content-Type, so this works
+    // for every method on this route: GET refetches arrive with no body (→ ""),
+    // and PUT writes arrive with `Content-Type: text/markdown` (raw markdown).
+    // A `Json<Value>` extractor here would reject both — 400 for the bodyless GET
+    // (Content-Type: application/json + empty body) and 415 for the non-JSON PUT —
+    // and on the rare success path it would persist `serde_json`-quoted garbage
+    // into the .md file instead of the user's text.
     match method.as_str() {
         "GET" => {
             let content = state
@@ -591,12 +627,18 @@ pub(crate) async fn handle_knowledge_file_or_sub(
                 .unwrap())
         }
         "PUT" => {
-            let value = serde_json::to_string_pretty(&body)
-                .map_err(|e| AppError::Internal(e.to_string()))?;
+            // Validate file size (max 5MB for knowledge files)
+            const MAX_KNOWLEDGE_FILE_SIZE: usize = 5 * 1024 * 1024;
+            if body.len() > MAX_KNOWLEDGE_FILE_SIZE {
+                return Err(AppError::PayloadTooLarge {
+                    size: body.len(),
+                    limit: MAX_KNOWLEDGE_FILE_SIZE,
+                });
+            }
             state
                 .kernel
                 .knowledge
-                .note_write(path, &value)
+                .note_write(path, &body)
                 .map_err(|e| AppError::Internal(e.to_string()))?;
             tracing::info!(path = %path, "Knowledge file written");
             Ok(axum::response::Response::builder()

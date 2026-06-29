@@ -13,8 +13,8 @@ import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useRoles } from '@/hooks/use-engine'
-import { useChatStore } from '@/stores/chat'
 import { useMounts } from '@/hooks/use-mounts'
+import { useChatStore } from '@/stores/chat'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
 

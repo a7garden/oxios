@@ -24,6 +24,7 @@ import {
 } from '@codemirror/autocomplete'
 import { history, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { Strikethrough, Table, TaskList } from '@lezer/markdown'
 import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { EditorSelection } from '@codemirror/state'
@@ -34,9 +35,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
+import { emojiFoldExtension } from '@/lib/emoji-fold-extension'
 import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
+import { createImageFoldExtension } from '@/lib/image-fold-extension'
+import { livePreviewExtension, livePreviewHighlight } from '@/lib/live-preview-extension'
+import { mathFoldExtension } from '@/lib/math-fold-extension'
 import { mermaidDarkObserver, mermaidExtension } from '@/lib/mermaid-extension'
 import { tokenHideExtension } from '@/lib/token-hide-extension'
+import { tableFoldExtension } from '@/lib/table-fold-extension'
 import { cn } from '@/lib/utils'
 import { wikilinkExtension } from '@/lib/wikilink-extension'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -242,6 +248,20 @@ export function MarkdownEditor({
   const isSettingContent = useRef(false)
   const openFile = useKnowledgeStore((s) => s.openFile)
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
+  // Image fold needs the current note's directory to resolve relative image
+  // URLs against the backend asset route. A ref lets the (stable) extension
+  // read the latest path on each rebuild without being recreated.
+  const filePathRef = useRef(currentFilePath)
+  filePathRef.current = currentFilePath
+  const imageFoldExt = useMemo(
+    () =>
+      createImageFoldExtension(() => {
+        const p = filePathRef.current ?? ''
+        const i = p.lastIndexOf('/')
+        return i >= 0 ? p.slice(0, i) : ''
+      }),
+    [],
+  )
   const { data: treeEntries } = useKnowledgeTree()
   const [isDark, setIsDark] = useState(false)
   const { t } = useTranslation()
@@ -383,13 +403,22 @@ export function MarkdownEditor({
             activateOnTyping: true,
             closeOnBlur: true,
           }),
-          markdown({ base: markdownLanguage, codeLanguages: languages }),
+          markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [Strikethrough, Table, TaskList] }),
           baseTheme,
           mermaidExtension,
           mermaidDarkObserver,
           tokenHideExtension,
+          livePreviewExtension,
           wikilinkExtension,
+          emojiFoldExtension,
+          mathFoldExtension,
+          imageFoldExt,
+          tableFoldExtension,
           ...(isDark ? [oneDark, darkTheme] : []),
+          // Live-preview inline styling (bold 800, strikethrough, inline
+          // code). Registered last so it wins over defaultHighlightStyle
+          // AND oneDark without clobbering their colours.
+          syntaxHighlighting(livePreviewHighlight),
         ]}
         theme={isDark ? 'dark' : 'light'}
         onChange={(value) => {

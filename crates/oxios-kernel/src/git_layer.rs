@@ -1097,10 +1097,7 @@ mod tests {
         assert_eq!(CommitContext::system().author_name(), "oxios");
 
         let id = uuid::Uuid::parse_str("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee").unwrap();
-        assert_eq!(
-            CommitContext::agent(id).author_name(),
-            "agent-aaaaaaaa"
-        );
+        assert_eq!(CommitContext::agent(id).author_name(), "agent-aaaaaaaa");
 
         assert_eq!(CommitContext::tagged("memory").author_name(), "oxios");
     }
@@ -1110,7 +1107,10 @@ mod tests {
         assert!(CommitContext::default().message_prefix().is_empty());
         assert_eq!(CommitContext::tagged("audit").message_prefix(), "[audit] ");
 
-        assert_eq!(CommitContext::tagged("memory").message_prefix(), "[memory] ");
+        assert_eq!(
+            CommitContext::tagged("memory").message_prefix(),
+            "[memory] "
+        );
     }
 
     #[test]

@@ -53,7 +53,7 @@ interface ChatInputProps {
   onAttachMount?: (id: string) => void
   /** RFC-025: unbind a Mount from the active session. */
   onRemoveMount?: (id: string) => void
- }
+}
 // ── Component ─────────────────────────────────────────────────
 
 /**
@@ -179,8 +179,7 @@ export function ChatInput({
 
       // Sort: mounts first (heaviest/most intentional), then knowledge, then
       // memory, with semantic score breaking ties within a kind.
-      const kindRank = (t: MentionResult['type']) =>
-        t === 'mount' ? 0 : t === 'knowledge' ? 1 : 2
+      const kindRank = (t: MentionResult['type']) => (t === 'mount' ? 0 : t === 'knowledge' ? 1 : 2)
       results.sort((a, b) => {
         if (a.type !== b.type) return kindRank(a.type) - kindRank(b.type)
         return (b.score ?? 0) - (a.score ?? 0)
@@ -352,7 +351,11 @@ export function ChatInput({
                   )}
                 </div>
                 <span className="text-2xs text-muted-foreground/60 shrink-0 mt-0.5">
-                  {result.type === 'mount' ? 'Mount' : result.type === 'knowledge' ? 'KB' : 'Memory'}
+                  {result.type === 'mount'
+                    ? 'Mount'
+                    : result.type === 'knowledge'
+                      ? 'KB'
+                      : 'Memory'}
                 </span>
               </button>
             ))}

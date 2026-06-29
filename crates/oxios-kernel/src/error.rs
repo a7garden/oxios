@@ -43,7 +43,6 @@ pub enum KernelError {
         detail: String,
     },
 
-
     /// Requested session was not found.
     #[error("Session '{id}' not found")]
     SessionNotFound {

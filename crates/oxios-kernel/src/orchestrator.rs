@@ -323,7 +323,6 @@ impl Orchestrator {
             }
         }
 
-
         // Display tag.
         let tag = if mounts.len() == 1 {
             mounts[0].tag()

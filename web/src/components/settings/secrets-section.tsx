@@ -106,8 +106,7 @@ export function SecretsSectionCard() {
         toast.error(res.message ?? t('settings.secretInvalid', 'Secret is invalid'))
       }
     },
-    onError: () =>
-      toast.error(t('settings.secretValidateFailed', 'Failed to validate secret')),
+    onError: () => toast.error(t('settings.secretValidateFailed', 'Failed to validate secret')),
   })
 
   const saveMutation = useMutation({
@@ -234,9 +233,7 @@ export function SecretsSectionCard() {
                           value: editValues[secret.key] ?? '',
                         })
                       }
-                      disabled={
-                        !editValues[secret.key] || validateMutation.isPending
-                      }
+                      disabled={!editValues[secret.key] || validateMutation.isPending}
                     >
                       <ShieldCheck className="h-3.5 w-3.5 mr-1" />
                       {t('settings.verify', 'Verify')}

@@ -149,6 +149,16 @@ impl KnowledgeBase {
         }
     }
 
+    /// Read a note's raw bytes — for binary assets (images, etc.) that aren't
+    /// valid UTF-8. Text notes should use [`note_read`].
+    pub fn note_read_bytes(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        let fs = self.fs.read();
+        match fs.read_path_bytes(path) {
+            Ok(bytes) => Ok(Some(bytes)),
+            Err(_) => Ok(None),
+        }
+    }
+
     /// Write a note — creates or overwrites.
     ///
     /// Writes the `.md` file via VirtualFs, updates the backlink index,
