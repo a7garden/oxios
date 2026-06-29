@@ -1741,7 +1741,9 @@ async fn run() -> Result<()> {
     // SAFETY: first statement after CLI parse; no other task is running yet, so
     // there is no concurrent environment access.
     if std::env::var("OXI_HOME").is_err() {
-        unsafe { std::env::set_var("OXI_HOME", &oxios_home); }
+        unsafe {
+            std::env::set_var("OXI_HOME", &oxios_home);
+        }
     }
 
     // Detect first run (before ensure_workspace creates the dir).
@@ -2452,11 +2454,8 @@ async fn run() -> Result<()> {
                                         }
                                     }
                                     if !mount_ids.is_empty()
-                                        && let Err(e) = pm.update_project_bundle(
-                                            p.id,
-                                            Some(mount_ids),
-                                            None,
-                                        )
+                                        && let Err(e) =
+                                            pm.update_project_bundle(p.id, Some(mount_ids), None)
                                     {
                                         eprintln!(
                                             "{} Project created but mount link failed: {}",

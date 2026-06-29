@@ -1,6 +1,6 @@
 [package]
 name = "oxios-memory"
-version = "1.14.0"
+version = "1.15.0"
 edition = "2024"
 description = "Tiered agent memory — extracted from oxios-kernel per RFC-018"
 license = "MIT"

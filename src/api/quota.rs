@@ -436,9 +436,7 @@ impl QuotaFetcher for ZaiQuotaFetcher {
             .send()
             .await?;
         let status = resp.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED
-            || status == reqwest::StatusCode::FORBIDDEN
-        {
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Ok(QuotaSnapshot {
                 provider: "zai".into(),
                 credit_balance_usd: None,
@@ -485,7 +483,10 @@ fn parse_zai_quota_limit(body: &serde_json::Value, now: DateTime<Utc>) -> QuotaS
         .map(str::to_string);
     let mut token_entries: Vec<&serde_json::Value> = Vec::new();
     let mut time_entries: Vec<&serde_json::Value> = Vec::new();
-    if let Some(limits) = data.and_then(|d| d.get("limits")).and_then(|l| l.as_array()) {
+    if let Some(limits) = data
+        .and_then(|d| d.get("limits"))
+        .and_then(|l| l.as_array())
+    {
         for entry in limits {
             match entry.get("type").and_then(|t| t.as_str()) {
                 Some("TOKENS_LIMIT") => token_entries.push(entry),
@@ -573,7 +574,7 @@ fn zai_entry_to_rate_window(
     };
     Some(RateWindow {
         name: window_label,
- used,
+        used,
         limit,
         remaining_percent,
         resets_at: match resets_at {

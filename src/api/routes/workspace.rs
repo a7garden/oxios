@@ -613,7 +613,13 @@ pub(crate) async fn handle_skill_content_update(
             limit: MAX_SKILL_CONTENT,
         });
     }
-    if state.kernel.extensions.get_skill_entry(&name).await.is_none() {
+    if state
+        .kernel
+        .extensions
+        .get_skill_entry(&name)
+        .await
+        .is_none()
+    {
         return Err(AppError::NotFound(format!("skill not found: {name}")));
     }
     let entry = state
@@ -752,12 +758,9 @@ pub(crate) async fn handle_skill_import_file(
                 file_bytes = Some(b.to_vec());
             }
             Some("name") => {
-                name_override = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|e| AppError::BadRequest(format!("reading name field failed: {e}")))?,
-                );
+                name_override = Some(field.text().await.map_err(|e| {
+                    AppError::BadRequest(format!("reading name field failed: {e}"))
+                })?);
             }
             _ => {
                 // Discard unknown fields.
@@ -765,9 +768,8 @@ pub(crate) async fn handle_skill_import_file(
         }
     }
 
-    let bytes = file_bytes.ok_or_else(|| {
-        AppError::BadRequest("no 'file' field in multipart upload".into())
-    })?;
+    let bytes = file_bytes
+        .ok_or_else(|| AppError::BadRequest("no 'file' field in multipart upload".into()))?;
     const MAX_UPLOAD: usize = 32 * 1024 * 1024;
     if bytes.len() > MAX_UPLOAD {
         return Err(AppError::PayloadTooLarge {
@@ -779,9 +781,8 @@ pub(crate) async fn handle_skill_import_file(
     let lower = fname.to_lowercase();
 
     let result = if lower.ends_with(".md") {
-        let content = String::from_utf8(bytes).map_err(|e| {
-            AppError::BadRequest(format!("file is not valid UTF-8: {e}"))
-        })?;
+        let content = String::from_utf8(bytes)
+            .map_err(|e| AppError::BadRequest(format!("file is not valid UTF-8: {e}")))?;
         state
             .kernel
             .extensions
@@ -1507,7 +1508,6 @@ pub(crate) async fn handle_dream_status(_state: State<Arc<AppState>>) -> Json<se
         "checkpoint_exists": false,
     }))
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-06-29
+
+### Added
+- **Skill management UI** — Create, edit, and import skills with Claude-grade UX (`.skill` file import, inline editor).
+- **Unified model picker** — Role + model selection merged into a single `ModelPicker` component.
+- **Role editor** — Inline role config editor in the settings engine panel.
+- **Cron schedule editor** — Visual cron expression builder and schedule management UI.
+- **Token-maxing billing model** — Final wiring of `billing_model` sourced from live provider snapshot.
+
+### Changed
+- **Chat input shell refactor** — Complete UX overhaul of the chat input area and model picker layout.
+- **Unified streaming orchestration (RFC-033)** — Ouroboros streaming architecture refactor for consistent event flow.
+- **Batch workspace changes** — Pending workspace dependency updates.
+
+### Fixed
+- **Chat + sidebar hardening (RFC-032)** — Audit-driven fixes for chat state and sidebar reliability.
+- **Agent completion status** — Successful agents now correctly marked `Completed` instead of `Idle`.
+
 ## [Unreleased]
 
 ## [1.14.0] - 2026-06-28

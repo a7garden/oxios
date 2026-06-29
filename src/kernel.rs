@@ -431,7 +431,16 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_unified("cli", prompt, session_id, None, None, None, None, "cli-direct")
+            .handle_unified(
+                "cli",
+                prompt,
+                session_id,
+                None,
+                None,
+                None,
+                None,
+                "cli-direct",
+            )
             .await
     }
 
@@ -445,7 +454,16 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_unified("cli", prompt, session_id, None, None, None, None, "cli-direct")
+            .handle_unified(
+                "cli",
+                prompt,
+                session_id,
+                None,
+                None,
+                None,
+                None,
+                "cli-direct",
+            )
             .await
     }
 
@@ -1533,8 +1551,7 @@ async fn recalibration_tick(
         // canonical list of providers with a known quota endpoint
         // (zai, openai, minimax today).
         let fetchers = crate::api::quota::all_fetchers();
-        let mut creds: std::collections::HashMap<String, String> =
-            std::collections::HashMap::new();
+        let mut creds: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         for f in &fetchers {
             let provider = f.provider();
             if let Some((key, _)) =
@@ -1574,7 +1591,8 @@ async fn recalibration_tick(
                 &snap.provider,
                 rem,
                 resets,
-                snap.token_limit.and_then(|l| if l > 0.0 { Some(l as u64) } else { None }),
+                snap.token_limit
+                    .and_then(|l| if l > 0.0 { Some(l as u64) } else { None }),
                 oxios_kernel::RecalibrationOutcome::Ok,
             );
         }
@@ -1787,9 +1805,7 @@ fn migrate_projects_to_mounts(
 
         // Link the resolved Mounts and clear the legacy `paths` field so the
         // runtime legacy fallbacks never re-activate for this Project.
-        if let Err(e) =
-            project_manager.update_project_bundle(project.id, Some(mount_ids), None)
-        {
+        if let Err(e) = project_manager.update_project_bundle(project.id, Some(mount_ids), None) {
             tracing::warn!(
                 project = %project.name,
                 error = %e,

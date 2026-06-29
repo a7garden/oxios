@@ -150,12 +150,7 @@ pub(crate) async fn handle_project_create(
     }
 
     let project = api
-        .create_project(
-            body.name,
-            body.tags,
-            body.emoji,
-            body.description,
-        )
+        .create_project(body.name, body.tags, body.emoji, body.description)
         .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
     Ok((StatusCode::CREATED, Json(project)))

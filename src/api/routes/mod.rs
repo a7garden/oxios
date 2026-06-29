@@ -99,17 +99,16 @@ pub(crate) use infra::{
     handle_permissions_get, handle_permissions_put, handle_security_permissions,
 };
 pub(crate) use knowledge_routes::{
-    handle_knowledge_asset_get,
-    handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
-    handle_knowledge_chat_messages, handle_knowledge_chat_move, handle_knowledge_checklist_add,
-    handle_knowledge_checklist_complete, handle_knowledge_checklist_items,
-    handle_knowledge_checklist_remove, handle_knowledge_config_get, handle_knowledge_config_put,
-    handle_knowledge_convert_html, handle_knowledge_copilot, handle_knowledge_emoji,
-    handle_knowledge_file_or_sub, handle_knowledge_graph, handle_knowledge_habits,
-    handle_knowledge_habits_last_week, handle_knowledge_journal_add,
-    handle_knowledge_journal_emoji, handle_knowledge_journal_today, handle_knowledge_search,
-    handle_knowledge_stats_done_today, handle_knowledge_stats_today, handle_knowledge_tree,
-    handle_knowledge_worker_nightly, handle_knowledge_worker_scheduled,
+    handle_knowledge_asset_get, handle_knowledge_backlinks, handle_knowledge_chat_append,
+    handle_knowledge_chat_delete, handle_knowledge_chat_messages, handle_knowledge_chat_move,
+    handle_knowledge_checklist_add, handle_knowledge_checklist_complete,
+    handle_knowledge_checklist_items, handle_knowledge_checklist_remove,
+    handle_knowledge_config_get, handle_knowledge_config_put, handle_knowledge_convert_html,
+    handle_knowledge_copilot, handle_knowledge_emoji, handle_knowledge_file_or_sub,
+    handle_knowledge_graph, handle_knowledge_habits, handle_knowledge_habits_last_week,
+    handle_knowledge_journal_add, handle_knowledge_journal_emoji, handle_knowledge_journal_today,
+    handle_knowledge_search, handle_knowledge_stats_done_today, handle_knowledge_stats_today,
+    handle_knowledge_tree, handle_knowledge_worker_nightly, handle_knowledge_worker_scheduled,
 };
 pub(crate) use marketplace::{
     handle_marketplace_install, handle_marketplace_search, handle_marketplace_skill_detail,
@@ -144,11 +143,11 @@ pub(crate) use workspace::{
     MemoryMapCache, handle_dream_reports, handle_dream_status, handle_memory_create,
     handle_memory_delete, handle_memory_get, handle_memory_list, handle_memory_map,
     handle_memory_pin, handle_memory_search, handle_memory_semantic_search, handle_memory_stats,
-    handle_skill_content, handle_skill_content_update, handle_skill_create,
-    handle_skill_delete, handle_skill_disable, handle_skill_enable, handle_skill_get,
-    handle_skill_import_file, handle_skill_import_text, handle_skill_import_url,
-    handle_skills_list, handle_workspace_file_create, handle_workspace_file_delete,
-    handle_workspace_file_get, handle_workspace_file_put, handle_workspace_tree,
+    handle_skill_content, handle_skill_content_update, handle_skill_create, handle_skill_delete,
+    handle_skill_disable, handle_skill_enable, handle_skill_get, handle_skill_import_file,
+    handle_skill_import_text, handle_skill_import_url, handle_skills_list,
+    handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
+    handle_workspace_file_put, handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -331,7 +330,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/skills/{name}/disable", post(handle_skill_disable))
         .route("/api/skills/{name}/content", get(handle_skill_content))
         // PUT content — inline edit, frontmatter preserved
-        .route("/api/skills/{name}/content", put(handle_skill_content_update))
+        .route(
+            "/api/skills/{name}/content",
+            put(handle_skill_content_update),
+        )
         // Import — text & URL (JSON bodies)
         .route("/api/skills/import/text", post(handle_skill_import_text))
         .route("/api/skills/import/url", post(handle_skill_import_url))
