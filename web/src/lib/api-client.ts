@@ -29,6 +29,8 @@ interface RequestOptions {
   headers?: Record<string, string>
   /** Skip JSON encoding — send body as-is (for file PUT with raw markdown) */
   rawBody?: boolean
+  /** body is a FormData — let the browser set the multipart Content-Type */
+  formData?: boolean
 }
 
 export async function apiClient<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -38,21 +40,24 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
       url.searchParams.set(k, v)
     }
   }
-
   const token = useAuthStore.getState().token
   const isRawBody = options?.rawBody === true
+  const isFormData = options?.formData === true
   const res = await fetch(url.toString(), {
     method: options?.method ?? 'GET',
     headers: {
-      'Content-Type': isRawBody ? 'text/markdown' : 'application/json',
+      // FormData: the browser must set Content-Type (with boundary) itself.
+      ...(isFormData ? {} : { 'Content-Type': isRawBody ? 'text/markdown' : 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
-    body: isRawBody
-      ? ((options.body as string) ?? undefined)
-      : options?.body
-        ? JSON.stringify(options.body)
-        : undefined,
+    body: isFormData
+      ? ((options.body as FormData) ?? undefined)
+      : isRawBody
+        ? ((options.body as string) ?? undefined)
+        : options?.body
+          ? JSON.stringify(options.body)
+          : undefined,
   })
 
   if (!res.ok) {
@@ -84,4 +89,7 @@ export const api = {
     apiClient<T>(path, { method: 'PUT', body, rawBody }),
   patch: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => apiClient<T>(path, { method: 'DELETE' }),
+  /** POST a FormData body (multipart upload) — browser sets Content-Type. */
+  upload: <T>(path: string, formData: FormData) =>
+    apiClient<T>(path, { method: 'POST', body: formData, formData: true }),
 }

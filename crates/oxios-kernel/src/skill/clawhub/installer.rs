@@ -289,94 +289,15 @@ impl ClawHubInstaller {
         self.workspace_dir.join(".clawhub").join("lock.json")
     }
 
-    /// Extract a zip archive into the target directory, finding the skill root
-    /// that contains `SKILL.md` / `skill.md` / `skills.md`.
+    /// Extract a downloaded skill zip into the target directory.
+    ///
+    /// Delegates to [`crate::skill::archive::extract_skill_zip`] so the
+    /// Zip-Slip defense and `SKILL.md` marker detection stay in one place,
+    /// shared with the user-driven `.skill` file import.
     fn extract_archive(&self, archive: &DownloadedArchive, target: &Path) -> Result<()> {
         let file = fs::File::open(&archive.path).context("open downloaded zip")?;
         let mut zip = zip::ZipArchive::new(file)?;
-
-        // Find the root directory inside the zip that contains a SKILL.md marker.
-        // Some archives zip the skill directory directly, others zip the contents.
-        let root_prefix = self
-            .find_skill_root(&mut zip)
-            .context("parse zip archive")?;
-
-        // Extract all entries, stripping the root prefix so contents land in `target`.
-        for i in 0..zip.len() {
-            let mut file = zip.by_index(i).context("read zip entry")?;
-            let name = file.name();
-
-            // Strip the detected root prefix
-            let relative = if let Some(rest) = name.strip_prefix(&root_prefix) {
-                rest.to_string()
-            } else {
-                // Entry outside the root — skip
-                continue;
-            };
-
-            // Normalize separators
-            let relative = relative.replace('\\', "/");
-            if relative.is_empty() || relative == "/" {
-                continue;
-            }
-
-            // Zip Slip defense: reject entries whose relative path could
-            // escape `target` (absolute paths, `..`, drive prefixes).
-            if !crate::skill::is_safe_relative_path(&relative) {
-                tracing::warn!("clawhub: skipping zip entry with unsafe path: {relative}");
-                continue;
-            }
-            let out_path = target.join(&relative);
-
-            if file.is_dir() {
-                fs::create_dir_all(&out_path).context("create extracted dir")?;
-            } else {
-                if let Some(parent) = out_path.parent() {
-                    fs::create_dir_all(parent).context("create parent dir")?;
-                }
-                let mut dst = fs::File::create(&out_path).context("create output file")?;
-                std::io::copy(&mut file, &mut dst).context("copy zip entry")?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Find the directory prefix inside the zip that contains a SKILL.md marker.
-    fn find_skill_root<R: std::io::Read + std::io::Seek>(
-        &self,
-        zip: &mut zip::ZipArchive<R>,
-    ) -> Result<String> {
-        // MARKER_FILES in order of preference
-        const MARKERS: &[&str] = &["SKILL.md", "skill.md", "skills.md"];
-
-        for i in 0..zip.len() {
-            let name = zip.by_index(i).unwrap().name().to_string();
-            let name_lower = name.to_lowercase();
-            if MARKERS.iter().any(|m| {
-                name_lower.ends_with(&format!("/{}", m.to_lowercase()))
-                    || name_lower == m.to_lowercase()
-            }) {
-                // Return everything up to and including the directory component
-                if let Some(slash) = name
-                    .strip_prefix('/')
-                    .and_then(|s| s.rfind('/'))
-                    .map(|p| p + 1)
-                {
-                    return Ok(name[..slash].to_string());
-                }
-                // File is at root level
-                if let Some(last_slash) = name.rfind('/') {
-                    return Ok(name[..=last_slash].to_string());
-                }
-                // No slash — the root is the archive root (empty prefix)
-                return Ok(String::new());
-            }
-        }
-
-        // Fallback: no marker found — extract everything at root
-        tracing::warn!("no SKILL.md marker found in archive, extracting all entries");
-        Ok(String::new())
+        crate::skill::archive::extract_skill_zip(&mut zip, target)
     }
 
     /// Update (or insert) a lockfile entry for the given slug.
@@ -418,58 +339,6 @@ impl ClawHubInstaller {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_find_skill_root() {
-        use std::io::Write;
-        // Build a zip with SKILL.md nested inside a skill directory
-        let mut buf = Vec::new();
-        {
-            let mut zipw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
-            zipw.start_file(
-                "code-review/SKILL.md",
-                zip::write::SimpleFileOptions::default(),
-            )
-            .unwrap();
-            zipw.write_all(b"# Code Review\n").unwrap();
-            zipw.finish().unwrap();
-        }
-
-        let cursor = std::io::Cursor::new(buf);
-        let mut arch = zip::ZipArchive::new(cursor).unwrap();
-
-        let installer = ClawHubInstaller::new(
-            PathBuf::from("/tmp/skills"),
-            PathBuf::from("/tmp/workspace"),
-            None,
-        );
-        let prefix = installer.find_skill_root(&mut arch).unwrap();
-        assert_eq!(prefix, "code-review/");
-    }
-
-    #[test]
-    fn test_find_skill_root_skips_root_level() {
-        use std::io::Write;
-        // Some archives may have SKILL.md at root level (no subdirectory)
-        let mut buf = Vec::new();
-        {
-            let mut zipw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
-            zipw.start_file("SKILL.md", zip::write::SimpleFileOptions::default())
-                .unwrap();
-            zipw.write_all(b"# Skill\n").unwrap();
-            zipw.finish().unwrap();
-        }
-        let cursor = std::io::Cursor::new(buf);
-        let mut arch = zip::ZipArchive::new(cursor).unwrap();
-        let installer = ClawHubInstaller::new(
-            PathBuf::from("/tmp/skills"),
-            PathBuf::from("/tmp/workspace"),
-            None,
-        );
-        // SKILL.md at root → prefix is empty (extract everything as-is)
-        let prefix = installer.find_skill_root(&mut arch).unwrap();
-        assert_eq!(prefix, "");
-    }
 
     #[test]
     fn test_install_result_serialize() {

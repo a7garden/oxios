@@ -7,12 +7,18 @@ import {
   CircleAlert,
   CircleCheck,
   CircleX,
+  Download,
+  FileUp,
   Globe,
+  Link2,
   PackagePlus,
+  Pencil,
+  Plus,
   Power,
   Search,
   Store,
   Trash2,
+  Type,
   X,
   Zap,
 } from 'lucide-react'
@@ -23,9 +29,11 @@ import { toast } from 'sonner'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { RefreshButton } from '@/components/shared/refresh-button'
+import { ImportDialog } from '@/components/skills/import-dialog'
 import { MarketplaceDetail } from '@/components/skills/marketplace-detail'
 import { SkillDetail } from '@/components/skills/skill-detail'
+import { SkillEditorDialog } from '@/components/skills/skill-editor-dialog'
+import { SkillSummaryPill } from '@/components/skills/skill-summary-pill'
 import { UpdateBadge, useSkillUpdates } from '@/components/skills/update-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,6 +46,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
@@ -116,12 +130,37 @@ function SkillsPage() {
   const [selectedMktSlug, setSelectedMktSlug] = useState<string | null>(null)
   const [selectedSkillsShId, setSelectedSkillsShId] = useState<string | null>(null)
 
+  // Editor + import dialog state (F1/F2/F3)
+  const [editorState, setEditorState] = useState<
+    { mode: 'create' } | { mode: 'edit'; skill: Skill } | null
+  >(null)
+  const [importState, setImportState] = useState<{ open: boolean; mode: 'file' | 'text' | 'url' }>({
+    open: false,
+    mode: 'file',
+  })
+
+  // Fetch the raw SKILL.md when editing, so the editor opens pre-filled.
+  const editingName = editorState?.mode === 'edit' ? editorState.skill.name : null
+  const { data: editContent } = useQuery({
+    queryKey: ['skill', editingName, 'content'],
+    queryFn: async () => {
+      const r = await api.get<{ content: string }>(
+        `/api/skills/${encodeURIComponent(editingName!)}/content`,
+      )
+      return r?.content ?? ''
+    },
+    enabled: !!editingName,
+  })
+
+  const handleEditSkill = useCallback((skill: Skill) => {
+    setEditorState({ mode: 'edit', skill })
+  }, [])
+
   const {
     data: skills,
     isLoading: sl,
     isError: se,
     refetch: sr,
-    isFetching: sf,
   } = useQuery({
     queryKey: ['skills'],
     queryFn: async () => {
@@ -212,22 +251,52 @@ function SkillsPage() {
     setSelectedSkillsShId(null)
   }, [])
 
+  // Gate the editor so edit mode opens only after SKILL.md content has loaded
+  // (avoids seeding a blank body when the content query is still fetching).
+  const editorOpen = !!editorState && (editorState.mode === 'create' || editContent !== undefined)
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Zap className="h-6 w-6" /> {t('skills.title')}
           </h1>
           <p className="text-muted-foreground">{t('skills.subtitle')}</p>
         </div>
-        <RefreshButton
-          onClick={() => {
-            sr()
-            if (tab === 'marketplace') mr()
-          }}
-          isFetching={sf}
-        />
+        {/* F5: summary pill replaces the manual refresh button; also filters. */}
+        <SkillSummaryPill counts={counts} filter={filter} onFilterChange={setFilter} />
+      </div>
+
+      {/* F1/F2: primary actions — create & import are always-visible entry points */}
+      <div className="flex items-center gap-2">
+        <Button onClick={() => setEditorState({ mode: 'create' })}>
+          <Plus className="h-4 w-4" />
+          {t('skills.create')}
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="secondary">
+              <Download className="h-4 w-4" />
+              {t('skills.import')}
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => setImportState({ open: true, mode: 'file' })}>
+              <FileUp className="h-4 w-4" />
+              {t('skills.importFromFile')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setImportState({ open: true, mode: 'text' })}>
+              <Type className="h-4 w-4" />
+              {t('skills.importFromText')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setImportState({ open: true, mode: 'url' })}>
+              <Link2 className="h-4 w-4" />
+              {t('skills.importFromUrl')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Tab switcher */}
@@ -272,9 +341,6 @@ function SkillsPage() {
             <InstalledTab
               filtered={filtered}
               allSkills={Array.isArray(skills) ? skills : []}
-              counts={counts}
-              filter={filter}
-              setFilter={setFilter}
               search={searchQuery}
               setSearch={setSearchQuery}
               isLoading={sl}
@@ -282,6 +348,7 @@ function SkillsPage() {
               refetch={sr}
               selectedSkill={selectedSkill}
               onSelectSkill={setSelectedSkill}
+              onEditSkill={handleEditSkill}
               updates={updates}
             />
           ) : (
@@ -310,7 +377,11 @@ function SkillsPage() {
         {/* Side panel */}
         {selectedSkill && (
           <div className="border rounded-lg p-4 h-fit sticky top-6">
-            <SkillDetail skill={selectedSkill} onClose={() => setSelectedSkill(null)} />
+            <SkillDetail
+              skill={selectedSkill}
+              onClose={() => setSelectedSkill(null)}
+              onEdit={() => handleEditSkill(selectedSkill)}
+            />
           </div>
         )}
         {selectedMktSlug && (
@@ -324,6 +395,21 @@ function SkillsPage() {
           </div>
         )}
       </div>
+
+      {/* F1/F2/F3 dialogs */}
+      <SkillEditorDialog
+        open={editorOpen}
+        onOpenChange={(o) => {
+          if (!o) setEditorState(null)
+        }}
+        skill={editorState?.mode === 'edit' ? editorState.skill : null}
+        initialContent={editorState?.mode === 'edit' ? (editContent ?? '') : ''}
+      />
+      <ImportDialog
+        open={importState.open}
+        onOpenChange={(o) => setImportState((s) => ({ ...s, open: o }))}
+        initialMode={importState.mode}
+      />
     </div>
   )
 }
@@ -340,9 +426,6 @@ interface SkillUpdate {
 function InstalledTab({
   filtered,
   allSkills,
-  counts,
-  filter,
-  setFilter,
   search,
   setSearch,
   isLoading,
@@ -350,13 +433,11 @@ function InstalledTab({
   refetch,
   selectedSkill,
   onSelectSkill,
+  onEditSkill,
   updates,
 }: {
   filtered: Skill[]
   allSkills: Skill[]
-  counts: Record<string, number>
-  filter: 'all' | SkillStatus
-  setFilter: (f: 'all' | SkillStatus) => void
   search: string
   setSearch: (s: string) => void
   isLoading: boolean
@@ -364,6 +445,7 @@ function InstalledTab({
   refetch: () => void
   selectedSkill: Skill | null
   onSelectSkill: (s: Skill | null) => void
+  onEditSkill: (s: Skill) => void
   updates?: SkillUpdate[]
 }) {
   const { t } = useTranslation()
@@ -406,34 +488,8 @@ function InstalledTab({
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground gap-0.5">
-          {(
-            [
-              { key: 'all' as const, labelKey: 'common.all' },
-              { key: 'ready' as const, labelKey: 'skills.statusReady' },
-              { key: 'needs_setup' as const, labelKey: 'skills.statusNeedsSetup' },
-              { key: 'disabled' as const, labelKey: 'common.disabled' },
-            ] as const
-          ).map((ti) => (
-            <button
-              type="button"
-              key={ti.key}
-              onClick={() => setFilter(ti.key)}
-              className={cn(
-                'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all',
-                filter === ti.key
-                  ? 'bg-background text-foreground shadow'
-                  : 'hover:bg-background/50',
-              )}
-            >
-              {t(ti.labelKey)}{' '}
-              <span className="ml-1.5 text-xs text-muted-foreground">
-                {counts[ti.key === 'needs_setup' ? 'needs_setup' : ti.key]}
-              </span>
-            </button>
-          ))}
-        </div>
+      {/* Status filter is unified in the header SkillSummaryPill (F5). */}
+      <div className="flex items-center justify-end">
         <Input
           placeholder={t('skills.searchInstalled')}
           value={search}
@@ -466,6 +522,7 @@ function InstalledTab({
                   toggleMutation.mutate({ name: s.name, enable: s.status === 'disabled' })
                 }
                 onDelete={() => setDeleteTarget(s)}
+                onEdit={() => onEditSkill(s)}
                 isToggling={toggleMutation.isPending}
               />
             )
@@ -691,6 +748,7 @@ function SkillCard({
   onSelect,
   onToggle,
   onDelete,
+  onEdit,
   isToggling,
 }: {
   skill: Skill
@@ -699,6 +757,7 @@ function SkillCard({
   onSelect: () => void
   onToggle: () => void
   onDelete: () => void
+  onEdit?: () => void
   isToggling: boolean
 }) {
   const { t } = useTranslation()
@@ -764,7 +823,11 @@ function SkillCard({
                 setExpanded((v) => !v)
               }}
               className="ml-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label={expanded ? t('skills.collapse', 'Collapse details') : t('skills.expand', 'Expand details')}
+              aria-label={
+                expanded
+                  ? t('skills.collapse', 'Collapse details')
+                  : t('skills.expand', 'Expand details')
+              }
             >
               {expanded ? (
                 <ChevronDown className="h-4 w-4" />
@@ -880,6 +943,12 @@ function SkillCard({
             <Power className="h-3.5 w-3.5" />
             {isDisabled ? t('skills.enable') : t('skills.disable')}
           </Button>
+          {onEdit && (
+            <Button variant="ghost" size="sm" onClick={onEdit} className="gap-1.5">
+              <Pencil className="h-3.5 w-3.5" />
+              {t('skills.edit')}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

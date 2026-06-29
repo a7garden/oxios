@@ -151,6 +151,130 @@ impl SkillManager {
         self.installed.write().await.remove(name);
         Ok(())
     }
+    /// Write a skill's raw `SKILL.md` content verbatim (frontmatter preserved)
+    /// and reindex it.
+    ///
+    /// Unlike [`create_skill`], this does **not** re-synthesize the frontmatter
+    /// from `name`+`description` — the raw bytes are stored untouched so rich
+    /// metadata (`requires`, `install`, `allowed-tools`, …) survives. Use this
+    /// for inline edits and `.md` text imports.
+    pub async fn write_skill_raw(&self, name: &str, raw: &str) -> Result<SkillEntry> {
+        let dir = self.skills_dir.join(name);
+        tokio::fs::create_dir_all(&dir).await?;
+        tokio::fs::write(dir.join("SKILL.md"), raw).await?;
+        let entry = Self::load_skill_entry(&dir.join("SKILL.md"), false)?;
+        self.installed
+            .write()
+            .await
+            .insert(name.to_string(), entry.clone());
+        Ok(entry)
+    }
+
+    /// Import a skill from raw `SKILL.md` text (frontmatter preserved).
+    ///
+    /// Validates the content by parsing it, derives the canonical name from
+    /// the frontmatter (falling back to `name_hint`, then erroring), and
+    /// writes the content verbatim via [`write_skill_raw`]. Used for the
+    /// text-paste and URL import modes.
+    pub async fn import_skill_text(
+        &self,
+        content: &str,
+        name_hint: Option<&str>,
+    ) -> Result<SkillEntry> {
+        let (parsed, _) = parse_skill(content, &self.skills_dir)?;
+        let name = if !parsed.name.is_empty() {
+            parsed.name.clone()
+        } else if let Some(hint) = name_hint {
+            sanitize_skill_name(hint)
+        } else {
+            anyhow::bail!("skill has no name in its frontmatter and none was provided");
+        };
+        self.write_skill_raw(&name, content).await
+    }
+
+    /// Import a skill from a `.zip` / `.skill` archive's raw bytes.
+    ///
+    /// Extracts into a temp dir under `skills_dir` (same filesystem, so the
+    /// final rename is atomic), derives the canonical name from the parsed
+    /// `SKILL.md` frontmatter (falling back to `name_hint`), moves the
+    /// extracted tree to `skills_dir/{name}/`, records provenance under
+    /// `.imported/origin.json`, and reindexes.
+    pub async fn import_skill_zip(&self, name_hint: &str, bytes: &[u8]) -> Result<SkillEntry> {
+        use std::io::Cursor;
+
+        // 1. Extract into a temp sibling of the target (same FS → atomic rename).
+        let tmp_root = self
+            .skills_dir
+            .join(format!(".import-tmp-{}", uuid::Uuid::new_v4()));
+        let extract_dir = tmp_root.join("extract");
+        tokio::fs::create_dir_all(&extract_dir).await?;
+        {
+            let cursor = Cursor::new(bytes);
+            let mut zip = zip::ZipArchive::new(cursor).context("read zip archive")?;
+            crate::skill::archive::extract_skill_zip(&mut zip, &extract_dir)?;
+        }
+
+        // 2. Locate SKILL.md, read + parse for the canonical name.
+        let result = self
+            .finalize_import(&extract_dir, name_hint, &tmp_root)
+            .await;
+
+        // Best-effort cleanup of the temp dir on any outcome.
+        let _ = tokio::fs::remove_dir_all(&tmp_root).await;
+
+        result
+    }
+
+    /// Move an already-extracted skill tree into `skills_dir/{name}/`,
+    /// derive the name from frontmatter, write provenance, and reindex.
+    async fn finalize_import(
+        &self,
+        extract_dir: &Path,
+        name_hint: &str,
+        tmp_root: &Path,
+    ) -> Result<SkillEntry> {
+        let skill_md = crate::skill::archive::find_skill_md(extract_dir)
+            .context("no SKILL.md found in archive")?;
+        let raw = std::fs::read_to_string(&skill_md)
+            .with_context(|| format!("reading {}", skill_md.display()))?;
+        let (parsed, _) = parse_skill(&raw, extract_dir)?;
+        let name = if !parsed.name.is_empty() {
+            parsed.name.clone()
+        } else {
+            sanitize_skill_name(name_hint)
+        };
+
+        // 3. Move the extracted tree to skills_dir/{name}.
+        let target = self.skills_dir.join(&name);
+        if target.exists() {
+            tokio::fs::remove_dir_all(&target)
+                .await
+                .context("remove existing skill")?;
+        }
+        // Rename extract_dir → target (same filesystem as skills_dir).
+        std::fs::rename(extract_dir, &target)
+            .with_context(|| format!("moving imported skill to {}", target.display()))?;
+        // Drop the now-empty temp root.
+        let _ = std::fs::remove_dir_all(tmp_root);
+
+        // 4. Provenance.
+        let origin_dir = target.join(".imported");
+        tokio::fs::create_dir_all(&origin_dir).await?;
+        let origin = serde_json::json!({
+            "source": "file",
+            "format": format!("{:?}", parsed.format).to_lowercase(),
+            "imported_at": chrono::Utc::now().to_rfc3339(),
+        });
+        tokio::fs::write(origin_dir.join("origin.json"), origin.to_string()).await?;
+
+        // 5. Reindex.
+        let entry = Self::load_skill_entry(&target.join("SKILL.md"), false)?;
+        self.installed
+            .write()
+            .await
+            .insert(name.clone(), entry.clone());
+        Ok(entry)
+    }
     pub async fn list_skills_meta(&self) -> Vec<SkillMeta> {
         let mut m: Vec<SkillMeta> = self
             .installed
@@ -313,5 +437,30 @@ impl SkillManager {
         }
         let mut e = tokio::fs::read_dir(dir).await?;
         Ok(e.next_entry().await?.is_none())
+    }
+}
+
+/// Normalize an arbitrary string into a valid skill directory name:
+/// lowercase ascii, digits, and hyphens only. Used as a fallback when an
+/// imported skill has no `name` in its frontmatter.
+fn sanitize_skill_name(raw: &str) -> String {
+    let stem = raw.rsplit(['/', '.']).next().unwrap_or(raw);
+    let s: String = stem
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() && c.is_ascii_lowercase() {
+                c
+            } else if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let s = s.trim_matches('-').to_string();
+    if s.is_empty() {
+        "imported-skill".to_string()
+    } else {
+        s
     }
 }

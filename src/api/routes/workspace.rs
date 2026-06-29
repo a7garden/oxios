@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
@@ -587,6 +587,224 @@ pub(crate) async fn handle_skill_delete(
         "status": "deleted",
         "name": name,
     })))
+}
+
+/// Request body for editing a skill's content (PUT /content).
+#[derive(Debug, Deserialize)]
+pub(crate) struct SkillContentUpdate {
+    /// Full SKILL.md content (frontmatter preserved, written verbatim).
+    #[serde(default)]
+    content: String,
+}
+
+/// PUT /api/skills/:name/content — Update a skill's SKILL.md verbatim.
+///
+/// Preserves frontmatter (unlike POST /api/skills which re-synthesizes it).
+/// Used by the inline editor.
+pub(crate) async fn handle_skill_content_update(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(body): Json<SkillContentUpdate>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    const MAX_SKILL_CONTENT: usize = 64 * 1024;
+    if body.content.len() > MAX_SKILL_CONTENT {
+        return Err(AppError::PayloadTooLarge {
+            size: body.content.len(),
+            limit: MAX_SKILL_CONTENT,
+        });
+    }
+    if state.kernel.extensions.get_skill_entry(&name).await.is_none() {
+        return Err(AppError::NotFound(format!("skill not found: {name}")));
+    }
+    let entry = state
+        .kernel
+        .extensions
+        .write_skill_raw(&name, &body.content)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, skill = %name, "Failed to update skill content");
+            AppError::BadRequest(e.to_string())
+        })?;
+    tracing::info!(skill = %name, "Skill content updated via API");
+    Ok(Json(skill_entry_to_json(&entry)))
+}
+
+/// Request body for text-paste import.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SkillTextImport {
+    /// Full SKILL.md content (with frontmatter).
+    content: String,
+    /// Optional name override (used only if frontmatter has no name).
+    #[serde(default)]
+    name: Option<String>,
+}
+
+/// POST /api/skills/import/text — Import a skill from pasted SKILL.md text.
+pub(crate) async fn handle_skill_import_text(
+    state: State<Arc<AppState>>,
+    Json(body): Json<SkillTextImport>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    const MAX_SKILL_CONTENT: usize = 64 * 1024;
+    if body.content.len() > MAX_SKILL_CONTENT {
+        return Err(AppError::PayloadTooLarge {
+            size: body.content.len(),
+            limit: MAX_SKILL_CONTENT,
+        });
+    }
+    let entry = state
+        .kernel
+        .extensions
+        .import_skill_text(&body.content, body.name.as_deref())
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Skill text import failed");
+            AppError::BadRequest(e.to_string())
+        })?;
+    tracing::info!(skill = %entry.skill.name, "Skill imported via text");
+    Ok(Json(skill_entry_to_json(&entry)))
+}
+
+/// Request body for URL import.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SkillUrlImport {
+    /// http(s) URL to a SKILL.md file.
+    url: String,
+    /// Optional name override.
+    #[serde(default)]
+    name: Option<String>,
+}
+
+/// POST /api/skills/import/url — Fetch a SKILL.md from a URL and import it.
+pub(crate) async fn handle_skill_import_url(
+    state: State<Arc<AppState>>,
+    Json(body): Json<SkillUrlImport>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    if !(body.url.starts_with("http://") || body.url.starts_with("https://")) {
+        return Err(AppError::BadRequest(
+            "only http:// and https:// URLs are allowed".into(),
+        ));
+    }
+    const MAX_FETCH: usize = 1024 * 1024;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| AppError::Internal(format!("HTTP client error: {e}")))?;
+    let resp = client
+        .get(&body.url)
+        .send()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("fetch failed: {e}")))?;
+    if !resp.status().is_success() {
+        return Err(AppError::BadRequest(format!(
+            "fetch returned HTTP {}",
+            resp.status()
+        )));
+    }
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("reading response failed: {e}")))?;
+    if bytes.len() > MAX_FETCH {
+        return Err(AppError::PayloadTooLarge {
+            size: bytes.len(),
+            limit: MAX_FETCH,
+        });
+    }
+    let content = String::from_utf8(bytes.to_vec())
+        .map_err(|e| AppError::BadRequest(format!("fetched content is not valid UTF-8: {e}")))?;
+    let entry = state
+        .kernel
+        .extensions
+        .import_skill_text(&content, body.name.as_deref())
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, url = %body.url, "Skill URL import failed");
+            AppError::BadRequest(e.to_string())
+        })?;
+    tracing::info!(skill = %entry.skill.name, "Skill imported via URL");
+    Ok(Json(skill_entry_to_json(&entry)))
+}
+
+/// POST /api/skills/import — Import a skill from an uploaded file (multipart).
+///
+/// Accepts `.md` (single SKILL.md), `.zip`, or `.skill` (zip) archives. A
+/// raised body limit is applied on the route so archives up to 32 MB upload.
+pub(crate) async fn handle_skill_import_file(
+    state: State<Arc<AppState>>,
+    mut multipart: Multipart,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let mut file_bytes: Option<Vec<u8>> = None;
+    let mut filename: Option<String> = None;
+    let mut name_override: Option<String> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("malformed multipart upload: {e}")))?
+    {
+        match field.name() {
+            Some("file") => {
+                filename = field.file_name().map(|s| s.to_string());
+                let b = field
+                    .bytes()
+                    .await
+                    .map_err(|e| AppError::BadRequest(format!("reading file field failed: {e}")))?;
+                file_bytes = Some(b.to_vec());
+            }
+            Some("name") => {
+                name_override = Some(
+                    field
+                        .text()
+                        .await
+                        .map_err(|e| AppError::BadRequest(format!("reading name field failed: {e}")))?,
+                );
+            }
+            _ => {
+                // Discard unknown fields.
+            }
+        }
+    }
+
+    let bytes = file_bytes.ok_or_else(|| {
+        AppError::BadRequest("no 'file' field in multipart upload".into())
+    })?;
+    const MAX_UPLOAD: usize = 32 * 1024 * 1024;
+    if bytes.len() > MAX_UPLOAD {
+        return Err(AppError::PayloadTooLarge {
+            size: bytes.len(),
+            limit: MAX_UPLOAD,
+        });
+    }
+    let fname = filename.unwrap_or_else(|| "skill.zip".to_string());
+    let lower = fname.to_lowercase();
+
+    let result = if lower.ends_with(".md") {
+        let content = String::from_utf8(bytes).map_err(|e| {
+            AppError::BadRequest(format!("file is not valid UTF-8: {e}"))
+        })?;
+        state
+            .kernel
+            .extensions
+            .import_skill_text(&content, name_override.as_deref())
+            .await
+    } else if lower.ends_with(".zip") || lower.ends_with(".skill") {
+        state
+            .kernel
+            .extensions
+            .import_skill_zip(&fname, &bytes)
+            .await
+    } else {
+        return Err(AppError::BadRequest(format!(
+            "unsupported file type: {fname} (expected .md, .zip, or .skill)"
+        )));
+    };
+
+    let entry = result.map_err(|e| {
+        tracing::error!(error = %e, file = %fname, "Skill file import failed");
+        AppError::BadRequest(e.to_string())
+    })?;
+    tracing::info!(skill = %entry.skill.name, file = %fname, "Skill imported via file upload");
+    Ok(Json(skill_entry_to_json(&entry)))
 }
 
 // ---------------------------------------------------------------------------

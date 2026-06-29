@@ -75,6 +75,35 @@ impl ExtensionApi {
         self.skill_manager.delete_skill(name).await
     }
 
+    /// Write a skill's raw `SKILL.md` verbatim (frontmatter preserved) and
+    /// reindex. For inline edits and `.md` text imports — never strips
+    /// rich frontmatter the way [`create_skill`] does.
+    pub async fn write_skill_raw(&self, name: &str, raw: &str) -> anyhow::Result<SkillEntry> {
+        self.skill_manager.write_skill_raw(name, raw).await
+    }
+
+    /// Import a skill from `.zip` / `.skill` archive bytes. Extracts, derives
+    /// the name from frontmatter, moves into `skills_dir`, records provenance.
+    pub async fn import_skill_zip(
+        &self,
+        name_hint: &str,
+        bytes: &[u8],
+    ) -> anyhow::Result<SkillEntry> {
+        self.skill_manager.import_skill_zip(name_hint, bytes).await
+    }
+
+    /// Import a skill from raw `SKILL.md` text (frontmatter preserved),
+    /// deriving the name from the frontmatter. For text-paste / URL imports.
+    pub async fn import_skill_text(
+        &self,
+        content: &str,
+        name_hint: Option<&str>,
+    ) -> anyhow::Result<SkillEntry> {
+        self.skill_manager
+            .import_skill_text(content, name_hint)
+            .await
+    }
+
     /// Skill manager reference.
     pub fn skill_manager(&self) -> &Arc<SkillManager> {
         &self.skill_manager

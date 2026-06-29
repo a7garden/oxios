@@ -1,8 +1,19 @@
-import { Check, CircleAlert, CircleCheck, CircleX, ExternalLink, X, Zap } from 'lucide-react'
+import {
+  Check,
+  CircleAlert,
+  CircleCheck,
+  CircleX,
+  ExternalLink,
+  Pencil,
+  X,
+  Zap,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { SkillContent } from '@/components/skills/skill-content'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import type { Skill, SkillFormat, SkillStatus } from '@/types'
 
@@ -31,7 +42,15 @@ const STATUS_DISPLAY: Record<
 
 // ─── Skill Detail side panel ────────────────────────────────
 
-export function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) {
+export function SkillDetail({
+  skill,
+  onClose,
+  onEdit,
+}: {
+  skill: Skill
+  onClose: () => void
+  onEdit?: () => void
+}) {
   const { t } = useTranslation()
   const sd = STATUS_DISPLAY[skill.status]
   const fm = FORMAT_META[skill.format]
@@ -54,154 +73,184 @@ export function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => v
             </Badge>
           </div>
         </div>
+        {onEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 h-7 w-7"
+            onClick={onEdit}
+            title={t('skills.edit')}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
       </div>
-
-      {/* Status */}
-      <div className="flex items-center gap-2">
-        <Badge variant={sd.variant} className="text-xs gap-1">
-          sd.icon {sd.label}
-        </Badge>
-        {skill.version && (
-          <span className="text-xs font-mono text-muted-foreground">v{skill.version}</span>
-        )}
-        <Badge variant="outline" className="text-xs">
-          {skill.source}
-        </Badge>
-      </div>
-
-      {/* Description */}
-      {skill.description && <p className="text-sm text-muted-foreground">{skill.description}</p>}
-
-      {skill.author && (
-        <p className="text-xs text-muted-foreground">
-          {t('skills.by')} {skill.author}
-        </p>
-      )}
-
-      <Separator />
-
-      {/* Requirements */}
-      {(skill.requirements.bins.length > 0 ||
-        skill.requirements.anyBins.length > 0 ||
-        skill.requirements.env.length > 0 ||
-        skill.requirements.config.length > 0) && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {t('skills.requires')}
-          </p>
-          <div className="space-y-1.5 pl-1">
-            {skill.requirements.bins.length > 0 && (
-              <ReqList items={skill.requirements.bins} missing={skill.missing.bins} />
-            )}
-            {skill.requirements.anyBins.length > 0 && (
-              <ReqList items={skill.requirements.anyBins} missing={skill.missing.anyBins} />
-            )}
-            {skill.requirements.env.length > 0 && (
-              <ReqList items={skill.requirements.env} missing={skill.missing.env} />
-            )}
-            {skill.requirements.config.length > 0 && (
-              <ReqList items={skill.requirements.config} missing={skill.missing.config} />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Missing warning */}
-      {hasMissing && skill.status === 'needs_setup' && (
-        <div className="rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
-          <p className="text-xs text-warning">
-            {t('skills.missingWarning', {
-              missing: [
-                ...skill.missing.bins.map((b) => `bin:${b}`),
-                ...skill.missing.env.map((e) => `env:${e}`),
-                ...skill.missing.config.map((c) => `config:${c}`),
-                ...skill.missing.anyBins.map((b) => `any_bin:${b}`),
-              ].join(', '),
-            })}
-          </p>
-        </div>
-      )}
-
-      {/* Install specs */}
-      {skill.install.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {t('skills.install')}
-          </p>
-          <div className="space-y-1 pl-1">
-            {skill.install.map((sp, i) => (
-              <div
-                key={`${sp.kind}-${i}`}
-                className="flex items-center gap-2 text-sm text-muted-foreground"
-              >
-                <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{sp.kind}</span>
-                <span>{sp.label ?? sp.bins.join(', ')}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Config checks */}
-      {skill.config_checks.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Config
-          </p>
-          <div className="space-y-1 pl-1">
-            {skill.config_checks.map((cc, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                {cc.satisfied ? (
-                  <Check className="h-3 w-3 text-success" />
-                ) : (
-                  <X className="h-3 w-3 text-error" />
-                )}
-                <span className={cn('font-mono', !cc.satisfied && 'text-error')}>{cc.path}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* OS / Flags */}
-      <div className="flex flex-wrap gap-1.5 text-xs">
-        {skill.os.length > 0 &&
-          skill.os.map((o) => (
-            <Badge key={o} variant="outline" className="text-xs">
-              {o}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="w-full">
+          <TabsTrigger value="overview">{t('skills.overview')}</TabsTrigger>
+          <TabsTrigger value="content">{t('skills.content')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview" className="space-y-4 mt-4">
+          {/* Status */}
+          <div className="flex items-center gap-2">
+            <Badge variant={sd.variant} className="text-xs gap-1">
+              sd.icon {sd.label}
             </Badge>
-          ))}
-        {skill.always && (
-          <Badge variant="secondary" className="text-xs">
-            {t('skills.always')}
-          </Badge>
-        )}
-        {skill.bundled && (
-          <Badge variant="outline" className="text-xs">
-            bundled
-          </Badge>
-        )}
-      </div>
+            {skill.version && (
+              <span className="text-xs font-mono text-muted-foreground">v{skill.version}</span>
+            )}
+            <Badge variant="outline" className="text-xs">
+              {skill.source}
+            </Badge>
+          </div>
 
-      {/* Homepage link */}
-      {skill.homepage && (
-        <a
-          href={skill.homepage}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-        >
-          <ExternalLink className="h-3 w-3" /> {skill.homepage}
-        </a>
-      )}
+          {/* Description */}
+          {skill.description && (
+            <p className="text-sm text-muted-foreground">{skill.description}</p>
+          )}
 
-      {/* File path */}
-      <p className="text-xs text-muted-foreground/60 font-mono truncate" title={skill.file_path}>
-        {skill.file_path}
-      </p>
+          {skill.author && (
+            <p className="text-xs text-muted-foreground">
+              {t('skills.by')} {skill.author}
+            </p>
+          )}
+
+          <Separator />
+
+          {/* Requirements */}
+          {(skill.requirements.bins.length > 0 ||
+            skill.requirements.anyBins.length > 0 ||
+            skill.requirements.env.length > 0 ||
+            skill.requirements.config.length > 0) && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {t('skills.requires')}
+              </p>
+              <div className="space-y-1.5 pl-1">
+                {skill.requirements.bins.length > 0 && (
+                  <ReqList items={skill.requirements.bins} missing={skill.missing.bins} />
+                )}
+                {skill.requirements.anyBins.length > 0 && (
+                  <ReqList items={skill.requirements.anyBins} missing={skill.missing.anyBins} />
+                )}
+                {skill.requirements.env.length > 0 && (
+                  <ReqList items={skill.requirements.env} missing={skill.missing.env} />
+                )}
+                {skill.requirements.config.length > 0 && (
+                  <ReqList items={skill.requirements.config} missing={skill.missing.config} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Missing warning */}
+          {hasMissing && skill.status === 'needs_setup' && (
+            <div className="rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
+              <p className="text-xs text-warning">
+                {t('skills.missingWarning', {
+                  missing: [
+                    ...skill.missing.bins.map((b) => `bin:${b}`),
+                    ...skill.missing.env.map((e) => `env:${e}`),
+                    ...skill.missing.config.map((c) => `config:${c}`),
+                    ...skill.missing.anyBins.map((b) => `any_bin:${b}`),
+                  ].join(', '),
+                })}
+              </p>
+            </div>
+          )}
+
+          {/* Install specs */}
+          {skill.install.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {t('skills.install')}
+              </p>
+              <div className="space-y-1 pl-1">
+                {skill.install.map((sp, i) => (
+                  <div
+                    key={`${sp.kind}-${i}`}
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  >
+                    <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
+                      {sp.kind}
+                    </span>
+                    <span>{sp.label ?? sp.bins.join(', ')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Config checks */}
+          {skill.config_checks.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Config
+              </p>
+              <div className="space-y-1 pl-1">
+                {skill.config_checks.map((cc, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    {cc.satisfied ? (
+                      <Check className="h-3 w-3 text-success" />
+                    ) : (
+                      <X className="h-3 w-3 text-error" />
+                    )}
+                    <span className={cn('font-mono', !cc.satisfied && 'text-error')}>
+                      {cc.path}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* OS / Flags */}
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            {skill.os.length > 0 &&
+              skill.os.map((o) => (
+                <Badge key={o} variant="outline" className="text-xs">
+                  {o}
+                </Badge>
+              ))}
+            {skill.always && (
+              <Badge variant="secondary" className="text-xs">
+                {t('skills.always')}
+              </Badge>
+            )}
+            {skill.bundled && (
+              <Badge variant="outline" className="text-xs">
+                bundled
+              </Badge>
+            )}
+          </div>
+
+          {/* Homepage link */}
+          {skill.homepage && (
+            <a
+              href={skill.homepage}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <ExternalLink className="h-3 w-3" /> {skill.homepage}
+            </a>
+          )}
+
+          {/* File path */}
+          <p
+            className="text-xs text-muted-foreground/60 font-mono truncate"
+            title={skill.file_path}
+          >
+            {skill.file_path}
+          </p>
+        </TabsContent>
+        <TabsContent value="content" className="mt-4">
+          <SkillContent skill={skill} onEdit={onEdit} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

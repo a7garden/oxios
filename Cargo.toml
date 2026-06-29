@@ -107,7 +107,7 @@ tempfile = "3"
 once_cell = "1.19"
 
 # Web/API (RFC-026: moved from surface/oxios-web)
-axum = { version = "0.8", features = ["ws"] }
+axum = { version = "0.8", features = ["ws", "multipart"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
 

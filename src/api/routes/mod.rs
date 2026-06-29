@@ -99,6 +99,7 @@ pub(crate) use infra::{
     handle_permissions_get, handle_permissions_put, handle_security_permissions,
 };
 pub(crate) use knowledge_routes::{
+    handle_knowledge_asset_get,
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
     handle_knowledge_chat_messages, handle_knowledge_chat_move, handle_knowledge_checklist_add,
     handle_knowledge_checklist_complete, handle_knowledge_checklist_items,
@@ -143,10 +144,11 @@ pub(crate) use workspace::{
     MemoryMapCache, handle_dream_reports, handle_dream_status, handle_memory_create,
     handle_memory_delete, handle_memory_get, handle_memory_list, handle_memory_map,
     handle_memory_pin, handle_memory_search, handle_memory_semantic_search, handle_memory_stats,
-    handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
-    handle_skill_enable, handle_skill_get, handle_skills_list, handle_workspace_file_create,
-    handle_workspace_file_delete, handle_workspace_file_get, handle_workspace_file_put,
-    handle_workspace_tree,
+    handle_skill_content, handle_skill_content_update, handle_skill_create,
+    handle_skill_delete, handle_skill_disable, handle_skill_enable, handle_skill_get,
+    handle_skill_import_file, handle_skill_import_text, handle_skill_import_url,
+    handle_skills_list, handle_workspace_file_create, handle_workspace_file_delete,
+    handle_workspace_file_get, handle_workspace_file_put, handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -328,6 +330,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/skills/{name}/enable", post(handle_skill_enable))
         .route("/api/skills/{name}/disable", post(handle_skill_disable))
         .route("/api/skills/{name}/content", get(handle_skill_content))
+        // PUT content — inline edit, frontmatter preserved
+        .route("/api/skills/{name}/content", put(handle_skill_content_update))
+        // Import — text & URL (JSON bodies)
+        .route("/api/skills/import/text", post(handle_skill_import_text))
+        .route("/api/skills/import/url", post(handle_skill_import_url))
+        // Import — file upload (multipart). Relies on the raised global
+        // API_BODY_LIMIT (32 MB); a per-route layer could not exceed it.
+        .route("/api/skills/import", post(handle_skill_import_file))
         // Memory
         .route("/api/memory", get(handle_memory_list))
         .route("/api/memory", post(handle_memory_create))
@@ -541,6 +551,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             delete(handle_knowledge_file_or_sub),
         )
         .route(
+            "/api/knowledge/asset/{*path}",
+            get(handle_knowledge_asset_get),
+        )
+        .route(
             "/api/knowledge/file/{*path}",
             post(handle_knowledge_file_or_sub),
         )
@@ -662,5 +676,9 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     public.merge(api).with_state(state)
 }
 
-/// Body size limit for API requests (10 MB).
-const API_BODY_LIMIT: usize = 10 * 1024 * 1024;
+/// Body size limit for API requests (32 MB).
+///
+/// Oxios is local-first / single-user (AGENTS.md: no containers, direct host
+/// execution), so this is a sanity guard against accidental huge payloads, not
+/// a multi-tenant DoS threshold. 32 MB comfortably covers skill archive uploads.
+const API_BODY_LIMIT: usize = 32 * 1024 * 1024;

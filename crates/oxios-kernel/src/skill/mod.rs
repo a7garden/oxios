@@ -1,6 +1,7 @@
 //! Skill system: multi-format SKILL.md parsing with format detection,
 //! plus multi-registry marketplace sources (ClawHub, Skills.sh).
 
+pub mod archive;
 pub mod clawhub;
 pub mod format;
 pub mod frontmatter;
