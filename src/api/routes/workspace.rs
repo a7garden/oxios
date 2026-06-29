@@ -1290,37 +1290,6 @@ pub(crate) async fn handle_dream_status(_state: State<Arc<AppState>>) -> Json<se
     }))
 }
 
-// ---------------------------------------------------------------------------
-// Seed agents
-// ---------------------------------------------------------------------------
-
-/// GET /api/seeds/{id}/agents — List agents spawned from this seed.
-#[allow(dead_code)]
-pub(crate) async fn handle_seed_agents(
-    state: State<Arc<AppState>>,
-    Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let agents = state
-        .kernel
-        .agents
-        .list()
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    let filtered: Vec<serde_json::Value> = agents
-        .into_iter()
-        .filter(|a| a.seed_id.as_ref().map(|s| s.to_string()) == Some(id.clone()))
-        .map(|a| {
-            serde_json::json!({
-                "id": a.id.to_string(),
-                "name": a.name,
-                "status": a.status.to_string(),
-                "steps_completed": 0,
-                "created_at": a.created_at.to_rfc3339(),
-            })
-        })
-        .collect();
-    Ok(Json(serde_json::json!({ "agents": filtered })))
-}
 
 #[cfg(test)]
 mod tests {

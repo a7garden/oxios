@@ -42,6 +42,29 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`
 }
 
+/**
+ * Format a USD amount with adaptive precision so that micro-costs
+ * ($0.0001) and bulk costs ($1234.57) both render with sensible
+ * significant digits rather than a fixed 4 decimals.
+ *
+ * Rules:
+ *  - < 0.01 → 4 significant digits (e.g. $0.000123)
+ *  - < 1    → 3 significant digits (e.g. $0.123)
+ *  - < 1000 → 2 decimals   (e.g. $12.34)
+ *  - else   → 2 decimals + thousands separator (e.g. $1,234.57)
+ */
+export function formatUsd(value: number): string {
+  if (!Number.isFinite(value)) return '$0'
+  const abs = Math.abs(value)
+  if (abs === 0) return '$0'
+  if (abs < 0.01) return `$${value.toPrecision(4)}`
+  if (abs < 1) return `$${value.toPrecision(3)}`
+  return `$${value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function formatRelativeTime(date: string | Date, t?: (...args: any[]) => any): string {
   const d = typeof date === 'string' ? new Date(date) : date

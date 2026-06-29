@@ -63,7 +63,7 @@ Large language models are powerful, but they're stuck in chat boxes. Oxios gives
 | The Problem | What Oxios Does |
 |---|---|
 | Agents die when the chat closes | **Supervisor** manages agent lifecycle: fork, exec, wait, kill |
-| No specification → unreliable output | **Ouroboros**: interview → seed → execute → evaluate → evolve |
+| No specification → unreliable output | **Ouroboros**: assess → crystallize → execute → review |
 | Every app reinvents browser/execution | **Built-in engine**: headless browser, host exec, MCP bridge, skills |
 | Agents have no memory between sessions | **Vector memory**: persistent, searchable knowledge with semantic recall |
 | No security boundary between agents | **Access Manager**: RBAC, path sandboxing, Merkle-chain audit trail |
@@ -430,7 +430,6 @@ oxios run --json --session "$SID" "follow-up question"
   "session_id": "uuid",
   "space_id": "uuid | null",
   "space_tag": "[emoji label] | null",
-  "seed_id": "uuid | null",
   "agent_id": "uuid | null",
   "phase_reached": "Execute",
   "evaluation_passed": true,
@@ -596,7 +595,7 @@ Full REST API on **port 4200** with 76 endpoints. Auth middleware on all `/api/*
 oxios/                          # Main binary (src/main.rs)
 ├── crates/
 │   ├── oxios-kernel/           # Core: supervisor, scheduler, event bus, state store, tools, tiered memory
-│   ├── oxios-ouroboros/        # Spec-first protocol (interview → seed → execute → evaluate → evolve)
+│   ├── oxios-ouroboros/        # Unified intent flow (assess → crystallize → execute → review)
 │   ├── oxios-markdown/         # Knowledge base (VirtualFs, BacklinkIndex)
 │   ├── oxios-gateway/          # Channel-agnostic message hub
 │   ├── oxios-mcp/              # MCP client (JSON-RPC 2.0 over stdio)
@@ -633,7 +632,6 @@ not separate crates.
 | `~/.oxios/config.toml` | Main configuration |
 | `~/.oxios/workspace/` | Agent working directory |
 | `~/.oxios/workspace/sessions/` | Session data |
-| `~/.oxios/workspace/seeds/` | Ouroboros seed specifications |
 | `~/.oxios/workspace/skills/` | Unified skill definitions |
 
 ---

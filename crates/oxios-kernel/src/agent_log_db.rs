@@ -132,7 +132,6 @@ pub struct AgentListFilter {
     pub status: Option<AgentStatusFilter>,
     pub session_id: Option<String>,
     pub project_id: Option<String>,
-    pub seed_id: Option<String>,
     pub model_id: Option<String>,
     pub tool: Option<String>,
     pub has_error: Option<bool>,
@@ -158,7 +157,6 @@ impl Default for AgentListFilter {
             status: None,
             session_id: None,
             project_id: None,
-            seed_id: None,
             model_id: None,
             tool: None,
             has_error: None,
@@ -361,7 +359,6 @@ impl AgentLogDb {
                 started_at      TEXT,
                 completed_at    TEXT,
                 session_id      TEXT,
-                seed_id         TEXT,
                 project_id      TEXT,
                 model_id        TEXT NOT NULL DEFAULT '',
                 error           TEXT,
@@ -389,7 +386,6 @@ impl AgentLogDb {
             CREATE INDEX IF NOT EXISTS idx_agents_status_created ON agents(status, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_agents_session     ON agents(session_id);
             CREATE INDEX IF NOT EXISTS idx_agents_project     ON agents(project_id);
-            CREATE INDEX IF NOT EXISTS idx_agents_seed        ON agents(seed_id);
             CREATE INDEX IF NOT EXISTS idx_agents_model       ON agents(model_id);
             CREATE INDEX IF NOT EXISTS idx_agents_cost        ON agents(cost_usd);
             CREATE INDEX IF NOT EXISTS idx_agents_duration    ON agents(duration_secs);
@@ -438,9 +434,9 @@ impl AgentLogDb {
 
         tx.execute(
             "INSERT INTO agents (id, name, status, created_at, started_at, completed_at,
-                 session_id, seed_id, project_id, model_id, error,
+                 session_id, project_id, model_id, error,
                  steps_completed, steps_total, tokens_input, tokens_output, cost_usd, duration_secs)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
              ON CONFLICT(id) DO UPDATE SET
                  status=excluded.status,
                  completed_at=excluded.completed_at,
@@ -459,7 +455,6 @@ impl AgentLogDb {
                 info.started_at.map(|t| t.to_rfc3339()),
                 info.completed_at.map(|t| t.to_rfc3339()),
                 info.session_id,
-                info.seed_id.map(|s| s.to_string()),
                 info.project_id.map(|p| p.to_string()),
                 info.model_id,
                 info.error,
@@ -929,7 +924,6 @@ impl AgentLogDb {
 
     fn row_to_agent(row: &rusqlite::Row) -> rusqlite::Result<AgentInfo> {
         let id_str: String = row.get("id")?;
-        let seed_id_str: Option<String> = row.get("seed_id")?;
         let project_id_str: Option<String> = row.get("project_id")?;
         let created_at_str: String = row.get("created_at")?;
         let started_at_str: Option<String> = row.get("started_at")?;
@@ -952,7 +946,6 @@ impl AgentLogDb {
                     );
                     Utc::now()
                 }),
-            seed_id: seed_id_str.and_then(|s| uuid::Uuid::parse_str(&s).ok()),
             project_id: project_id_str.and_then(|s| uuid::Uuid::parse_str(&s).ok()),
             started_at: started_at_str
                 .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
@@ -1046,7 +1039,7 @@ impl AgentLogDb {
             params.push(Box::new(to.to_rfc3339()));
         }
 
-        // Session / project / seed
+        // Session / project
         if let Some(ref sid) = filter.session_id {
             let idx = params.len() + 1;
             conditions.push(format!("session_id = ?{}", idx));
@@ -1056,11 +1049,6 @@ impl AgentLogDb {
             let idx = params.len() + 1;
             conditions.push(format!("project_id = ?{}", idx));
             params.push(Box::new(pid.clone()));
-        }
-        if let Some(ref sid) = filter.seed_id {
-            let idx = params.len() + 1;
-            conditions.push(format!("seed_id = ?{}", idx));
-            params.push(Box::new(sid.clone()));
         }
 
         // Model (substring)
@@ -1251,7 +1239,6 @@ mod tests {
             created_at: DateTime::parse_from_rfc3339(created)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap(),
-            seed_id: None,
             project_id: None,
             started_at: None,
             completed_at: None,

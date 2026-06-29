@@ -323,20 +323,6 @@ impl Orchestrator {
             }
         }
 
-        // Legacy fallback (RFC-025 migration window): a Project created
-        // before Mounts may carry explicit `paths` but no `mount_ids`. In
-        // that case grant path access directly so pre-RFC-025 Projects still
-        // resolve a CWD and populate `allowed_paths` (see agent_runtime.rs).
-        if let Some(project) = &project_for_instructions
-            && project.mount_ids.is_empty()
-            && !project.paths.is_empty()
-        {
-            for p in &project.paths {
-                if !paths.contains(p) {
-                    paths.push(p.clone());
-                }
-            }
-        }
 
         // Display tag.
         let tag = if mounts.len() == 1 {
@@ -526,6 +512,7 @@ impl Orchestrator {
         project_ids: Option<&str>,
         mount_ids: Option<&str>,
         role: Option<&str>,
+        model_override: Option<&str>,
         request_id: &str,
     ) -> Result<OrchestrationResult> {
         // Get the IntentEngine (always wired by the kernel assembler).
@@ -544,6 +531,7 @@ impl Orchestrator {
             project_ids: project_ids.map(String::from),
             mount_ids: mount_ids.map(String::from),
             role: role.map(String::from),
+            model_override: model_override.map(String::from),
             user_id: user_id.to_string(),
         };
 
@@ -682,7 +670,7 @@ impl Orchestrator {
             mount_paths,
             project_id,
             cspace_hint: None,
-            model_override: None,
+            model_override: ctx.model_override.clone(),
             role: ctx.role.clone(),
             restore_state: None,
             session_id: Some(ctx.session_id.clone()),

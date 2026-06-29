@@ -497,11 +497,11 @@ fn parse_zai_quota_limit(body: &serde_json::Value, now: DateTime<Utc>) -> QuotaS
     token_entries.sort_by_key(|e| zai_window_minutes(e));
     let mut rate_windows = Vec::new();
     let mut token_limit: Option<f64> = None;
-    if let Some(primary) = token_entries.last() {
-        if let Some(w) = zai_entry_to_rate_window(primary, "tokens-primary", now) {
-            token_limit = w.limit;
-            rate_windows.push(w);
-        }
+    if let Some(primary) = token_entries.last()
+        && let Some(w) = zai_entry_to_rate_window(primary, "tokens-primary", now)
+    {
+        token_limit = w.limit;
+        rate_windows.push(w);
     }
     if token_entries.len() >= 2 {
         let tertiary_idx = if token_entries.len() >= 3 {
@@ -554,7 +554,7 @@ fn zai_entry_to_rate_window(
     let resets_at = entry
         .get("nextResetTime")
         .and_then(|v| v.as_i64())
-        .and_then(|ms| DateTime::<Utc>::from_timestamp_millis(ms));
+        .and_then(DateTime::<Utc>::from_timestamp_millis);
     let limit = entry.get("usage").and_then(|u| u.as_f64());
     let used = entry.get("currentValue").and_then(|v| v.as_f64());
     let remaining_percent = match (used, limit) {

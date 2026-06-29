@@ -37,12 +37,13 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
             {project.source ?? 'manual'}
           </span>
         </div>
-        <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="shrink-0 flex items-center gap-1 opacity-70 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           <button
             type="button"
             onClick={() => onEdit(project)}
             className="p-1 rounded hover:bg-muted text-xs text-muted-foreground"
             title="Edit"
+            aria-label="Edit project"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -51,6 +52,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
             onClick={() => onDelete(project)}
             className="p-1 rounded hover:bg-muted text-xs text-destructive"
             title="Delete"
+            aria-label="Delete project"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

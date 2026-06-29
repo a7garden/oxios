@@ -190,7 +190,7 @@ pub(crate) async fn handle_events(
         match result {
             Ok(event) => {
                 // Sanitize events: include type and basic metadata only.
-                // Detailed data (full seed content, LLM responses) is excluded.
+                // Detailed data (full directive content, LLM responses) is excluded.
                 let sanitized = sanitize_event(&event);
                 // RFC-024 SP2: attach the sanitized event's `id` as the SSE
                 // event id so the browser (or fetch client) can set

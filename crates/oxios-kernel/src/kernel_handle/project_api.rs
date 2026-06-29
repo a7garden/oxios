@@ -5,7 +5,6 @@
 //! - CRUD operations on Projects
 //! - Project-Memory association (link/unlink)
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -23,7 +22,6 @@ pub struct ProjectInfo {
     pub name: String,
     pub description: String,
     pub source: String,
-    pub paths: Vec<String>,
     pub tags: Vec<String>,
     pub emoji: String,
     pub memory_visible: bool,
@@ -43,11 +41,6 @@ impl From<&Project> for ProjectInfo {
             name: project.name.clone(),
             description: project.description.clone(),
             source: project.source.to_string(),
-            paths: project
-                .paths
-                .iter()
-                .map(|p| p.to_string_lossy().to_string())
-                .collect(),
             tags: project.tags.clone(),
             emoji: project.emoji.clone(),
             memory_visible: project.memory_visible,
@@ -98,15 +91,12 @@ impl ProjectApi {
     pub fn create_project(
         &self,
         name: String,
-        paths: Vec<String>,
         tags: Vec<String>,
         emoji: Option<String>,
         description: Option<String>,
     ) -> Result<ProjectInfo> {
-        let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
         let project = self.project_manager.create_project(
             name,
-            paths,
             tags,
             emoji,
             description,
@@ -121,19 +111,16 @@ impl ProjectApi {
         &self,
         id: &str,
         name: Option<String>,
-        paths: Option<Vec<String>>,
         tags: Option<Vec<String>>,
         emoji: Option<String>,
         description: Option<String>,
         memory_visible: Option<bool>,
     ) -> Result<ProjectInfo> {
         let project_id = Uuid::parse_str(id).context("Invalid project ID")?;
-        let paths = paths.map(|v| v.into_iter().map(PathBuf::from).collect());
 
         let mut project = self.project_manager.update_project(
             project_id,
             name,
-            paths,
             tags,
             emoji,
             description,

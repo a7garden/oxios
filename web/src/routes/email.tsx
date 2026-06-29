@@ -18,7 +18,7 @@ import {
   Settings,
   Wrench,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -155,7 +155,16 @@ function providerDashboardLabel(provider: string | null): string | null {
 function EmailPage() {
   const { t } = useTranslation()
   const { data: status, isLoading, isError, refetch } = useEmailStatus()
-  const [activeTab, setActiveTab] = useState(status?.configured ? 'overview' : 'setup')
+  const [activeTab, setActiveTab] = useState<string>('setup')
+  useEffect(() => {
+    // status loads asynchronously; once we know whether the user is
+    // already configured, jump them to the right tab. The previous
+    // useState initializer evaluated only once with `status === undefined`
+    // and stuck every user on the setup tab.
+    if (status?.configured) {
+      setActiveTab((cur) => (cur === 'setup' ? 'overview' : cur))
+    }
+  }, [status?.configured])
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
@@ -530,6 +539,11 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
+                aria-label={
+                  showPassword
+                    ? t('email.hidePassword', 'Hide password')
+                    : t('email.showPassword', 'Show password')
+                }
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>

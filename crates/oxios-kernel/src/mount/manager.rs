@@ -578,15 +578,24 @@ impl MountManager {
         created
     }
 
-    /// Returns `true` if some existing Mount's `paths` already includes (or is
-    /// an ancestor of) `root`, meaning the root is already covered.
-    fn root_already_covered(&self, root: &PathBuf) -> bool {
+    /// Returns the id of an existing Mount whose `paths` includes (or is an
+    /// ancestor/descendant of) `root`, if any. Used by the RFC-025 migration
+    /// to avoid creating a duplicate Mount for a path the user already
+    /// registered under a different name.
+    pub fn covering_mount_id(&self, root: &PathBuf) -> Option<MountId> {
         let mounts = self.mounts.read();
-        mounts.values().any(|m| {
+        mounts.values().find_map(|m| {
             m.paths
                 .iter()
                 .any(|p| root.starts_with(p) || p.starts_with(root))
+                .then_some(m.id)
         })
+    }
+
+    /// Returns `true` if some existing Mount's `paths` already includes (or is
+    /// an ancestor of) `root`, meaning the root is already covered.
+    fn root_already_covered(&self, root: &PathBuf) -> bool {
+        self.covering_mount_id(root).is_some()
     }
 }
 

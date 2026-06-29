@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   Check,
+  ChevronDown,
+  ChevronRight,
   CircleAlert,
   CircleCheck,
   CircleX,
@@ -14,6 +16,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
+
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -699,6 +702,7 @@ function SkillCard({
   isToggling: boolean
 }) {
   const { t } = useTranslation()
+  const [expanded, setExpanded] = useState(isSelected)
   const sd = STATUS_DISPLAY[skill.status]
   const isClaude = skill.format === 'claude_code'
   const isDisabled = skill.status === 'disabled'
@@ -714,6 +718,16 @@ function SkillCard({
         'transition-shadow hover:shadow-md cursor-pointer select-none',
         isSelected && 'ring-2 ring-primary',
       )}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect()
+          setExpanded((v) => !v)
+        }
+      }}
     >
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
@@ -743,6 +757,21 @@ function SkillCard({
             <Badge variant={sd.variant} className="text-xs gap-1">
               {sd.icon} {sd.label}
             </Badge>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setExpanded((v) => !v)
+              }}
+              className="ml-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label={expanded ? t('skills.collapse', 'Collapse details') : t('skills.expand', 'Expand details')}
+            >
+              {expanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -761,65 +790,69 @@ function SkillCard({
             <p className="text-xs text-info">{t('skills.claudeCompatible')}</p>
           </div>
         )}
-        {(skill.requirements.bins.length > 0 ||
-          skill.requirements.anyBins.length > 0 ||
-          skill.requirements.env.length > 0 ||
-          skill.requirements.config.length > 0) && (
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {t('skills.requires')}
-            </p>
-            <div className="space-y-1 pl-2">
-              {skill.requirements.bins.length > 0 && (
-                <ReqRow
-                  labelKey="skills.bins"
-                  items={skill.requirements.bins}
-                  missing={skill.missing.bins}
-                />
-              )}
-              {skill.requirements.anyBins.length > 0 && (
-                <ReqRow
-                  labelKey="skills.anyBins"
-                  items={skill.requirements.anyBins}
-                  missing={skill.missing.anyBins}
-                />
-              )}
-              {skill.requirements.env.length > 0 && (
-                <ReqRow
-                  labelKey="skills.env"
-                  items={skill.requirements.env}
-                  missing={skill.missing.env}
-                />
-              )}
-              {skill.requirements.config.length > 0 && (
-                <ReqRow
-                  labelKey="skills.config"
-                  items={skill.requirements.config}
-                  missing={skill.missing.config}
-                />
-              )}
-            </div>
-          </div>
-        )}
-        {skill.install.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {t('skills.install')}
-            </p>
-            <div className="pl-2 space-y-1">
-              {skill.install.map((sp, i) => (
-                <div
-                  key={`${sp.kind}-${i}`}
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                >
-                  <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
-                    {sp.kind}
-                  </span>
-                  <span>{sp.label ?? sp.bins.join(', ')}</span>
+        {expanded && (
+          <>
+            {(skill.requirements.bins.length > 0 ||
+              skill.requirements.anyBins.length > 0 ||
+              skill.requirements.env.length > 0 ||
+              skill.requirements.config.length > 0) && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {t('skills.requires')}
+                </p>
+                <div className="space-y-1 pl-2">
+                  {skill.requirements.bins.length > 0 && (
+                    <ReqRow
+                      labelKey="skills.bins"
+                      items={skill.requirements.bins}
+                      missing={skill.missing.bins}
+                    />
+                  )}
+                  {skill.requirements.anyBins.length > 0 && (
+                    <ReqRow
+                      labelKey="skills.anyBins"
+                      items={skill.requirements.anyBins}
+                      missing={skill.missing.anyBins}
+                    />
+                  )}
+                  {skill.requirements.env.length > 0 && (
+                    <ReqRow
+                      labelKey="skills.env"
+                      items={skill.requirements.env}
+                      missing={skill.missing.env}
+                    />
+                  )}
+                  {skill.requirements.config.length > 0 && (
+                    <ReqRow
+                      labelKey="skills.config"
+                      items={skill.requirements.config}
+                      missing={skill.missing.config}
+                    />
+                  )}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            )}
+            {skill.install.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {t('skills.install')}
+                </p>
+                <div className="pl-2 space-y-1">
+                  {skill.install.map((sp, i) => (
+                    <div
+                      key={`${sp.kind}-${i}`}
+                      className="flex items-center gap-2 text-sm text-muted-foreground"
+                    >
+                      <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
+                        {sp.kind}
+                      </span>
+                      <span>{sp.label ?? sp.bins.join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
         {hasMissing && skill.status === 'needs_setup' && (
           <div className="rounded-md bg-warning/10 border border-warning/20 px-3 py-2">

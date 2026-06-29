@@ -116,7 +116,10 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
             {t('mcp.edit', 'MCP 서버 편집')}
           </DialogTitle>
           <DialogDescription>
-            {t('mcp.editDescription', '서버의 명령, 인자, 환경변수를 변경합니다. 저장 시 재시작됩니다.')}
+            {t(
+              'mcp.editDescription',
+              '서버의 명령, 인자, 환경변수를 변경합니다. 저장 시 재시작됩니다.',
+            )}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -124,7 +127,10 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
             <Label>{t('mcp.name', '이름')}</Label>
             <Input value={server?.name ?? ''} disabled className="font-mono" />
             <p className="text-xs text-muted-foreground">
-              {t('mcp.nameImmutable', '이름은 변경할 수 없습니다. 변경하려면 삭제 후 새로 등록하세요.')}
+              {t(
+                'mcp.nameImmutable',
+                '이름은 변경할 수 없습니다. 변경하려면 삭제 후 새로 등록하세요.',
+              )}
             </p>
           </div>
           <div className="space-y-2">
@@ -174,9 +180,7 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
               {t('common.cancel', '취소')}
             </Button>
             <Button type="submit" disabled={!command.trim() || updateServer.isPending}>
-              {updateServer.isPending
-                ? t('common.saving', '저장 중...')
-                : t('common.save', '저장')}
+              {updateServer.isPending ? t('common.saving', '저장 중...') : t('common.save', '저장')}
             </Button>
           </DialogFooter>
         </form>

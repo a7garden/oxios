@@ -2,6 +2,7 @@ import { Bot, Coins, Cpu } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCostSummary } from '@/hooks/use-costs'
+import { formatUsd } from '@/lib/utils'
 import type { CostPeriod } from '@/types/cost'
 
 interface Props {
@@ -26,7 +27,7 @@ export function CostSummaryCards({ period }: Props) {
           <Coins className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">${cost.toFixed(4)}</div>
+          <div className="text-2xl font-bold">{formatUsd(cost)}</div>
           <p className="text-xs text-muted-foreground">{t('cost.usd')}</p>
         </CardContent>
       </Card>

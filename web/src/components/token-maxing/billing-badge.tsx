@@ -20,7 +20,11 @@ export function BillingBadge({ billingModel }: { billingModel: BillingModel | nu
   switch (model) {
     case 'subscription':
       return (
-        <Badge variant="success" className="gap-1 text-xs" title={t('tokenMaxing.billing.subscription')}>
+        <Badge
+          variant="success"
+          className="gap-1 text-xs"
+          title={t('tokenMaxing.billing.subscription')}
+        >
           <Crown className="h-3 w-3" />
           {t('tokenMaxing.billing.subscription')}
         </Badge>
@@ -35,7 +39,11 @@ export function BillingBadge({ billingModel }: { billingModel: BillingModel | nu
     case 'unknown':
     default:
       return (
-        <Badge variant="outline" className="gap-1 text-xs" title={t('tokenMaxing.billing.unknownHelp')}>
+        <Badge
+          variant="outline"
+          className="gap-1 text-xs"
+          title={t('tokenMaxing.billing.unknownHelp')}
+        >
           <HelpCircle className="h-3 w-3" />
           {t('tokenMaxing.billing.unknown')}
         </Badge>

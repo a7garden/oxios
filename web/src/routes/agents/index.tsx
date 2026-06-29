@@ -30,7 +30,7 @@ export const Route = createFileRoute('/agents/')({
     sort_dir: (search.sort_dir as string) || 'desc',
     page: Number(search.page) || 1,
     per_page: Number(search.per_page) || 50,
-    view: search.view === 'table' ? 'table' : 'canvas',
+    view: search.view === 'canvas' ? 'canvas' : 'table',
   }),
 })
 
@@ -43,7 +43,7 @@ export const defaultAgentSearch = {
   sort_dir: 'desc',
   page: 1,
   per_page: 50,
-  view: 'canvas' as const,
+  view: 'table' as const,
 }
 
 function buildQueryString(params: Record<string, string | number | undefined>) {

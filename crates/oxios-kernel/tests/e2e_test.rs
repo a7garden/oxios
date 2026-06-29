@@ -69,7 +69,6 @@ impl Supervisor for MockSupervisor {
             name: directive.goal.clone(),
             status: AgentStatus::Starting,
             created_at: chrono::Utc::now(),
-            seed_id: None,
             project_id: None,
             started_at: None,
             completed_at: None,
@@ -181,6 +180,7 @@ async fn test_orchestrator_happy_path() {
             None,
             None,
             None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await
@@ -214,6 +214,7 @@ async fn test_session_continuation() {
             None,
             None,
             None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await
@@ -229,6 +230,7 @@ async fn test_session_continuation() {
             None,
             None,
             None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await
@@ -250,6 +252,7 @@ async fn test_multiple_sessions_independent() {
             None,
             None,
             None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await
@@ -262,6 +265,7 @@ async fn test_multiple_sessions_independent() {
             None,
             None,
             None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await
@@ -289,6 +293,7 @@ async fn test_session_cleaned_after_completion() {
             None,
             None,
             None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await
@@ -302,12 +307,12 @@ async fn test_session_cleaned_after_completion() {
             None,
             None,
             None,
-            None,
+            None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await
         .unwrap();
-
     assert_ne!(result2.session_id.as_deref(), Some(session_id));
 }
 
@@ -326,7 +331,8 @@ async fn test_phase_events_published() {
             None,
             None,
             None,
-            None,
+            None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await

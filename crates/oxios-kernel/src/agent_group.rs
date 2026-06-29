@@ -39,8 +39,6 @@ pub struct OxiosGroupAgent {
 pub struct OxiosAgentGroup {
     /// Unique group ID.
     pub id: Uuid,
-    /// The parent ID that spawned this group.
-    pub parent_seed_id: Uuid,
     /// Agents in this group.
     pub agents: Vec<OxiosGroupAgent>,
 }
@@ -116,7 +114,6 @@ mod tests {
     fn test_completion_pct_empty_group() {
         let group = OxiosAgentGroup {
             id: Uuid::new_v4(),
-            parent_seed_id: Uuid::new_v4(),
             agents: vec![],
         };
         assert!((group.completion_pct() - 0.0).abs() < f64::EPSILON);

@@ -7,7 +7,6 @@
 //! - Lookup by name, path, or tag
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -97,7 +96,6 @@ impl ProjectManager {
     pub fn create_project(
         &self,
         name: String,
-        paths: Vec<PathBuf>,
         tags: Vec<String>,
         emoji: Option<String>,
         description: Option<String>,
@@ -112,7 +110,6 @@ impl ProjectManager {
         }
 
         let mut project = Project::new(&name, source);
-        project.paths = paths;
         project.tags = tags;
         if let Some(emoji) = emoji {
             project.emoji = emoji;
@@ -150,7 +147,6 @@ impl ProjectManager {
         &self,
         id: ProjectId,
         name: Option<String>,
-        paths: Option<Vec<PathBuf>>,
         tags: Option<Vec<String>>,
         emoji: Option<String>,
         description: Option<String>,
@@ -175,9 +171,6 @@ impl ProjectManager {
             project.name = new_name.clone();
         }
 
-        if let Some(paths) = paths {
-            project.paths = paths;
-        }
         if let Some(tags) = tags {
             project.tags = tags;
         }
@@ -300,6 +293,22 @@ impl ProjectManager {
         drop(projects);
         project_db::save_project(&self.db.conn(), &project_clone)?;
         Ok(project_clone)
+    }
+    /// Clear the legacy `paths` field after the RFC-025 migration has linked
+    /// Mounts via `mount_ids`. The field is retained on the struct only as the
+    /// migration read-source; once Mounts are linked it is dead weight that
+    /// the runtime legacy fallbacks would otherwise keep reading.
+    pub fn clear_legacy_paths(&self, id: ProjectId) -> Result<()> {
+        let mut projects = self.projects.write();
+        let project = projects
+            .get_mut(&id)
+            .ok_or(ProjectManagerError::NotFound(id))?;
+        project.paths.clear();
+        project.updated_at = Utc::now();
+        let project_clone = project.clone();
+        drop(projects);
+        project_db::save_project(&self.db.conn(), &project_clone)?;
+        Ok(())
     }
 }
 

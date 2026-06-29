@@ -6,7 +6,7 @@
  * `~/.oxi/auth.json`, never in `config.toml` plaintext.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Eye, EyeOff, KeyRound, Trash2 } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff, KeyRound, ShieldCheck, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -54,6 +54,9 @@ const SECRET_LABELS: Record<string, { labelKey: string; descKey: string }> = {
   },
 }
 
+/** Keys for which `/api/engine/validate-key` is meaningful. */
+const PROVIDER_KEYS = new Set(['anthropic', 'openai', 'google', 'oxios_api_key', 'clawhub_api_key'])
+
 function sourceBadgeClass(source: string): string {
   switch (source) {
     case 'env':
@@ -88,6 +91,23 @@ export function SecretsSectionCard() {
   const { data: secrets, isLoading } = useQuery<SecretInfo[]>({
     queryKey: ['secrets'],
     queryFn: () => api.get<SecretInfo[]>('/api/secrets'),
+  })
+
+  const validateMutation = useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      api.post<{ valid: boolean; message?: string }>('/api/engine/validate-key', {
+        key,
+        value,
+      }),
+    onSuccess: (res) => {
+      if (res.valid) {
+        toast.success(res.message ?? t('settings.secretValid', 'Secret is valid'))
+      } else {
+        toast.error(res.message ?? t('settings.secretInvalid', 'Secret is invalid'))
+      }
+    },
+    onError: () =>
+      toast.error(t('settings.secretValidateFailed', 'Failed to validate secret')),
   })
 
   const saveMutation = useMutation({
@@ -204,6 +224,24 @@ export function SecretsSectionCard() {
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                     {t('common.save', 'Save')}
                   </Button>
+                  {PROVIDER_KEYS.has(secret.key) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        validateMutation.mutate({
+                          key: secret.key,
+                          value: editValues[secret.key] ?? '',
+                        })
+                      }
+                      disabled={
+                        !editValues[secret.key] || validateMutation.isPending
+                      }
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                      {t('settings.verify', 'Verify')}
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="flex gap-2">

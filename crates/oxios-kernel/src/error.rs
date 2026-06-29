@@ -43,12 +43,6 @@ pub enum KernelError {
         detail: String,
     },
 
-    /// Requested seed was not found.
-    #[error("Seed '{id}' not found")]
-    SeedNotFound {
-        /// Seed identifier.
-        id: String,
-    },
 
     /// Requested session was not found.
     #[error("Session '{id}' not found")]
@@ -127,7 +121,6 @@ impl KernelError {
             Self::ProgramNotFound { .. } => HttpStatus::NotFound,
             Self::ProgramAlreadyExists { .. } => HttpStatus::Conflict,
             Self::InvalidConfig { .. } => HttpStatus::BadRequest,
-            Self::SeedNotFound { .. } => HttpStatus::NotFound,
             Self::SessionNotFound { .. } => HttpStatus::NotFound,
             Self::StateStore(_) => HttpStatus::InternalServerError,
             Self::Memory { .. } => HttpStatus::InternalServerError,
@@ -171,7 +164,6 @@ impl KernelError {
     pub fn category(&self) -> ErrorCategory {
         match self {
             Self::AgentNotFound { .. } => ErrorCategory::NotFound,
-            Self::SeedNotFound { .. } => ErrorCategory::NotFound,
             Self::SessionNotFound { .. } => ErrorCategory::NotFound,
             Self::PermissionDenied { .. } => ErrorCategory::Security,
             Self::ProgramNotFound { .. } => ErrorCategory::NotFound,
@@ -240,10 +232,6 @@ mod tests {
                 .http_status()
             ),
             400
-        );
-        assert_eq!(
-            u16::from(KernelError::SeedNotFound { id: "s".into() }.http_status()),
-            404
         );
         assert_eq!(
             u16::from(KernelError::SessionNotFound { id: "s".into() }.http_status()),

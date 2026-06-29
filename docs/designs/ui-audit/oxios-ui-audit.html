@@ -204,7 +204,7 @@ a{color:inherit;text-decoration:none}
 <div class="report">
 <nav class="index">
   <h1>Oxios UI/UX Audit</h1>
-  <div class="sub">2026-06-27 · 21/21 screens · rubric v1</div>
+  <div class="sub">2026-06-28 · 21/21 screens · v2 (chat role/routing refresh)</div>
   <ul class="toc">
       <li><a href="#screen-summary" style="font-weight:700;color:var(--accent)"><span style="color:var(--accent)">★</span> 요약 — Top 3 재발 패턴</a></li>
 
@@ -225,7 +225,7 @@ a{color:inherit;text-decoration:none}
       <li><a href="#screen-mcp"><span style="color:var(--ink-3)">14</span> MCP Servers — 서버 등록 / 도구 카탈로그 / 도구 실행기<span class="cnt"><b class="h">2</b><b class="m">3</b><b class="l">2</b></span></a></li>
       <li><a href="#screen-email"><span style="color:var(--ink-3)">15</span> Email — SMTP 설정 / 발신자 / 발송 기록 / 템플릿<span class="cnt"><b class="h">2</b><b class="m">3</b><b class="l">2</b></span></a></li>
       <li><a href="#screen-git"><span style="color:var(--ink-3)">16</span> Git — 인프로세스 버전 관리 (태그 / 복원 / 커밋 로그)<span class="cnt"><b class="h">2</b><b class="m">3</b><b class="l">1</b></span></a></li>
-      <li><a href="#screen-chat"><span style="color:var(--ink-3)">17</span> Chat<span class="cnt"><b class="h">2</b><b class="m">2</b><b class="l">1</b></span></a></li>
+      <li><a href="#screen-chat"><span style="color:var(--ink-3)">17</span> Chat<span class="cnt"><b class="h">4</b><b class="m">3</b><b class="l">1</b></span></a></li>
       <li><a href="#screen-knowledge"><span style="color:var(--ink-3)">18</span> Knowledge — Markdown Editor + Link Graph + Copilot<span class="cnt"><b class="h">3</b><b class="m">3</b><b class="l">2</b></span></a></li>
       <li><a href="#screen-settings"><span style="color:var(--ink-3)">19</span> Settings (Rail + Pane)<span class="cnt"><b class="h">3</b><b class="m">1</b><b class="l">3</b></span></a></li>
       <li><a href="#screen-sessions"><span style="color:var(--ink-3)">20</span> Sessions — 대화 세션 목록/상세<span class="cnt"><b class="h">1</b><b class="m">3</b><b class="l">3</b></span></a></li>
@@ -244,7 +244,7 @@ a{color:inherit;text-decoration:none}
   <p class="lede">각 화면을 8차원 루브릭으로 평가하고, 실제 React 코드를 기반으로 재현한 <b>현행 목업(주석)</b>과 <b>개선 제안</b>을 나란히 배치한다. 바로 아래 <b>요약</b> 섹션은 전 앱에 걸쳐 재발하는 시스템적 패턴을, 이하 섹션은 화면별 상세를 다룬다.</p>
   <div class="rmeta">
     <span>대상 <b>web/</b> (React + TanStack Router)</span>
-    <span>스크린 <b>21 / 21</b> · 발견 138 (42H/59M/37L)</span>
+    <span>스크린 <b>21 / 21</b> · 발견 141 (44H/60M/37L)</span>
     <span>테마 <b>light (OKLCH tokens)</b></span>
   </div>
 </header>
@@ -253,7 +253,7 @@ a{color:inherit;text-decoration:none}
     <div class="left">
       <div class="num">요약 · Cross-screen</div>
       <h3>앱 전체 재발 패턴 (Top 3)</h3>
-      <div class="smeta">21개 화면에서 <b>42 HIGH</b> 발견 중 재발하는 구조적 문제.</div>
+      <div class="smeta">21개 화면에서 <b>44 HIGH</b> 발견 중 재발하는 구조적 문제 — v2에서 <b>SDK role/routing 묵음</b>을 신규 시스템 패턴으로 추가.</div>
     </div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px">
@@ -286,22 +286,22 @@ a{color:inherit;text-decoration:none}
       </div>
     </div>
     <div style="border:1px solid var(--rule);border-radius:12px;background:#fff;overflow:hidden">
-      <div style="padding:13px 16px;border-bottom:1px solid var(--rule-2);background:var(--paper-2);display:flex;align-items:center;justify-content:space-between"><h4 style="font-size:14px;font-weight:700">③ 파괴적 액션 안전성 불일치</h4><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:var(--high);color:#fff">SYSTEMIC</span></div>
+      <div style="padding:13px 16px;border-bottom:1px solid var(--rule-2);background:var(--paper-2);display:flex;align-items:center;justify-content:space-between"><h4 style="font-size:14px;font-weight:700">③ SDK role / 라우팅 묵음 <span style="color:var(--ink-3);font-weight:500;font-size:11px">— 신규</span></h4><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;background:var(--high);color:#fff">SYSTEMIC</span></div>
       <div style="padding:14px 16px">
-        <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px;line-height:1.5">네이티브 <code>confirm()</code> / 즉시 삭제 / Undo 부재가 화면마다 제각각. 한 번의 실수로 영구 삭제되는 경로가 무방비.</p>
+        <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px;line-height:1.5">엔진·설정에 멀티 프로바이더/role 라우팅이 구현되어 있지만 chat·dashboard가 그 결정에 <b>무지</b>. 사용자는 "지금 어떤 모델로 가고, 왜 그 모델인지, 쿼터는 얼마나 남았는지"를 전혀 알 수 없다. 게다가 role 셀렉터 자체가 컴파일 에러로 비어 있다. <b>결과:</b> 라우팅이 활성인데 UI가 끊겨있어 "내가 어떤 모델을 쓰는지 모름 → 다른 모델로 못 바꿈 → 토큰 없으면 멈춰있음".</p>
         <div style="font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);font-weight:700;margin-bottom:7px">재발 증거</div>
         <ul style="list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--ink-2)">
-          <li><b>Agent Detail</b> ① 종료에 네이티브 confirm() <span style="font-family:var(--mono);color:var(--ink-3);font-size:11px">$agentId.tsx:55</span></li>
-          <li><b>Personas</b> ① 즉시 삭제, 확인·Undo 無 <span style="font-family:var(--mono);color:var(--ink-3);font-size:11px">personas.tsx:64</span></li>
-          <li><b>Memory</b> ① 고정 카드가 항상 0 (거짓 신호) <span style="font-family:var(--mono);color:var(--ink-3);font-size:11px">memory-overview.tsx:75</span></li>
-          <li><b>Sessions</b> ① 즉시 삭제, 확인·Undo 無 <span style="font-family:var(--mono);color:var(--ink-3);font-size:11px">sessions/index.tsx:82</span></li>
+          <li><b>Chat</b> ⑥ role 셀렉터 항상 비어있음 — <code>const &#123; roles = [] &#125; = props</code> 컴파일 에러 <span style="font-family:var(--mono);color:var(--ink-3);font-size:11px">chat-input.tsx:66</span></li>
+          <li><b>Chat</b> ⑦ 토큰 없는 프로바이더로 보내면 무한 로딩, 에러 미노출 <span style="font-family:var(--mono);color:var(--ink-3);font-size:11px">chat.ts:1289-1315</span></li>
+          <li><b>Chat</b> ⑧ 라우팅 활성화/실패/쿼터 상태 묵음 <span style="font-family:var(--mono);color:var(--ink-3);font-size:11px">use-engine.ts:roles</span></li>
+          <li><b>Dashboard · SystemHealthCard</b> ProvidersSection 모델 클릭 라우팅은 동작, 단 어디로 갔는지 표시 無 <span style="font-family:var(--mono);color:var(--ink-3);font-size:11px">providers-section.tsx:17-141</span></li>
         </ul>
-        <div style="margin-top:13px;padding-top:11px;border-top:1px solid var(--rule-2);font-size:12px;color:var(--ink-2)"><b style="color:var(--accent)">Fix:</b> 전 앱 통일 — shadcn Dialog 확인 + Undo 토스트, 파괴적 액션 가이드라인 수립. 거짓 메트릭은 데이터 소스 연결.</div>
+        <div style="margin-top:13px;padding-top:11px;border-top:1px solid var(--rule-2);font-size:12px;color:var(--ink-2)"><b style="color:var(--accent)">Fix:</b> ① chat-input.tsx:66의 <code>props</code> destructure 한 줄 수정 ② role pill + 쿼터 뱃지 + 라우팅 사유 표면 ③ idle timeout + provider-quota 조회 기반 인라인 에러 카드 ④ settings → engine 패널과 chat role pill 상태 양방향 동기화.</div>
       </div>
     </div>
   </div>
   <div style="margin-top:20px;padding:15px 18px;border:1px dashed var(--rule);border-radius:10px;background:var(--paper-2);font-size:13px;color:var(--ink-2);line-height:1.55">
-    <b style="color:var(--ink)">＋ 4위 패턴 — 위계 평탄화:</b> 탭/리스트에 카운트·상태가 없어 한 화면의 가치 흐름이 평등하게 눌려진다. <span style="color:var(--ink-3)">Memory ②(mcp.tsx:33) · MCP ①(mcp.tsx:33) · Email ② · Resources ① · Sessions ⑦</span> — 탭에 카운트 배지, 임계 메트릭에 색/강조 부여.
+    <b style="color:var(--ink)">＋ 4위 패턴 — 파괴적 액션 안전성 불일치:</b> 네이티브 <code>confirm()</code> / 즉시 삭제 / Undo 부재가 화면마다 제각각. <span style="color:var(--ink-3)">Agent Detail $agentId.tsx:55 (종료 confirm) · Personas personas.tsx:64 (즉시 삭제) · Sessions sessions/index.tsx:82 (즉시 삭제) · Memory memory-overview.tsx:75 (거짓 신호)</span> — 전 앱 통일: shadcn Dialog 확인 + Undo 토스트, 거짓 메트릭은 데이터 소스 연결. <b>＋ 5위 — 위계 평탄화:</b> 탭/리스트에 카운트·상태가 없어 가치 흐름이 평등하게 눌려진다. <span style="color:var(--ink-3)">Memory(memory.tsx:33) · MCP(mcp.tsx:33) · Email(email.tsx) · Resources(resources.tsx:68) · Sessions</span> — 탭에 카운트 배지, 임계 메트릭에 색/강조 부여.
   </div>
 </section>
 
@@ -4111,15 +4111,16 @@ a{color:inherit;text-decoration:none}
   <div class="compare">
     <!-- ───── CURRENT ───── -->
     <div class="panel">
-      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현, 문제점 ①–⑤</span></div>
+      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현, 문제점 ①–⑧</span></div>
       <div class="mock-frame">
-        <div class="mock mock-wrap">
           <span class="pin" style="--py:34px;--px:8px" title="F1">①</span>
           <span class="pin" style="--py:34px;--px:120px" title="F2">②</span>
           <span class="pin" style="--py:88px;--px:260px" title="F3">③</span>
           <span class="pin" style="--py:140px;--px:200px" title="F4">④</span>
           <span class="pin" style="--py:212px;--px:260px" title="F5">⑤</span>
-          <div class="ox">
+          <span class="pin" style="--py:212px;--px:14px" title="F6">⑥</span>
+          <span class="pin" style="--py:34px;--px:480px" title="F7">⑦</span>
+          <span class="pin" style="--py:88px;--px:480px" title="F8">⑧</span>
             <aside class="sb">
               <div class="brand"><span class="dot"></span>Oxios</div>
               <div class="grp">
@@ -4342,39 +4343,47 @@ a{color:inherit;text-decoration:none}
                         <div style="display:flex;align-items:flex-start;gap:6px;padding:5px 7px;border-radius:5px"><span style="width:11px;height:11px;background:#3b82f6;border-radius:2px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">rotate-tokens.md</div><div style="font-size:9px;color:var(--ox-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">…use the /rotate endpoint…</div></div></div>
                       </div>
                     </div>
-                    <div style="display:flex;align-items:flex-end;border:1px solid var(--ox-border);border-radius:12px;background:var(--ox-card);padding:7px 9px">
+                    <div style="display:flex;align-items:flex-end;border:1px solid var(--ox-border);border-radius:12px;background:var(--ox-card);padding:7px 9px;gap:6px">
+                      <!-- Role pill (replaces bare <select>): chip + quota + chevron -->
+                      <button title="코드 리뷰어 · claude-3-7-sonnet · 잔여 78%" style="display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border:1px solid var(--ox-border);border-radius:7px;background:var(--ox-accent);font-size:9px;color:var(--ox-fg);font-weight:600;max-width:160px"><span style="width:6px;height:6px;border-radius:50%;background:var(--ox-success)"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">코드 리뷰어</span><span style="font-size:8px;color:var(--ox-muted);font-weight:500">claude-3.7</span><span style="font-size:8px;color:var(--ox-success)">78%</span><span style="font-size:7px;color:var(--ox-muted)">▾</span></button>
                       <textarea rows="1" placeholder="메시지를 입력하세요… (@로 컨텍스트 추가)" style="flex:1;border:0;outline:0;background:transparent;font-size:11px;resize:none;font-family:inherit;color:var(--ox-fg)"></textarea>
                       <button style="display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 11px;border-radius:7px;background:var(--ox-primary);color:#fff;border:0;font-size:10px;font-weight:600">전송 <span style="font-size:9px;opacity:.7">⏎</span></button>
                     </div>
-                    <div style="text-align:center;font-size:8px;color:var(--ox-muted);margin-top:4px">Enter 전송 · ⇧Enter 줄바꿈 · ⌘⇧N 새 채팅 · 1 컨텍스트</div>
-                  </div>
+                    <!-- Inline routing error sample (when target provider has no token) -->
+                    <div style="margin-top:5px;display:flex;align-items:flex-start;gap:6px;padding:6px 8px;border:1px solid oklch(0.91 0.05 27);border-left:3px solid var(--ox-error);border-radius:6px;background:oklch(0.97 0.014 27);font-size:9px;color:var(--ox-error)">
+                      <span style="font-weight:700">⛔</span>
+                      <div style="flex:1"><b style="color:var(--ox-fg)">선택한 프로바이더에 API 키가 없습니다.</b> 다른 프로바이더로 자동 라우팅되었거나, <button style="all:unset;color:var(--ox-primary);font-weight:600;text-decoration:underline;cursor:pointer">설정에서 키 추가</button> 후 다시 시도하세요.</div>
+                    </div>
+                    <div style="text-align:center;font-size:8px;color:var(--ox-muted);margin-top:4px">Enter 전송 · ⇧Enter 줄바꿈 · ⌘⇧N 새 채팅 · 1 컨텍스트 · 라우팅: claude-3.7</div>
                 </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-
   <!-- FINDINGS -->
   <div class="findings">
-    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">5건 · High 2 / Med 2 / Low 1</span></h4>
+    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">8건 · High 4 / Med 3 / Low 1</span></h4>
     <ul class="flist">
       <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>Chat-mode 사이드바에 상위 모드(Console/Chat/Knowledge) 표시가 desktop에서 사라짐</b> — 사용자는 어느 모드에 있는지 알 수 없고, Console 화면과 채팅 화면이 같은 사이드바를 공유하다가 라우트 변경 시 콘솔 nav 그룹이 통째로 세션 트리로 교체됨. 모바일에서는 <code>ModeTabs</code>가 보이지만 desktop에서는 브랜드 바 아래에 모드 식별자 자체가 없음. 작업 중 모드 전환 인지 불가.<span class="ev">web/src/components/layout/sidebar.tsx:206-211 · chat-session-nav.tsx:111-260</span></div></li>
       <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>빈 채팅 상태가 진입점으로 빈약 — Oxios의 4대 능력이 전혀 보이지 않음</b> — 그저 인사말 + 최근 세션 목록. 신규 사용자에게 지식·메모리·도구·프로젝트가 이 화면에서 호출 가능하다는 단서가 0개. 첫 메시지를 보내기 전에는 시스템이 무엇을 할 수 있는지 알 수 없음.<span class="ev">web/src/components/chat/empty-chat-state.tsx:26-63</span></div></li>
+      <li class="high"><span class="fno">⑥</span><div class="ft"><span class="badge high">HIGH</span> <b>Role 셀렉터가 항상 비어 있음 — <code>const &#123; roles = [] &#125; = props</code> 라인이 미정의 식별자 <code>props</code>를 참조, TypeScript 컴파일 에러(<code>tsc --noEmit</code>에서도 잡힘)</b> — 결과: ① 기본 모델 외 다른 SDK role이 드롭다운에 절대 안 뜸 ② 라우팅을 켜도 사용자에게는 보이지 않음 ③ 프로바이더가 여러 개여도 기본 프로바이더의 모델만 사용 가능. 라우팅 기능 자체는 살아있는데 UI가 끊어져 있어 "내가 어느 모델로 보내는지 모르고, 다른 모델로 못 바꾼다"는 상태. <b>근본 원인:</b> chat-input.tsx의 destructure는 매개변수 목록이 아닌 식별자 <code>props</code>(=undefined)에서 시도. 수정 = <code>function ChatInput(&#123; value, onChange, onSend, onCancel, disabled, isStreaming, connected, roles = [], activeRole = null, setActiveRole = () =&gt; &#123;&#125; &#125;: ChatInputProps) &#123;</code> 한 줄로 끝.<span class="ev">web/src/components/chat/chat-input.tsx:57-66 (destructure 대상 불일치) · chat-input.tsx:372-388 (select 렌더) · routes/chat.tsx:200-202 (정상 전달 중)</span></div></li>
+      <li class="high"><span class="fno">⑦</span><div class="ft"><span class="badge high">HIGH</span> <b>토큰이 남지 않은 프로바이더로 메시지를 보내면 무한 로딩 — 에러/실패 메시지가 사용자에게 노출되지 않음</b> — 스토어의 <code>'error'</code> chunk 핸들러(<code>stores/chat.ts:1290-1315</code>)는 에러 시 어시스턴트 메시지를 인라인 삽입하도록 만들어져 있으나, ① 입력창 위 재연결 배너(노란 점멸)가 일반 "스트리밍"과 구분 안 됨 ② 토큰/쿼터 초과처럼 백엔드가 200을 돌려주되 payload가 비어있는 케이스에서는 chunk가 안 와 <code>isStreaming</code>이 true로 멈춤 ③ 사용자가 보는 신호는 "⏳ 멈춤" 하나뿐. 멈춘 이유도, 얼마나 기다려야 할지도, 어떻게 풀어야 할지도 안 알려줌. <b>결과:</b> 첫 보고 그대로 — 로딩만 뜨고 끝.<span class="ev">web/src/stores/chat.ts:1289-1315 (error chunk 처리) · routes/chat.tsx:113-122 (재연결 배너)</span></div></li>
       <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>인터뷰 마법사 — 모든 문항 아래에 자유 입력 textarea가 항상 노출됨</b> — yes_no / single_choice 같은 명확한 단일 선택 문항에서도 "추가 설명 (선택)"이 보임. 사용자는 "둘 다 채워야 하나?"라고 헷갈리고, 백엔드는 두 값을 결합해 제출하지만 그 결합 규칙은 어디에도 안내되지 않음. 인지 부하 + 답변 모호성.<span class="ev">web/src/components/chat/interview-wizard.tsx:334-349 (항상 렌더) · :421-459 (yes_no) · :505-537 (single_choice)</span></div></li>
       <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>도구 권한 승인이 인라인 1회성 — 반복 호출 시 매번 차단</b> — 같은 도구(예: shell_exec)를 N번 호출하는 워크플로우에서 매 메시지마다 동일한 경고 카드가 떠 흐름이 끊김. "세션 신뢰"나 "이 도구 다시 묻지 않기" 옵션이 없어 권한 정책이 가장 거친 단위(메시지)로만 표현됨.<span class="ev">web/src/components/chat/tool-approval-card.tsx:26-63</span></div></li>
+      <li class="med"><span class="fno">⑧</span><div class="ft"><span class="badge med">MED</span> <b>SDK role 기능이 라우팅 활성화 후에도 시각적으로 묵음 — 어떤 모델로 라우팅되는지, 그 프로바이더의 잔여 쿼터가 얼마나 남았는지 보이지 않음</b> — <code>useRoles()</code>(hooks/use-engine.ts) 결과는 select의 <code>&lt;option&gt;</code>로만 노출되고, 라우팅 활성화/비활성화/실패 상태가 별도 표면 없음. 프로바이더가 N개일 때 사용자는 "지금 무슨 모델을 쓰고 있고, 왜 그 모델이 선택됐는가"를 알 수 없음. <code>OxiosEngine</code>이 role로 라우팅할 때도 chat UI는 그 결정에 무지.<span class="ev">web/src/hooks/use-engine.ts:roles query · routes/chat.tsx:13 (useRoles) · chat-input.tsx:373-385 (option only)</span></div></li>
       <li class="low"><span class="fno">⑤</span><div class="ft"><span class="badge low">LOW</span> <b>지식 저장 인디케이터 — 메시지 메타데이터 텍스트 사이에 묻혀 발견성 낮음</b> — '지식에 저장' 버튼이 <code>mt-1</code> 위치에 text-2xs 텍스트 링크로 렌더되어 긴 답변에서는 스크롤 후 인지 불가. 보조 동작이지만 RFC-016 핵심 기능.<span class="ev">web/src/components/chat/knowledge-save-indicator.tsx:76-89</span></div></li>
     </ul>
   </div>
-
   <!-- CHANGES -->
   <div class="changes" style="margin-top:22px">
     <h4>개선안 — 무엇이 바뀌는가</h4>
     <ul>
       <li><span></span><div><b>사이드바 상단 모드 탭:</b> 데스크탑에서도 Console / Knowledge / Chat 3-tab이 항상 보이도록 sidebar 헤더 아래에 고정. 현재 경로의 모드가 활성. ① 해결.</div></li>
       <li><span></span><div><b>빈 상태 capability grid:</b> 인사말 아래 4셀(📚지식 · 🧠메모리 · 🔧도구 · 📁프로젝트) 진입점. 각 셀이 클릭 시 해당 도메인으로 점프 + 첫 메시지 템플릿 자동 주입. ② 해결.</div></li>
+      <li><span></span><div><b>Role 셀렉터 버그 수정(우선순위 1):</b> <code>chat-input.tsx:66</code>의 <code>const &#123; roles = [] &#125; = props</code> → 매개변수 목록으로 옮김. 한 줄 수정으로 SDK role 전체가 select에 등장. ⑥ 즉시 해결.</div></li>
+      <li><span></span><div><b>Role pill + quota 뱃지로 시각 진화:</b> 텍스트 셀렉터 → role 이름 + 모델 short-id + 잔여 쿼터% + 상태 도트 한 줄 pill. 호버 시 풀 모델명·라우팅 사유·쿼터 갱신 시각. ⑧ 해결.</div></li>
+      <li><span></span><div><b>라우팅 실패 인라인 에러:</b> 백엔드가 200 + 빈 payload로 멈추는 케이스(store에 <code>'error'</code> chunk 미도달) — 클라이언트 측 <code>idle timeout</code>(15s) + provider-quota 조회 + "이 프로바이더에 API 키가 없습니다 / 다른 프로바이더로 자동 라우팅" 인라인 카드. 재연결 배너와 시각 구분. ⑦ 해결.</div></li>
       <li><span></span><div><b>인터뷰 자유입력 접기:</b> 항상 보이던 textarea를 <code>&lt;details&gt;</code> "추가 설명 (선택)" 토글로 강등. 단답 문항은 시각적으로 단순화, 다답/주관식만 노출. ③ 해결.</div></li>
       <li><span></span><div><b>도구 승인 3-옵션:</b> [거부] [1회 승인] [세션 신뢰]. 세션 신뢰 선택 시 같은 세션 동안 동일 도구 재승인 생략. 카드에 호출 명령 preview를 보여줘 맥락 제공. ④ 해결.</div></li>
       <li><span></span><div><b>지식 저장 pill:</b> text-only 링크 → 테두리 있는 작은 pill 버튼으로 승격. 메타 라인과 분리되어 한 눈에 보임. ⑤ 해소.</div></li>

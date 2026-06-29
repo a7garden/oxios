@@ -158,6 +158,12 @@ pub struct MsgCtx {
     /// resolves the model via `engine.role_routing[role]`. Populated
     /// by the gateway from the WS `role` field.
     pub role: Option<String>,
+    /// Per-message model override (optional). When set, the orchestrator
+    /// carries it into [`ExecEnv::model_override`] so the agent runtime
+    /// uses this model instead of `role_routing[role]` or the engine
+    /// default. Populated by the gateway from the WS / POST `model`
+    /// field. `None` for normal runs.
+    pub model_override: Option<String>,
     /// User identifier.
     pub user_id: String,
 }

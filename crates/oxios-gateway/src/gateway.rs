@@ -548,6 +548,7 @@ impl Gateway {
             // RFC-027: unified path. Falls back to handle_message internally
             // if IntentEngine is not wired.
             let role = msg.metadata.get("role").map(String::as_str);
+            let model_override = msg.metadata.get("model_override").map(String::as_str);
             let result = orchestrator
                 .handle_unified(
                     &msg.user_id,
@@ -556,6 +557,7 @@ impl Gateway {
                     project_ids.as_deref(),
                     mount_ids.as_deref(),
                     role,
+                    model_override,
                     &request_id,
                 )
                 .await;

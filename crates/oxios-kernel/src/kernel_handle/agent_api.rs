@@ -474,7 +474,7 @@ fn filter_matches(agent: &AgentInfo, filter: &AgentListFilter) -> bool {
         return false;
     }
 
-    // Session / project / seed
+    // Session / project
     if let Some(ref sid) = filter.session_id
         && agent.session_id.as_deref() != Some(sid.as_str())
     {
@@ -482,11 +482,6 @@ fn filter_matches(agent: &AgentInfo, filter: &AgentListFilter) -> bool {
     }
     if let Some(ref pid) = filter.project_id
         && agent.project_id.map(|p| p.to_string()).as_deref() != Some(pid.as_str())
-    {
-        return false;
-    }
-    if let Some(ref sid) = filter.seed_id
-        && agent.seed_id.map(|s| s.to_string()).as_deref() != Some(sid.as_str())
     {
         return false;
     }

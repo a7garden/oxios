@@ -925,7 +925,9 @@ export function useModels(provider: string | null) {
     queryFn: async (): Promise<ModelInfo[]> => {
       if (provider) {
         try {
-          const res = await api.get<ProviderModelsResponse>(`/api/engine/models?provider=${encodeURIComponent(provider)}`)
+          const res = await api.get<ProviderModelsResponse>(
+            `/api/engine/models?provider=${encodeURIComponent(provider)}`,
+          )
           return res.models
         } catch {
           // Fall back to static catalog
@@ -1068,7 +1070,6 @@ export function useSetRoles() {
     },
   })
 }
-
 
 /** Fetch routing statistics (model usage counts + costs). */
 export function useRoutingStats() {

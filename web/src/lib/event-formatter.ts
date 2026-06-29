@@ -187,14 +187,6 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         color: approved ? 'text-emerald-500' : 'text-red-500',
       }
     }
-    case 'seed_created':
-      return {
-        ...base,
-        label: 'seed',
-        summary: 'seed created',
-        icon: Sparkles,
-        color: 'text-violet-500',
-      }
     case 'phase_started':
     case 'phase_completed': {
       const phase = safeStr(event.phase, 30)
@@ -311,7 +303,6 @@ export const INTERESTING_EVENT_TYPES = new Set<string>([
   'memory_stored',
   'approval_requested',
   'approval_resolved',
-  'seed_created',
   'phase_started',
   'phase_completed',
   'evaluation_complete',

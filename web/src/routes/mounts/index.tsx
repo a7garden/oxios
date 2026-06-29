@@ -1,3 +1,4 @@
+import { MOUNT_DRAG_MIME } from '@/hooks/use-mount-drop-zone'
 import { createFileRoute } from '@tanstack/react-router'
 import { FolderPlus, Pencil, RefreshCw, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { useState } from 'react'
@@ -10,6 +11,14 @@ import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useDeleteMount, useMounts, useRescanMount } from '@/hooks/use-mounts'
 import type { Mount } from '@/types'
@@ -21,7 +30,7 @@ function MountsPage() {
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [editingMount, setEditingMount] = useState<Mount | null>(null)
-
+  const [deleteTarget, setDeleteTarget] = useState<Mount | null>(null)
   const { data, isLoading, isError, refetch } = useMounts(search || undefined)
   const deleteMount = useDeleteMount()
   const rescanMount = useRescanMount()
@@ -98,14 +107,21 @@ function MountsPage() {
           {mounts.map((mount) => (
             <div
               key={mount.id}
-              className="group relative rounded-lg border bg-card p-4 transition-all hover:shadow-sm"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'copy'
+                e.dataTransfer.setData(MOUNT_DRAG_MIME, mount.id)
+                e.dataTransfer.setData('text/plain', mount.name)
+              }}
+              className="group relative rounded-lg border bg-card p-4 transition-all hover:shadow-sm cursor-grab active:cursor-grabbing"
             >
               {/* Action buttons: rescan + delete (top-right) */}
-              <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+
+              <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-70 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-8 w-8"
                   onClick={() => setEditingMount(mount)}
                   aria-label={t('common.edit', '편집')}
                 >
@@ -114,7 +130,7 @@ function MountsPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-8 w-8"
                   onClick={() => handleRescan(mount)}
                   aria-label={t('mounts.rescan', '갱신')}
                 >
@@ -123,8 +139,8 @@ function MountsPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
-                  onClick={() => handleDelete(mount)}
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  onClick={() => setDeleteTarget(mount)}
                   aria-label={t('common.delete', '삭제')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -191,6 +207,46 @@ function MountsPage() {
       <CreateMountDialog open={showCreate} onOpenChange={setShowCreate} />
       {/* Edit dialog */}
       <EditMountDialog mount={editingMount} onOpenChange={setEditingMount} />
+
+      {/* Delete confirm */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('mounts.deleteConfirmTitle', 'Delete mount?')}</DialogTitle>
+            <DialogDescription>
+              {t(
+                'mounts.deleteConfirmDescription',
+                'This will permanently remove the mount. Agents that depend on it will lose access.',
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteMount.isPending}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (!deleteTarget) return
+                handleDelete(deleteTarget)
+                setDeleteTarget(null)
+              }}
+              disabled={deleteMount.isPending}
+            >
+              {t('common.delete', '삭제')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

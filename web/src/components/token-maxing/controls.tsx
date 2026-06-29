@@ -47,9 +47,7 @@ export function TokenMaxingControls() {
   // can fire the right mutation after the metered-provider confirm dialog.
   const [pending, setPending] = useState<StartRequest | null>(null)
 
-  const meteredProviders = (providers?.providers ?? []).filter(
-    (p) => p.billing_model === 'metered',
-  )
+  const meteredProviders = (providers?.providers ?? []).filter((p) => p.billing_model === 'metered')
   const hasMetered = meteredProviders.length > 0
 
   const guardedStart = (req: StartRequest) => {

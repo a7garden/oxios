@@ -8,7 +8,7 @@ import { ApprovalsQueue } from '@/components/dashboard/approvals-queue'
 import { BudgetCard } from '@/components/dashboard/budget-card'
 import { DreamCard } from '@/components/dashboard/dream-card'
 import { McpStatusCard } from '@/components/dashboard/mcp-status-card'
-import { SkillsSeedsCard } from '@/components/dashboard/skills-seeds-card'
+import { SkillsCronCard } from '@/components/dashboard/skills-cron-card'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { SystemHealthCard } from '@/components/dashboard/system-health-card'
 import { ErrorState } from '@/components/shared/error-state'
@@ -193,7 +193,7 @@ function DashboardPage() {
         <McpStatusCard />
         <BudgetCard />
         <DreamCard />
-        <SkillsSeedsCard />
+        <SkillsCronCard />
       </div>
 
       {/* Row 4: Pending approvals (full-width, only when needed) */}

@@ -1,13 +1,4 @@
-import {
-  AlertCircle,
-  Bot,
-  ClipboardList,
-  KeyRound,
-  RefreshCw,
-  Route,
-  User,
-  Wrench,
-} from 'lucide-react'
+import { AlertCircle, ClipboardList, KeyRound, RefreshCw, Route } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -45,41 +36,29 @@ export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: M
 
   if (isTool) {
     return (
-      <div className="flex gap-3 my-1">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-          <span className="text-xs">
-            <Wrench className="h-3.5 w-3.5" />
-          </span>
-        </div>
-        <div className="flex-1">
-          {message.toolName && (
-            <ToolCallCard
-              call={{
-                tool_name: message.toolName,
-                input:
-                  typeof message.toolArgs === 'string'
-                    ? message.toolArgs
-                    : JSON.stringify(message.toolArgs ?? '', null, 2),
-                output:
-                  typeof message.toolResult === 'string'
-                    ? message.toolResult
-                    : JSON.stringify(message.toolResult ?? '', null, 2),
-                duration_ms: message.toolDurationMs ?? 0,
-              }}
-            />
-          )}
-        </div>
+      <div className="my-1">
+        {message.toolName && (
+          <ToolCallCard
+            call={{
+              tool_name: message.toolName,
+              input:
+                typeof message.toolArgs === 'string'
+                  ? message.toolArgs
+                  : JSON.stringify(message.toolArgs ?? '', null, 2),
+              output:
+                typeof message.toolResult === 'string'
+                  ? message.toolResult
+                  : JSON.stringify(message.toolResult ?? '', null, 2),
+              duration_ms: message.toolDurationMs ?? 0,
+            }}
+          />
+        )}
       </div>
     )
   }
 
   return (
-    <div className={`flex gap-3 my-1.5 ${isUser ? 'justify-end' : ''}`}>
-      {!isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-          <Bot className="h-4 w-4" />
-        </div>
-      )}
+    <div className={`flex my-1.5 ${isUser ? 'justify-end' : ''}`}>
       <div className="max-w-[80%]">
         <div
           className={`rounded-lg px-4 py-2 ${
@@ -168,11 +147,6 @@ export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: M
           <KnowledgeSaveIndicator sessionId={sessionId} messageIndex={assistantIndex} />
         )}
       </div>
-      {isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-          <User className="h-4 w-4" />
-        </div>
-      )}
     </div>
   )
 }

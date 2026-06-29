@@ -49,8 +49,7 @@ export function EditMountDialog({ mount, onOpenChange }: EditMountDialogProps) {
     if (!mount) return
     const trimmedName = name.trim()
     const trimmedPath = path.trim()
-    const unchanged =
-      trimmedName === mount.name && trimmedPath === (mount.paths[0] ?? '')
+    const unchanged = trimmedName === mount.name && trimmedPath === (mount.paths[0] ?? '')
     if (unchanged) {
       close()
       return
@@ -97,20 +96,14 @@ export function EditMountDialog({ mount, onOpenChange }: EditMountDialogProps) {
               placeholder="/path/to/project"
             />
             <p className="text-xs text-muted-foreground">
-              {t(
-                'mounts.pathEditHint',
-                '경로를 바꾸면 자동 설명과 기술 스택이 다시 채워집니다.',
-              )}
+              {t('mounts.pathEditHint', '경로를 바꾸면 자동 설명과 기술 스택이 다시 채워집니다.')}
             </p>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close}>
               {t('common.cancel', '취소')}
             </Button>
-            <Button
-              type="submit"
-              disabled={!name.trim() || !path.trim() || updateMount.isPending}
-            >
+            <Button type="submit" disabled={!name.trim() || !path.trim() || updateMount.isPending}>
               {updateMount.isPending ? t('common.saving', '저장 중...') : t('common.save', '저장')}
             </Button>
           </DialogFooter>

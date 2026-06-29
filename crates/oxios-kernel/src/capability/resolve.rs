@@ -1,9 +1,9 @@
 //! CSpace resolution — determines an agent's initial capability space from
-//! Seed + Config inputs.
+//! Directive + Config inputs.
 //!
 //! The resolution follows a priority chain:
 //!
-//! 1. **Explicit cspace hint** on the seed → parse and use it.
+//! 1. **Explicit cspace hint** on the directive → parse and use it.
 //! 2. **Persona role** → map known roles to built-in templates.
 //! 3. **Default** → fall back to the `worker` template.
 //!
@@ -32,7 +32,7 @@ const ROLE_SUPERVISOR: &str = "supervisor";
 ///
 /// # Arguments
 ///
-/// * `cspace_hint` — Optional hint string from the Seed. Can be a known
+/// * `cspace_hint` — Optional hint string from the Directive. Can be a known
 ///   template name ("worker", "standard", "operator", "supervisor") or a
 ///   JSON object describing custom capabilities.
 /// * `persona_role` — The role field of the assigned persona, if any.
@@ -51,7 +51,7 @@ pub fn resolve_cspace(
     default_template: Option<&str>,
     agent_id: AgentId,
 ) -> CSpace {
-    // 1. Explicit hint from seed takes highest priority.
+    // 1. Explicit hint from directive takes highest priority.
     if let Some(hint) = cspace_hint {
         let trimmed = hint.trim();
         if !trimmed.is_empty() {

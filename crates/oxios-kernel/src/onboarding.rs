@@ -25,7 +25,6 @@ pub const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace",
     "workspace/memory",
     "workspace/memory/knowledge",
-    "workspace/seeds",
     "workspace/sessions",
     "workspace/skills",
 ];

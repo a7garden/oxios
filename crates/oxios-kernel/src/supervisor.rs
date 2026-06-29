@@ -123,10 +123,7 @@ pub trait Supervisor: Send + Sync {
 
     /// Fork a new agent from a Directive and ExecEnv (RFC-027).
     ///
-    /// Reads the goal / project_id from the unified-intent types. The
-    /// resulting agent has no `seed_id` (a Directive has no stable
-    /// per-execution UUID yet — Phase 6 will mint one in
-    /// `Orchestrator::handle()`).
+    /// Reads the goal / project_id from the unified-intent Directive.
     async fn fork_directive(&self, directive: &Directive, env: &ExecEnv) -> Result<AgentId>;
 
     /// Fork and execute an agent with a Directive + ExecEnv, running to completion.
@@ -236,9 +233,6 @@ impl Supervisor for BasicSupervisor {
             name: directive.goal.clone(),
             status: AgentStatus::Starting,
             created_at: Utc::now(),
-            // Directive has no per-execution UUID yet (Phase 6). Leave
-            // seed_id None to mark this as a directive-spawned agent.
-            seed_id: None,
             project_id: env.project_id,
             started_at: None,
             completed_at: None,
@@ -792,7 +786,6 @@ mod tests {
         assert_eq!(agents[0].id, id);
         assert_eq!(agents[0].name, "Test agent");
         assert_eq!(agents[0].status, AgentStatus::Starting);
-        assert_eq!(agents[0].seed_id, None);
     }
 
     #[tokio::test]

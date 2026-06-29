@@ -1,5 +1,5 @@
-import { Check, ChevronDown } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Check, ChevronDown, Search, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { ModelInfo } from '@/types/engine'
@@ -24,13 +24,23 @@ interface ModelSelectProps {
   models: ModelInfo[]
   value: string | null
   onValueChange: (modelId: string) => void
+  /** Optional id → display name map. Falls back to the model.provider id. */
+  providersById?: Map<string, string>
   className?: string
 }
 
-export function ModelSelect({ models, value, onValueChange, className }: ModelSelectProps) {
+export function ModelSelect({
+  models,
+  value,
+  onValueChange,
+  providersById,
+  className,
+}: ModelSelectProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -40,11 +50,46 @@ export function ModelSelect({ models, value, onValueChange, className }: ModelSe
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
+  // Reset search query when closing; focus input when opening.
+  useEffect(() => {
+    if (open) {
+      requestAnimationFrame(() => inputRef.current?.focus())
+    } else {
+      setQuery('')
+    }
+  }, [open])
+
   const selected = models.find((m) => m.id === value)
 
-  // Separate reasoning and non-reasoning models
-  const reasoningModels = models.filter((m) => m.reasoning)
-  const standardModels = models.filter((m) => !m.reasoning)
+  // Filter by search query (name, id, or provider name). Case-insensitive.
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return null
+    return models.filter((m) => {
+      if (m.name.toLowerCase().includes(q)) return true
+      if (m.id.toLowerCase().includes(q)) return true
+      const providerName = providersById?.get(m.provider) ?? m.provider
+      if (providerName.toLowerCase().includes(q)) return true
+      return false
+    })
+  }, [models, query, providersById])
+
+  // Group by provider, then split each provider's models into reasoning / standard.
+  // Order providers by their first appearance in the model list to keep stable
+  // ordering across renders.
+  const grouped = models.reduce<Map<string, { reasoning: ModelInfo[]; standard: ModelInfo[] }>>(
+    (acc, m) => {
+      const bucket = acc.get(m.provider) ?? { reasoning: [], standard: [] }
+      if (m.reasoning) bucket.reasoning.push(m)
+      else bucket.standard.push(m)
+      acc.set(m.provider, bucket)
+      return acc
+    },
+    new Map(),
+  )
+  const providerOrder = Array.from(new Set(models.map((m) => m.provider)))
+  const providerLabel = (id: string) => providersById?.get(id) ?? id
+  const isFiltering = filtered !== null
 
   return (
     <div className={cn('relative', className)} ref={ref}>
@@ -73,44 +118,107 @@ export function ModelSelect({ models, value, onValueChange, className }: ModelSe
       </button>
 
       {open && models.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md max-h-96 overflow-y-auto">
-          {/* Reasoning models */}
-          {reasoningModels.length > 0 && (
-            <div>
-              <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 flex items-center gap-1">
-                <span>✦</span> {t('engine.reasoningModels')}
-              </div>
-              {reasoningModels.map((m) => (
-                <ModelRow
-                  key={m.id}
-                  model={m}
-                  selected={value === m.id}
-                  onSelect={onValueChange}
-                  onClose={() => setOpen(false)}
-                />
-              ))}
-            </div>
-          )}
+        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md max-h-96 flex flex-col">
+          {/* Search input */}
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2 shrink-0">
+            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  if (query) setQuery('')
+                  else setOpen(false)
+                }
+              }}
+              placeholder={t('engine.searchModel')}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="text-muted-foreground hover:text-foreground shrink-0"
+                title="Clear"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
 
-          {/* Standard models */}
-          {standardModels.length > 0 && (
-            <div>
-              {reasoningModels.length > 0 && (
-                <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 flex items-center gap-1">
-                  {t('engine.standardModels')}
+          {/* List */}
+          <div className="overflow-y-auto flex-1">
+            {isFiltering ? (
+              filtered!.length === 0 ? (
+                <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  {t('engine.noSearchResults', { query })}
                 </div>
-              )}
-              {standardModels.map((m) => (
-                <ModelRow
-                  key={m.id}
-                  model={m}
-                  selected={value === m.id}
-                  onSelect={onValueChange}
-                  onClose={() => setOpen(false)}
-                />
-              ))}
-            </div>
-          )}
+              ) : (
+                <div>
+                  {filtered!.map((m) => (
+                    <ModelRow
+                      key={m.id}
+                      model={m}
+                      selected={value === m.id}
+                      onSelect={onValueChange}
+                      onClose={() => setOpen(false)}
+                    />
+                  ))}
+                </div>
+              )
+            ) : (
+              providerOrder.map((providerId, idx) => {
+                const bucket = grouped.get(providerId)
+                if (!bucket) return null
+                const { reasoning: rs, standard: ss } = bucket
+                if (rs.length === 0 && ss.length === 0) return null
+                return (
+                  <div key={providerId}>
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 sticky top-0">
+                      {providerLabel(providerId)}
+                    </div>
+                    {rs.length > 0 && (
+                      <div>
+                        <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-muted-foreground/80 flex items-center gap-1">
+                          <span>✦</span> {t('engine.reasoningModels')}
+                        </div>
+                        {rs.map((m) => (
+                          <ModelRow
+                            key={m.id}
+                            model={m}
+                            selected={value === m.id}
+                            onSelect={onValueChange}
+                            onClose={() => setOpen(false)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {ss.length > 0 && (
+                      <div>
+                        {rs.length > 0 && (
+                          <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-muted-foreground/80">
+                            {t('engine.standardModels')}
+                          </div>
+                        )}
+                        {ss.map((m) => (
+                          <ModelRow
+                            key={m.id}
+                            model={m}
+                            selected={value === m.id}
+                            onSelect={onValueChange}
+                            onClose={() => setOpen(false)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {idx < providerOrder.length - 1 && <div className="h-px bg-border my-1" />}
+                  </div>
+                )
+              })
+            )}
+          </div>
         </div>
       )}
     </div>

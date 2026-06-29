@@ -1,5 +1,5 @@
 import { FolderOpen } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -12,8 +12,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { useMountDropZone } from '@/hooks/use-mount-drop-zone'
 import { useMounts } from '@/hooks/use-mounts'
 import { useUpdateProject } from '@/hooks/use-projects'
 import type { Project } from '@/types'
@@ -38,25 +38,20 @@ export function EditProjectDialog({
 
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('package')
-  const [description, setDescription] = useState('')
-  const [tags, setTags] = useState('')
-  const [paths, setPaths] = useState('')
-  const [memoryVisible, setMemoryVisible] = useState(true)
   // RFC-025: mount_ids + instructions
   const [mountIds, setMountIds] = useState<string[]>([])
   const [instructions, setInstructions] = useState('')
   const { data: mountsData } = useMounts()
-  const availableMounts = mountsData?.items ?? []
+  const availableMounts = useMemo(() => mountsData?.items ?? [], [mountsData?.items])
+  const attachMount = (id: string) =>
+    setMountIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  const { isOver, dropProps } = useMountDropZone({ onDropMount: attachMount })
 
   // Sync state when the project prop or open state changes.
   useEffect(() => {
     if (project && open) {
       setName(project.name)
       setIcon(project.emoji ?? 'package')
-      setDescription(project.description ?? '')
-      setTags((project.tags ?? []).join(', '))
-      setPaths((project.paths ?? []).join('\n'))
-      setMemoryVisible(project.memory_visible ?? true)
       setMountIds(project.mount_ids ?? [])
       setInstructions(project.instructions ?? '')
     }
@@ -69,17 +64,7 @@ export function EditProjectDialog({
       {
         id: project.id,
         name: name.trim(),
-        description: description.trim() || undefined,
-        tags: tags
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
-        paths: paths
-          .split('\n')
-          .map((p) => p.trim())
-          .filter(Boolean),
         emoji: icon,
-        memory_visible: memoryVisible,
         mount_ids: mountIds,
         instructions: instructions.trim() || undefined,
       },
@@ -134,44 +119,11 @@ export function EditProjectDialog({
             </div>
           </div>
 
+
+          {/* RFC-025: Mount references — click-toggle chips + drag-drop zone */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">
-              {t('projects.description', 'Description')}
-            </label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.tags', 'Tags')}</label>
-            <Input value={tags} onChange={(e) => setTags(e.target.value)} />
-            <p className="text-2xs text-muted-foreground">
-              {t('projects.tagsHint', 'Comma-separated')}
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.paths', 'Paths')}</label>
-            <Textarea value={paths} onChange={(e) => setPaths(e.target.value)} rows={2} />
-            <p className="text-2xs text-muted-foreground">
-              {t('projects.pathsHint', 'One per line')}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">
-              {t('projects.memoryVisible', 'Memory Visible')}
-            </label>
-            <Switch checked={memoryVisible} onCheckedChange={setMemoryVisible} />
-          </div>
-
-          {/* RFC-025: Mount references */}
-          {availableMounts.length > 0 && (
-            <div className="space-y-1">
-              <label className="text-sm font-medium">{t('projects.mounts', 'Mounts')}</label>
+            <label className="text-sm font-medium">{t('projects.mounts', 'Mounts')}</label>
+            {availableMounts.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {availableMounts.map((m) => (
                   <button
@@ -194,8 +146,23 @@ export function EditProjectDialog({
                   </button>
                 ))}
               </div>
+            )}
+            <div
+              {...dropProps}
+              className={`mt-2 rounded-md border-2 border-dashed p-3 transition-colors ${
+                isOver
+                  ? 'border-primary bg-primary/5'
+                  : 'border-muted-foreground/30 bg-muted/30'
+              }`}
+            >
+              <p className="text-xs text-muted-foreground text-center py-1">
+                {t(
+                  'projects.mountDropHint',
+                  'Mount 카드를 여기로 드래그해 첨부하세요.',
+                )}
+              </p>
             </div>
-          )}
+          </div>
 
           {/* RFC-025: Custom instructions */}
           <div className="space-y-1">

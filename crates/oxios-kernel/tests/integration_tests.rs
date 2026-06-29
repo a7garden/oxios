@@ -76,7 +76,6 @@ impl Supervisor for MockSupervisor {
             name: directive.goal.clone(),
             status: AgentStatus::Starting,
             created_at: chrono::Utc::now(),
-            seed_id: None,
             project_id: None,
             started_at: None,
             completed_at: None,
@@ -285,15 +284,15 @@ async fn test_state_store_list_category() {
     let store = StateStore::new(tmp.path().to_path_buf()).unwrap();
 
     store
-        .save_markdown("seeds", "alpha", "seed alpha content")
+        .save_markdown("notes", "alpha", "alpha content")
         .await
         .unwrap();
     store
-        .save_markdown("seeds", "beta", "seed beta content")
+        .save_markdown("notes", "beta", "beta content")
         .await
         .unwrap();
 
-    let names = store.list_category("seeds").await.unwrap();
+    let names = store.list_category("notes").await.unwrap();
     assert_eq!(names, vec!["alpha", "beta"]);
 }
 
@@ -377,6 +376,7 @@ async fn test_orchestrator_happy_path() {
             None,
             None,
             None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await
@@ -412,7 +412,8 @@ async fn test_orchestrator_events_published() {
                 None,
                 None,
                 None,
-                None,
+                None, // RFC-032: role
+                None, // model_override
                 "test-req",
             )
             .await
@@ -579,7 +580,6 @@ impl Supervisor for TrackingSupervisor {
             name: directive.goal.clone(),
             status: AgentStatus::Starting,
             created_at: chrono::Utc::now(),
-            seed_id: None,
             project_id: None,
             started_at: None,
             completed_at: None,
@@ -677,6 +677,7 @@ async fn test_orchestrator_routes_to_supervisor() {
             None,
             None,
             None, // RFC-032: role
+            None, // model_override
             "test-req",
         )
         .await

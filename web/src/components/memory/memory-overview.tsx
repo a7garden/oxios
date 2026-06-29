@@ -1,4 +1,4 @@
-import { Activity, Brain, Hash, Pin } from 'lucide-react'
+import { Activity, Brain, Hash } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -72,13 +72,13 @@ export function MemoryOverview() {
       value: stats.by_type ? Object.keys(stats.by_type).length : 0,
       icon: Hash,
     },
-    { label: t('memory.pinnedEntries'), value: 0, icon: Pin },
+
     { label: t('memory.dreamStatus'), value: 'idle', icon: Activity },
   ]
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {statCards.map((s) => (
           <Card key={s.label}>
             <CardContent className="p-4 flex items-center gap-3">

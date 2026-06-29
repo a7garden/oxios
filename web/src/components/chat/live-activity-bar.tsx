@@ -1,4 +1,4 @@
-import { Bot, Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { deriveCurrentActivity } from '@/lib/live-activity'
 import { cn } from '@/lib/utils'
@@ -44,15 +44,12 @@ export function LiveActivityBar() {
   return (
     <div
       className={cn(
-        'flex gap-3 my-1.5 animate-fade-in-up transition-opacity duration-300',
+        'flex my-1.5 animate-fade-in-up transition-opacity duration-300',
         streamingTextStarted && 'opacity-0 pointer-events-none',
       )}
       aria-live="polite"
       data-state={streamingTextStarted ? 'fading' : 'live'}
     >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-        <Bot className="h-4 w-4" />
-      </div>
       <div className="max-w-[80%]">
         <div className="rounded-lg px-4 py-2.5 bg-muted">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

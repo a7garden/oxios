@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oxios Web UI/UX 감사 보고서</title>
+<style>
+/* ===== Report chrome (editorial design-review doc) =====
+   Self-contained. Mockups inside .panel use INLINE styles or #screen-NN scoped
+   selectors ONLY — never bare global rules (leak-on-merge rule). */
+:root{
+  --ink:#1a1a1a; --ink-soft:#444; --ink-mute:#777; --rule:#e4e2dd;
+  --paper:#faf8f4; --paper-2:#f3f0e9; --card:#ffffff;
+  --hi:#b3261e;   /* high */
+  --med:#9a6700;  /* med */
+  --lo:#475569;   /* low */
+  --hi-bg:#fdecea; --med-bg:#fbf3e0; --lo-bg:#eef1f4;
+  --oklch-primary:oklch(0.23 0.025 265);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behout:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.doc{max-width:1180px;margin:0 auto;padding:48px 40px 120px}
+a{color:inherit}
+/* ---- top bar ---- */
+.topbar{display:flex;align-items:baseline;justify-content:space-between;
+  border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:8px}
+.topbar h1{font-size:30px;font-weight:750;letter-spacing:-.02em;margin:0}
+.topbar .meta{font-family:var(--mono);font-size:12px;color:var(--ink-mute);text-align:right;line-height:1.5}
+.lede{font-size:16px;color:var(--ink-soft);max-width:760px;margin:14px 0 0}
+/* ---- tally ---- */
+.tally{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 6px}
+.tally b{font-family:var(--mono);font-size:13px}
+.chip{border:1px solid var(--rule);border-radius:999px;padding:5px 12px;font-size:13px;background:var(--card)}
+.chip.h{border-color:var(--hi);color:var(--hi)} .chip.m{border-color:var(--med);color:var(--med)} .chip.l{border-color:var(--lo);color:var(--lo)}
+/* ---- cross-screen summary ---- */
+.summary{background:var(--paper-2);border:1px solid var(--rule);border-left:4px solid var(--oklch-primary);
+  border-radius:10px;padding:22px 26px;margin:26px 0 8px}
+.summary h2{margin:0 0 4px;font-size:20px;font-weight:750;letter-spacing:-.01em}
+.summary .pat{margin:16px 0 0}
+.summary .pat:first-of-type{margin-top:14px}
+.summary .pat h3{margin:0 0 4px;font-size:15px;font-weight:700}
+.summary .pat .ev{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin-top:4px}
+.summary .pat .fix{font-size:14px;color:var(--ink-soft)}
+/* ---- sticky index ---- */
+.idx-wrap{position:sticky;top:0;z-index:20;background:var(--paper);
+  margin:0 -40px 24px;padding:14px 40px 12px;border-bottom:1px solid var(--rule)}
+.idx{display:flex;gap:6px;flex-wrap:wrap}
+.idx a{font-size:12px;font-family:var(--mono);text-decoration:none;color:var(--ink-mute);
+  border:1px solid transparent;border-radius:6px;padding:3px 8px}
+.idx a:hover{background:var(--card);border-color:var(--rule);color:var(--ink)}
+.idx a .h{color:var(--hi);font-weight:700}
+.idx a .m{color:var(--med);font-weight:700}
+.idx a .l{color:var(--lo);font-weight:700}
+/* ---- screen section ---- */
+.screen{border-top:1px solid var(--rule);padding:30px 0 10px;margin-top:30px}
+.screen:first-of-type{border-top:0;margin-top:10px}
+.screen-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:6px}
+.num{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:var(--ink);color:#fff;
+  font-family:var(--mono);font-size:14px;font-weight:700;display:grid;place-items:center}
+.screen-head .titles{flex:1}
+.screen-head h2{margin:0;font-size:22px;font-weight:750;letter-spacing:-.01em}
+.screen-head .route{font-family:var(--mono);font-size:12.5px;color:var(--ink-mute)}
+/* ---- rubric bar (8 cells) ---- */
+.rubric{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin:14px 0 4px;max-width:760px}
+.rubric .cell{text-align:center;border-radius:6px;padding:7px 2px 6px;font-size:11px;line-height:1.25}
+.rubric .cell .sc{display:block;font-family:var(--mono);font-size:14px;font-weight:700;margin-bottom:2px}
+.r5{background:#e7f3e8;color:#1e6b2c} .r4{background:#eef4ea;color:#3f6b1e}
+.r3{background:var(--med-bg);color:var(--med)} .r2{background:#fbe7e3;color:var(--hi)} .r1{background:#f6d6d1;color:var(--hi)}
+/* ---- compare panels ---- */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 6px}
+.panel{border:1px solid var(--rule);border-radius:12px;overflow:hidden;background:var(--card)}
+.panel .plabel{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:12px;
+  font-weight:700;font-family:var(--mono);border-bottom:1px solid var(--rule)}
+.panel.cur .plabel{background:var(--paper-2);color:var(--ink-soft)}
+.panel.prop .plabel{background:var(--oklch-primary);color:#fff}
+.panel.prop .plabel .tag{opacity:.85}
+.panel .stage{padding:0;position:relative}
+/* ---- pins ---- */
+.pin{position:absolute;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;
+  color:#fff;font-size:11px;font-weight:700;font-family:var(--mono);border:2px solid #fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:3}
+.pin.h{background:var(--hi)} .pin.m{background:var(--med)} .pin.l{background:var(--lo)}
+/* ---- findings ---- */
+.findings{margin-top:18px}
+.findings h4{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-mute)}
+.flist{list-style:none;margin:0;padding:0}
+.flist li{display:grid;grid-template-columns:54px 1fr;gap:10px;padding:9px 0;border-bottom:1px solid var(--rule);font-size:14px}
+.flist li:last-child{border-bottom:0}
+.badge{justify-self:start;align-self:start;font-family:var(--mono);font-size:11px;font-weight:700;
+  border-radius:5px;padding:2px 7px;margin-top:2px}
+.badge.h{background:var(--hi-bg);color:var(--hi)} .badge.m{background:var(--med-bg);color:var(--med)} .badge.l{background:var(--lo-bg);color:var(--lo)}
+.flist .ft{font-weight:650}
+.flist .cite{display:block;font-family:var(--mono);font-size:11.5px;color:var(--ink-mute);margin-top:2px}
+/* ---- changes ---- */
+.changes{margin-top:16px;background:var(--paper-2);border-radius:10px;padding:14px 18px}
+.changes h4{margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-mute)}
+.changes ul{margin:0;padding-left:18px} .changes li{font-size:14px;color:var(--ink-soft);margin:3px 0}
+.foot{margin-top:60px;padding-top:18px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:11.5px;color:var(--ink-mute)}
+@media (max-width:860px){.compare{grid-template-columns:1fr}.rubric{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<div class="doc">

@@ -8,7 +8,6 @@ export interface AgentListItem {
   created_at: string
   started_at: string | null
   completed_at: string | null
-  seed_id: string | null
   project_id: string | null
   session_id: string | null
   error: string | null
@@ -60,9 +59,8 @@ export interface AgentDetail {
   id: string
   name: string
   status: string
-  seed_id: string | null
-  project_id: string | null
   session_id: string | null
+  project_id: string | null
   created_at: string
   started_at: string | null
   completed_at: string | null

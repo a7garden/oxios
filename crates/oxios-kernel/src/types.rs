@@ -62,8 +62,6 @@ pub struct AgentInfo {
     pub status: AgentStatus,
     /// Timestamp when the agent was created.
     pub created_at: DateTime<Utc>,
-    /// The seed this agent was forked from, if any.
-    pub seed_id: Option<uuid::Uuid>,
     /// Project ID detected by the orchestrator.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<uuid::Uuid>,
@@ -161,7 +159,7 @@ mod tests {
     #[test]
     fn test_agent_info_construction() {
         let id = AgentId::new_v4();
-        let seed_id = uuid::Uuid::new_v4();
+
         let now = Utc::now();
 
         let info = AgentInfo {
@@ -169,7 +167,6 @@ mod tests {
             name: "test-agent".to_string(),
             status: AgentStatus::Running,
             created_at: now,
-            seed_id: Some(seed_id),
             project_id: None,
             started_at: None,
             completed_at: None,
@@ -188,7 +185,6 @@ mod tests {
         assert_eq!(info.name, "test-agent");
         assert_eq!(info.status, AgentStatus::Running);
         assert_eq!(info.created_at, now);
-        assert_eq!(info.seed_id, Some(seed_id));
     }
 
     #[test]
@@ -198,7 +194,6 @@ mod tests {
             name: "serializer".to_string(),
             status: AgentStatus::Idle,
             created_at: Utc::now(),
-            seed_id: None,
             project_id: None,
             started_at: None,
             completed_at: None,
@@ -218,7 +213,6 @@ mod tests {
         assert_eq!(restored.id, info.id);
         assert_eq!(restored.name, info.name);
         assert_eq!(restored.status, info.status);
-        assert_eq!(restored.seed_id, None);
         assert_eq!(restored.steps_completed, 3);
     }
 

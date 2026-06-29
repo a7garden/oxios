@@ -95,10 +95,11 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — only on mobile where the panel covers the whole screen.
+         On desktop the panel is a side sheet, so the canvas stays usable. */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-background/40 backdrop-blur-[1px] transition-opacity"
+          className="fixed inset-0 z-40 bg-background/40 backdrop-blur-[1px] transition-opacity md:hidden"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -111,8 +112,6 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
           'transition-transform duration-300 ease-[var(--animate-in-easing)]',
           isOpen ? 'translate-x-0' : 'translate-x-full',
         )}
-        aria-label={node ? t('agentMonitor.inspectorTitle', { name: node.name }) : ''}
-        aria-hidden={!isOpen}
       >
         {node && (
           <>

@@ -10,38 +10,37 @@ import type { SemanticSearchResult } from '@/types/memory'
 export function MemorySearch() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
-  const [mode, setMode] = useState<'keyword' | 'semantic'>('keyword')
   const [results, setResults] = useState<SemanticSearchResult[]>([])
   const semanticSearch = useMemorySemanticSearch()
 
   const handleSearch = async () => {
     if (!query.trim()) return
-    if (mode === 'semantic') {
+    // Semantic search falls back to keyword internally when the HNSW
+    // index is unavailable (see oxios-memory manager::ops.rs), so a
+    // single mode is sufficient and avoids the previously broken
+    // "keyword" path that had no backend wiring.
+    try {
       const res = await semanticSearch.mutateAsync({
         query,
         limit: 20,
       })
       setResults(res?.entries ?? [])
+    } catch {
+      setResults([])
     }
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Button
-          variant={mode === 'keyword' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setMode('keyword')}
-        >
-          <Search className="h-4 w-4 mr-1" /> {t('memory.keywordSearch')}
-        </Button>
-        <Button
-          variant={mode === 'semantic' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setMode('semantic')}
-        >
-          <Zap className="h-4 w-4 mr-1" /> {t('memory.semanticSearch')}
-        </Button>
+      <div className="flex items-center justify-between gap-2">
+        <Badge variant="secondary" className="gap-1">
+          <Zap className="h-3 w-3" /> {t('memory.semanticSearch')}
+        </Badge>
+        {semanticSearch.isError && (
+          <p className="text-xs text-destructive">
+            {t('memory.searchFailed', 'Search failed. Please try again.')}
+          </p>
+        )}
       </div>
       <div className="flex gap-2">
         <div className="relative flex-1">

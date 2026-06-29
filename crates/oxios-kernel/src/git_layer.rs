@@ -66,8 +66,6 @@ pub struct CommitContext {
     /// Agent ID — if present the author becomes `agent-{short_id}`,
     /// otherwise `"oxios"`.
     pub agent_id: Option<uuid::Uuid>,
-    /// Seed ID — if present, included in the commit message prefix.
-    pub seed_id: Option<uuid::Uuid>,
     /// Extra tag such as `"memory"`, `"audit"`, `"cron"`.
     pub tag: Option<&'static str>,
 }
@@ -79,10 +77,9 @@ impl CommitContext {
     }
 
     /// Agent commit.
-    pub fn agent(agent_id: uuid::Uuid, seed_id: Option<uuid::Uuid>) -> Self {
+    pub fn agent(agent_id: uuid::Uuid) -> Self {
         Self {
             agent_id: Some(agent_id),
-            seed_id,
             tag: None,
         }
     }
@@ -106,15 +103,11 @@ impl CommitContext {
         }
     }
 
-    /// Build a prefix for the commit message (e.g. `[audit] [seed-abc123] `).
+    /// Build a prefix for the commit message (e.g. `[audit] `).
     fn message_prefix(&self) -> String {
         let mut parts = Vec::new();
         if let Some(tag) = self.tag {
             parts.push(format!("[{tag}]"));
-        }
-        if let Some(ref seed) = self.seed_id {
-            let hex = seed.to_string();
-            parts.push(format!("[seed-{}]", &hex[..8]));
         }
         if parts.is_empty() {
             String::new()
@@ -1057,7 +1050,7 @@ mod tests {
         std::fs::write(dir.path().join("agent_work.json"), b"{\"result\":42}").unwrap();
 
         let agent_id = uuid::Uuid::new_v4();
-        let ctx = CommitContext::agent(agent_id, None);
+        let ctx = CommitContext::agent(agent_id);
         layer
             .commit_file_with("agent_work.json", "agent did work", ctx)
             .unwrap();
@@ -1105,7 +1098,7 @@ mod tests {
 
         let id = uuid::Uuid::parse_str("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee").unwrap();
         assert_eq!(
-            CommitContext::agent(id, None).author_name(),
+            CommitContext::agent(id).author_name(),
             "agent-aaaaaaaa"
         );
 
@@ -1117,13 +1110,7 @@ mod tests {
         assert!(CommitContext::default().message_prefix().is_empty());
         assert_eq!(CommitContext::tagged("audit").message_prefix(), "[audit] ");
 
-        let seed_id = uuid::Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap();
-        let ctx = CommitContext {
-            tag: Some("memory"),
-            seed_id: Some(seed_id),
-            ..Default::default()
-        };
-        assert_eq!(ctx.message_prefix(), "[memory] [seed-11111111] ");
+        assert_eq!(CommitContext::tagged("memory").message_prefix(), "[memory] ");
     }
 
     #[test]
@@ -1133,7 +1120,7 @@ mod tests {
         std::fs::write(dir.path().join("b.json"), b"2").unwrap();
 
         let agent_id = uuid::Uuid::new_v4();
-        let ctx = CommitContext::agent(agent_id, None);
+        let ctx = CommitContext::agent(agent_id);
         let info = layer
             .commit_files_with(&["a.json", "b.json"], "batch agent work", ctx)
             .unwrap();

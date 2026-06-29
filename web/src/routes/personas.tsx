@@ -4,14 +4,27 @@ import { Pencil, Plus, Star, Trash2, Users } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { EditPersonaDialog, type PersonaItem, type PersonaPatch } from '@/components/persona/edit-persona-dialog'
+import {
+  EditPersonaDialog,
+  type PersonaItem,
+  type PersonaPatch,
+} from '@/components/persona/edit-persona-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api-client'
 
@@ -22,6 +35,7 @@ function PersonasPage() {
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<PersonaItem | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<PersonaItem | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
@@ -107,45 +121,75 @@ function PersonasPage() {
         </div>
       </div>
 
-      {showCreate && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('personas.createPersona')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('personas.personaNamePlaceholder')}
-            />
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t('common.description')}
-            />
-            <Textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder={t('personas.systemPromptPlaceholder')}
-              rows={4}
-            />
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() =>
-                  createMutation.mutate({ name, description, system_prompt: systemPrompt })
-                }
-                disabled={!name.trim() || createMutation.isPending}
-              >
-                {t('common.create')}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
-                {t('common.cancel')}
-              </Button>
+      <Dialog
+        open={showCreate}
+        onOpenChange={(open) => {
+          setShowCreate(open)
+          if (!open) {
+            setName('')
+            setDescription('')
+            setSystemPrompt('')
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('personas.createPersona')}</DialogTitle>
+            <DialogDescription>
+              {t('personas.createPersonaDescription', 'Create a new persona for agent customization.')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="persona-name">{t('personas.nameLabel', 'Name')}</Label>
+              <Input
+                id="persona-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('personas.personaNamePlaceholder')}
+              />
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <div className="space-y-1">
+              <Label htmlFor="persona-description">{t('common.description')}</Label>
+              <Input
+                id="persona-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={t('common.description')}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="persona-prompt">{t('personas.systemPromptLabel', 'System prompt')}</Label>
+              <Textarea
+                id="persona-prompt"
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder={t('personas.systemPromptPlaceholder')}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCreate(false)}
+              disabled={createMutation.isPending}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() =>
+                createMutation.mutate({ name, description, system_prompt: systemPrompt })
+              }
+              disabled={!name.trim() || createMutation.isPending}
+            >
+              {t('common.create')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {items.length === 0 && !showCreate ? (
         <EmptyState
@@ -189,7 +233,7 @@ function PersonasPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => deleteMutation.mutate(persona.id)}
+                    onClick={() => setDeleteTarget(persona)}
                     aria-label={t('personas.deletePersona')}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
@@ -217,6 +261,48 @@ function PersonasPage() {
           updateMutation.mutate({ id: editing.id, patch })
         }}
       />
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('personas.deletePersonaConfirmTitle', 'Delete persona?')}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                'personas.deletePersonaConfirmDescription',
+                'This will permanently delete the persona. Agents that depend on it will lose their configuration.',
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteMutation.isPending}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (!deleteTarget) return
+                deleteMutation.mutate(deleteTarget.id, {
+                  onSettled: () => setDeleteTarget(null),
+                })
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              {t('common.delete', '삭제')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

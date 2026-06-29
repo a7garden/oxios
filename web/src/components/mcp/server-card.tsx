@@ -61,7 +61,7 @@ export function ServerCard({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-10 w-10"
           onClick={onRefresh}
           disabled={isRefreshing || !server.enabled}
           title={t('mcp.refresh', 'Refresh')}
@@ -71,7 +71,7 @@ export function ServerCard({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-10 w-10"
           onClick={onEdit}
           title={t('mcp.edit', 'Edit')}
         >
@@ -80,7 +80,7 @@ export function ServerCard({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-10 w-10"
           onClick={onToggle}
           disabled={isToggling}
           title={server.enabled ? t('mcp.disable', 'Disable') : t('mcp.enable', 'Enable')}
@@ -90,7 +90,7 @@ export function ServerCard({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-destructive hover:text-destructive"
+          className="h-10 w-10 text-destructive hover:text-destructive"
           onClick={onDelete}
           disabled={isDeleting}
           title={t('mcp.remove', 'Remove')}

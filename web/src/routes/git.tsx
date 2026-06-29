@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { GitBranch, RotateCcw, ShieldCheck, Tag } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -63,7 +64,13 @@ function GitPage() {
   })
 
   const verifyMutation = useMutation({
-    mutationFn: () => api.post('/api/git/verify'),
+    mutationFn: () => api.post<{ valid?: boolean; message?: string }>('/api/git/verify'),
+    onSuccess: (res) => {
+      toast.success(res?.message ?? t('git.verifySuccess', 'Git integrity verified'))
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : t('git.verifyFailed', 'Verification failed'))
+    },
   })
 
   if (isLoading) return <LoadingCards count={4} />

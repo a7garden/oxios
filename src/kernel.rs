@@ -251,6 +251,12 @@ impl Kernel {
             .expect("ProjectManager not available — SQLite must be enabled")
     }
 
+    /// Get the MountManager reference, if SQLite-backed mounts are enabled.
+    /// Returns `None` when the mount system is unavailable (SQLite off).
+    pub fn mount_manager(&self) -> Option<Arc<oxios_kernel::MountManager>> {
+        self.mount_manager.clone()
+    }
+
     /// Build a MarketplaceApi (ClawHub + Skills.sh) from config.
     fn build_marketplace_api(&self) -> MarketplaceApi {
         let workspace = PathBuf::from(&self.config.kernel.workspace);
@@ -425,7 +431,7 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_unified("cli", prompt, session_id, None, None, None, "cli-direct")
+            .handle_unified("cli", prompt, session_id, None, None, None, None, "cli-direct")
             .await
     }
 
@@ -439,7 +445,7 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_unified("cli", prompt, session_id, None, None, None, "cli-direct")
+            .handle_unified("cli", prompt, session_id, None, None, None, None, "cli-direct")
             .await
     }
 
@@ -808,7 +814,7 @@ impl KernelBuilder {
             .context(format!("Failed to resolve model: {model_id}"))?;
 
         // EngineHandle — hot-swappable engine reference. Created here so both
-        // the OuroborosEngine (interview/seed/eval/evolve) and the AgentRuntime
+        // the OuroborosEngine (interview/crystallize/review) and the AgentRuntime
         // (execute) resolve the *live* default model through it — the single
         // source of truth that makes the phases agree and honors hot-swaps.
         let engine_handle = Arc::new(EngineHandle::new(engine));
@@ -1381,8 +1387,11 @@ impl KernelBuilder {
         // manager (it impls Clone) before the orchestrator consumes it; the
         // maxer drains eligible subscription providers over a window.
         let maxer_lifecycle = lifecycle.clone();
-        let planner =
-            oxios_kernel::WorkPlanner::new(Arc::clone(&skill_manager), project_manager.clone());
+        let planner = oxios_kernel::WorkPlanner::new(
+            Arc::clone(&skill_manager),
+            project_manager.clone(),
+            mount_manager.clone(),
+        );
         let token_maxer = Arc::new(oxios_kernel::TokenMaxer::new(
             maxer_lifecycle,
             Arc::clone(&quota_tracker),
@@ -1713,10 +1722,14 @@ fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {
 
 /// RFC-025 one-time migration: promote legacy Project paths into Mounts.
 ///
-/// For each Project that has `paths` but no `mount_ids`, create a Mount
-/// named after the Project (carrying its paths) and link it via `mount_ids`.
-/// Idempotent — Projects already referencing Mounts are left untouched, and
-/// a name collision (Mount already exists) is treated as already-migrated.
+/// For each Project that has `paths` but no `mount_ids`, resolve a Mount for
+/// every legacy path — reusing an existing Mount that already covers the path
+/// (path-prefix match) when one exists, otherwise creating one named after the
+/// Project — link them via `mount_ids`, then clear the legacy `paths` field.
+///
+/// Idempotent: Projects already referencing Mounts are skipped, and the
+/// path-coverage check prevents duplicate Mounts for paths a user registered
+/// under a different name.
 fn migrate_projects_to_mounts(
     mount_manager: &oxios_kernel::MountManager,
     project_manager: &ProjectManager,
@@ -1734,48 +1747,64 @@ fn migrate_projects_to_mounts(
             continue;
         }
 
-        // A Mount named after the Project is the natural alias.
-        if mount_manager.get_mount_by_name(&project.name).is_some() {
-            tracing::debug!(
-                project = %project.name,
-                "migration skipped: Mount with this name already exists"
-            );
-            continue;
+        // Partition legacy paths: reuse any existing Mount that already covers
+        // a path (path-prefix match), collecting only the uncovered ones for a
+        // new Mount. This avoids duplicating a Mount the user registered for
+        // the same path under a different name.
+        let mut mount_ids: Vec<oxios_kernel::MountId> = Vec::new();
+        let mut uncovered: Vec<PathBuf> = Vec::new();
+        for path in &project.paths {
+            match mount_manager.covering_mount_id(path) {
+                Some(mid) => {
+                    if !mount_ids.contains(&mid) {
+                        mount_ids.push(mid);
+                    }
+                }
+                None => uncovered.push(path.clone()),
+            }
         }
 
-        let paths: Vec<PathBuf> = project.paths.iter().map(PathBuf::from).collect();
-        match mount_manager.create_mount(
-            project.name.clone(),
-            paths,
-            oxios_kernel::MountSource::AutoDetected,
-        ) {
-            Ok(mount) => {
-                // Link the new Mount back to the Project. If the link fails,
-                // roll back the just-created Mount so it does not become a
-                // permanent orphan — otherwise the name-collision check above
-                // would skip it on every subsequent migration run while the
-                // Project still references no Mount.
-                if let Err(e) =
-                    project_manager.update_project_bundle(project.id, Some(vec![mount.id]), None)
-                {
+        // Create one Mount for any uncovered paths, named after the Project
+        // (suffixed to avoid colliding with a manually-created Mount).
+        if !uncovered.is_empty() {
+            let name = unique_mount_name(mount_manager, &project.name);
+            match mount_manager.create_mount(
+                name,
+                uncovered,
+                oxios_kernel::MountSource::AutoDetected,
+            ) {
+                Ok(mount) => mount_ids.push(mount.id),
+                Err(e) => {
                     tracing::warn!(
                         project = %project.name,
                         error = %e,
-                        "link failed; rolling back orphan Mount"
+                        "failed to create Mount during migration; leaving Project paths in place"
                     );
-                    let _ = mount_manager.remove_mount(mount.id);
-                } else {
-                    migrated += 1;
+                    continue;
                 }
             }
-            Err(e) => {
-                tracing::warn!(
-                    project = %project.name,
-                    error = %e,
-                    "failed to create Mount during migration"
-                );
-            }
         }
+
+        // Link the resolved Mounts and clear the legacy `paths` field so the
+        // runtime legacy fallbacks never re-activate for this Project.
+        if let Err(e) =
+            project_manager.update_project_bundle(project.id, Some(mount_ids), None)
+        {
+            tracing::warn!(
+                project = %project.name,
+                error = %e,
+                "link failed; orphan Mounts may remain"
+            );
+            continue;
+        }
+        if let Err(e) = project_manager.clear_legacy_paths(project.id) {
+            tracing::warn!(
+                project = %project.name,
+                error = %e,
+                "Mounts linked but failed to clear legacy paths"
+            );
+        }
+        migrated += 1;
     }
 
     if migrated > 0 {
@@ -1783,5 +1812,21 @@ fn migrate_projects_to_mounts(
             migrated = migrated,
             "RFC-025: migrated legacy Project paths into Mounts"
         );
+    }
+}
+
+/// Pick a Mount name based on `base` that is not already taken, suffixing
+/// `-2`, `-3`, … as needed so the migration never fails on a name collision.
+fn unique_mount_name(mount_manager: &oxios_kernel::MountManager, base: &str) -> String {
+    if mount_manager.get_mount_by_name(base).is_none() {
+        return base.to_string();
+    }
+    let mut n = 2;
+    loop {
+        let candidate = format!("{base}-{n}");
+        if mount_manager.get_mount_by_name(&candidate).is_none() {
+            return candidate;
+        }
+        n += 1;
     }
 }

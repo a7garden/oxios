@@ -117,7 +117,7 @@ enum Command {
         #[arg(long)]
         exit_code: bool,
 
-        /// Chat mode: skip Ouroboros pipeline (interview/seed/evaluate)
+        /// Chat mode: skip Ouroboros pipeline (interview/crystallize/review)
         /// and execute directly via the agent runtime.
         #[arg(long)]
         chat: bool,
@@ -1731,6 +1731,18 @@ async fn run() -> Result<()> {
 
     let config_path = oxios_kernel::config::expand_home(&cli.config);
     let oxios_home = oxios_home_from_config(&config_path);
+    // Isolate oxi-ai's product-home namespace: route the embedded library's
+    // catalog/cache/auth state to oxios's own `~/.oxios/` instead of oxi-cli's
+    // `~/.oxi/`. Must precede any oxi-ai catalog/provider init (oxi-ai 0.50+
+    // honors `OXI_HOME`). Credential reads stay compatible with the standalone
+    // `oxi` CLI via CredentialStore's shared-store fallback (~/.oxi/auth.json);
+    // only oxios's own writes move under `~/.oxios`.
+    //
+    // SAFETY: first statement after CLI parse; no other task is running yet, so
+    // there is no concurrent environment access.
+    if std::env::var("OXI_HOME").is_err() {
+        unsafe { std::env::set_var("OXI_HOME", &oxios_home); }
+    }
 
     // Detect first run (before ensure_workspace creates the dir).
     let is_first_run = !oxios_home.join("config.toml").exists();
@@ -2400,16 +2412,66 @@ async fn run() -> Result<()> {
                     emoji,
                     description,
                 } => {
-                    let path_bufs: Vec<_> = paths.iter().map(std::path::PathBuf::from).collect();
+                    // RFC-025: paths live on Mounts. Create the Project, then
+                    // promote any provided paths into Mounts and link them via
+                    // `mount_ids` so the project is a usable code context in one
+                    // step. When the mount system is unavailable, paths are
+                    // ignored with a warning.
                     match pm.create_project(
                         name.clone(),
-                        path_bufs,
                         tags.clone(),
                         Some(emoji.clone()),
                         description.clone(),
                         oxios_kernel::ProjectSource::Manual,
                     ) {
                         Ok(p) => {
+                            if !paths.is_empty() {
+                                if let Some(mm) = kernel.mount_manager() {
+                                    let mut mount_ids: Vec<oxios_kernel::MountId> = Vec::new();
+                                    for raw in paths {
+                                        let root = std::path::PathBuf::from(raw);
+                                        match mm.covering_mount_id(&root) {
+                                            Some(mid) => {
+                                                if !mount_ids.contains(&mid) {
+                                                    mount_ids.push(mid);
+                                                }
+                                            }
+                                            None => match mm.create_mount(
+                                                p.name.clone(),
+                                                vec![root],
+                                                oxios_kernel::MountSource::Manual,
+                                            ) {
+                                                Ok(m) => mount_ids.push(m.id),
+                                                Err(e) => eprintln!(
+                                                    "{} Could not create mount for '{}': {}",
+                                                    style("✗").red().bold(),
+                                                    raw,
+                                                    e
+                                                ),
+                                            },
+                                        }
+                                    }
+                                    if !mount_ids.is_empty()
+                                        && let Err(e) = pm.update_project_bundle(
+                                            p.id,
+                                            Some(mount_ids),
+                                            None,
+                                        )
+                                    {
+                                        eprintln!(
+                                            "{} Project created but mount link failed: {}",
+                                            style("✗").red().bold(),
+                                            e
+                                        );
+                                    }
+                                } else {
+                                    eprintln!(
+                                        "{} Mount system unavailable — paths ignored. \
+                                         Use `oxios mount add` and link separately.",
+                                        style("⚠").yellow().bold()
+                                    );
+                                }
+                            }
                             println!(
                                 "{} Project '{}' created ({})",
                                 style("✓").green().bold(),

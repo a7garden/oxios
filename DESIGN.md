@@ -19,7 +19,7 @@ Oxios is an Agent Operating System where Unix philosophy meets Ouroboros spec-fi
 
 1. **Wonder** — "What IS this, really?" — question the essence first
 2. **Ambiguity Gate** — Don't execute until ambiguity ≤ 0.2
-3. **Seed** — Immutable specification. Once set, it doesn't change
+3. **Crystallize** — Generate a directive before acting. Once set, it doesn't change
 4. **Evolve** — Each loop knows more than the last
 
 ### Convergence
@@ -53,9 +53,8 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 │  │ (lifecycle) │  │ (broadcast) │  │ (markdown)    │         │
 │  └─────────────┘  └──────────────┘  └───────────────┘         │
 │                                                                │
-│  ┌────────────────────────────────────────────────────────┐   │
 │  │          Ouroboros Protocol                              │   │
-│  │  interview → seed → execute → evaluate → evolve         │   │
+│  │  assess → crystallize → execute → review                 │   │
 │  └────────────────────────────────────────────────────────┘   │
 │                                                                │
 │  ┌────────────────────────────────────────────────────────┐   │
@@ -143,7 +142,8 @@ oxios/
 │   │       ├── lib.rs          Public exports
 │   │       ├── protocol.rs    OuroborosProtocol trait, Phase, ExecutionResult
 │   │       ├── interview.rs    InterviewResult, questions/answers
-│   │       ├── seed.rs         Seed, AmbiguityScore, Entity
+│   │       ├── directive.rs   Directive (crystallize output)
+│   │       ├── types.rs       AmbiguityScore, Entity, shared types
 │   │       ├── evaluation.rs   EvaluationResult (mechanical/semantic/consensus)
 │   │       └── ouroboros_engine.rs LLM-backed OuroborosEngine
 │   │
@@ -204,11 +204,11 @@ The OS kernel. Everything passes through here.
 ```
 User request → Gateway → Kernel
                         │
-                        ├── 1. Ouroboros: interview (clarify intent)
-                        ├── 2. Ouroboros: seed (generate spec)
+                        ├── 1. assess: classify message (conversation / clarify / task)
+                        ├── 2. crystallize: generate directive (goal, constraints, criteria)
                         ├── 3. fork: create agent instance
-                        ├── 4. exec: tool-calling loop per spec
-                        ├── 5. evaluate: verify result
+                        ├── 4. execute: tool-calling loop per directive
+                        ├── 5. review: verify result against criteria
                         └── 6. reap: cleanup after completion
                               │
                               └── Result → Gateway → User
@@ -219,8 +219,8 @@ User request → Gateway → Kernel
 ```rust
 // Supervisor manages agent lifecycle
 trait Supervisor: Send + Sync {
-    async fn fork(&self, spec: &Seed) -> Result<AgentId>;
-    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<ExecutionResult>;
+    async fn fork_directive(&self, directive: &Directive, env: &ExecEnv) -> Result<AgentId>;
+    async fn run(&self, id: AgentId) -> Result<ExecutionResult>;
     async fn wait(&self, id: AgentId) -> Result<AgentStatus>;
     async fn kill(&self, id: AgentId) -> Result<()>;
     async fn list(&self) -> Result<Vec<AgentInfo>>;
@@ -233,8 +233,8 @@ enum KernelEvent {
     AgentStarted { id: AgentId },
     AgentStopped { id: AgentId },
     AgentFailed { id: AgentId, error: String },
-    SeedCreated { seed_id: SeedId },
-    EvaluationComplete { seed_id: SeedId, passed: bool },
+    DirectiveCreated { directive_id: DirectiveId },
+    ReviewComplete { directive_id: DirectiveId, passed: bool },
     PhaseStarted { session_id: String, phase: Phase },
     PhaseCompleted { session_id: String, phase: Phase, result_summary: String },
     // ...
@@ -434,7 +434,6 @@ pub struct Session {
     pub user_id: String,
     pub user_messages: Vec<UserMessage>,
     pub agent_responses: Vec<AgentResponse>,
-    pub active_seed_id: Option<String>,
     pub active_persona_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -450,7 +449,7 @@ pub struct ExecutionMetadata {
 }
 ```
 
-**Seed execution metadata:** Each seed tracks its execution history:
+**Directive execution metadata:** Each directive tracks its execution history:
 - `execution_count` — total number of times executed
 - `last_executed` — timestamp of most recent execution
 - `success_count` — how many evaluations passed
@@ -589,9 +588,9 @@ Phase 1: Kernel skeleton ✓
   └── Basic agent execution test ✓
 
 Phase 2: Ouroboros Protocol ✓
-  ├── oxios-ouroboros (interview, seed, evaluate) ✓
+  ├── oxios-ouroboros (assess, crystallize, review) ✓
   ├── Ambiguity score calculation ✓
-  └── Seed generation/validation ✓
+  └── Directive generation/validation ✓
 
 Phase 3: Gateway + Web ✓
   ├── oxios-gateway (channel trait, routing) ✓

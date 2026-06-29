@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  deriveCurrentActivity,
-  type LiveActivityDescriptor,
-} from '@/lib/live-activity'
+import { deriveCurrentActivity, type LiveActivityDescriptor } from '@/lib/live-activity'
 import type { ChatActivity } from '@/types'
 
 const NOW = new Date().toISOString()
@@ -53,9 +50,7 @@ describe('deriveCurrentActivity (RFC-015 §4.3)', () => {
   })
 
   it('reports a running tool_call as tool_running with the tool name', () => {
-    const activities: ChatActivity[] = [
-      toolCall({ isRunning: true, toolName: 'bash' }),
-    ]
+    const activities: ChatActivity[] = [toolCall({ isRunning: true, toolName: 'bash' })]
     expect(deriveCurrentActivity(activities)).toEqual<LiveActivityDescriptor>({
       kind: 'tool_running',
       toolName: 'bash',
@@ -77,9 +72,7 @@ describe('deriveCurrentActivity (RFC-015 §4.3)', () => {
   it('returns tool_running with undefined name when toolName is missing', () => {
     // Defensive: chunkToActivity always sets toolName, but the type allows
     // it to be absent; the component falls back to the literal "tool".
-    const activities: ChatActivity[] = [
-      toolCall({ isRunning: true, toolName: undefined }),
-    ]
+    const activities: ChatActivity[] = [toolCall({ isRunning: true, toolName: undefined })]
     expect(deriveCurrentActivity(activities)).toEqual<LiveActivityDescriptor>({
       kind: 'tool_running',
       toolName: undefined,
@@ -89,10 +82,7 @@ describe('deriveCurrentActivity (RFC-015 §4.3)', () => {
   it('reports the most recent reasoning as in-progress (no completion flag exists)', () => {
     // Reasoning fragments are fire-and-forget — they carry no running/end
     // marker. The latest reasoning entry is by definition the live one.
-    const activities: ChatActivity[] = [
-      reasoning(),
-      reasoning(),
-    ]
+    const activities: ChatActivity[] = [reasoning(), reasoning()]
     expect(deriveCurrentActivity(activities)).toEqual<LiveActivityDescriptor>({
       kind: 'reasoning',
     })

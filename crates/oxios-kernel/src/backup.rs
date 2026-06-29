@@ -20,7 +20,7 @@ pub struct BackupManifest {
 /// A single section in a backup manifest.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BackupSection {
-    /// Section name (e.g., "seeds", "memory/facts").
+    /// Section name (e.g., "sessions", "memory/facts").
     pub name: String,
     /// Number of entries in this section.
     pub entry_count: usize,
@@ -39,7 +39,6 @@ pub async fn create_backup(
     };
 
     let categories = [
-        "seeds",
         "evals",
         "memory/conversations",
         "memory/sessions",
@@ -158,7 +157,7 @@ mod tests {
             oxios_version: "0.1.0".to_string(),
             sections: vec![
                 BackupSection {
-                    name: "seeds".to_string(),
+                    name: "sessions".to_string(),
                     entry_count: 42,
                 },
                 BackupSection {
@@ -174,7 +173,7 @@ mod tests {
         assert_eq!(restored.version, 1);
         assert_eq!(restored.oxios_version, "0.1.0");
         assert_eq!(restored.sections.len(), 2);
-        assert_eq!(restored.sections[0].name, "seeds");
+        assert_eq!(restored.sections[0].name, "sessions");
         assert_eq!(restored.sections[0].entry_count, 42);
         assert_eq!(restored.sections[1].name, "memory/facts");
         assert_eq!(restored.sections[1].entry_count, 100);

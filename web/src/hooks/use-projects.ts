@@ -6,11 +6,9 @@ import type { Project } from '@/types'
 
 export interface CreateProjectInput {
   name: string
-  paths?: string[]
-  tags?: string[]
   emoji?: string
-  description?: string
-  memory_visible?: boolean
+  /** RFC-025: custom instructions injected into the system prompt. */
+  instructions?: string
 }
 
 export interface UpdateProjectInput {

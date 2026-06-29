@@ -1,0 +1,170 @@
+<!-- SCREEN 01 — DASHBOARD (REFERENCE TEMPLATE) -->
+<section class="screen" id="screen-01">
+  <div class="screen-head">
+    <div class="num">01</div>
+    <div class="titles">
+      <h2>대시보드</h2>
+      <div class="route">web/src/routes/index.tsx · /</div>
+    </div>
+    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
+      <span class="h" style="color:var(--hi);font-weight:700">0 H</span> ·
+      <span style="color:var(--med);font-weight:700">3 M</span> ·
+      <span style="color:var(--lo);font-weight:700">1 L</span>
+    </div>
+  </div>
+  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
+    시스템 상태를 한눈에 보여주는 운영 현황 화면. KPI 카드 6종, 에이전트 활동 + 시스템 헬스, 그리고 MCP/예산/드림/스킬 요약 행으로 구성된다.
+  </p>
+
+  <!-- 8-dimension rubric -->
+  <div class="rubric" aria-label="루브릭">
+    <div class="cell r4"><span class="sc">4</span>정보구조</div>
+    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
+    <div class="cell r3"><span class="sc">3</span>기능배치</div>
+    <div class="cell r4"><span class="sc">4</span>내비게이션</div>
+    <div class="cell r4"><span class="sc">4</span>일관성</div>
+    <div class="cell r3"><span class="sc">3</span>인터랙션</div>
+    <div class="cell r3"><span class="sc">3</span>접근성</div>
+    <div class="cell r4"><span class="sc">4</span>타이포</div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT (annotated) -->
+    <div class="panel cur">
+      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
+      <div class="stage" style="position:relative;background:#fafafa">
+        <!-- app shell mock -->
+        <div style="display:flex;height:300px;font-size:11px">
+          <!-- sidebar -->
+          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
+            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;margin-bottom:8px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
+            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);letter-spacing:.05em;margin:6px 2px 3px">메인</div>
+            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600;margin-bottom:2px">▦ 대시보드</div>
+            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🤖 에이전트</div>
+            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">⚡ 스킬</div>
+            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);letter-spacing:.05em;margin:8px 2px 3px">운영</div>
+            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">⏱ 크론잡</div>
+          </div>
+          <!-- main -->
+          <div style="flex:1;padding:10px 12px;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:flex-end">
+              <div><div style="font-size:14px;font-weight:600">대시보드</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">시스템 운영 현황</div></div>
+              <div style="display:flex;gap:3px" id="verbadge"><!-- pin1 target --></div>
+            </div>
+            <!-- 6-up KPI -->
+            <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:8px;position:relative">
+              <div class="kpicard" style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
+                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">에이전트</div>
+                <div style="font-size:15px;font-weight:700" id="agtotal">—</div>
+                <div style="height:14px"></div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
+                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">토큰/분</div>
+                <div style="font-size:15px;font-weight:700">1.2k</div><div style="height:14px"></div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
+                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">CPU</div>
+                <div style="font-size:15px;font-weight:700;color:oklch(0.669 0.162 70)">42%</div><div style="height:14px"></div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
+                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">RAM</div>
+                <div style="font-size:15px;font-weight:700;color:oklch(0.577 0.245 27.325)">61%</div><div style="height:14px"></div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;position:relative" id="memcard">
+                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">메모리</div>
+                <div style="font-size:15px;font-weight:700">1284</div><div style="height:14px"></div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
+                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">승인 대기</div>
+                <div style="font-size:15px;font-weight:700;color:oklch(0.577 0.245 27.325)">2</div><div style="height:14px"></div>
+              </div>
+            </div>
+            <!-- activity + health -->
+            <div style="display:grid;grid-template-columns:3fr 2fr;gap:6px;margin-top:6px">
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;height:70px;padding:6px;position:relative" id="actcard">
+                <div style="font-size:9px;font-weight:600">에이전트 활동</div>
+                <div style="display:flex;gap:4px;margin-top:4px"><span style="font-size:8px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:4px;padding:1px 4px">실행중 2</span></div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;height:70px;padding:6px">
+                <div style="font-size:9px;font-weight:600">시스템 헬스</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- PINS -->
+        <span class="pin m" style="top:32px;right:78px">1</span>
+        <span class="pin m" style="top:84px;left:138px">2</span>
+        <span class="pin m" style="top:118px;right:46px">3</span>
+        <span class="pin l" style="top:120px;right:96px">4</span>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div class="panel prop">
+      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
+      <div class="stage" style="position:relative;background:#fafafa">
+        <div style="display:flex;height:300px;font-size:11px">
+          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
+            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
+            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:8px 2px 3px">메인</div>
+            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">▦ 대시보드</div>
+          </div>
+          <div style="flex:1;padding:10px 12px;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:flex-end">
+              <div><div style="font-size:14px;font-weight:600">대시보드</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">시스템 운영 현황</div></div>
+              <!-- fix1: 11px pill, AA contrast -->
+              <span style="font-size:11px;background:oklch(0.97 0.014 265);color:oklch(0.23 0.025 265);border-radius:999px;padding:2px 8px;font-weight:600">v0.8.2</span>
+            </div>
+            <!-- fix2: 4-up primary KPIs (de-cram), secondary metrics demoted to a row -->
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px">
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px">
+                <div style="font-size:9px;color:oklch(0.552 0.016 285.938)">실행중 에이전트</div>
+                <div style="font-size:17px;font-weight:700">2<span style="font-size:9px;color:oklch(0.552 0.016 285.938);font-weight:400"> / 47 누적</span></div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px">
+                <div style="font-size:9px;color:oklch(0.552 0.016 285.938)">토큰/분</div>
+                <div style="font-size:17px;font-weight:700">1.2k</div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px">
+                <div style="font-size:9px;color:oklch(0.552 0.016 285.938)">CPU</div>
+                <div style="font-size:17px;font-weight:700;color:oklch(0.669 0.162 70)">42%</div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px">
+                <div style="font-size:9px;color:oklch(0.552 0.016 285.938)">RAM</div>
+                <div style="font-size:17px;font-weight:700;color:oklch(0.577 0.245 27.325)">61%</div>
+              </div>
+            </div>
+            <!-- fix3: every KPI row item is uniformly clickable (cursor + underline-on-hover), link affordance shown -->
+            <div style="display:grid;grid-template-columns:3fr 2fr;gap:6px;margin-top:6px">
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;height:70px;padding:6px">
+                <div style="font-size:9px;font-weight:600">에이전트 활동</div>
+              </div>
+              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;height:70px;padding:6px">
+                <div style="font-size:9px;font-weight:600">시스템 헬스</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- findings: 4 pins == 4 findings -->
+  <div class="findings">
+    <h4>발견사항 (4)</h4>
+    <ul class="flist">
+      <li><span class="badge m">MED</span><div><span class="ft">버전 배지가 10px(text-2xs)로 가독성 임계치 미만</span><span class="cite">index.tsx:103,107 — text-2xs (10px) + mono</span></div></li>
+      <li><span class="badge m">MED</span><div><span class="ft">total_forked가 없으면 total=null이 AgentStatusCard로 전달 — 널 렌더 위험</span><span class="cite">index.tsx:75-78 → 117-122</span></div></li>
+      <li><span class="badge m">MED</span><div><span class="ft">KPI 클릭 가능성이 불일치 — CPU·RAM·Memory는 href, Token·Approvals·Agent는 링크 아님 (시각적 구분 없음)</span><span class="cite">index.tsx:123-174 (href 유무 혼재)</span></div></li>
+      <li><span class="badge l">LOW</span><div><span class="ft">Memory 카드 값이 단위/문맥 없는 정수(1284) — 단위·포맷 누락</span><span class="cite">index.tsx:157-164</span></div></li>
+    </ul>
+  </div>
+  <div class="changes">
+    <h4>변경 방향</h4>
+    <ul>
+      <li>주요 KPI 4개로 압축(xl:grid-cols-4), 2차 지표는 별도 행으로 강등 — 카드 내 라벨·값·스파크라인 경쟁 해소.</li>
+      <li>text-2xs 배지를 11px/AA 대비 pill로 상향; totalForked 널 가드 추가(기본 0 표시).</li>
+      <li>KPI 전체에 동일한 클릭 어포던스(cursor·호버 언더라인) 적용 — 링크 여부를 시각으로 드러냄.</li>
+    </ul>
+  </div>
+</section>

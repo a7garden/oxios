@@ -61,8 +61,12 @@ pub struct Project {
     pub name: String,
     /// Optional description for UI display.
     pub description: String,
-    /// Filesystem paths associated with this project.
-    /// Empty for non-code projects (e.g. "travel planning").
+    /// LEGACY RFC-025 migration read-source.
+    ///
+    /// Paths now live on Mounts (`mount_ids`); this field is retained solely
+    /// so the one-time `migrate_projects_to_mounts` boot step can read
+    /// pre-RFC-025 data. New code MUST NOT read it — resolve paths via
+    /// `mount_ids`. Removed from the struct + DB in a follow-up release.
     pub paths: Vec<PathBuf>,
     /// Tags for keyword matching (detection layer 3).
     #[serde(default)]

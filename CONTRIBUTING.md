@@ -28,7 +28,7 @@ Oxios is an **Agent Operating System** in Rust. Key components:
 | Crate | Purpose |
 |-------|---------|
 | `oxios-kernel` | Core: supervisor, scheduler, event bus, tools, memory |
-| `oxios-ouroboros` | Spec-first protocol: interview → seed → execute → evaluate → evolve |
+| `oxios-ouroboros` | Unified intent flow: assess → crystallize → execute → review |
 | `oxios-gateway` | Channel-agnostic message hub |
 | `oxios-web` | Web dashboard (Axum backend + Dioxus/WASM frontend) |
 | `oxios-cli` | CLI channel |

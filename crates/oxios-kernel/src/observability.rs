@@ -20,7 +20,7 @@
 //! use oxios_kernel::observability;
 //!
 //! // Start a span for an agent execution
-//! let _span = observability::tracer().start("seed-execution", observability::SpanKind::Agent);
+//! let _span = observability::tracer().start("agent-execution", observability::SpanKind::Agent);
 //!
 //! // Log audit entry
 //! observability::audit_log()

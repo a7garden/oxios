@@ -1,7 +1,7 @@
 //! Model resolution port — the single source of truth for "which model does
 //! this task use".
 //!
-//! Both the Ouroboros phases (interview / seed / evaluate / evolve) and the
+//! Both the Ouroboros phases (interview / crystallize / review) and the
 //! kernel's `AgentRuntime` (execute) resolve the active model through this
 //! port, reading the live engine's default model. This eliminates the
 //! divergence where interview used a boot-time-captured model while execute

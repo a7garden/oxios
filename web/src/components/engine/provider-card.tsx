@@ -8,13 +8,11 @@ import {
   Lock,
   Plus,
   ShieldCheck,
-  Star,
   Trash2,
   X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
@@ -42,8 +40,6 @@ const CATEGORY_DOT: Record<string, string> = {
 
 interface ProviderCardProps {
   provider: ProviderInfo
-  isDefault: boolean
-  onSetDefault: () => void
   onChangeKey: (apiKey: string) => void
   onRemove: () => void
   isPending?: boolean
@@ -51,8 +47,6 @@ interface ProviderCardProps {
 
 export function ProviderCard({
   provider,
-  isDefault,
-  onSetDefault,
   onChangeKey,
   onRemove,
   isPending,
@@ -96,9 +90,7 @@ export function ProviderCard({
       className={cn(
         'flex flex-col rounded-lg border border-l-[3px] bg-card p-4 transition-all',
         CATEGORY_ACCENT[provider.category] ?? 'border-l-gray-400',
-        isDefault
-          ? 'border-primary/40 ring-1 ring-primary/20'
-          : 'hover:border-primary/30 hover:shadow-sm',
+        'hover:border-primary/30 hover:shadow-sm',
       )}
     >
       {/* Header */}
@@ -112,12 +104,6 @@ export function ProviderCard({
           />
           <span className="font-medium text-sm truncate">{provider.name}</span>
         </div>
-        {isDefault && (
-          <Badge variant="secondary" className="shrink-0 gap-1">
-            <Star className="h-3 w-3 fill-current" />
-            {t('engine.default')}
-          </Badge>
-        )}
       </div>
 
       {/* Description */}
@@ -229,18 +215,6 @@ export function ProviderCard({
               <ShieldCheck className="h-4 w-4" />
             )}
           </Button>
-          {!isDefault && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={onSetDefault}
-              disabled={isPending}
-              title={t('engine.setAsDefault')}
-            >
-              <Star className="h-4 w-4" />
-            </Button>
-          )}
           <Button
             size="icon"
             variant="ghost"

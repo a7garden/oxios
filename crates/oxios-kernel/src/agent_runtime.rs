@@ -103,8 +103,6 @@ pub struct AgentRuntimeConfig {
     pub tool_execution: ToolExecutionMode,
     /// Whether auto-retry is enabled for retryable LLM errors.
     pub auto_retry_enabled: bool,
-    /// Bound project paths. AgentRuntime sets CWD to paths[0].
-    pub project_paths: Vec<std::path::PathBuf>,
     /// Scratch workspace directory for temp files.
     pub workspace_dir: Option<std::path::PathBuf>,
     /// API key resolved from CredentialStore at build time.
@@ -128,7 +126,6 @@ impl Default for AgentRuntimeConfig {
             model_id: String::new(),
             tool_execution: ToolExecutionMode::Parallel,
             auto_retry_enabled: true,
-            project_paths: Vec::new(),
             workspace_dir: None,
             api_key: None,
             provider_options: None,
@@ -493,7 +490,7 @@ impl AgentRuntime {
 
         // Build the agent. Refresh config.model_id to the live value so every
         // downstream consumer (AgentConfig, legacy provider path, usage callback)
-        // uses the same model as the interview/seed phases — no frozen boot
+        // uses the same model as the interview/crystallize phases — no frozen boot
         // string that silently diverges from what interview used.
         let mut config = self.config.clone();
         config.model_id = model_id;
@@ -701,8 +698,8 @@ async fn run_agent(
     kernel_handle: Arc<KernelHandle>,
     system_prompt: String,
     prompt: String,
-    seed_id: uuid::Uuid,
-    seed_goal: String,
+    exec_id: uuid::Uuid,
+    goal: String,
     agent_id: AgentId,
     cspace: crate::capability::CSpace,
     audit_trail: Option<Arc<AuditTrail>>,
@@ -725,13 +722,13 @@ async fn run_agent(
     String,
 )> {
     // Extract workspace.
-    // RFC-025: prefer the primary Mount's first path, then fall back to the
-    // legacy config.project_paths, then workspace_dir, then temp.
+    // RFC-025: the primary Mount's first path is the CWD; otherwise the
+    // configured workspace_dir, otherwise a per-agent temp dir. Paths now
+    // come only from Mounts — the legacy config.project_paths fallback was
+    // removed when the RFC-025 migration completed.
     let workspace = if !mount_paths.is_empty() {
         mount_paths[0].clone()
-    } else if !config.project_paths.is_empty() {
-        config.project_paths[0].clone()
-    } else if let Some(ref ws) = config.workspace_dir {
+    } else if let Some(ws) = &config.workspace_dir {
         ws.clone()
     } else {
         std::env::temp_dir()
@@ -756,7 +753,7 @@ async fn run_agent(
     //      subprocesses may still resolve against the process CWD. We grant
     //      it as a safety net so those tools aren't denied by GatedTool.
     //   2. The designated workspace — computed from mount_paths / workspace_dir / temp.
-    //   3. Kernel workspace — state store path for seeds, sessions, etc.
+    //   3. Kernel workspace — state store path for sessions, etc.
     //   4. /tmp -- general temp file access.
     //
     // All four must be in allowed_paths before GatedTool wraps any tool.
@@ -827,7 +824,7 @@ async fn run_agent(
 
     // Start distributed trace span for this agent execution.
     let _trace_guard = crate::observability::tracer().start(
-        format!("seed-{}", &seed_id.to_string()[..8]).as_str(),
+        format!("exec-{}", &exec_id.to_string()[..8]).as_str(),
         oxi_sdk::SpanKind::Agent,
     );
 
@@ -873,7 +870,7 @@ async fn run_agent(
     );
 
     tracing::info!(
-        seed_id = %seed_id,
+        exec_id = %exec_id,
         capabilities = cspace.len(),
         "Tools registered from CSpace"
     );
@@ -1042,7 +1039,7 @@ async fn run_agent(
     let exec_state = Arc::new(Mutex::new(ExecuteState::default()));
     let exec_state_cb = Arc::clone(&exec_state);
     let memory_for_callback: Arc<MemoryManager> = (*kernel_handle.agents.memory_manager()).clone();
-    let session_id_for_callback = seed_id.to_string();
+    let session_id_for_callback = exec_id.to_string();
     let model_id_for_callback = config.model_id.clone();
     let agent_id_for_callback = agent_id.to_string();
     let routing_stats_for_cb = routing_stats.clone();
@@ -1339,7 +1336,7 @@ async fn run_agent(
     }
 
     if let Err(e) = result {
-        tracing::error!(seed_id = %seed_id, error = %e, "Agent failed");
+        tracing::error!(exec_id = %exec_id, error = %e, "Agent failed");
         // RFC-029 P2b: capture the agent's accumulated conversation state
         // before returning. The supervisor's Err arm unwraps AgentRunError
         // and populates ExecutionResult.restore_state so the coordinator
@@ -1350,7 +1347,7 @@ async fn run_agent(
 
     let s = exec_state.lock();
     tracing::info!(
-        seed_id = %seed_id,
+        exec_id = %exec_id,
         steps = s.steps_completed,
         success = s.success,
         "Agent completed"
@@ -1364,7 +1361,7 @@ async fn run_agent(
         let steps = s.trajectory_steps.clone();
         let success = s.success;
         let sona = Arc::clone(sona);
-        let domain = infer_domain(&seed_goal);
+        let domain = infer_domain(&goal);
         tokio::spawn(async move {
             let verdict = if success {
                 oxios_memory::memory::sona::Verdict::Success
@@ -1431,7 +1428,7 @@ fn truncate_json_str(json_str: &str, max_len: usize) -> String {
     format!("{truncated}...")
 }
 
-/// Infer a domain category from a seed goal for SONA trajectory grouping.
+/// Infer a domain category from the goal for SONA trajectory grouping.
 ///
 /// Extracts the core verb + object from the goal to create a meaningful
 /// domain label. Falls back to "general" for unrecognizable patterns.

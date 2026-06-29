@@ -1,18 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ChevronRight, FolderKanban, FolderPlus, HardDrive, Inbox, List, MoreHorizontal, Plus } from 'lucide-react'
+import {
+  ChevronRight,
+  FolderKanban,
+  FolderPlus,
+  HardDrive,
+  Inbox,
+  List,
+  MoreHorizontal,
+  Plus,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { CreateProjectDialog } from '@/components/project/create-project-dialog'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useMoveSession } from '@/hooks/use-sessions'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'

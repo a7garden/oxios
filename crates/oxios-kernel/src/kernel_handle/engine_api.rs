@@ -975,7 +975,7 @@ impl EngineApi {
         // unconfigured providers so the Web UI's "switch succeeded" is truthful.
         // This prevents the divergence where a bad model ID was silently
         // accepted at swap time and only surfaced as "Model not found" at the
-        // execute phase — after interview/seed had already run.
+        // execute phase — after interview/crystallize had already run.
         {
             let engine = self.engine_handle.get();
             let model = engine

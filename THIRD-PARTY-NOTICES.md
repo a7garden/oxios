@@ -39,7 +39,7 @@ SOFTWARE.
 ### Usage in Oxios
 
 The `oxios-ouroboros` crate incorporates the **specification-first protocol concept**
-(interview → seed → execute → evaluate → evolve) and the **ambiguity scoring model**
+(assess → crystallize → execute → review) and the **ambiguity scoring model**
 from the Ouroboros project by Q00. The Rust implementation in Oxios is original —
 no source code was copied. The concept, naming, and protocol phases are derived from
 the Ouroboros specification framework.

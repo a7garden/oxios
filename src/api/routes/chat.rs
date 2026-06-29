@@ -39,6 +39,10 @@ pub(crate) struct ChatRequest {
     /// RFC-025: comma-separated Mount IDs to bind (primary first).
     #[serde(default)]
     mount_ids: String,
+    /// Optional model override. Populates the gateway `model_override`
+    /// metadata so the orchestrator forwards it as `ExecEnv::model_override`.
+    #[serde(default)]
+    model: Option<String>,
 }
 
 pub(crate) fn default_user() -> String {
@@ -123,6 +127,13 @@ pub(crate) async fn handle_chat(
     if !body.mount_ids.is_empty() {
         msg.metadata
             .insert("mount_ids".to_owned(), body.mount_ids.clone());
+    }
+
+    // Per-message model override. Carried via gateway metadata to the
+    // orchestrator, which forwards it as ExecEnv::model_override (highest
+    // precedence in agent_runtime model resolution).
+    if let Some(m) = &body.model {
+        msg.metadata.insert("model_override".to_owned(), m.clone());
     }
 
     let msg_id = msg.id.to_string();
@@ -754,6 +765,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             .and_then(|v| v.as_str())
                             .filter(|s| !s.is_empty())
                             .map(String::from);
+                        // Per-message model override from the WS client. When set,
+                        // the orchestrator carries it into ExecEnv::model_override
+                        // (highest precedence over role_routing[role] / default).
+                        let incoming_model = parsed
+                            .get("model")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty())
+                            .map(String::from);
 
                         match msg_type {
                             // RFC-024 SP2 / C2 (replay): client announces its
@@ -827,6 +846,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 if let Some(ref role) = incoming_role {
                                     incoming.metadata.insert("role".into(), role.clone());
                                 }
+                                if let Some(m) = &incoming_model {
+                                    incoming.metadata.insert("model_override".into(), m.clone());
+                                }
                                 incoming
                                     .metadata
                                     .insert("conn_id".into(), conn_id_for_send.clone());
@@ -872,6 +894,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 }
                                 if let Some(ref role) = incoming_role {
                                     incoming.metadata.insert("role".into(), role.clone());
+                                }
+                                if let Some(m) = &incoming_model {
+                                    incoming.metadata.insert("model_override".into(), m.clone());
                                 }
                                 incoming
                                     .metadata

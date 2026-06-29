@@ -8,12 +8,12 @@ import { formatRelativeDate } from '@/lib/utils'
 import type { CronJob, Skill } from '@/types'
 
 /**
- * Combined Skills, Seeds & Cron Jobs overview card.
+ * Combined Skills & Cron Jobs overview card.
  *
- * Shows active skills count, seed count, and active cron jobs
+ * Shows active skills count and active cron jobs
  * with next-run time. Uses shared formatRelativeDate util.
  */
-export function SkillsSeedsCard({ className }: { className?: string }) {
+export function SkillsCronCard({ className }: { className?: string }) {
   const { t } = useTranslation()
 
   const { data: skillsData } = useQuery({
@@ -40,7 +40,7 @@ export function SkillsSeedsCard({ className }: { className?: string }) {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Layers className="h-4 w-4" />
-          {t('dashboard.skillsSeeds')}
+          {t('dashboard.skillsCron')}
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">

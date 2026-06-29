@@ -28,11 +28,11 @@ fn test_outgoing_message_new() {
 fn test_outgoing_message_with_metadata() {
     use std::collections::HashMap;
     let mut meta = HashMap::new();
-    meta.insert("phase".to_string(), "seed".to_string());
+    meta.insert("phase".to_string(), "execute".to_string());
     meta.insert("evaluation_passed".to_string(), "true".to_string());
 
     let msg = OutgoingMessage::with_metadata("web", "user1", "Done", meta.clone());
-    assert_eq!(msg.metadata["phase"], "seed");
+    assert_eq!(msg.metadata["phase"], "execute");
     assert_eq!(msg.metadata["evaluation_passed"], "true");
 }
 

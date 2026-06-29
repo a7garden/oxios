@@ -42,8 +42,6 @@ fn default_limit() -> usize {
 pub(crate) struct CreateProjectRequest {
     pub name: String,
     #[serde(default)]
-    pub paths: Vec<String>,
-    #[serde(default)]
     pub tags: Vec<String>,
     pub emoji: Option<String>,
     pub description: Option<String>,
@@ -59,7 +57,6 @@ fn default_true() -> bool {
 #[derive(Debug, Deserialize)]
 pub(crate) struct UpdateProjectRequest {
     pub name: Option<String>,
-    pub paths: Option<Vec<String>>,
     pub tags: Option<Vec<String>>,
     pub emoji: Option<String>,
     pub description: Option<String>,
@@ -155,7 +152,6 @@ pub(crate) async fn handle_project_create(
     let project = api
         .create_project(
             body.name,
-            body.paths,
             body.tags,
             body.emoji,
             body.description,
@@ -180,7 +176,6 @@ pub(crate) async fn handle_project_update(
             .map_err(|e| AppError::BadRequest(e.to_string()))?;
         // Also apply traditional field updates if provided.
         if body.name.is_some()
-            || body.paths.is_some()
             || body.tags.is_some()
             || body.emoji.is_some()
             || body.description.is_some()
@@ -190,7 +185,6 @@ pub(crate) async fn handle_project_update(
                 .update_project(
                     &id,
                     body.name,
-                    body.paths,
                     body.tags,
                     body.emoji,
                     body.description,
@@ -206,7 +200,6 @@ pub(crate) async fn handle_project_update(
         .update_project(
             &id,
             body.name,
-            body.paths,
             body.tags,
             body.emoji,
             body.description,

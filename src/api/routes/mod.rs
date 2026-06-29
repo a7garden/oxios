@@ -3,7 +3,7 @@
 //! Route groups are split into sub-modules:
 //! - **chat**: Chat and WebSocket streaming
 //! - **system**: Health, status, agents, config
-//! - **workspace**: File tree, seeds, skills, memory
+//! - **workspace**: File tree, skills, memory
 //! - **resource_routes**: System resources
 //! - **infra**: Scheduler, audit, permissions, MCP
 //! - **events**: Sessions, SSE events, approvals
