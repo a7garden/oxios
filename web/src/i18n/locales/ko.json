@@ -907,6 +907,8 @@
       "noModelsHint": "설정에서 프로바이더를 연결해 모델을 추가하세요.",
       "reasoning": "추론",
       "standard": "표준",
+      "rolesTitle": "역할",
+      "noRolesHint": "아직 역할이 없습니다. 설정 → 엔진 → 역할에서 추가하세요.",
       "setAsDefault": "기본으로 설정",
       "currentDefault": "현재 기본값",
       "isDefault": "기본값",

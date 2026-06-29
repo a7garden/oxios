@@ -7,7 +7,6 @@ import { useKnowledgeSearch } from '@/hooks/use-knowledge'
 import { useMemorySemanticSearch } from '@/hooks/use-memory'
 import { useMounts } from '@/hooks/use-mounts'
 import { cn } from '@/lib/utils'
-import { RolePill } from './role-pill'
 import { ModelPickerContainer } from './model-picker'
 
 // ── Context item attached via @mention ────────────────────────
@@ -440,17 +439,12 @@ export function ChatInput({
         {/* ── Bottom bar (flex, not absolute) ── */}
         <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1 border-t border-transparent">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            {roles.length > 0 && (
-              <RolePill
-                roles={roles}
-                activeRole={activeRole}
-                onChange={setActiveRole}
-                hasRoles={roles.length > 0}
-              />
-            )}
             <ModelPickerContainer
               activeModelId={activeModelId}
               setActiveModelId={setActiveModelId}
+              roles={roles}
+              activeRole={activeRole}
+              setActiveRole={setActiveRole}
             />
           </div>
           <div className="flex items-center shrink-0">

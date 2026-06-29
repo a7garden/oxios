@@ -9,6 +9,7 @@ import {
   Settings2,
   Sparkles,
   Star,
+  Tag,
   X,
 } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -25,7 +26,6 @@ function shortModelId(id: string): string {
 
 function shortProvider(id: string): string {
   if (!id) return ''
-  // 'anthropic' → 'Anthropic', keep acronyms uppercase, cap length.
   const seg = id.split('/')[0] ?? id
   if (seg.length <= 4) return seg.toUpperCase()
   return seg.charAt(0).toUpperCase() + seg.slice(1)
@@ -43,42 +43,55 @@ function formatCost(cost: number): string {
   return cost.toFixed(2)
 }
 
+/** A role entry: name → model id. */
+export interface RoleEntry {
+  name: string
+  model: string
+}
+
 // ─── Props ───────────────────────────────────────────────────
 
 export interface ModelPickerProps {
   /** All models from all connected providers. */
   models: ModelInfo[]
-  /** Currently active model id (null = no override → global default). */
+  /** Currently active model id (null = no override → role/global default). */
   activeModelId: string | null
   setActiveModelId: (id: string | null) => void
   /** Global default model id from /api/engine/config. */
   defaultModelId: string | null
   /** Promote the current `activeModelId` into the global default. */
   setAsDefault: (modelId: string) => void
+  /** RFC-032 roles (name → model id). Empty when none configured. */
+  roles: RoleEntry[]
+  /** Currently active role (null = no role). Mutually exclusive with activeModelId. */
+  activeRole: string | null
+  setActiveRole: (role: string | null) => void
 }
 
 // ─── Component ───────────────────────────────────────────────
 
 /**
- * ModelPicker — compact trigger pill in the chat input bottom bar.
+ * ModelPicker — the unified chat-input pill for model + role routing.
  *
- * The popover surfaces only model routing concerns. Role routing
- * (RFC-032) lives in `RolePill`; this picker must not duplicate it.
+ * Single entry point. Model override and role are mutually exclusive:
+ * picking a model clears the active role, and vice versa. This avoids
+ * the sync problems of having two separate pills.
  *
- * Trigger shows: provider dot + model short name + chevron.
- * The active model is always the model that will be used; null falls back
- * to the global default (also surfaced in the trigger when no override).
+ * Trigger shows: provider dot + label + chevron.
+ *   - role active  → role name + its model short id
+ *   - model active → model short name
+ *   - neither      → "Default" + default model short id
  *
  * Popover layout (single panel, scrollable):
  *   ┌─ search ─────────────────────────────────┐
- *   ├─ ⌘ default model row (or "current")     │
+ *   ├─ ⌘ default model row                     │
  *   ├─ Provider: anthropic                     │
- *   │   ✦ reasoning                           │
- *   │      • Claude Sonnet 4.5    [1M]  $/$   │
- *   │   standard                              │
- *   │      • Claude Haiku 3.5     [200K] $/$  │
- *   ├─ Provider: openai                        │
- *   │   …                                     │
+ *   │   ✦ reasoning / standard                 │
+ *   ├─ Provider: openai …                      │
+ *   ├─ Roles (when configured)                 │
+ *   │   # fast     → claude-haiku              │
+ *   │   # careful  → sonnet-4.5                │
+ *   ├─ (empty hint when no roles)              │
  *   └─ footer: [Set as default] ⌨ ↑↓ │
  */
 export function ModelPicker({
@@ -87,6 +100,9 @@ export function ModelPicker({
   setActiveModelId,
   defaultModelId,
   setAsDefault,
+  roles,
+  activeRole,
+  setActiveRole,
 }: ModelPickerProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -101,22 +117,33 @@ export function ModelPicker({
   const defaultModel = defaultModelId
     ? (models.find((m) => m.id === defaultModelId) ?? null)
     : null
-  // The "currently routing to" model: explicit override > global default > first available.
-  const routingModel = selected ?? defaultModel
 
-  // ── Flattened, filterable list of (model, flatIndex) rows. ──
-  // We precompute this so keyboard nav (↑↓) maps to a single integer.
+  // Resolve the active role entry and the model it routes to.
+  const activeRoleEntry = activeRole ? (roles.find((r) => r.name === activeRole) ?? null) : null
+  const roleModel = activeRoleEntry
+    ? (models.find((m) => m.id === activeRoleEntry.model) ?? null)
+    : null
+  // The model actually being used right now: explicit override > role's model > default.
+  const routingModel = selected ?? roleModel ?? defaultModel
+
+  // ── Flattened, filterable list of rows for keyboard nav (↑↓). ──
   const flatRows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const rows: { kind: 'default' | 'model'; model: ModelInfo | null }[] = []
+    const rows: {
+      kind: 'default' | 'model' | 'role'
+      model: ModelInfo | null
+      role?: RoleEntry
+    }[] = []
 
-    // "Default model" row — always present when a default exists; the user
-    // can pick it to clear their override.
-    if (defaultModel && (!q || 'default'.includes(q) || shortModelId(defaultModel.id).toLowerCase().includes(q))) {
+    // "Default model" row.
+    if (
+      defaultModel &&
+      (!q || 'default'.includes(q) || shortModelId(defaultModel.id).toLowerCase().includes(q))
+    ) {
       rows.push({ kind: 'default', model: defaultModel })
     }
 
-    // Group by provider, then by reasoning/standard.
+    // Group models by provider, then reasoning/standard.
     const providerOrder: string[] = []
     const grouped = new Map<string, { reasoning: ModelInfo[]; standard: ModelInfo[] }>()
     for (const m of models) {
@@ -135,14 +162,24 @@ export function ModelPicker({
         m.name.toLowerCase().includes(q) ||
         m.id.toLowerCase().includes(q) ||
         providerId.toLowerCase().includes(q)
-      const reasoning = bucket.reasoning.filter(matches)
-      const standard = bucket.standard.filter(matches)
-      if (reasoning.length === 0 && standard.length === 0) continue
-      for (const m of reasoning) rows.push({ kind: 'model', model: m })
-      for (const m of standard) rows.push({ kind: 'model', model: m })
+      for (const m of bucket.reasoning.filter(matches)) rows.push({ kind: 'model', model: m })
+      for (const m of bucket.standard.filter(matches)) rows.push({ kind: 'model', model: m })
     }
+
+    // Roles — searchable by role name or model id.
+    for (const r of roles) {
+      if (
+        !q ||
+        r.name.toLowerCase().includes(q) ||
+        r.model.toLowerCase().includes(q) ||
+        shortModelId(r.model).toLowerCase().includes(q)
+      ) {
+        rows.push({ kind: 'role', model: null, role: r })
+      }
+    }
+
     return rows
-  }, [models, defaultModel, query])
+  }, [models, defaultModel, roles, query])
 
   // Reset keyboard focus when the row set changes.
   useEffect(() => {
@@ -171,11 +208,19 @@ export function ModelPicker({
   const isCurrentDefault =
     !!activeModelId && !!defaultModelId && activeModelId === defaultModelId
 
-  const onPickRow = (row: { kind: 'default' | 'model'; model: ModelInfo | null }) => {
+  const onPickRow = (row: (typeof flatRows)[number]) => {
     if (row.kind === 'default' || !row.model) {
-      setActiveModelId(null) // clear override → fall back to global default
+      // "Default" clears every override.
+      setActiveModelId(null)
+      setActiveRole(null)
+    } else if (row.kind === 'role' && row.role) {
+      // Role and model are mutually exclusive.
+      setActiveRole(row.role.name)
+      setActiveModelId(null)
     } else {
+      // Picking a specific model clears any active role.
       setActiveModelId(row.model.id)
+      setActiveRole(null)
     }
     setOpen(false)
   }
@@ -210,6 +255,20 @@ export function ModelPicker({
     }
   }
 
+  // Trigger label: role name takes priority (it's the most specific intent).
+  const triggerLabel = activeRoleEntry
+    ? activeRoleEntry.name
+    : routingModel
+      ? shortModelId(routingModel.id)
+      : t('chat.modelPicker.defaultLabel', 'Default model')
+  const triggerProvider = activeRoleEntry
+    ? roleModel
+      ? shortProvider(roleModel.id.split('/')[0] ?? '')
+      : null
+    : routingModel
+      ? shortProvider(routingModel.id.split('/')[0] ?? '')
+      : null
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -221,6 +280,7 @@ export function ModelPicker({
             'border border-border/60 bg-background/60 px-2.5 text-xs',
             'hover:bg-accent/50 hover:border-border transition-colors',
             'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            activeRoleEntry && 'border-primary/40 bg-primary/5',
           )}
           title={t('chat.modelPicker.triggerHint', 'Choose a model for the next message')}
           aria-label={t('chat.modelPicker.trigger', 'Model')}
@@ -228,16 +288,21 @@ export function ModelPicker({
           <span
             className={cn(
               'h-1.5 w-1.5 rounded-full shrink-0',
-              routingModel ? 'bg-success' : 'bg-muted-foreground/40',
+              activeRoleEntry
+                ? 'bg-primary'
+                : routingModel
+                  ? 'bg-success'
+                  : 'bg-muted-foreground/40',
             )}
             aria-hidden
           />
-          <span className="truncate font-medium">
-            {routingModel ? shortModelId(routingModel.id) : t('chat.modelPicker.defaultLabel', 'Default model')}
-          </span>
-          {routingModel && (
+          {activeRoleEntry && (
+            <Tag className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+          )}
+          <span className="truncate font-medium">{triggerLabel}</span>
+          {triggerProvider && (
             <span className="text-muted-foreground/70 text-2xs truncate hidden sm:inline">
-              · {shortProvider(routingModel.id.split('/')[0] ?? '')}
+              · {triggerProvider}
             </span>
           )}
           <ChevronDown className="h-3 w-3 text-muted-foreground/60 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
@@ -298,12 +363,23 @@ export function ModelPicker({
               focusIndex={focusIndex}
               activeModelId={activeModelId}
               defaultModelId={defaultModelId}
-              query={query}
+              activeRole={activeRole}
+              models={models}
               onHover={setFocusIndex}
               onPick={onPickRow}
             />
           )}
         </div>
+
+        {/* ── Roles hint (when no roles configured) ─────────── */}
+        {roles.length === 0 && !hasNoModels && !query && (
+          <div className="border-t border-border px-3 py-1.5 bg-muted/20">
+            <p className="text-2xs text-muted-foreground/70 flex items-center gap-1.5">
+              <Tag className="h-3 w-3 shrink-0" />
+              {t('chat.modelPicker.noRolesHint', 'No roles yet. Add them in Settings → Engine → Roles.')}
+            </p>
+          </div>
+        )}
 
         {/* ── Footer ────────────────────────────────────────── */}
         <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2 bg-muted/30">
@@ -357,28 +433,69 @@ function ListRows({
   focusIndex,
   activeModelId,
   defaultModelId,
-  query,
+  activeRole,
+  models,
   onHover,
   onPick,
 }: {
-  rows: { kind: 'default' | 'model'; model: ModelInfo | null }[]
+  rows: {
+    kind: 'default' | 'model' | 'role'
+    model: ModelInfo | null
+    role?: RoleEntry
+  }[]
   focusIndex: number
   activeModelId: string | null
   defaultModelId: string | null
-  query: string
+  activeRole: string | null
+  models: ModelInfo[]
   onHover: (i: number) => void
-  onPick: (row: { kind: 'default' | 'model'; model: ModelInfo | null }) => void
+  onPick: (row: (typeof rows)[number]) => void
 }) {
   const { t } = useTranslation()
 
-  // Group consecutive "model" rows by provider for headers. Each group:
-  //   - if all reasoning, show one "Reasoning" subheader
-  //   - if all standard, show one "Standard" subheader
-  //   - if mixed, show both with a divider
+  // Render model rows grouped by provider, then append role rows in a
+  // separate section. We iterate the flat `rows` array but emit provider
+  // headers between model groups, and a "Roles" header before the first
+  // role row.
   let i = 0
   const out: React.ReactNode[] = []
+  let sawFirstRole = false
+
   while (i < rows.length) {
     const row = rows[i]!
+
+    if (row.kind === 'role') {
+      // Emit a single "Roles" header before the first role row.
+      if (!sawFirstRole) {
+        sawFirstRole = true
+        out.push(
+          <div
+            key="roles-header"
+            className="px-2 mt-1.5 pb-1 text-2xs uppercase tracking-wider text-muted-foreground/70 font-semibold border-t border-border pt-2 flex items-center gap-1.5"
+          >
+            <Tag className="h-3 w-3" />
+            {t('chat.modelPicker.rolesTitle', 'Roles')}
+          </div>,
+        )
+      }
+      const r = row.role!
+      const roleModelInfo = models.find((m) => m.id === r.model) ?? null
+      out.push(
+        <RoleRow
+          key={`role-${r.name}`}
+          index={i}
+          focused={i === focusIndex}
+          role={r}
+          roleModelInfo={roleModelInfo}
+          selected={activeRole === r.name}
+          onHover={onHover}
+          onClick={() => onPick(row)}
+        />,
+      )
+      i++
+      continue
+    }
+
     if (row.kind === 'default' || !row.model) {
       out.push(
         <RowButton
@@ -397,13 +514,16 @@ function ListRows({
               {t('chat.modelPicker.isDefault', 'Default')}
             </span>
           </div>
-          {activeModelId === null && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+          {activeModelId === null && activeRole === null && (
+            <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+          )}
         </RowButton>,
       )
       i++
       continue
     }
-    // Group: collect all consecutive model rows for the same provider.
+
+    // Group consecutive model rows for the same provider.
     const providerId = row.model.provider
     const groupRows: { idx: number; model: ModelInfo }[] = []
     while (i < rows.length) {
@@ -440,15 +560,12 @@ function ListRows({
               model={g.model}
               activeModelId={activeModelId}
               defaultModelId={defaultModelId}
-              query={query}
               onHover={onHover}
-              onClick={() => onPick({ kind: 'model', model: g.model })}
+              onClick={() => onPick(rows[g.idx]!)}
             />
           ))}
         {hasStandard && (
-          <SubHeader>
-            {t('chat.modelPicker.standard', 'Standard')}
-          </SubHeader>
+          <SubHeader>{t('chat.modelPicker.standard', 'Standard')}</SubHeader>
         )}
         {groupRows
           .filter((g) => !g.model.reasoning)
@@ -460,9 +577,8 @@ function ListRows({
               model={g.model}
               activeModelId={activeModelId}
               defaultModelId={defaultModelId}
-              query={query}
               onHover={onHover}
-              onClick={() => onPick({ kind: 'model', model: g.model })}
+              onClick={() => onPick(rows[g.idx]!)}
             />
           ))}
       </div>,
@@ -524,7 +640,6 @@ function ModelRow({
   model: ModelInfo
   activeModelId: string | null
   defaultModelId: string | null
-  query: string
   onHover: (i: number) => void
   onClick: () => void
 }) {
@@ -567,6 +682,42 @@ function ModelRow({
   )
 }
 
+function RoleRow({
+  index,
+  focused,
+  role,
+  roleModelInfo,
+  selected,
+  onHover,
+  onClick,
+}: {
+  index: number
+  focused: boolean
+  role: RoleEntry
+  roleModelInfo: ModelInfo | null
+  selected: boolean
+  onHover: (i: number) => void
+  onClick: () => void
+}) {
+  const shortModel = shortModelId(role.model)
+  const provider = role.model.includes('/') ? shortProvider(role.model.split('/')[0]!) : ''
+  return (
+    <RowButton index={index} focused={focused} onHover={onHover} onClick={onClick}>
+      <Tag className="h-3 w-3 shrink-0 text-primary" />
+      <span className="text-xs font-medium truncate">{role.name}</span>
+      <span className="text-muted-foreground/50 text-2xs shrink-0">→</span>
+      <span className="text-2xs text-muted-foreground truncate font-mono min-w-0">
+        {provider && <span className="text-foreground/70 font-sans">{provider}/</span>}
+        {shortModel}
+      </span>
+      {roleModelInfo?.reasoning && (
+        <span className="text-warning text-2xs shrink-0" title="reasoning">✦</span>
+      )}
+      {selected && <Check className="h-3.5 w-3.5 text-primary shrink-0 ml-auto" />}
+    </RowButton>
+  )
+}
+
 function EmptyState({
   icon,
   title,
@@ -590,6 +741,9 @@ function EmptyState({
 export interface ModelPickerContainerProps {
   activeModelId: string | null
   setActiveModelId: (id: string | null) => void
+  roles: RoleEntry[]
+  activeRole: string | null
+  setActiveRole: (role: string | null) => void
 }
 
 /**

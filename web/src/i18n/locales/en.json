@@ -907,6 +907,8 @@
       "noModelsHint": "Connect a provider in Settings to add models.",
       "reasoning": "Reasoning",
       "standard": "Standard",
+      "rolesTitle": "Roles",
+      "noRolesHint": "No roles yet. Add them in Settings → Engine → Roles.",
       "setAsDefault": "Set as default",
       "currentDefault": "Current default",
       "isDefault": "Default",

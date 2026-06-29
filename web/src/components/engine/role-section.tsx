@@ -39,7 +39,7 @@ function normalizeRoleName(raw: string): string {
  *
  * Roles are named aliases that route a chat message to a specific
  * model without changing the global default. The store persists
- * `activeRole`; chat-input's `RolePill` surfaces this for one-tap
+ * `activeRole`; the chat-input ModelPicker surfaces this for one-tap
  * routing.
  *
  * Persisted via PUT /api/engine/roles (useSetRoles). Each mutation is
