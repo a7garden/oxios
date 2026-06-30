@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-06-30
+
+### Added
+- **Calendar integration** — Event creation, editing, deletion, conflict detection, iCalendar import/export, journal bridge, and cron bridge for scheduling.
+- **Command palette** — ⌘K command palette for quick navigation and actions.
+- **Skill forge tool** — Agent-facing tool for skill generation, validation, packaging, and benchmarking.
+
 ## [1.14.0] - 2026-06-28
 
 ### Added
