@@ -47,7 +47,7 @@ import { SidebarFooter } from './sidebar-footer'
 
 // ── Types ──────────────────────────────────────────────────────
 
-interface NavItem {
+export interface NavItem {
   labelKey: string
   href: string
   icon: React.ReactNode
@@ -88,7 +88,7 @@ export const sectionSeparator = 'border-t border-sidebar-border my-2'
 
 // ── Console mode nav groups ────────────────────────────────────
 
-const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
+export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: 'common.main',
     items: [

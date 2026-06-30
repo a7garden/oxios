@@ -130,20 +130,75 @@ impl ActiveWebDist {
         }
     }
 
+    /// Validate that a web-dist directory is internally self-consistent.
+    ///
+    /// A dist is usable only when every `/assets/...` reference in its
+    /// `index.html` resolves to a real file under `<dist>/assets/`.
+    /// Checking `index.html` alone is not enough: a stale legacy dir, a
+    /// partial extraction, or an interrupted staging publish can leave
+    /// `index.html` from one build and `assets/` from another — serving
+    /// that mix makes the entry chunk 404, so the app never boots (its
+    /// lazy chunks then show up as "preloaded but not used").
+    ///
+    /// RFC-024 SP3's atomic publish guards only the *swap* race (readers
+    /// never observe a half-populated directory). It does not catch a
+    /// directory that was *already* inconsistent on disk. This check
+    /// closes that gap: callers honor a dir as "active" only when it is
+    /// self-consistent, otherwise they fall through to a fresh download.
+    ///
+    /// Returns `false` when `index.html` is missing/unreadable, references
+    /// no assets (malformed), or any referenced asset is absent.
+    pub fn dist_is_consistent(dist: &std::path::Path) -> bool {
+        let Ok(html) = std::fs::read_to_string(dist.join("index.html")) else {
+            return false;
+        };
+
+        // Collect every referenced `/assets/<name>` token. Vite always emits
+        // these as quoted attribute values (src="..." / href="..."), so a
+        // token runs from `/assets/` to the next quote, whitespace, or tag
+        // delimiter. A real build references a non-empty set of chunks.
+        let mut referenced: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut search_from = 0usize;
+        while let Some(rel) = html[search_from..].find("/assets/") {
+            let start = search_from + rel + "/assets/".len();
+            let tail = &html[start..];
+            let end = tail
+                .find(|c: char| ['"', '\'', ' ', '>', '<', '\n', '\r', '?', '#'].contains(&c))
+                .unwrap_or(tail.len());
+            if end > 0 {
+                referenced.insert(&tail[..end]);
+            }
+            search_from = start;
+        }
+
+        if referenced.is_empty() {
+            return false;
+        }
+
+        let assets_dir = dist.join("assets");
+        referenced
+            .iter()
+            .all(|name| assets_dir.join(name).is_file())
+    }
+
     /// Resolve the active directory at process start.
     ///
-    /// Order: (1) the persisted marker file, if it points at a directory with
-    /// `index.html`; (2) the `legacy` directory, if it has `index.html`.
-    /// Returns `None` when neither is usable (caller should download/embed).
+    /// Order: (1) the persisted marker file, if it points at a
+    /// **self-consistent** directory; (2) the `legacy` directory, if it is
+    /// self-consistent. Returns `None` when neither is usable (caller should
+    /// download/embed). Self-consistency (see [`dist_is_consistent`]) is
+    /// required, not merely the presence of `index.html`, so an internally
+    /// inconsistent dir is never honored — the caller falls through to a
+    /// fresh download instead of serving a broken page forever.
     pub fn resolve(marker: &std::path::Path, legacy: Option<&std::path::Path>) -> Option<PathBuf> {
         if let Ok(s) = std::fs::read_to_string(marker) {
             let p = PathBuf::from(s.trim());
-            if p.join("index.html").is_file() {
+            if Self::dist_is_consistent(&p) {
                 return Some(p);
             }
         }
         legacy
-            .filter(|p| p.join("index.html").is_file())
+            .filter(|p| Self::dist_is_consistent(p))
             .map(PathBuf::from)
     }
 }
@@ -226,6 +281,83 @@ mod tests {
         let _ = h.swap(PathBuf::from("/v3"));
         let after_two = counter_value("oxios_web_dist_swaps_total");
         assert_eq!(after_two - after_one, 1, "swap must count");
+    }
+
+    /// The exact failure mode behind the 404-on-entry-chunk incident:
+    /// `index.html` references an entry chunk whose hash is NOT present in
+    /// `assets/` (the dir mixes two builds). Must be rejected as
+    /// inconsistent; once the missing entry is supplied, it must pass.
+    #[test]
+    fn dist_is_consistent_detects_missing_entry_chunk() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("assets")).unwrap();
+        std::fs::write(
+            root.join("index.html"),
+            "<script type=\"module\" src=\"/assets/index-D8nuEOZy.js\"></script>\n\
+             <link rel=\"modulepreload\" href=\"/assets/button-ClwPtCvQ.js\">\n\
+             <link rel=\"stylesheet\" href=\"/assets/index-BmHykPB0.css\">",
+        )
+        .unwrap();
+        // Only the button chunk + css exist — the entry chunk is missing.
+        std::fs::write(root.join("assets").join("button-ClwPtCvQ.js"), b"// chunk").unwrap();
+        std::fs::write(root.join("assets").join("index-BmHykPB0.css"), b"/* css */").unwrap();
+        assert!(
+            !ActiveWebDist::dist_is_consistent(root),
+            "dir with a missing entry chunk must be rejected"
+        );
+
+        // Supply the entry chunk → now self-consistent.
+        std::fs::write(root.join("assets").join("index-D8nuEOZy.js"), b"// entry").unwrap();
+        assert!(
+            ActiveWebDist::dist_is_consistent(root),
+            "dir with all referenced assets must pass"
+        );
+    }
+
+    #[test]
+    fn dist_is_consistent_rejects_missing_index_html() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!ActiveWebDist::dist_is_consistent(dir.path()));
+    }
+
+    #[test]
+    fn dist_is_consistent_rejects_malformed_index_html() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("assets")).unwrap();
+        // index.html with no /assets/ references → treated as malformed.
+        std::fs::write(root.join("index.html"), "<html><body>hi</body></html>").unwrap();
+        assert!(!ActiveWebDist::dist_is_consistent(root));
+    }
+
+    /// resolve() must refuse an internally-inconsistent marker dir and fall
+    /// through to the legacy dir (or None) — never honor a broken dist.
+    #[test]
+    fn resolve_refuses_inconsistent_marker_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let broken = tmp.path().join("broken");
+        let good = tmp.path().join("good");
+        for root in [&broken, &good] {
+            std::fs::create_dir_all(root.join("assets")).unwrap();
+            std::fs::write(
+                root.join("index.html"),
+                "<script src=\"/assets/index-X.js\"></script>",
+            )
+            .unwrap();
+        }
+        // broken: entry chunk absent. good: present.
+        std::fs::write(good.join("assets").join("index-X.js"), b"// entry").unwrap();
+
+        let marker = tmp.path().join(".active");
+        std::fs::write(&marker, broken.to_string_lossy().as_bytes()).unwrap();
+
+        // Marker points at broken → resolve falls through to legacy (good).
+        let resolved = ActiveWebDist::resolve(&marker, Some(&good));
+        assert_eq!(resolved.as_deref(), Some(good.as_path()));
+
+        // No usable legacy either → None (caller downloads).
+        assert_eq!(ActiveWebDist::resolve(&marker, None), None);
     }
 
     fn counter_value(metric: &str) -> u64 {

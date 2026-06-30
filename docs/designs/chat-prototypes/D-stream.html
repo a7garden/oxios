@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Oxios · Chat</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist@5/400.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist@5/500.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist@5/600.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist-mono@5/400.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist-mono@5/500.css" />
+<style>
+/* ── Oxios OKLCH tokens (verbatim from the design system) ── */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --primary: oklch(0.23 0.025 265);
+  --primary-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.967 0.003 265);
+  --border: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.45 0.04 265);
+  --success: oklch(0.596 0.145 163);
+  --warning: oklch(0.669 0.162 70);
+  --error: oklch(0.577 0.245 27.325);
+  --info: oklch(0.623 0.214 259.815);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+  --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
+}
+.dark {
+  --background: oklch(0.13 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.19 0.008 265);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --primary: oklch(0.91 0.03 265);
+  --primary-foreground: oklch(0.15 0.02 265);
+  --accent: oklch(0.274 0.01 265);
+  --border: oklch(1 0 0 / 10%);
+  --ring: oklch(0.6 0.05 265);
+  --success: oklch(0.723 0.219 149.579);
+  --warning: oklch(0.769 0.188 70.08);
+  --error: oklch(0.704 0.191 22.216);
+  --info: oklch(0.685 0.196 259);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
+  --shadow-md: 0 2px 8px oklch(0 0 0 / 0.3);
+  --code-bg: oklch(0.158 0.006 265);
+  --code-bar: oklch(0.205 0.008 265);
+  --syn-kw: oklch(0.78 0.14 268);
+  --syn-type: oklch(0.80 0.10 195);
+  --syn-fn: oklch(0.80 0.13 255);
+  --syn-str: oklch(0.78 0.14 150);
+  --syn-com: oklch(0.58 0.014 286);
+}
+:root {
+  --code-bg: oklch(0.975 0.002 286);
+  --code-bar: oklch(0.965 0.002 286);
+  --syn-kw: oklch(0.46 0.16 268);
+  --syn-type: oklch(0.43 0.10 200);
+  --syn-fn: oklch(0.47 0.16 255);
+  --syn-str: oklch(0.40 0.12 150);
+  --syn-com: oklch(0.52 0.013 286);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { color-scheme: light dark; }
+body {
+  margin: 0; height: 100vh;
+  background: var(--background); color: var(--foreground);
+  font-family: 'Geist', system-ui, -apple-system, sans-serif;
+  font-size: 15px; line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: 'Geist Mono', monospace; }
+
+/* ── App shell ── */
+.app { display: flex; flex-direction: column; height: 100vh; }
+/* top bar — minimal */
+.topbar {
+  flex-shrink: 0; height: 48px; display: flex; align-items: center; gap: 10px;
+  padding: 0 18px; border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+.topbar .crumb { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+.topbar .crumb span { color: var(--muted-foreground); font-weight: 400; }
+.topbar .spacer { flex: 1; }
+.modelchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Geist Mono', monospace; font-size: 11.5px;
+  color: var(--muted-foreground);
+  padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--card);
+}
+.modelchip .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.iconbtn {
+  width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--card); border-radius: 8px;
+  cursor: pointer; color: var(--muted-foreground); font-size: 14px;
+}
+.iconbtn:hover { background: var(--muted); color: var(--foreground); }
+
+/* ── Scroll area ── */
+.scroll { flex: 1; overflow-y: auto; }
+.thread { max-width: 780px; margin: 0 auto; padding: 28px 24px 48px; }
+
+/* ── turn separator ── */
+.turn { padding: 4px 0; }
+.turn + .turn { margin-top: 14px; }
+
+/* ── user message — subtle card, NOT a bubble, NOT right-aligned ── */
+.msg-user {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.6);
+  padding: 12px 15px;
+}
+.msg-user .role {
+  font-family: 'Geist Mono', monospace; font-size: 10.5px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+.msg-user p { margin: 0; font-size: 14.5px; line-height: 1.6; }
+
+/* ── assistant — no background, full-width markdown body ── */
+.msg-asst { padding: 2px 0; }
+.msg-asst .role {
+  display: flex; align-items: center; gap: 7px;
+  font-family: 'Geist Mono', monospace; font-size: 10.5px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground);
+  margin-bottom: 8px;
+}
+.msg-asst .role .mark {
+  width: 16px; height: 16px; border-radius: 5px;
+  background: var(--primary); color: var(--primary-foreground);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; letter-spacing: 0;
+}
+/* answer prose */
+.prose { font-size: 15px; line-height: 1.72; }
+.prose > *:first-child { margin-top: 0; }
+.prose > *:last-child { margin-bottom: 0; }
+.prose h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin: 22px 0 10px; }
+.prose h3 { font-size: 15.5px; font-weight: 600; margin: 18px 0 8px; }
+.prose p { margin: 0 0 12px; }
+.prose strong { font-weight: 600; }
+.prose ul { margin: 0 0 12px; padding-left: 20px; }
+.prose li { margin: 3px 0; }
+.prose code:not(pre code) {
+  font-family: 'Geist Mono', monospace; font-size: 0.86em;
+  background: var(--muted); padding: 1.5px 5px; border-radius: 5px;
+}
+
+/* ── reasoning — quiet, collapsible ── */
+.reasoning { margin: 0 0 10px; }
+.reasoning > summary {
+  list-style: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Geist Mono', monospace; font-size: 11.5px;
+  color: var(--muted-foreground); user-select: none;
+  padding: 2px 0;
+}
+.reasoning > summary::-webkit-details-marker { display: none; }
+.reasoning > summary .chev { transition: transform .15s; font-size: 9px; opacity: .6; }
+.reasoning[open] > summary .chev { transform: rotate(90deg); }
+.reasoning .body {
+  margin-top: 6px; padding: 9px 12px;
+  border-left: 2px solid var(--border);
+  font-size: 13px; color: var(--muted-foreground); line-height: 1.6;
+  font-style: italic;
+}
+
+/* ── tool call — Oxios ToolCallCard treatment ── */
+.tool {
+  margin: 4px 0 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: color-mix(in oklch, var(--muted) 50%, transparent); overflow: hidden;
+}
+.tool > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; font-size: 13px;
+}
+.tool > summary::-webkit-details-marker { display: none; }
+.tool > summary:hover { background: color-mix(in oklch, var(--muted) 80%, transparent); }
+.tool .chev { transition: transform .15s; font-size: 9px; color: var(--muted-foreground); }
+.tool[open] > summary .chev { transform: rotate(90deg); }
+.tool .wicon { color: var(--muted-foreground); flex-shrink: 0; }
+.tool .name { font-weight: 500; font-family: 'Geist Mono', monospace; font-size: 12.5px; }
+.tool .args { color: var(--muted-foreground); font-family: 'Geist Mono', monospace; font-size: 12px; }
+.tool .dur { margin-left: auto; font-size: 11px; color: var(--muted-foreground); font-family: 'Geist Mono', monospace; }
+.tool .out {
+  border-top: 1px solid var(--border); padding: 10px 12px; font-size: 12px;
+  font-family: 'Geist Mono', monospace; color: var(--muted-foreground);
+  white-space: pre-wrap; line-height: 1.55;
+  max-height: 180px; overflow-y: auto;
+}
+.tool .out .k { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); opacity: .7; margin-bottom: 3px; }
+
+/* ── code block — Claude-style header + copy, full width ── */
+.code {
+  margin: 14px 0; border-radius: var(--radius); overflow: hidden;
+  border: 1px solid var(--border); background: var(--code-bg);
+}
+.code .head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; background: var(--code-bar); border-bottom: 1px solid var(--border);
+  font-family: 'Geist Mono', monospace; font-size: 11.5px; color: var(--muted-foreground);
+}
+.code .head .lang { font-weight: 500; }
+.code .head .path { opacity: .7; }
+.code .copy {
+  margin-left: auto; border: 0; background: transparent; cursor: pointer;
+  color: var(--muted-foreground); font-family: 'Geist Mono', monospace; font-size: 11px;
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 5px;
+}
+.code .copy:hover { background: var(--muted); color: var(--foreground); }
+.code pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+.code code { font-family: 'Geist Mono', monospace; }
+.tk { color: var(--syn-kw); font-weight: 500; }
+.tt { color: var(--syn-type); }
+.tf { color: var(--syn-fn); }
+.ts { color: var(--syn-str); }
+.tc { color: var(--syn-com); font-style: italic; }
+
+/* ── table ── */
+.tbl-wrap { margin: 14px 0; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { padding: 9px 13px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--muted); font-weight: 600; font-size: 12px; }
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code { font-family: 'Geist Mono', monospace; font-size: 0.85em; background: var(--muted); padding: 1px 5px; border-radius: 4px; }
+
+/* ── error — Oxios error-subtle ── */
+.err {
+  margin: 6px 0 12px; border: 1px solid color-mix(in oklch, var(--error) 30%, var(--border));
+  background: color-mix(in oklch, var(--error) 5%, var(--card));
+  border-radius: var(--radius); padding: 12px 14px;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.err .eicon { color: var(--error); flex-shrink: 0; margin-top: 1px; }
+.err .etitle { font-weight: 600; font-size: 13.5px; color: var(--error); }
+.err .edetail { font-size: 12.5px; color: var(--muted-foreground); margin-top: 3px; line-height: 1.55; }
+.err .edetail code { font-family: 'Geist Mono', monospace; font-size: 11.5px; }
+.err .retry {
+  margin-top: 9px; display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid color-mix(in oklch, var(--error) 30%, var(--border));
+  background: var(--card); color: var(--error); cursor: pointer;
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+}
+.err .retry:hover { background: color-mix(in oklch, var(--error) 10%, var(--card)); }
+
+/* ── turn footer meta ── */
+.meta {
+  margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted-foreground);
+}
+.meta .m { display: inline-flex; align-items: center; gap: 5px; }
+.meta .ok { color: var(--success); }
+
+/* ── composer ── */
+.composer {
+  flex-shrink: 0; border-top: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background) 92%, transparent);
+  backdrop-filter: blur(10px);
+}
+.composer .inner { max-width: 780px; margin: 0 auto; padding: 14px 24px 18px; }
+.composer .box {
+  border: 1px solid var(--border); border-radius: calc(var(--radius) * 1.8);
+  background: var(--card); padding: 8px 8px 8px 14px;
+  display: flex; align-items: flex-end; gap: 8px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .15s, box-shadow .15s;
+}
+.composer .box:focus-within { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 15%, transparent); }
+.composer textarea {
+  flex: 1; border: 0; outline: 0; resize: none; background: transparent;
+  font-family: inherit; font-size: 14.5px; color: var(--foreground); line-height: 1.55;
+  max-height: 200px; padding: 7px 0;
+}
+.composer textarea::placeholder { color: var(--muted-foreground); }
+.composer .send {
+  flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; border: 0;
+  background: var(--primary); color: var(--primary-foreground); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.composer .send:hover { opacity: .9; }
+.composer .row2 { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.composer .hint { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted-foreground); }
+.composer .hint kbd { background: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- top bar -->
+  <div class="topbar">
+    <div class="crumb">Chat <span>· 의존성 경계 분석</span></div>
+    <div class="spacer"></div>
+    <span class="modelchip"><span class="pulse"></span>claude-sonnet-4.5</span>
+    <button class="iconbtn" id="theme" title="테마 전환" aria-label="테마 전환">◐</button>
+  </div>
+
+  <!-- thread -->
+  <div class="scroll">
+    <div class="thread">
+
+      <!-- TURN 1 -->
+      <div class="turn">
+        <div class="msg-user">
+          <div class="role">사용자</div>
+          <p>Oxios 커널이 oxi-sdk에 의존하는 부분과 자체 구현하는 부분을 구분해줘. 그리고 왜 커널을 단일 크레이트로 유지하는지도.</p>
+        </div>
+      </div>
+
+      <div class="turn">
+        <div class="msg-asst">
+          <div class="role"><span class="mark">O</span> oxios · claude-sonnet-4.5</div>
+
+          <!-- reasoning -->
+          <details class="reasoning" open>
+            <summary><span class="chev">▶</span> 추론</summary>
+            <div class="body">사용자가 커널↔oxi-sdk 의존성 경계를 묻고 있음. ARCHITECTURE.md §10(모놀리식 근거)과 워크스페이스 Cargo.toml을 확인해야 함.</div>
+          </details>
+
+          <!-- tool 1 -->
+          <details class="tool">
+            <summary>
+              <span class="chev">▶</span>
+              <svg class="wicon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+              <span class="name">read_file</span>
+              <span class="args">docs/ARCHITECTURE.md</span>
+              <span class="dur">198ms</span>
+            </summary>
+            <div class="out">
+              <div class="k">출력 · 2,340 lines</div>
+§10 Monolithic Rationale — The kernel is intentionally a single crate. Star topology around AgentId / EventBus / StateStore prevents circular deps. Internal boundaries via pub(crate) + directory mod files. Do not propose splitting.
+            </div>
+          </details>
+
+          <!-- reasoning 2 -->
+          <details class="reasoning">
+            <summary><span class="chev">▶</span> 추론</summary>
+            <div class="body">star topology 확인. oxi-sdk는 crates.io 전용 정책 — path dep 금지, 재구현 금지.</div>
+          </details>
+
+          <!-- tool 2 -->
+          <details class="tool" open>
+            <summary>
+              <span class="chev">▶</span>
+              <svg class="wicon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+              <span class="name">grep</span>
+              <span class="args">pattern="oxi-sdk" glob="**/Cargo.toml"</span>
+              <span class="dur">42ms</span>
+            </summary>
+            <div class="out">
+<div class="k">출력 · 3 matches</div>
+Cargo.toml:31:             oxi-sdk = "0.45"
+crates/oxios-kernel/Cargo.toml:12: oxi-sdk = { workspace = true }
+crates/oxios-memory/Cargo.toml:8:  oxi-sdk = { workspace = true }
+            </div>
+          </details>
+
+          <!-- answer -->
+          <div class="prose">
+            <h2>의존성 경계 — oxi-sdk vs 자체 구현</h2>
+            <p>Oxios 커널(<code>oxios-kernel</code>)은 의도적으로 <strong>단일 모놀리식 크레이트</strong>다. <code>oxi-sdk</code>는 crates.io 전용 의존성이라 재구현이 금지되며, 커널은 이를 <em>래핑</em>만 하고 자체 수명 주기·보안·메모리를 얹는 구조다.</p>
+            <ul>
+              <li><strong>oxi-sdk에서 가져옴</strong> — <code>AgentConfig</code>, tool-calling loop, <code>Oxi</code>, <code>ModelCatalog</code></li>
+              <li><strong>커널이 자체 구현</strong> — <code>Supervisor</code>, <code>EventBus</code>, <code>StateStore</code>, <code>AccessManager</code>, <code>OxiosEngine</code>(래퍼)</li>
+            </ul>
+
+            <div class="code">
+              <div class="head">
+                <span class="lang">rust</span><span class="path">crates/oxios-kernel/src/lib.rs</span>
+                <button class="copy" onclick="copyCode(this)">복사</button>
+              </div>
+              <pre><code><span class="tc">// star topology around AgentId</span>
+<span class="tk">use</span> oxios_memory::<span class="tt">MemoryManager</span>;
+<span class="tk">use</span> oxios_ouroboros::<span class="tt">Orchestrator</span>;
+<span class="tk">use</span> oxi_sdk::{<span class="tt">AgentConfig</span>, <span class="tt">Oxi</span>};
+
+<span class="tk">pub struct</span> <span class="tt">Kernel</span> {
+    bus: <span class="tt">EventBus</span>,          <span class="tc">// pub/sub across all subsystems</span>
+    state: <span class="tt">StateStore</span>,      <span class="tc">// durable, keyed by AgentId</span>
+    supervisor: <span class="tt">Supervisor</span>, <span class="tc">// fork / exec / wait / kill</span>
+    access: <span class="tt">AccessManager</span>,  <span class="tc">// RBAC + path sandbox + Merkle audit</span>
+    memory: <span class="tt">MemoryManager</span>,  <span class="tc">// tiered: Hot / Warm / Cold</span>
+    engine: <span class="tt">OxiosEngine</span>,    <span class="tc">// wraps oxi_sdk::Oxi + ModelCatalog</span>
+}
+
+<span class="tk">impl</span> <span class="tt">Kernel</span> {
+    <span class="tc">/// Fork a new agent process — Unix semantics.</span>
+    <span class="tk">pub fn</span> <span class="tf">fork</span>(&amp;<span class="tk">self</span>, parent: <span class="tt">AgentId</span>, spec: <span class="tt">AgentSpec</span>) -&gt; <span class="tt">AgentId</span> {
+        <span class="tk">let</span> id = <span class="tk">self</span>.state.<span class="tf">next_id</span>();
+        <span class="tk">self</span>.supervisor.<span class="tf">spawn</span>(id, spec);
+        <span class="tk">self</span>.bus.<span class="tf">emit</span>(<span class="tt">Event</span>::<span class="tt">Forked</span> { parent, child: id });
+        id
+    }
+}</code></pre>
+            </div>
+
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Component</th><th>Source</th><th>Why</th></tr></thead>
+                <tbody>
+                  <tr><td><code>AgentConfig</code>, tool loop, <code>Oxi</code>, <code>ModelCatalog</code></td><td><code>oxi-sdk</code> (crates.io)</td><td>업스트림 재구현 금지</td></tr>
+                  <tr><td><code>OxiosEngine</code> (wrapper)</td><td>kernel</td><td>프로바이더/모델 해석 + 핫스왑</td></tr>
+                  <tr><td><code>Supervisor</code>, <code>EventBus</code>, <code>StateStore</code></td><td>kernel (자체)</td><td>프로세스 수명 주기 — Unix 핵심</td></tr>
+                  <tr><td><code>AccessManager</code></td><td>kernel (자체)</td><td>RBAC + 샌드박스 + Merkle 감사</td></tr>
+                  <tr><td><code>MemoryManager</code></td><td><code>oxios-memory</code> 크레이트</td><td>계층 메모리, Dream, HNSW</td></tr>
+                  <tr><td><code>Orchestrator</code></td><td><code>oxios-ouroboros</code> 크레이트</td><td>assess → crystallize → execute → review</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>왜 모놀리식 단일 크레이트인가</h3>
+            <p>순환 의존성을 원천 차단하고, <code>pub(crate)</code> 경계로 모듈을 분리한다. 8개 크레이트로 쪼개면 빌드 시간은 늘고 인지 비용만 커진다. 커널은 "의도적으로 모놀리식"이다 — 분할 제안은 거부한다.</p>
+          </div>
+
+          <div class="meta">
+            <span class="m"><span class="ok">●</span> 완료</span>
+            <span class="m">in 1,240 · out 380 tok</span>
+            <span class="m">$0.0089</span>
+            <span class="m">4.2s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TURN 2 — failure -->
+      <div class="turn">
+        <div class="msg-user">
+          <div class="role">사용자</div>
+          <p>트레이드오프 비교표도 만들어줘</p>
+        </div>
+      </div>
+
+      <div class="turn">
+        <div class="msg-asst">
+          <div class="role"><span class="mark">O</span> oxios · gpt-4o</div>
+          <div class="err">
+            <svg class="eicon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>
+              <div class="etitle">선택한 프로바이더에 토큰이 남아있지 않습니다.</div>
+              <div class="edetail"><code>gpt-4o</code> (openai) — <code>quota_exceeded</code>. 다른 모델로 전환하거나 토큰을 충전한 뒤 다시 시도하세요.</div>
+              <button class="retry">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                다시 시도
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- composer -->
+  <div class="composer">
+    <div class="inner">
+      <div class="box">
+        <textarea rows="1" placeholder="메시지를 입력하세요…" id="ta" oninput="autosize(this)"></textarea>
+        <button class="send" aria-label="전송">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div class="row2">
+        <span class="modelchip"><span class="pulse"></span>claude-sonnet-4.5</span>
+        <span class="spacer" style="flex:1"></span>
+        <span class="hint"><kbd>⏎</kbd> 전송 · <kbd>⇧⏎</kbd> 줄바꿈</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// theme
+const h = document.documentElement;
+const saved = localStorage.getItem('ox-chat-theme');
+if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches)) h.classList.add('dark');
+document.getElementById('theme').onclick = () => {
+  h.classList.toggle('dark');
+  localStorage.setItem('ox-chat-theme', h.classList.contains('dark') ? 'dark' : 'light');
+};
+// composer autosize
+function autosize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,200)+'px'; }
+// copy code
+function copyCode(btn){
+  const code = btn.closest('.code').querySelector('code');
+  navigator.clipboard.writeText(code.innerText);
+  const old = btn.textContent; btn.textContent='복사됨';
+  setTimeout(()=>btn.textContent=old, 1200);
+}
+// enter to send
+document.getElementById('ta').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); /* mock send */ }
+});
+</script>
+</body>
+</html>

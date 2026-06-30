@@ -122,6 +122,11 @@ impl CalendarApi {
         self.engine.search(query).await
     }
 
+    /// Find all events linked to a knowledge note by its path.
+    pub async fn list_by_note_path(&self, note_path: &str) -> anyhow::Result<Vec<Event>> {
+        self.engine.list_by_note_path(note_path).await
+    }
+
     /// Compute free/busy slots in a time range.
     pub async fn freebusy(
         &self,

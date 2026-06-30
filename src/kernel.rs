@@ -646,6 +646,12 @@ async fn daily_health_check(web_dist: oxios_gateway::ActiveWebDist) -> anyhow::R
     // GitHub tags carry a leading `v`; the version file does not, so
     // normalize before comparing.
     let active_path = web_dist.path();
+    // A dir is "usable" only when internally self-consistent; a partial or
+    // raced extraction missing referenced assets must be replaced.
+    let consistent = active_path
+        .as_ref()
+        .map(|p| oxios_gateway::ActiveWebDist::dist_is_consistent(p))
+        .unwrap_or(false);
     let current_version = active_path
         .as_ref()
         .and_then(|p| std::fs::read(p.join("version.json")).ok())
@@ -654,10 +660,22 @@ async fn daily_health_check(web_dist: oxios_gateway::ActiveWebDist) -> anyhow::R
         .unwrap_or_default();
 
     let latest_version = latest_tag.trim_start_matches('v');
-    let needs_download = active_path.is_none() || current_version != latest_version;
+    // Only (re)download when the dist is missing/inconsistent, OR reports a
+    // KNOWN version that differs from latest. A blank version on a
+    // CONSISTENT dir (e.g. an unstamped "0.0.0" build — see
+    // web/vite.config.ts) does NOT trigger a download: this is what stops a
+    // perpetually re-downloading storm when version stamping regresses,
+    // while still recovering a genuinely broken or missing dist.
+    let needs_download =
+        !consistent || (!current_version.is_empty() && current_version != latest_version);
 
     if !needs_download {
-        tracing::debug!("Daily health check: web UI up to date ({})", latest_tag);
+        tracing::debug!(
+            current = %current_version,
+            latest = %latest_tag,
+            consistent,
+            "Daily health check: web UI up to date; skipping download"
+        );
         return Ok(());
     }
 
@@ -677,9 +695,13 @@ async fn daily_health_check(web_dist: oxios_gateway::ActiveWebDist) -> anyhow::R
         .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     crate::web_dist::extract_zip_into(&staging, &bytes)?;
 
-    // Validate before publishing — a corrupt extraction must not become active.
-    if !staging.join("index.html").is_file() {
-        anyhow::bail!("extracted dist missing index.html");
+    // Validate before publishing — a corrupt or partial extraction must not
+    // become active. Self-consistency (not just index.html presence) catches
+    // a dist that mixes two builds, so a broken page is never published.
+    if !oxios_gateway::ActiveWebDist::dist_is_consistent(&staging) {
+        anyhow::bail!(
+            "extracted dist is not self-consistent (index.html references missing assets)"
+        );
     }
 
     // Atomic publish: swap the pointer + persist marker. The previous

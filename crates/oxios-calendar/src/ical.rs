@@ -9,6 +9,8 @@ use crate::types::{Event, EventDraft, EventSource};
 
 /// Custom X-SOURCE property key.
 const X_SOURCE: &str = "X-SOURCE";
+/// Custom X-OXIOS-NOTE property key — links an event to a knowledge note.
+const X_OXIOS_NOTE: &str = "X-OXIOS-NOTE";
 
 /// Build a complete .ics file string from an [`EventDraft`].
 ///
@@ -73,6 +75,10 @@ pub fn build_ics(uid: &str, draft: &EventDraft) -> anyhow::Result<String> {
         EventSource::Cron => "cron",
     };
     event.append_property(icalendar::Property::new(X_SOURCE, source_str));
+    // Store linked knowledge note path as custom property
+    if let Some(np) = &draft.note_path {
+        event.append_property(icalendar::Property::new(X_OXIOS_NOTE, np.clone()));
+    }
 
     // Default status: CONFIRMED
     event.status(icalendar::EventStatus::Confirmed);
@@ -145,6 +151,9 @@ pub fn parse_ics(content: &str, filename: &str) -> anyhow::Result<Event> {
         })
         .unwrap_or(EventSource::Agent);
 
+    // Linked knowledge note (custom X-OXIOS-NOTE)
+    let note_path = event.property_value(X_OXIOS_NOTE).map(|s| s.to_string());
+
     Ok(Event {
         uid,
         title,
@@ -156,6 +165,7 @@ pub fn parse_ics(content: &str, filename: &str) -> anyhow::Result<Event> {
         rrule,
         status,
         source,
+        note_path,
         filename: filename.to_string(),
     })
 }
@@ -302,6 +312,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![15],
             source: EventSource::User,
+            note_path: None,
         };
 
         let ics = build_ics("test-uid-123", &draft).unwrap();
@@ -330,6 +341,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: EventSource::Agent,
+            note_path: None,
         };
 
         let ics = build_ics("bday-uid", &draft).unwrap();

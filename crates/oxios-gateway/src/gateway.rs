@@ -499,6 +499,30 @@ impl Gateway {
                                 // text) instead — no data lost (advisory).
                                 let _ = send_with_retry(&channel, outgoing).await;
                             }
+                            oxios_kernel::agent_runtime::StreamDelta::Model(model_id) => {
+                                // One-shot model announcement at the start of a
+                                // streaming turn. Forwarded as a `model` chunk
+                                // (no partial flag, no terminal) so the chat
+                                // store can attach the real model to the
+                                // in-flight assistant message immediately,
+                                // including after fallback resolution.
+                                let mut outgoing = OutgoingMessage::with_id(
+                                    uuid::Uuid::new_v4(),
+                                    channel_name_for_collector.clone(),
+                                    user_id.clone(),
+                                    String::new(),
+                                );
+                                outgoing.target_conn_id = conn_id.clone();
+                                outgoing
+                                    .metadata
+                                    .insert("stream_kind".to_string(), "model".to_string());
+                                outgoing.metadata.insert("model".to_string(), model_id);
+                                outgoing.metadata.insert(
+                                    meta::SESSION_ID.to_string(),
+                                    session_id_for_collector.clone(),
+                                );
+                                let _ = send_with_retry(&channel, outgoing).await;
+                            }
                             oxios_kernel::agent_runtime::StreamDelta::Thinking => {
                                 // Signal only — LiveActivityBar reacts to
                                 // this via the local activity-stream arm in

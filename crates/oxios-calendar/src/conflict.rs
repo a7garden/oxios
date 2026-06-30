@@ -69,6 +69,7 @@ mod tests {
             status: "CONFIRMED".to_string(),
             source: EventSource::Agent,
             filename: format!("{}.ics", uid),
+            note_path: None,
         }
     }
 

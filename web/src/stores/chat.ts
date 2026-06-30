@@ -39,6 +39,10 @@ interface ChatRuntimeState {
   /** All messages in the current session (restored from /api/sessions/:id). */
   messages: ChatMessage[]
   isStreaming: boolean
+  /** Buffer for the backend model-announcement chunk (`type: 'model'`) that
+   *  arrives before the first token; consumed when the assistant placeholder
+   *  is created. Null when no turn is in flight. */
+  pendingModel: string | null
   /** WebSocket connection state. */
   connected: boolean
   /** Queue of messages waiting for WS connection. */
@@ -156,6 +160,7 @@ const KNOWN_CHUNK_TYPES = new Set<StreamChunk['type']>([
   'usage',
   'interview',
   'tool_approval',
+  'model',
 ])
 
 function parseChunk(raw: unknown): StreamChunk {
@@ -525,6 +530,7 @@ export const useChatStore = create<ChatStore>()(
       // ── Runtime ──
       messages: [],
       isStreaming: false,
+      pendingModel: null as string | null,
       connected: false,
       _sendQueue: [],
       _lastDoneSessionId: null,
@@ -892,6 +898,7 @@ export const useChatStore = create<ChatStore>()(
         set(() => ({
           messages: [],
           isStreaming: false,
+          pendingModel: null,
           activeSessionId: null,
           _lastDoneSessionId: null,
           _lastDoneProjectId: null,
@@ -1078,6 +1085,33 @@ export const useChatStore = create<ChatStore>()(
           flushPendingTokens()
         }
         switch (chunk.type) {
+          // RFC-015 model mark — arrives before the first token, so buffer it
+          // in `pendingModel` when no assistant message exists yet; the first
+          // placeholder consumes it. Patch the live message if it already exists.
+          case 'model': {
+            const modelId = chunk.model
+            if (!modelId) break
+            const msgs = get().messages
+            let idx = -1
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i]?.role === 'assistant') {
+                idx = i
+                break
+              }
+            }
+            if (idx >= 0) {
+              set((s) => {
+                const updated = [...s.messages]
+                const target = updated[idx]
+                if (!target) return {}
+                updated[idx] = { ...target, model: modelId }
+                return { messages: updated }
+              })
+            } else {
+              set({ pendingModel: modelId })
+            }
+            break
+          }
           case 'token': {
             // F9: batch tokens into a single rAF flush instead of rebuilding
             // the messages array on every token.
@@ -1112,6 +1146,7 @@ export const useChatStore = create<ChatStore>()(
                   role: 'assistant',
                   content: '',
                   timestamp: new Date().toISOString(),
+                  model: get().pendingModel ?? get().activeModelId ?? undefined,
                   activities: [activity],
                 }
                 return { messages: [...updated, placeholder] }
@@ -1267,6 +1302,7 @@ export const useChatStore = create<ChatStore>()(
                   role: 'assistant',
                   content: '',
                   timestamp: new Date().toISOString(),
+                  model: get().pendingModel ?? get().activeModelId ?? undefined,
                   activities: doneActivities.length > 0 ? doneActivities : undefined,
                   metadata: {
                     phase,
@@ -1362,6 +1398,7 @@ export const useChatStore = create<ChatStore>()(
                 role: 'assistant',
                 content: errorContent,
                 timestamp: new Date().toISOString(),
+                model: get().pendingModel ?? get().activeModelId ?? undefined,
                 metadata: {
                   isError: true,
                   errorKind: errKind,

@@ -549,6 +549,37 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         // The token chunk itself still forwards so the
                         // frontend's `flushPendingTokens` can accumulate.
                         let is_partial = msg.partial == Some(true);
+                        // RFC-015 model mark: one-shot announcement emitted at
+                        // stream start. Forward as a typed `model` chunk and
+                        // `continue` — it carries no content, so it must NOT
+                        // hit persist_session (would write an empty response),
+                        // the token path (empty token), or the terminal `done`
+                        // (would terminate the stream before any text).
+                        if msg.metadata.get("stream_kind").map(|v| v.as_str()) == Some("model") {
+                            let model_id = msg
+                                .metadata
+                                .get("model")
+                                .map(|v| v.as_str())
+                                .unwrap_or("");
+                            let model_chunk = serde_json::json!({
+                                "type": "model",
+                                "seq": msg.seq,
+                                "model": model_id,
+                                "session_id": session_id,
+                                "project_id": project_id,
+                            });
+                            let json = match serde_json::to_string(&model_chunk) {
+                                Ok(j) => j,
+                                Err(e) => {
+                                    tracing::error!(error = %e, "Failed to serialize model chunk");
+                                    continue;
+                                }
+                            };
+                            if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                break;
+                            }
+                            continue;
+                        }
 
                         // ── Persist session to disk FIRST ──
                         // Always persist, even if WS send fails later. This ensures

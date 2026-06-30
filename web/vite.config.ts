@@ -8,7 +8,12 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import type { Plugin } from 'vite'
 
 // Root workspace Cargo.toml is the single source of truth for versioning.
-const WORKSPACE_ROOT = path.resolve(__dirname, '..', '..', '..')
+// RFC-026 moved `web/` to the repo root, so the Cargo.toml is ONE level up
+// (was three when this lived under `surface/oxios-web/web/`). The stale
+// `..`/`..`/`..` resolved outside the repo, read a non-existent Cargo.toml,
+// and silently fell back to "0.0.0" — which made the daily health check
+// think every build was outdated and re-download forever.
+const WORKSPACE_ROOT = path.resolve(__dirname, '..')
 
 /// Reads the binary version from the root `[package].version` in Cargo.toml.
 function readBinaryVersion(): string {

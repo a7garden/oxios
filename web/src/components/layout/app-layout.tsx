@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { InfoPanel } from '@/components/knowledge/info-panel'
 import { MoveModal } from '@/components/knowledge/move-modal'
 import { SearchModal } from '@/components/knowledge/search-modal'
+import { CommandPalette } from '@/components/layout/command-palette'
 import { useApprovalWatcher, useGlobalEvents } from '@/hooks/use-global-events'
 import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
 import { cn } from '@/lib/utils'
@@ -117,6 +118,7 @@ export function AppLayout() {
       )}
       {/* Global Notification Center slide-over (schedule + notifications) */}
       <NotificationCenter />
+      <CommandPalette />
     </div>
   )
 }

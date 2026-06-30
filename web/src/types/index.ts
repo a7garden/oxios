@@ -165,6 +165,9 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
+  /** Model that produced this assistant turn (`provider/model`). Absent for
+   *  user/tool messages and for history reloaded before backend threading. */
+  model?: string
   timestamp?: string
   // Tool call fields (role === 'tool')
   toolName?: string
@@ -309,7 +312,10 @@ export interface StreamChunk {
     | 'interview'
     // RFC-017: runtime tool capability escalation
     | 'tool_approval'
+    // RFC-015 model mark — one-shot announcement of the responding model.
+    | 'model'
   content?: string
+  model?: string
   tool_name?: string
   tool_args?: Record<string, unknown>
   tool_result?: unknown

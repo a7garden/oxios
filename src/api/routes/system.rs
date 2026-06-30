@@ -511,10 +511,13 @@ pub(crate) async fn handle_update_run(
                 }
             }
 
-            // Validate before publishing.
-            if !staging.join("index.html").is_file() {
+            // Validate before publishing. Self-consistency (not just
+            // index.html presence) catches a dist that mixes two builds, so
+            // a broken page is never published as active.
+            if !oxios_gateway::ActiveWebDist::dist_is_consistent(&staging) {
                 return Err(AppError::Internal(
-                    "extracted dist missing index.html".into(),
+                    "extracted dist is not self-consistent (index.html references missing assets)"
+                        .into(),
                 ));
             }
 

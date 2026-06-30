@@ -184,6 +184,7 @@ webbrowser = "1.0"
  dirs = { workspace = true }
  sha2 = { workspace = true }
  toml_edit = "0.22"
+include_dir = "0.7"
 
 [dev-dependencies]
 oxios-ouroboros = { version = "1.15.0", path = "crates/oxios-ouroboros" }

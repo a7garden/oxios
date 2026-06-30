@@ -411,7 +411,7 @@ export function ChatInput({
       {/* ── Input container ── */}
       <div
         className={cn(
-          'rounded-2xl border bg-background shadow-sm transition-all',
+          'rounded-lg border bg-background shadow-sm transition-all',
           'focus-within:shadow-md focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-ring/30',
           !connected && 'opacity-60',
           isStreaming && 'border-destructive/30',
@@ -432,7 +432,7 @@ export function ChatInput({
           disabled={disabled || !connected}
           rows={1}
           className={cn(
-            'block w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm',
+            'block w-full resize-none bg-transparent px-4 py-3.5 text-sm',
             'placeholder:text-muted-foreground/70',
             'focus:outline-none disabled:cursor-not-allowed',
             'max-h-[280px] overflow-y-auto',
@@ -440,7 +440,7 @@ export function ChatInput({
         />
 
         {/* ── Bottom bar (flex, not absolute) ── */}
-        <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1 border-t border-transparent">
+        <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <ModelPickerContainer
               activeModelId={activeModelId}

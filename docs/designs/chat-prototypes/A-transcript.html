@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>oxios ▏ process transcript — sess 0x4a2f·a91c</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist@5.0.3/index.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist-mono@5.0.3/index.css" />
+<style>
+  /* ───────────────────────────────────────────────────────────────
+     Oxios OKLCH tokens — VERBATIM from docs/designs/chat-prototypes/SPEC.md
+     ─────────────────────────────────────────────────────────────── */
+  :root {
+    --radius: 0.625rem;
+    --background: oklch(0.99 0 0);
+    --foreground: oklch(0.141 0.005 285.823);
+    --card: oklch(1 0 0);
+    --muted: oklch(0.967 0.001 286.375);
+    --muted-foreground: oklch(0.552 0.016 285.938);
+    --primary: oklch(0.23 0.025 265);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.967 0.001 286.375);
+    --accent: oklch(0.967 0.003 265);
+    --accent-foreground: oklch(0.23 0.025 265);
+    --border: oklch(0.92 0.004 286.32);
+    --ring: oklch(0.45 0.04 265);
+    --success: oklch(0.596 0.145 163);
+    --warning: oklch(0.669 0.162 70);
+    --error: oklch(0.577 0.245 27.325);
+    --info: oklch(0.623 0.214 259.815);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+    --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
+    --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.08);
+  }
+  .dark {
+    --background: oklch(0.13 0.005 285.823);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.19 0.008 265);
+    --muted: oklch(0.274 0.006 286.033);
+    --muted-foreground: oklch(0.705 0.015 286.067);
+    --primary: oklch(0.91 0.03 265);
+    --primary-foreground: oklch(0.15 0.02 265);
+    --border: oklch(1 0 0 / 10%);
+    --ring: oklch(0.6 0.05 265);
+    --success: oklch(0.723 0.219 149.579);
+    --warning: oklch(0.769 0.188 70.08);
+    --error: oklch(0.704 0.191 22.216);
+    --info: oklch(0.685 0.196 259);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
+    --shadow-md: 0 2px 8px oklch(0 0 0 / 0.3);
+  }
+
+  /* ── Transcript paradigm extensions (derive from the tokens above) ── */
+  :root {
+    --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --proc-bg: var(--card);
+    --proc-head: color-mix(in oklch, var(--card), var(--background) 55%);
+    --rule: var(--border);
+    --gutter: color-mix(in oklch, var(--muted-foreground), transparent 55%);
+    --stdout-bg: color-mix(in oklch, var(--background), var(--card) 30%);
+    --hi-info: color-mix(in oklch, var(--info), transparent 82%);
+    --hi-succ: color-mix(in oklch, var(--success), transparent 82%);
+    --hi-err:  color-mix(in oklch, var(--error), transparent 80%);
+  }
+  .dark {
+    --proc-head: color-mix(in oklch, var(--card), var(--background) 40%);
+    --stdout-bg: color-mix(in oklch, var(--background), transparent 35%);
+    --hi-info: color-mix(in oklch, var(--info), transparent 78%);
+    --hi-succ: color-mix(in oklch, var(--success), transparent 80%);
+    --hi-err:  color-mix(in oklch, var(--error), transparent 75%);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-feature-settings: "calt" 1, "ss01" 1;
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 13.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  ::selection { background: var(--info); color: var(--background); }
+
+  /* ───────── tmux-style statusline ───────── */
+  .statusbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: var(--proc-head);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    letter-spacing: 0.01em;
+    user-select: none;
+    z-index: 20;
+  }
+  .sb-left, .sb-right { display: flex; align-items: center; gap: 2px; padding: 0 6px; }
+  .sb-left { padding-left: 14px; }
+  .sb-right { margin-left: auto; padding-right: 8px; }
+  .seg {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 10px;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+  }
+  .seg + .seg { box-shadow: inset 1px 0 0 var(--border); }
+  .seg b { color: var(--foreground); font-weight: 600; }
+  .brand {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 12px 7px 4px;
+    color: var(--foreground);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .brand .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--success), transparent 60%);
+    animation: pulse 2.4s ease-out infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--success), transparent 55%); }
+    70%  { box-shadow: 0 0 0 7px color-mix(in oklch, var(--success), transparent 100%); }
+    100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--success), transparent 100%); }
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11.5px; font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: color-mix(in oklch, var(--info), transparent 90%);
+    color: var(--info);
+    white-space: nowrap;
+  }
+  .chip::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+  }
+  .sb-right .chip { color: var(--foreground); background: var(--muted); border-color: var(--border); }
+  .theme-toggle {
+    margin-left: 6px;
+    width: 30px; height: 30px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--foreground);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .theme-toggle:hover { background: var(--muted); }
+
+  /* ───────── transcript scroll region ───────── */
+  .transcript {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 22px clamp(16px, 3.4vw, 52px) 40px;
+    scroll-behavior: smooth;
+  }
+  .transcript::-webkit-scrollbar { width: 11px; height: 11px; }
+  .transcript::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground), transparent 70%);
+    border: 3px solid var(--background); border-radius: 99px;
+  }
+  .transcript::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+
+  /* ───────── job-submitted rule + prompt ───────── */
+  .job { margin: 26px 0 14px; }
+  .job:first-child { margin-top: 4px; }
+  .rule {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 11.5px; color: var(--muted-foreground);
+    letter-spacing: 0.02em;
+  }
+  .rule .ts { color: var(--info); font-weight: 600; }
+  .rule .tag { color: var(--muted-foreground); }
+  .rule .dash {
+    flex: 1; height: 1px; min-width: 24px;
+    background: repeating-linear-gradient(90deg, var(--rule) 0 7px, transparent 7px 12px);
+  }
+  .rule .jid { color: var(--gutter); }
+  .prompt {
+    margin: 10px 0 0;
+    display: flex; align-items: flex-start; gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--foreground);
+  }
+  .prompt .ps { color: var(--info); font-weight: 700; flex: 0 0 auto; }
+  .prompt .txt { flex: 1 1 auto; word-break: break-word; }
+
+  /* ───────── process block ───────── */
+  .proc {
+    margin: 0 0 8px;
+    background: var(--proc-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--info);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .proc.done   { border-left-color: var(--success); }
+  .proc.err    { border-left-color: var(--error); }
+  .proc-head {
+    display: flex; align-items: center; gap: 14px;
+    padding: 9px 14px;
+    background: var(--proc-head);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ph-pid { color: var(--gutter); }
+  .ph-pid b { color: var(--foreground); font-weight: 600; }
+  .ph-arrow { color: var(--muted-foreground); }
+  .ph-sep { color: var(--border); }
+  .ph-spacer { flex: 1 1 auto; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 3px 9px; border-radius: 4px;
+    border: 1px solid transparent;
+  }
+  .badge::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  }
+  .badge.run { color: var(--info); background: var(--hi-info); border-color: color-mix(in oklch, var(--info), transparent 70%); }
+  .badge.run::before { animation: pulse-dot 1.1s ease-in-out infinite; }
+  .badge.ok  { color: var(--success); background: var(--hi-succ); border-color: color-mix(in oklch, var(--success), transparent 70%); }
+  .badge.err { color: var(--error); background: var(--hi-err); border-color: color-mix(in oklch, var(--error), transparent 65%); }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .ph-meta { color: var(--muted-foreground); font-size: 11.5px; }
+  .ph-meta b { color: var(--foreground); font-weight: 600; }
+  .ph-collapse { color: var(--gutter); font-size: 10px; transition: transform .15s ease; }
+  .proc[data-collapsed="true"] .ph-collapse { transform: rotate(-90deg); }
+  .proc[data-collapsed="true"] .proc-body { display: none; }
+
+  .proc-body { padding: 14px 16px 12px; }
+
+  /* ───────── reasoning: folded log line ───────── */
+  .think { margin: 0 0 12px; border-radius: 6px; }
+  .think-head {
+    display: flex; align-items: center; gap: 9px;
+    width: 100%; text-align: left;
+    background: none; border: none; cursor: pointer;
+    font: inherit; color: var(--muted-foreground);
+    padding: 4px 2px;
+  }
+  .think-head .caret {
+    display: inline-block; width: 10px; color: var(--gutter);
+    transition: transform .15s ease;
+  }
+  .think[data-open="false"] .caret { transform: rotate(-90deg); }
+  .think[data-open="false"] .think-body { display: none; }
+  .think .mk { color: var(--info); font-weight: 700; }
+  .think .label { color: var(--muted-foreground); }
+  .think .sum { color: var(--foreground); font-weight: 500; }
+  .think .tm { margin-left: auto; color: var(--gutter); font-size: 11px; }
+  .think-body {
+    margin: 6px 0 0 19px;
+    padding: 2px 0 2px 12px;
+    border-left: 2px solid color-mix(in oklch, var(--info), transparent 70%);
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    max-width: 92ch;
+  }
+
+  /* ───────── child-process forks (tool calls) ───────── */
+  .fork { margin: 4px 0 12px; font-size: 12.5px; }
+  .fork-line {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+    color: var(--foreground);
+  }
+  .tree { color: var(--gutter); font-weight: 700; }
+  .op { color: var(--warning); font-weight: 600; }
+  .arrow { color: var(--muted-foreground); }
+  .tool { color: var(--info); font-weight: 700; }
+  .argv { color: var(--muted-foreground); }
+  .argv .flag { color: var(--foreground); }
+  .fork .cpid { color: var(--gutter); font-size: 11px; }
+  .fork-out {
+    margin: 5px 0 0 22px;
+    padding: 8px 12px;
+    background: var(--stdout-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .out-meta {
+    font-size: 10.5px; letter-spacing: 0.06em;
+    color: var(--gutter); text-transform: lowercase;
+    margin-bottom: 5px;
+  }
+  .out-meta b { color: var(--muted-foreground); font-weight: 600; }
+  .out-body {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted-foreground);
+    white-space: pre-wrap;
+    line-height: 1.55;
+  }
+  .out-body .gtpath { color: var(--info); }
+  .out-body .gtln   { color: var(--warning); }
+  .out-body .gtkey  { color: var(--success); }
+  .fork-exit {
+    margin: 5px 0 0 22px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+    color: var(--muted-foreground); font-size: 11.5px;
+  }
+  .fork-exit .ex {
+    color: var(--success); font-weight: 700;
+    background: var(--hi-succ);
+    padding: 1px 7px; border-radius: 4px;
+    border: 1px solid color-mix(in oklch, var(--success), transparent 70%);
+  }
+  .fork-exit .dot { color: var(--gutter); }
+
+  /* ───────── answer prose (Geist, readable) ───────── */
+  .answer { margin: 6px 0 8px; font-family: var(--font-sans); }
+  .answer h2 {
+    font-family: var(--font-mono);
+    font-size: 15px; font-weight: 700;
+    margin: 14px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    color: var(--foreground);
+    letter-spacing: -0.005em;
+  }
+  .answer h3 {
+    font-family: var(--font-mono);
+    font-size: 13px; font-weight: 700;
+    margin: 18px 0 8px; color: var(--foreground);
+  }
+  .answer p { margin: 0 0 10px; font-size: 14px; line-height: 1.65; color: var(--foreground); max-width: 86ch; }
+  .answer p.kv {
+    font-family: var(--font-mono); font-size: 12.5px;
+    margin: 0 0 5px; color: var(--muted-foreground);
+  }
+  .answer strong { color: var(--foreground); font-weight: 650; }
+  .answer em { color: var(--foreground); font-style: italic; }
+  code {
+    font-family: var(--font-mono); font-size: 0.88em;
+    background: var(--stdout-bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 4px;
+    color: var(--foreground);
+  }
+
+  /* ───────── full-width code block (stdout) ───────── */
+  .codeblock {
+    margin: 14px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--stdout-bg);
+    width: 100%;
+  }
+  .codeblock > .cb-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px;
+    background: var(--proc-head);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; color: var(--muted-foreground);
+  }
+  .cb-head .lang { color: var(--warning); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .cb-head .path { color: var(--foreground); }
+  .cb-head .path code { background: none; border: none; padding: 0; }
+  .cb-head .ln { margin-left: auto; color: var(--gutter); }
+  .cb-head .copy {
+    border: 1px solid var(--border); background: var(--card);
+    color: var(--muted-foreground); border-radius: 5px;
+    font: inherit; font-size: 10.5px; padding: 2px 8px; cursor: pointer;
+  }
+  .cb-head .copy:hover { color: var(--foreground); }
+  pre.code {
+    margin: 0;
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--foreground);
+    overflow-x: auto;
+    tab-size: 4;
+    counter-reset: ln;
+  }
+  pre.code .row { display: block; }
+  pre.code .row::before {
+    counter-increment: ln;
+    content: counter(ln);
+    display: inline-block;
+    width: 2.4em; margin-right: 1.1em;
+    text-align: right;
+    color: var(--gutter);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  pre.code .c { color: var(--muted-foreground); font-style: italic; }
+  pre.code .k { color: var(--info); }
+  pre.code .t { color: var(--warning); }
+  pre.code .s { color: var(--success); }
+  pre.code .m { color: color-mix(in oklch, var(--muted-foreground), var(--foreground) 15%); }
+  pre.code .f { color: var(--primary); }
+  pre.code .p { color: color-mix(in oklch, var(--muted-foreground), transparent 20%); }
+
+  /* ───────── full-width table (process output) ───────── */
+  .tbl-wrap {
+    margin: 14px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+    background: var(--stdout-bg);
+  }
+  .tbl-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px;
+    background: var(--proc-head);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; color: var(--muted-foreground);
+  }
+  .tbl-head .ttl { color: var(--foreground); font-weight: 600; }
+  .tbl-head .meta { margin-left: auto; color: var(--gutter); }
+  table.map {
+    width: 100%; border-collapse: collapse;
+    font-family: var(--font-mono); font-size: 12px;
+  }
+  table.map th, table.map td {
+    text-align: left; vertical-align: top;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.map thead th {
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted-foreground); font-weight: 700;
+    background: color-mix(in oklch, var(--card), var(--background) 65%);
+  }
+  table.map tbody tr:last-child td { border-bottom: none; }
+  table.map tbody tr:hover { background: color-mix(in oklch, var(--info), transparent 93%); }
+  table.map td.comp { color: var(--foreground); white-space: normal; }
+  table.map td.src  { color: var(--muted-foreground); white-space: nowrap; }
+  table.map td.src b { color: var(--info); font-weight: 600; }
+  table.map td.why  { color: var(--muted-foreground); }
+
+  /* ───────── process footer (exit summary + turn meta) ───────── */
+  .proc-foot {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    font-size: 11.5px;
+    color: var(--muted-foreground);
+  }
+  .proc-foot .ex0 {
+    color: var(--success); font-weight: 700;
+    background: var(--hi-succ);
+    padding: 1px 7px; border-radius: 4px;
+    border: 1px solid color-mix(in oklch, var(--success), transparent 70%);
+  }
+  .proc-foot .sep { color: var(--gutter); }
+  .proc-foot .k { color: var(--muted-foreground); }
+  .proc-foot .v { color: var(--foreground); font-weight: 600; }
+  .proc-foot .model { color: var(--info); }
+
+  /* ───────── error / stderr block ───────── */
+  .errblk {
+    margin: 8px 0 4px;
+    border: 1px solid color-mix(in oklch, var(--error), transparent 55%);
+    border-left: 3px solid var(--error);
+    border-radius: 6px;
+    background: color-mix(in oklch, var(--error), transparent 90%);
+    padding: 12px 14px;
+  }
+  .errblk .estream {
+    font-size: 10.5px; letter-spacing: 0.08em;
+    color: var(--error); font-weight: 700; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .errblk .etitle { font-family: var(--font-sans); font-size: 14px; font-weight: 650; color: var(--foreground); margin: 0 0 6px; }
+  .errblk .edetail { font-family: var(--font-mono); font-size: 12px; color: var(--muted-foreground); line-height: 1.6; margin: 0; }
+  .errblk .edetail code { color: var(--error); background: color-mix(in oklch, var(--error), transparent 85%); border-color: color-mix(in oklch, var(--error), transparent 70%); }
+  .errblk .actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+  .btn-retry {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+    padding: 6px 13px;
+    border-radius: 6px;
+    border: 1px solid var(--error);
+    background: var(--error); color: var(--background);
+    cursor: pointer;
+    transition: filter .15s ease, transform .05s ease;
+  }
+  .dark .btn-retry { color: oklch(0.15 0.02 22); }
+  .btn-retry:hover { filter: brightness(1.08); }
+  .btn-retry:active { transform: translateY(1px); }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    padding: 6px 13px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--card); color: var(--foreground);
+    cursor: pointer;
+  }
+  .btn-ghost:hover { background: var(--muted); }
+  .proc-foot .exN {
+    color: var(--error); font-weight: 700;
+    background: var(--hi-err);
+    padding: 1px 7px; border-radius: 4px;
+    border: 1px solid color-mix(in oklch, var(--error), transparent 60%);
+  }
+
+  /* ───────── composer (command-line prompt) ───────── */
+  .composer {
+    flex: 0 0 auto;
+    background: var(--proc-head);
+    border-top: 1px solid var(--border);
+    padding: 12px clamp(16px, 3.4vw, 52px) 14px;
+    z-index: 20;
+  }
+  .prompt-shell {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 6px 4px 8px;
+    box-shadow: var(--shadow-sm);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .prompt-shell:focus-within {
+    border-color: color-mix(in oklch, var(--ring), transparent 30%);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring), transparent 80%);
+  }
+  .prompt-shell .chip { border-color: color-mix(in oklch, var(--info), transparent 55%); }
+  .prompt-shell .ps2 { color: var(--info); font-weight: 700; font-size: 15px; }
+  .prompt-shell input {
+    flex: 1 1 auto;
+    border: none; outline: none; background: none;
+    font-family: var(--font-mono); font-size: 14px;
+    color: var(--foreground);
+    padding: 9px 2px;
+  }
+  .prompt-shell input::placeholder { color: var(--gutter); }
+  .exec-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--font-mono); font-size: 12.5px; font-weight: 600;
+    padding: 8px 14px; border-radius: 7px;
+    border: 1px solid var(--primary);
+    background: var(--primary); color: var(--primary-foreground);
+    cursor: pointer;
+    transition: filter .15s ease, transform .05s ease;
+  }
+  .exec-btn:hover { filter: brightness(1.08); }
+  .exec-btn:active { transform: translateY(1px); }
+  .hint-line {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    margin-top: 9px;
+    font-size: 10.5px; color: var(--gutter);
+    letter-spacing: 0.02em;
+  }
+  .hint-line kbd {
+    font-family: var(--font-mono);
+    color: var(--muted-foreground);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-right: 5px;
+  }
+  .hint-line .sp { flex: 1 1 auto; }
+  .hint-line .verb { color: var(--info); }
+
+  @media (max-width: 720px) {
+    body { font-size: 12.5px; }
+    .seg:nth-child(2), .sb-left .seg.hide-sm { display: none; }
+    .ph-meta .hide-sm { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ tmux statusline ════════════════ -->
+<header class="statusbar" role="banner">
+  <div class="sb-left">
+    <span class="brand"><span class="dot" aria-hidden="true"></span>oxios</span>
+    <span class="seg">session <b>0x4a2f·a91c</b></span>
+    <span class="seg hide-sm">branch <b>main</b></span>
+    <span class="seg hide-sm">procs <b>2</b></span>
+  </div>
+  <div class="sb-right">
+    <span class="seg">model <b class="chip">claude-sonnet-4.5</b></span>
+    <span class="seg">tokens <b>12,847</b></span>
+    <span class="seg">cost <b>$0.0320</b></span>
+    <span class="seg hide-sm">uptime <b>04:12</b></span>
+    <button class="theme-toggle" id="themeToggle" title="toggle theme" aria-label="toggle light / dark">◐</button>
+  </div>
+</header>
+
+<!-- ════════════════ transcript ════════════════ -->
+<main class="transcript" id="transcript" role="log" aria-live="polite">
+
+  <!-- ───── JOB 1 ───── -->
+  <section class="job">
+    <div class="rule">
+      <span class="ts">18:42:01</span>
+      <span class="tag">▏ job submitted</span>
+      <span class="jid">job #01</span>
+      <span class="dash"></span>
+    </div>
+    <div class="prompt">
+      <span class="ps" aria-hidden="true">$</span>
+      <span class="txt">Oxios 커널이 oxi-sdk에 의존하는 부분과 자체 구현하는 부분을 구분해줘. 그리고 왜 커널을 단일 크레이트로 유지하는지도.</span>
+    </div>
+  </section>
+
+  <!-- ───── PROCESS 1 (assistant turn — rich) ───── -->
+  <article class="proc done" id="proc-1337" data-collapsed="false">
+    <header class="proc-head" onclick="toggleProc('proc-1337')">
+      <span class="ph-pid">pid <b>1337</b></span>
+      <span class="ph-arrow">▸</span>
+      <span class="ph-pid">ppid <b>1</b></span>
+      <span class="ph-sep">▏</span>
+      <span class="ph-meta">spawn <b>18:42:02</b></span>
+      <span class="ph-sep">▏</span>
+      <span class="ph-meta">model <b style="color:var(--info)">claude-sonnet-4.5</b></span>
+      <span class="ph-spacer"></span>
+      <span class="badge ok">DONE</span>
+      <span class="ph-collapse">▼</span>
+    </header>
+
+    <div class="proc-body">
+
+      <!-- reasoning 1 -->
+      <div class="think" data-open="true">
+        <button class="think-head" onclick="toggleThink(this)">
+          <span class="caret" aria-hidden="true">▾</span>
+          <span class="mk">»</span>
+          <span class="label">thinking</span>
+          <span class="sum">— 커널↔oxi-sdk 의존성 경계 확인</span>
+          <span class="tm">128 tok</span>
+        </button>
+        <div class="think-body">사용자가 커널↔oxi-sdk 의존성 경계를 묻고 있음. ARCHITECTURE.md §10(모놀리식 근거)과 워크스페이스 Cargo.toml을 확인해야 함.</div>
+      </div>
+
+      <!-- tool 1: read_file -->
+      <div class="fork">
+        <div class="fork-line">
+          <span class="tree">├─</span>
+          <span class="op">fork</span><span class="arrow">→</span><span class="op">exec</span>
+          <span class="tool">read_file</span>
+          <span class="argv"><span class="flag">--path</span> <code>docs/ARCHITECTURE.md</code></span>
+          <span class="cpid">cpid 1338</span>
+        </div>
+        <div class="fork-out">
+          <div class="out-meta">stdout ▏ <b>excerpt</b></div>
+          <pre class="out-body">§10 Monolithic Rationale — The kernel is intentionally a single crate. Star topology around AgentId / EventBus / StateStore prevents circular deps. Internal boundaries via pub(crate) + directory mod files. Do not propose splitting.</pre>
+        </div>
+        <div class="fork-exit">
+          <span class="tree">└─</span>
+          <span class="ex">exit 0</span>
+          <span class="dot">·</span> 2340 lines read <span class="dot">·</span> 198 ms
+        </div>
+      </div>
+
+      <!-- reasoning 2 -->
+      <div class="think" data-open="true">
+        <button class="think-head" onclick="toggleThink(this)">
+          <span class="caret" aria-hidden="true">▾</span>
+          <span class="mk">»</span>
+          <span class="label">thinking</span>
+          <span class="sum">— star topology 확정, oxi-sdk 정책 정리</span>
+          <span class="tm">96 tok</span>
+        </button>
+        <div class="think-body">star topology 확인. oxi-sdk는 crates.io 전용 정책 — path dep 금지, 재구현 금지.</div>
+      </div>
+
+      <!-- tool 2: grep -->
+      <div class="fork">
+        <div class="fork-line">
+          <span class="tree">└─</span>
+          <span class="op">fork</span><span class="arrow">→</span><span class="op">exec</span>
+          <span class="tool">grep</span>
+          <span class="argv"><span class="flag">--pattern</span> <code>oxi-sdk</code> <span class="flag">--glob</span> <code>**/Cargo.toml</code></span>
+          <span class="cpid">cpid 1339</span>
+        </div>
+        <div class="fork-out">
+          <div class="out-meta">stdout ▏ <b>3 matches</b></div>
+<pre class="out-body"><span class="gtpath">Cargo.toml</span>:<span class="gtln">31</span>:             <span class="gtkey">oxi-sdk</span> = "0.45"
+<span class="gtpath">crates/oxios-kernel/Cargo.toml</span>:<span class="gtln">12</span>: <span class="gtkey">oxi-sdk</span> = { workspace = true }
+<span class="gtpath">crates/oxios-memory/Cargo.toml</span>:<span class="gtln">8</span>:  <span class="gtkey">oxi-sdk</span> = { workspace = true }</pre>
+        </div>
+        <div class="fork-exit">
+          <span class="tree">└─</span>
+          <span class="ex">exit 0</span>
+          <span class="dot">·</span> 3 matches <span class="dot">·</span> 42 ms
+        </div>
+      </div>
+
+      <!-- answer prose -->
+      <div class="answer">
+        <h2>의존성 경계 — oxi-sdk vs 자체 구현</h2>
+        <p>Oxios 커널(<code>oxios-kernel</code>)은 의도적으로 <strong>단일 모놀리식 크레이트</strong>다. <code>oxi-sdk</code>는 crates.io 전용 의존성이라 재구현이 금지되며, 커널은 이를 <em>래핑</em>만 하고 자체 수명 주기·보안·메모리를 얹는 구조다.</p>
+        <p class="kv"><strong>oxi-sdk에서 가져옴</strong> — <code>AgentConfig</code>, tool-calling loop, <code>Oxi</code>, <code>ModelCatalog</code></p>
+        <p class="kv"><strong>커널이 자체 구현</strong> — <code>Supervisor</code>, <code>EventBus</code>, <code>StateStore</code>, <code>AccessManager</code>, <code>OxiosEngine</code>(래퍼)</p>
+      </div>
+
+      <!-- FULL-WIDTH rust code block -->
+      <div class="codeblock">
+        <div class="cb-head">
+          <span class="lang">rust</span>
+          <span class="path"><code>crates/oxios-kernel/src/lib.rs</code></span>
+          <span class="ln">star topology around AgentId · 23 lines</span>
+          <button class="copy" onclick="copyCode(this)">copy</button>
+        </div>
+<pre class="code"><span class="row"><span class="c">// crates/oxios-kernel/src/lib.rs — star topology around AgentId</span></span><span class="row"><span class="k">use</span> <span class="m">oxios_memory</span><span class="p">::</span><span class="t">MemoryManager</span><span class="p">;</span></span><span class="row"><span class="k">use</span> <span class="m">oxios_ouroboros</span><span class="p">::</span><span class="t">Orchestrator</span><span class="p">;</span></span><span class="row"><span class="k">use</span> <span class="m">oxi_sdk</span><span class="p">::{</span><span class="t">AgentConfig</span><span class="p">,</span> <span class="t">Oxi</span><span class="p">};</span></span><span class="row"> </span><span class="row"><span class="k">pub</span> <span class="k">struct</span> <span class="t">Kernel</span> <span class="p">{</span></span><span class="row">    bus<span class="p">:</span> <span class="t">EventBus</span><span class="p">,</span>          <span class="c">// pub/sub across all subsystems</span></span><span class="row">    state<span class="p">:</span> <span class="t">StateStore</span><span class="p">,</span>      <span class="c">// durable, keyed by AgentId</span></span><span class="row">    supervisor<span class="p">:</span> <span class="t">Supervisor</span><span class="p">,</span> <span class="c">// fork / exec / wait / kill</span></span><span class="row">    access<span class="p">:</span> <span class="t">AccessManager</span><span class="p">,</span>  <span class="c">// RBAC + path sandbox + Merkle audit</span></span><span class="row">    memory<span class="p">:</span> <span class="t">MemoryManager</span><span class="p">,</span>  <span class="c">// tiered: Hot / Warm / Cold</span></span><span class="row">    engine<span class="p">:</span> <span class="t">OxiosEngine</span><span class="p">,</span>    <span class="c">// wraps oxi_sdk::Oxi + ModelCatalog</span></span><span class="row"><span class="p">}</span></span><span class="row"> </span><span class="row"><span class="k">impl</span> <span class="t">Kernel</span> <span class="p">{</span></span><span class="row">    <span class="c">/// Fork a new agent process — Unix semantics.</span></span><span class="row">    <span class="k">pub</span> <span class="k">fn</span> <span class="f">fork</span><span class="p">(&amp;</span><span class="k">self</span><span class="p">,</span> parent<span class="p">:</span> <span class="t">AgentId</span><span class="p">,</span> spec<span class="p">:</span> <span class="t">AgentSpec</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="t">AgentId</span> <span class="p">{</span></span><span class="row">        <span class="k">let</span> id <span class="p">=</span> <span class="k">self</span><span class="p">.</span>state<span class="p">.</span><span class="f">next_id</span><span class="p">();</span></span><span class="row">        <span class="k">self</span><span class="p">.</span>supervisor<span class="p">.</span><span class="f">spawn</span><span class="p">(</span>id<span class="p">,</span> spec<span class="p">);</span></span><span class="row">        <span class="k">self</span><span class="p">.</span>bus<span class="p">.</span><span class="f">emit</span><span class="p">(</span><span class="t">Event</span><span class="p">::</span><span class="t">Forked</span> <span class="p">{</span> parent<span class="p">,</span> child<span class="p">:</span> id <span class="p">});</span></span><span class="row">        id</span><span class="row">    <span class="p">}</span></span><span class="row"><span class="p">}</span></span></pre>
+      </div>
+
+      <!-- FULL-WIDTH table -->
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <span class="ttl">dependency map</span>
+          <span class="meta">6 rows · component → source → rationale</span>
+        </div>
+        <table class="map">
+          <thead>
+            <tr><th>Component</th><th>Source</th><th>Why</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="comp"><code>AgentConfig</code>, tool loop, <code>Oxi</code>, <code>ModelCatalog</code></td>
+              <td class="src"><b>oxi-sdk</b> (crates.io)</td>
+              <td class="why">업스트림 재구현 금지</td>
+            </tr>
+            <tr>
+              <td class="comp"><code>OxiosEngine</code> (wrapper)</td>
+              <td class="src"><b>kernel</b></td>
+              <td class="why">프로바이더/모델 해석 + 핫스왑</td>
+            </tr>
+            <tr>
+              <td class="comp"><code>Supervisor</code>, <code>EventBus</code>, <code>StateStore</code></td>
+              <td class="src"><b>kernel</b> (자체)</td>
+              <td class="why">프로세스 수명 주기 — Unix 핵심</td>
+            </tr>
+            <tr>
+              <td class="comp"><code>AccessManager</code></td>
+              <td class="src"><b>kernel</b> (자체)</td>
+              <td class="why">RBAC + 샌드박스 + Merkle 감사</td>
+            </tr>
+            <tr>
+              <td class="comp"><code>MemoryManager</code></td>
+              <td class="src"><b>oxios-memory</b> 크레이트</td>
+              <td class="why">계층 메모리, Dream, HNSW</td>
+            </tr>
+            <tr>
+              <td class="comp"><code>Orchestrator</code></td>
+              <td class="src"><b>oxios-ouroboros</b> 크레이트</td>
+              <td class="why">assess → crystallize → execute → review</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- h3 section -->
+      <div class="answer">
+        <h3>왜 모놀리식 단일 크레이트인가</h3>
+        <p>순환 의존성을 원천 차단하고, <code>pub(crate)</code> 경계로 모듈을 분리한다. 8개 크레이트로 쪼개면 빌드 시간은 늘고 인지 비용만 커진다. 커널은 "의도적으로 모놀리식"이다 — 분할 제안은 거부한다.</p>
+      </div>
+
+      <!-- turn footer meta -->
+      <div class="proc-foot">
+        <span class="ex0">exit 0</span>
+        <span class="sep">·</span>
+        <span><span class="k">in</span> <span class="v">1,240 tok</span></span>
+        <span class="sep">·</span>
+        <span><span class="k">out</span> <span class="v">380 tok</span></span>
+        <span class="sep">·</span>
+        <span><span class="model">claude-sonnet-4.5</span></span>
+        <span class="sep">·</span>
+        <span><span class="v">$0.0089</span></span>
+        <span class="sep">·</span>
+        <span><span class="v">4.2s</span></span>
+        <span class="sep">·</span>
+        <span class="k">forked 2 children</span>
+      </div>
+
+    </div>
+  </article>
+
+  <!-- ───── JOB 2 ───── -->
+  <section class="job">
+    <div class="rule">
+      <span class="ts">18:43:15</span>
+      <span class="tag">▏ job submitted</span>
+      <span class="jid">job #02</span>
+      <span class="dash"></span>
+    </div>
+    <div class="prompt">
+      <span class="ps" aria-hidden="true">$</span>
+      <span class="txt">트레이드오프 비교표도 만들어줘</span>
+    </div>
+  </section>
+
+  <!-- ───── PROCESS 2 (assistant turn — FAILED) ───── -->
+  <article class="proc err" id="proc-1338" data-collapsed="false">
+    <header class="proc-head" onclick="toggleProc('proc-1338')">
+      <span class="ph-pid">pid <b>1338</b></span>
+      <span class="ph-arrow">▸</span>
+      <span class="ph-pid">ppid <b>1</b></span>
+      <span class="ph-sep">▏</span>
+      <span class="ph-meta">spawn <b>18:43:16</b></span>
+      <span class="ph-sep">▏</span>
+      <span class="ph-meta">model <b style="color:var(--warning)">gpt-4o</b> <span style="color:var(--gutter)">(openai)</span></span>
+      <span class="ph-spacer"></span>
+      <span class="badge err">ERR</span>
+      <span class="ph-collapse">▼</span>
+    </header>
+
+    <div class="proc-body">
+      <div class="errblk">
+        <div class="estream">stderr ▏ exit 137 ▏ provider token quota exhausted</div>
+        <p class="etitle">선택한 프로바이더에 토큰이 남아있지 않습니다.</p>
+        <p class="edetail"><code>gpt-4o</code> (openai) — <code>quota_exceeded</code>. 다른 모델로 전환하거나 토큰을 충전한 뒤 다시 시도하세요.</p>
+        <div class="actions">
+          <button class="btn-retry" onclick="retry(this)">↻ 다시 시도</button>
+          <button class="btn-ghost" onclick="swapModel(this)">↻ 다른 모델로 전환</button>
+        </div>
+      </div>
+
+      <div class="proc-foot">
+        <span class="exN">exit 137</span>
+        <span class="sep">·</span>
+        <span><span class="k">signal</span> <span class="v">SIGKILL (provider)</span></span>
+        <span class="sep">·</span>
+        <span><span class="k">in</span> <span class="v">0 tok</span></span>
+        <span class="sep">·</span>
+        <span><span class="k">out</span> <span class="v">0 tok</span></span>
+        <span class="sep">·</span>
+        <span><span style="color:var(--warning)">gpt-4o</span></span>
+        <span class="sep">·</span>
+        <span><span class="v">$0.0000</span></span>
+        <span class="sep">·</span>
+        <span class="k">failed at preflight</span>
+      </div>
+    </div>
+  </article>
+
+  <div style="height: 8px"></div>
+</main>
+
+<!-- ════════════════ composer (command-line prompt) ════════════════ -->
+<footer class="composer" role="contentinfo">
+  <form class="prompt-shell" id="composer" onsubmit="submitJob(event)">
+    <span class="chip">claude-sonnet-4.5</span>
+    <span class="ps2" aria-hidden="true">$</span>
+    <input id="promptInput" type="text" autocomplete="off" spellcheck="false"
+           placeholder="submit a job — describe what the agent should do…" aria-label="prompt" />
+    <button class="exec-btn" type="submit">⏎ exec</button>
+  </form>
+  <div class="hint-line">
+    <span><kbd>⌘K</kbd>commands</span>
+    <span><kbd>⌘↵</kbd>exec</span>
+    <span><kbd>⌘/</kbd>tools</span>
+    <span><kbd>esc</kbd>cancel</span>
+    <span class="sp"></span>
+    <span class="verb">fork</span>
+    <span class="verb">· exec</span>
+    <span class="verb">· wait</span>
+    <span class="verb">· kill</span>
+  </div>
+</footer>
+
+<script>
+  // theme: dark-first, auto via prefers-color-scheme, toggle overrides + persists
+  (function () {
+    const root = document.documentElement;
+    const stored = localStorage.getItem('oxios-theme');
+    if (stored === 'light' || stored === 'dark') {
+      root.classList.toggle('dark', stored === 'dark');
+    } else {
+      root.classList.toggle('dark', !window.matchMedia('(prefers-color-scheme: light)').matches);
+    }
+  })();
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    const root = document.documentElement;
+    const dark = !root.classList.contains('dark');
+    root.classList.toggle('dark', dark);
+    localStorage.setItem('oxios-theme', dark ? 'dark' : 'light');
+  });
+
+  function toggleProc(id) {
+    const el = document.getElementById(id);
+    el.dataset.collapsed = el.dataset.collapsed === 'true' ? 'false' : 'true';
+  }
+  function toggleThink(btn) {
+    const t = btn.closest('.think');
+    t.dataset.open = t.dataset.open === 'true' ? 'false' : 'true';
+  }
+  function copyCode(btn) {
+    const pre = btn.closest('.codeblock').querySelector('pre.code');
+    const txt = pre.innerText.replace(/^\s*\d+/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+    navigator.clipboard && navigator.clipboard.writeText(txt);
+    const old = btn.textContent; btn.textContent = 'copied ✓';
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  }
+  function retry(btn) {
+    const orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '↻ respawning…';
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 1400);
+  }
+  function swapModel(btn) {
+    btn.textContent = '↻ claude-sonnet-4.5 준비됨';
+    setTimeout(() => { btn.textContent = '↻ 다른 모델로 전환'; }, 1600);
+  }
+  function submitJob(e) {
+    e.preventDefault();
+    const input = document.getElementById('promptInput');
+    if (!input.value.trim()) return;
+    input.value = '';
+    input.placeholder = 'job queued — agent will fork on exec…';
+    setTimeout(() => { input.placeholder = 'submit a job — describe what the agent should do…'; }, 1800);
+  }
+  // keyboard: Cmd/Ctrl+Enter handled natively by form submit; Esc clears
+  document.getElementById('promptInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { this.value = ''; this.blur(); }
+  });
+</script>
+</body>
+</html>

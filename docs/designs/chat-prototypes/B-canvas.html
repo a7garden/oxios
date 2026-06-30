@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oxios · Split Canvas</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist@5/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist-mono@5/index.css">
+<style>
+/* ============================================================================
+   OXIOS OKLCH TOKENS — embedded VERBATIM from SPEC.md (do not alter given vars)
+   ============================================================================ */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --primary: oklch(0.23 0.025 265);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.967 0.001 286.375);
+  --accent: oklch(0.967 0.003 265);
+  --accent-foreground: oklch(0.23 0.025 265);
+  --border: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.45 0.04 265);
+  --success: oklch(0.596 0.145 163);
+  --warning: oklch(0.669 0.162 70);
+  --error: oklch(0.577 0.245 27.325);
+  --info: oklch(0.623 0.214 259.815);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+  --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
+  --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.08);
+
+  /* ---- derived (not in spec; additive only) ---- */
+  --pane-bg: oklch(0.978 0.002 265);
+  --dot: oklch(0.141 0.005 285.823 / 0.05);
+  --spine-hi: oklch(0.23 0.025 265 / 0.06);
+  --hairline: oklch(0.92 0.004 286.32);
+  --row-hover: oklch(0.23 0.025 265 / 0.025);
+  --error-bg: oklch(0.577 0.245 27.325 / 0.07);
+  --error-border: oklch(0.577 0.245 27.325 / 0.28);
+
+  /* syntax colors */
+  --syn-cmt: oklch(0.552 0.016 285.938);
+  --syn-kw: oklch(0.45 0.20 285);
+  --syn-type: oklch(0.48 0.13 220);
+  --syn-fn: oklch(0.50 0.16 250);
+  --syn-str: oklch(0.42 0.14 155);
+  --syn-num: oklch(0.55 0.16 60);
+  --syn-macro: oklch(0.52 0.20 20);
+  --syn-punct: oklch(0.45 0.012 286);
+}
+.dark {
+  --background: oklch(0.13 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.19 0.008 265);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --primary: oklch(0.91 0.03 265);
+  --primary-foreground: oklch(0.15 0.02 265);
+  --border: oklch(1 0 0 / 10%);
+  --ring: oklch(0.6 0.05 265);
+  --success: oklch(0.723 0.219 149.579);
+  --warning: oklch(0.769 0.188 70.08);
+  --error: oklch(0.704 0.191 22.216);
+  --info: oklch(0.685 0.196 259);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
+  --shadow-md: 0 2px 8px oklch(0 0 0 / 0.3);
+  /* derived */
+  --pane-bg: oklch(0.155 0.006 265);
+  --dot: oklch(1 0 0 / 0.045);
+  --spine-hi: oklch(1 0 0 / 0.06);
+  --hairline: oklch(1 0 0 / 9%);
+  --row-hover: oklch(1 0 0 / 0.03);
+  --error-bg: oklch(0.704 0.191 22.216 / 0.10);
+  --error-border: oklch(0.704 0.191 22.216 / 0.34);
+  --syn-cmt: oklch(0.62 0.018 286);
+  --syn-kw: oklch(0.74 0.16 285);
+  --syn-type: oklch(0.78 0.12 220);
+  --syn-fn: oklch(0.80 0.13 250);
+  --syn-str: oklch(0.78 0.15 155);
+  --syn-num: oklch(0.83 0.14 60);
+  --syn-macro: oklch(0.78 0.16 20);
+  --syn-punct: oklch(0.78 0.012 286);
+}
+
+/* ============================================================================
+   BASE
+   ============================================================================ */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+code, pre, .mono, .kbd { font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+::selection { background: var(--primary); color: var(--primary-foreground); }
+
+/* scrollbars */
+.spine-scroll::-webkit-scrollbar,
+.pane::-webkit-scrollbar { width: 10px; height: 10px; }
+.spine-scroll::-webkit-scrollbar-thumb,
+.pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+.spine-scroll::-webkit-scrollbar-thumb:hover,
+.pane::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); background-clip: padding-box; }
+
+/* ============================================================================
+   APP SHELL
+   ============================================================================ */
+.app { display: grid; grid-template-rows: 46px 1fr; height: 100vh; }
+
+.topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+}
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 600; letter-spacing: -0.01em; }
+.brand-mark {
+  width: 20px; height: 20px; border-radius: 5px;
+  background: linear-gradient(150deg, var(--primary), oklch(from var(--primary) calc(l + 0.06) c h));
+  display: grid; place-items: center;
+  color: var(--primary-foreground); font-size: 12px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+.brand b { font-size: 14px; }
+.brand .ver { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted-foreground); font-weight: 400; }
+.tb-sep { width: 1px; height: 18px; background: var(--border); }
+.crumb { font-size: 12.5px; color: var(--muted-foreground); display: flex; align-items: center; gap: 7px; }
+.crumb .pid { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--foreground); background: var(--muted); padding: 1px 6px; border-radius: 5px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px oklch(from var(--success) l c h / 0.18); }
+.tb-spacer { flex: 1; }
+.tb-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 11px; border-radius: 8px;
+  font-size: 12.5px; color: var(--muted-foreground);
+  border: 1px solid transparent;
+}
+.tb-btn:hover { background: var(--muted); color: var(--foreground); }
+.theme-toggle { width: 30px; padding: 0; justify-content: center; }
+.theme-toggle svg { width: 15px; height: 15px; }
+:root:not(.dark) .ico-moon { display: block; } :root:not(.dark) .ico-sun { display: none; }
+:root.dark .ico-moon { display: none; } :root.dark .ico-sun { display: block; }
+
+/* ============================================================================
+   WORKSPACE — the split (40 / 60)
+   ============================================================================ */
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(360px, 40%) 1fr;
+  min-height: 0;
+}
+
+/* ---------- SPINE (left, the index) ---------- */
+.spine {
+  display: flex; flex-direction: column;
+  min-height: 0;
+  background: var(--background);
+  border-right: 1px solid var(--border);
+}
+.spine-scroll { flex: 1; overflow-y: auto; }
+
+.turn { }
+.row {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+.row-user { background: transparent; }
+.row-user:hover { background: var(--row-hover); }
+.row-meta {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 7px;
+}
+.role-tag {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px; border-radius: 5px;
+}
+.role-tag.you { color: var(--foreground); background: var(--muted); border: 1px solid var(--border); }
+.role-tag.agent { color: var(--primary-foreground); background: var(--primary); }
+.turn-no {
+  font-family: 'Geist Mono', monospace; font-size: 10.5px;
+  color: var(--muted-foreground); letter-spacing: 0.04em;
+}
+.row-time { margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: var(--muted-foreground); }
+.user-text { font-size: 13.5px; color: var(--foreground); line-height: 1.5; }
+
+/* assistant ack row */
+.row-ack { }
+.ack-line {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Geist Mono', monospace; font-size: 11px;
+  color: var(--muted-foreground);
+  margin-bottom: 8px;
+}
+.ack-line .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--muted-foreground); opacity: 0.5; }
+.ack-summary { font-size: 13px; color: var(--foreground); margin-bottom: 11px; line-height: 1.5; }
+
+/* chips = compact reference links to artifacts */
+.chips { display: flex; flex-direction: column; gap: 6px; }
+.chip {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  padding: 8px 11px 8px 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  border-left: 3px solid var(--primary);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+}
+.chip:hover {
+  transform: translateX(2px);
+  box-shadow: var(--shadow-md);
+  border-left-color: var(--ring);
+}
+.chip.is-active { border-left-color: var(--ring); background: var(--accent); box-shadow: var(--shadow-md); }
+.chip.is-error { border-left-color: var(--error); }
+.chip.is-error:hover { border-left-color: var(--error); background: var(--error-bg); }
+
+.chip-no {
+  flex: 0 0 auto;
+  font-family: 'Geist Mono', monospace; font-size: 10.5px; font-weight: 600;
+  min-width: 30px; height: 24px;
+  display: grid; place-items: center;
+  background: var(--primary); color: var(--primary-foreground);
+  border-radius: 6px; letter-spacing: 0.02em;
+}
+.chip.is-error .chip-no { background: var(--error); color: #fff; }
+.chip-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.chip-title { font-size: 12.5px; font-weight: 500; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 7px; }
+.chip-title .err-x { color: var(--error); font-weight: 700; }
+.chip-sub { font-family: 'Geist Mono', monospace; font-size: 10.5px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-kind {
+  flex: 0 0 auto;
+  font-family: 'Geist Mono', monospace; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 3px 7px; border-radius: 5px;
+  color: var(--accent-foreground); background: var(--accent);
+}
+.chip.is-error .chip-kind { color: var(--error); background: var(--error-bg); }
+
+.turn-foot {
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px dashed var(--hairline);
+  font-family: 'Geist Mono', monospace; font-size: 10.5px;
+  color: var(--muted-foreground);
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+}
+.turn-foot .pill { display: inline-flex; align-items: center; gap: 5px; }
+.turn-foot .pill b { color: var(--foreground); font-weight: 500; }
+.turn-foot .model-pill { color: var(--info); }
+
+/* failed ack */
+.fail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--error); }
+.fail-head .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--error); }
+
+/* ---------- COMPOSER (bottom of spine only) ---------- */
+.composer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  background: var(--background);
+  padding: 12px 16px 14px;
+}
+.comp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.model-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 26px; padding: 0 10px 0 9px;
+  border-radius: 7px;
+  background: var(--muted); border: 1px solid var(--border);
+  font-size: 12px; color: var(--foreground);
+}
+.model-chip .mdot { width: 7px; height: 7px; border-radius: 50%; background: var(--info); box-shadow: 0 0 0 3px oklch(from var(--info) l c h / 0.16); }
+.model-chip b { font-weight: 600; }
+.model-chip .caret { color: var(--muted-foreground); font-size: 10px; }
+.comp-hint-left { margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: var(--muted-foreground); }
+.comp-box {
+  display: flex; align-items: flex-end; gap: 8px;
+  border: 1px solid var(--border); border-radius: 11px;
+  background: var(--card);
+  padding: 7px 7px 7px 12px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.comp-box:focus-within { border-color: var(--ring); box-shadow: 0 0 0 3px oklch(from var(--ring) l c h / 0.16); }
+.comp-box textarea {
+  flex: 1; border: none; outline: none; resize: none;
+  background: transparent; color: var(--foreground);
+  font-family: inherit; font-size: 13.5px; line-height: 1.5;
+  max-height: 120px; padding: 5px 0;
+}
+.comp-box textarea::placeholder { color: var(--muted-foreground); }
+.send-btn {
+  flex: 0 0 auto; width: 32px; height: 32px; border-radius: 8px;
+  background: var(--primary); color: var(--primary-foreground);
+  display: grid; place-items: center;
+  transition: transform .1s ease, opacity .1s ease;
+}
+.send-btn:hover { transform: translateY(-1px); }
+.send-btn:active { transform: translateY(0); }
+.send-btn svg { width: 15px; height: 15px; }
+.comp-foot { display: flex; align-items: center; gap: 14px; margin-top: 8px; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: var(--muted-foreground); }
+.comp-foot kbd { font-family: inherit; background: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 10px; }
+
+/* ============================================================================
+   ARTIFACT PANE (right, the hero canvas)
+   ============================================================================ */
+.pane {
+  overflow-y: auto;
+  background-color: var(--pane-bg);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: 0 0;
+  padding: 26px 28px 60px;
+}
+.pane-head {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-bottom: 18px; padding: 0 2px;
+}
+.pane-head h1 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.pane-head .sub { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted-foreground); }
+.pane-head .sub b { color: var(--foreground); font-weight: 500; }
+
+.artifact {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 18px;
+  scroll-margin-top: 18px;
+  overflow: hidden;
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+.artifact::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--primary);
+}
+.artifact.is-error::before { background: var(--error); }
+.artifact.flash { animation: flash .7s ease; }
+@keyframes flash {
+  0% { box-shadow: var(--shadow-md), 0 0 0 0 oklch(from var(--ring) l c h / 0.45); }
+  100% { box-shadow: var(--shadow-md), 0 0 0 10px oklch(from var(--ring) l c h / 0); }
+}
+
+.art-head {
+  display: flex; align-items: center; gap: 11px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+.art-no {
+  flex: 0 0 auto;
+  font-family: 'Geist Mono', monospace; font-size: 11px; font-weight: 600;
+  min-width: 30px; height: 24px;
+  display: grid; place-items: center;
+  background: var(--primary); color: var(--primary-foreground);
+  border-radius: 6px; letter-spacing: 0.02em;
+}
+.artifact.is-error .art-no { background: var(--error); color: #fff; }
+.art-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.art-title .err-tag {
+  margin-left: 8px; font-family: 'Geist Mono', monospace; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--error); background: var(--error-bg);
+  padding: 2px 7px; border-radius: 5px;
+}
+.art-sub { margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted-foreground); text-align: right; }
+.art-body { padding: 18px 22px 20px; }
+
+/* ---- markdown answer body ---- */
+.md h2 { font-size: 16.5px; font-weight: 650; margin: 0 0 12px; letter-spacing: -0.015em; }
+.md h3 { font-size: 14px; font-weight: 600; margin: 0 0 9px; letter-spacing: -0.01em; color: var(--foreground); }
+.md p { margin: 0 0 11px; color: var(--foreground); line-height: 1.62; }
+.md p:last-child { margin-bottom: 0; }
+.md strong { font-weight: 650; }
+.md em { font-style: italic; color: var(--foreground); }
+.md code {
+  font-family: 'Geist Mono', monospace; font-size: 0.86em;
+  background: var(--muted); color: var(--foreground);
+  padding: 1.5px 5px; border-radius: 5px;
+  border: 1px solid var(--border);
+}
+.split-list { margin: 4px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.split-list > div {
+  display: grid; grid-template-columns: minmax(150px, 200px) 1fr; gap: 16px;
+  padding: 11px 14px;
+  background: var(--muted); border: 1px solid var(--border); border-radius: 9px;
+}
+.split-list dt { font-size: 12px; font-weight: 600; color: var(--muted-foreground); align-self: center; }
+.split-list dd { margin: 0; font-size: 13px; color: var(--foreground); line-height: 1.5; }
+.callout {
+  margin-top: 14px; padding: 12px 14px;
+  border-left: 3px solid var(--primary);
+  background: var(--accent); border-radius: 0 9px 9px 0;
+  font-size: 13px; color: var(--accent-foreground);
+}
+.callout strong { color: var(--foreground); }
+
+/* ---- TRACE strip (collapsible reasoning + tool calls) ---- */
+.trace {
+  margin: 0 22px 18px;
+  border: 1px solid var(--border); border-radius: 11px;
+  background: var(--muted);
+  overflow: hidden;
+}
+.trace-toggle {
+  width: 100%; display: flex; align-items: center; gap: 9px;
+  padding: 10px 13px; text-align: left;
+  font-size: 12px; color: var(--foreground);
+}
+.trace-toggle:hover { background: oklch(from var(--muted) calc(l - 0.01) c h); }
+.trace-toggle .chev { transition: transform .15s ease; color: var(--muted-foreground); }
+.trace[data-open="false"] .trace-toggle .chev { transform: rotate(-90deg); }
+.trace-toggle .tlabel { font-family: 'Geist Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); }
+.trace-toggle .tcount { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted-foreground); margin-left: auto; }
+.trace-toggle .tcount b { color: var(--foreground); }
+.trace-body { padding: 4px 16px 16px; }
+.trace[data-open="false"] .trace-body { display: none; }
+
+.trace-item {
+  position: relative;
+  padding: 0 0 14px 22px;
+  border-left: 1.5px solid var(--border);
+  margin-left: 4px;
+}
+.trace-item:last-child { padding-bottom: 4px; border-left-color: transparent; }
+.trace-item::before {
+  content: ''; position: absolute; left: -6px; top: 3px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--card); border: 2px solid var(--primary);
+}
+.trace-item.t-tool::before { border-color: var(--info); }
+.ti-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 5px; }
+.ti-tag { font-family: 'Geist Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; }
+.ti-tag.reason { color: var(--warning); background: oklch(from var(--warning) l c h / 0.12); }
+.ti-tag.tool { color: var(--info); background: oklch(from var(--info) l c h / 0.12); }
+.ti-fn { font-family: 'Geist Mono', monospace; font-size: 12.5px; font-weight: 600; color: var(--syn-fn); }
+.ti-args { font-family: 'Geist Mono', monospace; font-size: 11.5px; color: var(--muted-foreground); }
+.ti-meta { margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: var(--muted-foreground); white-space: nowrap; }
+.ti-meta b { color: var(--foreground); font-weight: 500; }
+.reason-text { font-size: 12.5px; color: var(--foreground); line-height: 1.55; font-style: italic; opacity: 0.92; }
+.reason-text code, .ti-args code { font-family: 'Geist Mono', monospace; font-size: 0.88em; background: var(--card); border: 1px solid var(--border); padding: 0.5px 4px; border-radius: 4px; color: var(--foreground); }
+.ti-out { margin-top: 6px; }
+.ti-out .excerpt { font-size: 12.5px; color: var(--foreground); line-height: 1.55; margin: 0; padding: 9px 11px; background: var(--card); border: 1px solid var(--border); border-radius: 7px; }
+.ti-out .excerpt code { font-family: 'Geist Mono', monospace; font-size: 0.88em; background: var(--muted); padding: 0.5px 4px; border-radius: 4px; }
+.ti-out pre.grep {
+  margin: 0; padding: 9px 11px; background: var(--card); border: 1px solid var(--border); border-radius: 7px;
+  font-family: 'Geist Mono', monospace; font-size: 11.5px; line-height: 1.6; color: var(--foreground); overflow-x: auto;
+  white-space: pre;
+}
+.ti-out pre.grep .ln { color: var(--muted-foreground); }
+.ti-out pre.grep .mtok { color: var(--syn-str); }
+
+/* ---- CODE BLOCK ---- */
+.code-block { margin: 0; border-top: 1px solid var(--hairline); }
+.code-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px;
+  background: oklch(from var(--card) calc(l - 0.012) c h);
+  border-bottom: 1px solid var(--hairline);
+}
+.code-path { font-family: 'Geist Mono', monospace; font-size: 11.5px; color: var(--foreground); display: flex; align-items: center; gap: 7px; }
+.code-path .fname { font-weight: 500; }
+.code-path .dir { color: var(--muted-foreground); }
+.lang-tag { font-family: 'Geist Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 5px; color: var(--syn-kw); background: oklch(from var(--syn-kw) l c h / 0.10); }
+.copy-btn {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 10px; border-radius: 7px;
+  font-size: 11.5px; color: var(--muted-foreground);
+  border: 1px solid var(--border); background: var(--card);
+}
+.copy-btn:hover { color: var(--foreground); background: var(--muted); }
+.copy-btn svg { width: 13px; height: 13px; }
+.copy-btn.done { color: var(--success); border-color: oklch(from var(--success) l c h / 0.4); }
+.code-body { display: flex; margin: 0; background: var(--card); }
+.code-body .gutter {
+  flex: 0 0 auto; margin: 0; padding: 16px 12px 16px 16px;
+  font-family: 'Geist Mono', monospace; font-size: 12.5px; line-height: 1.7;
+  color: var(--muted-foreground); text-align: right; user-select: none;
+  white-space: pre; border-right: 1px solid var(--hairline);
+  background: oklch(from var(--card) calc(l - 0.008) c h);
+}
+.code-body .code {
+  margin: 0; padding: 16px 18px; flex: 1; min-width: 0;
+  font-family: 'Geist Mono', monospace; font-size: 12.5px; line-height: 1.7;
+  color: var(--foreground); overflow-x: auto; white-space: pre; tab-size: 4;
+}
+.code code { font-family: inherit; background: none; border: none; padding: 0; font-size: inherit; }
+.t-cmt { color: var(--syn-cmt); font-style: italic; }
+.t-str { color: var(--syn-str); }
+.t-kw  { color: var(--syn-kw); font-weight: 600; }
+.t-type{ color: var(--syn-type); }
+.t-fn  { color: var(--syn-fn); }
+.t-num { color: var(--syn-num); }
+.t-macro { color: var(--syn-macro); }
+
+/* ---- TABLE ---- */
+.tbl-wrap { overflow-x: auto; }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.tbl thead th {
+  text-align: left; font-weight: 600; font-size: 11.5px; letter-spacing: 0.02em;
+  color: var(--muted-foreground); text-transform: uppercase;
+  padding: 10px 14px; background: var(--muted);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+table.tbl tbody td { padding: 11px 14px; border-bottom: 1px solid var(--hairline); vertical-align: top; color: var(--foreground); line-height: 1.5; }
+table.tbl tbody tr:last-child td { border-bottom: none; }
+table.tbl tbody tr:hover td { background: oklch(from var(--muted) calc(l + 0.006) c h); }
+table.tbl td .src { font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--muted-foreground); }
+table.tbl td code { font-family: 'Geist Mono', monospace; font-size: 0.86em; background: var(--muted); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; color: var(--foreground); }
+td.col-comp { font-family: 'Geist Mono', monospace; font-size: 12px; }
+
+/* ---- ERROR CARD ---- */
+.err-card .art-body { padding: 24px 26px; }
+.err-top { display: flex; gap: 16px; align-items: flex-start; }
+.err-ico {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 11px;
+  display: grid; place-items: center;
+  background: var(--error-bg); color: var(--error);
+  border: 1px solid var(--error-border);
+}
+.err-ico svg { width: 22px; height: 22px; }
+.err-text { flex: 1; min-width: 0; }
+.err-title { font-size: 16px; font-weight: 650; color: var(--foreground); margin: 2px 0 6px; letter-spacing: -0.01em; }
+.err-detail { font-size: 13px; color: var(--muted-foreground); line-height: 1.6; margin: 0 0 16px; }
+.err-detail code { font-family: 'Geist Mono', monospace; font-size: 0.86em; background: var(--muted); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; color: var(--foreground); }
+.err-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-retry {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 15px; border-radius: 9px;
+  background: var(--error); color: #fff; font-size: 13px; font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: transform .1s ease, box-shadow .1s ease;
+}
+.btn-retry:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-retry svg { width: 14px; height: 14px; }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 14px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--card); color: var(--foreground);
+  font-size: 13px;
+}
+.btn-ghost:hover { background: var(--muted); }
+.err-switch { font-family: 'Geist Mono', monospace; font-size: 11.5px; color: var(--muted-foreground); margin-left: 6px; }
+.err-switch b { color: var(--foreground); font-weight: 500; }
+
+/* responsive: keep the split but allow pane to dominate on narrow */
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: minmax(300px, 42%) 1fr; }
+  .pane { padding: 18px 16px 50px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ======================= TOPBAR ======================= -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <b>OXIOS</b>
+      <span class="ver">agent-os · v0.45</span>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="crumb">
+      <span>kernel</span><span style="opacity:.4">/</span>
+      <span>session</span>
+      <span class="pid">#4f2a·8e1</span>
+      <span class="live-dot" title="live"></span>
+      <span style="font-family:'Geist Mono',monospace;font-size:11px">2 turns · forked 14:31</span>
+    </div>
+    <div class="tb-spacer"></div>
+    <button class="tb-btn" title="새 에이전트 fork">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px"><path d="M8 2v6m0 0a3 3 0 1 0 0 4m0-4a3 3 0 1 1 0 4"/><path d="M8 2 6.5 4M8 2 9.5 4"/></svg>
+      fork
+    </button>
+    <button class="tb-btn" title="바로가기">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px"><circle cx="8" cy="8" r="6"/><path d="M5 8h6M8 5v6"/></svg>
+    </button>
+    <button class="tb-btn theme-toggle" id="themeToggle" title="테마 전환" aria-label="테마 전환">
+      <svg class="ico-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 9.2A5.5 5.5 0 0 1 6.8 3 5.5 5.5 0 1 0 13 9.2Z"/></svg>
+      <svg class="ico-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6 13 13M3 13l1.4-1.4M11.6 4.4 13 3"/></svg>
+    </button>
+  </header>
+
+  <!-- ======================= WORKSPACE ======================= -->
+  <main class="workspace">
+
+    <!-- ============ LEFT: SPINE (the index) ============ -->
+    <section class="spine">
+      <div class="spine-scroll">
+
+        <!-- ---- TURN 1 ---- -->
+        <div class="turn">
+          <div class="row row-user">
+            <div class="row-meta">
+              <span class="turn-no">T·01</span>
+              <span class="role-tag you">YOU</span>
+              <span class="row-time">14:32</span>
+            </div>
+            <div class="user-text">Oxios 커널이 oxi-sdk에 의존하는 부분과 자체 구현하는 부분을 구분해줘. 그리고 왜 커널을 단일 크레이트로 유지하는지도.</div>
+          </div>
+          <div class="row row-ack">
+            <div class="ack-line">
+              <span class="role-tag agent">KERNEL</span>
+              <span>oxios-kernel</span><span class="dot"></span>
+              <span>2 tools</span><span class="dot"></span>
+              <span>1.6k tok</span><span class="dot"></span>
+              <span>4.2s</span>
+            </div>
+            <div class="ack-summary">의존성 경계를 정리하고, 단일 모놀리식 크레이트를 유지하는 근거를 문서화했습니다. 4개 산출물을 캔버스에 배치했어요.</div>
+
+            <div class="chips">
+              <button class="chip" data-target="a1">
+                <span class="chip-no">01</span>
+                <span class="chip-main">
+                  <span class="chip-title">ARCHITECTURE.md 분석</span>
+                  <span class="chip-sub">의존성 경계 · oxi-sdk vs 자체 구현</span>
+                </span>
+                <span class="chip-kind">markdown</span>
+              </button>
+              <button class="chip" data-target="a2">
+                <span class="chip-no">02</span>
+                <span class="chip-main">
+                  <span class="chip-title">lib.rs · star topology</span>
+                  <span class="chip-sub">crates/oxios-kernel/src/lib.rs · 23 lines</span>
+                </span>
+                <span class="chip-kind">rust</span>
+              </button>
+              <button class="chip" data-target="a3">
+                <span class="chip-no">03</span>
+                <span class="chip-main">
+                  <span class="chip-title">의존성 경계표</span>
+                  <span class="chip-sub">component × source × why · 6 rows</span>
+                </span>
+                <span class="chip-kind">table</span>
+              </button>
+              <button class="chip" data-target="a4">
+                <span class="chip-no">04</span>
+                <span class="chip-main">
+                  <span class="chip-title">모놀리식 단일 크레이트 근거</span>
+                  <span class="chip-sub">순환 의존성 차단 · 분할 제안 거부</span>
+                </span>
+                <span class="chip-kind">markdown</span>
+              </button>
+            </div>
+
+            <div class="turn-foot">
+              <span class="pill">in <b>1,240 tok</b></span>
+              <span class="pill">out <b>380 tok</b></span>
+              <span class="pill model-pill">◼ <b>claude-sonnet-4.5</b></span>
+              <span class="pill"><b>$0.0089</b></span>
+              <span class="pill"><b>4.2s</b></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ---- TURN 2 (failure) ---- -->
+        <div class="turn">
+          <div class="row row-user">
+            <div class="row-meta">
+              <span class="turn-no">T·02</span>
+              <span class="role-tag you">YOU</span>
+              <span class="row-time">14:33</span>
+            </div>
+            <div class="user-text">트레이드오프 비교표도 만들어줘</div>
+          </div>
+          <div class="row row-ack">
+            <div class="fail-head">
+              <span class="dot"></span>
+              <span>EXEC FAILED</span><span style="opacity:.6">·</span>
+              <span>exit code 1</span>
+            </div>
+            <div class="ack-summary" style="color:var(--muted-foreground)">모델 <span class="mono" style="color:var(--foreground)">gpt-4o</span> 라우팅 중 프로바이더 토큰 할당량이 소진되어 산출물을 생성하지 못했습니다.</div>
+            <div class="chips">
+              <button class="chip is-error" data-target="a5">
+                <span class="chip-no">05</span>
+                <span class="chip-main">
+                  <span class="chip-title"><span class="err-x">✕</span> 트레이드오프 비교표</span>
+                  <span class="chip-sub">gpt-4o (openai) · quota_exceeded</span>
+                </span>
+                <span class="chip-kind">failed</span>
+              </button>
+            </div>
+            <div class="turn-foot">
+              <span class="pill" style="color:var(--error)">◼ <b>gpt-4o</b></span>
+              <span class="pill"><b>0 tok out</b></span>
+              <span class="pill"><b>$0.0000</b></span>
+              <span class="pill"><b>0.4s</b></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ---- COMPOSER (spine only) ---- -->
+      <div class="composer">
+        <div class="comp-row">
+          <span class="model-chip" title="활성 모델 · 클릭하여 전환">
+            <span class="mdot"></span><b>claude-sonnet-4.5</b><span class="caret">▾</span>
+          </span>
+          <span class="comp-hint-left">routes via <span style="color:var(--foreground)">oxios-engine</span></span>
+        </div>
+        <div class="comp-box">
+          <textarea id="composer" rows="1" placeholder="커널에 무엇을 실행할까요? — fork / exec / wait / kill…"></textarea>
+          <button class="send-btn" title="전송" aria-label="전송">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9M8 4l4 4-4 4"/></svg>
+          </button>
+        </div>
+        <div class="comp-foot">
+          <span><kbd>⏎</kbd> 전송</span>
+          <span><kbd>⇧</kbd><kbd>⏎</kbd> 줄바꿈</span>
+          <span style="margin-left:auto;color:var(--muted-foreground)">esc · cancel · <b style="color:var(--foreground)">kill</b></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ RIGHT: ARTIFACT PANE (the hero) ============ -->
+    <section class="pane" id="pane">
+      <div class="pane-head">
+        <h1>Canvas</h1>
+        <span class="sub">T·01 · <b>4 artifacts</b> · 산출물은 캔버스 전폭으로 렌더됩니다</span>
+      </div>
+
+      <!-- ===== ARTIFACT 01 — answer body + trace ===== -->
+      <article class="artifact" id="a1">
+        <div class="art-head">
+          <span class="art-no">01</span>
+          <span class="art-title">ARCHITECTURE.md 분석</span>
+          <span class="art-sub">markdown · 1,620 tok<br>read_file 198ms · grep 42ms</span>
+        </div>
+
+        <!-- collapsible trace -->
+        <div class="trace" data-open="true">
+          <button class="trace-toggle" type="button">
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" style="width:13px;height:13px"><path d="M4 6l4 4 4-4"/></svg>
+            <span class="tlabel">trace</span>
+            <span style="font-size:12px;color:var(--muted-foreground)">2 reasoning · 2 tool calls</span>
+            <span class="tcount">read_file <b>198ms</b> · grep <b>42ms</b></span>
+          </button>
+          <div class="trace-body">
+            <!-- reasoning 1 -->
+            <div class="trace-item t-reason">
+              <div class="ti-head"><span class="ti-tag reason">reasoning</span><span class="ti-meta">step 1</span></div>
+              <p class="reason-text">사용자가 커널↔oxi-sdk 의존성 경계를 묻고 있음. <code>ARCHITECTURE.md §10</code>(모놀리식 근거)과 워크스페이스 <code>Cargo.toml</code>을 확인해야 함.</p>
+            </div>
+            <!-- tool 1 -->
+            <div class="trace-item t-tool">
+              <div class="ti-head">
+                <span class="ti-tag tool">tool</span>
+                <span class="ti-fn">read_file</span>
+                <span class="ti-args">path = <code>docs/ARCHITECTURE.md</code></span>
+                <span class="ti-meta"><b>2,340 lines</b> · <b>198 ms</b></span>
+              </div>
+              <div class="ti-out">
+                <p class="excerpt">§10 Monolithic Rationale — The kernel is intentionally a single crate. Star topology around <code>AgentId</code> / <code>EventBus</code> / <code>StateStore</code> prevents circular deps. Internal boundaries via <code>pub(crate)</code> + directory mod files. Do not propose splitting.</p>
+              </div>
+            </div>
+            <!-- reasoning 2 -->
+            <div class="trace-item t-reason">
+              <div class="ti-head"><span class="ti-tag reason">reasoning</span><span class="ti-meta">step 2</span></div>
+              <p class="reason-text">star topology 확인. oxi-sdk는 crates.io 전용 정책 — path dep 금지, 재구현 금지.</p>
+            </div>
+            <!-- tool 2 -->
+            <div class="trace-item t-tool">
+              <div class="ti-head">
+                <span class="ti-tag tool">tool</span>
+                <span class="ti-fn">grep</span>
+                <span class="ti-args">pattern = <code>oxi-sdk</code> · glob = <code>**/Cargo.toml</code></span>
+                <span class="ti-meta"><b>3 matches</b> · <b>42 ms</b></span>
+              </div>
+              <div class="ti-out">
+<pre class="grep"><span class="ln">Cargo.toml:31:</span>             oxi-sdk = <span class="mtok">"0.45"</span>
+<span class="ln">crates/oxios-kernel/Cargo.toml:12:</span> oxi-sdk = { workspace = true }
+<span class="ln">crates/oxios-memory/Cargo.toml:8:</span>  oxi-sdk = { workspace = true }</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="art-body md">
+          <h2>의존성 경계 — oxi-sdk vs 자체 구현</h2>
+          <p>Oxios 커널(<code>oxios-kernel</code>)은 의도적으로 <strong>단일 모놀리식 크레이트</strong>다. <code>oxi-sdk</code>는 crates.io 전용 의존성이라 재구현이 금지되며, 커널은 이를 <em>래핑</em>만 하고 자체 수명 주기·보안·메모리를 얹는 구조다.</p>
+          <dl class="split-list">
+            <div>
+              <dt>oxi-sdk에서 가져옴</dt>
+              <dd><code>AgentConfig</code>, tool-calling loop, <code>Oxi</code>, <code>ModelCatalog</code></dd>
+            </div>
+            <div>
+              <dt>커널이 자체 구현</dt>
+              <dd><code>Supervisor</code>, <code>EventBus</code>, <code>StateStore</code>, <code>AccessManager</code>, <code>OxiosEngine</code>(래퍼)</dd>
+            </div>
+          </dl>
+          <div class="callout"><strong>결론 —</strong> 커널은 <code>oxi-sdk</code>를 래핑하고, Unix 세마틱스(fork/exec/wait/kill)를 자체 구현한다. 업스트림 재구현은 정책상 거부.</div>
+        </div>
+      </article>
+
+      <!-- ===== ARTIFACT 02 — Rust code (FULL WIDTH) ===== -->
+      <article class="artifact" id="a2">
+        <div class="art-head">
+          <span class="art-no">02</span>
+          <span class="art-title">lib.rs · star topology</span>
+          <span class="art-sub">crates/oxios-kernel/src/lib.rs<br>23 lines · rust</span>
+        </div>
+        <div class="code-block">
+          <div class="code-head">
+            <span class="code-path"><span class="dir">crates/oxios-kernel/src/</span><span class="fname">lib.rs</span></span>
+            <span class="lang-tag">rust</span>
+            <button class="copy-btn" data-copy="rust-src">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5" y="5" width="8" height="8" rx="1.5"/><path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11"/></svg>
+              복사
+            </button>
+          </div>
+          <div class="code-body">
+            <pre class="gutter" id="rust-gutter"></pre>
+            <pre class="code"><code id="rust-src">// crates/oxios-kernel/src/lib.rs — star topology around AgentId
+use oxios_memory::MemoryManager;
+use oxios_ouroboros::Orchestrator;
+use oxi_sdk::{AgentConfig, Oxi};
+
+pub struct Kernel {
+    bus: EventBus,          // pub/sub across all subsystems
+    state: StateStore,      // durable, keyed by AgentId
+    supervisor: Supervisor, // fork / exec / wait / kill
+    access: AccessManager,  // RBAC + path sandbox + Merkle audit
+    memory: MemoryManager,  // tiered: Hot / Warm / Cold
+    engine: OxiosEngine,    // wraps oxi_sdk::Oxi + ModelCatalog
+}
+
+impl Kernel {
+    /// Fork a new agent process — Unix semantics.
+    pub fn fork(&self, parent: AgentId, spec: AgentSpec) -> AgentId {
+        let id = self.state.next_id();
+        self.supervisor.spawn(id, spec);
+        self.bus.emit(Event::Forked { parent, child: id });
+        id
+    }
+}</code></pre>
+          </div>
+        </div>
+      </article>
+
+      <!-- ===== ARTIFACT 03 — table (FULL WIDTH) ===== -->
+      <article class="artifact" id="a3">
+        <div class="art-head">
+          <span class="art-no">03</span>
+          <span class="art-title">의존성 경계표</span>
+          <span class="art-sub">component × source × why<br>6 rows</span>
+        </div>
+        <div class="art-body" style="padding-top:0;padding-bottom:6px">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr><th>Component</th><th>Source</th><th>Why</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="col-comp"><code>AgentConfig</code>, tool loop, <code>Oxi</code>, <code>ModelCatalog</code></td>
+                  <td><span class="src">oxi-sdk (crates.io)</span></td>
+                  <td>업스트림 재구현 금지</td>
+                </tr>
+                <tr>
+                  <td class="col-comp"><code>OxiosEngine</code> (wrapper)</td>
+                  <td><span class="src">kernel</span></td>
+                  <td>프로바이더/모델 해석 + 핫스왑</td>
+                </tr>
+                <tr>
+                  <td class="col-comp"><code>Supervisor</code>, <code>EventBus</code>, <code>StateStore</code></td>
+                  <td><span class="src">kernel (자체)</span></td>
+                  <td>프로세스 수명 주기 — Unix 핵심</td>
+                </tr>
+                <tr>
+                  <td class="col-comp"><code>AccessManager</code></td>
+                  <td><span class="src">kernel (자체)</span></td>
+                  <td>RBAC + 샌드박스 + Merkle 감사</td>
+                </tr>
+                <tr>
+                  <td class="col-comp"><code>MemoryManager</code></td>
+                  <td><span class="src">oxios-memory 크레이트</span></td>
+                  <td>계층 메모리, Dream, HNSW</td>
+                </tr>
+                <tr>
+                  <td class="col-comp"><code>Orchestrator</code></td>
+                  <td><span class="src">oxios-ouroboros 크레이트</span></td>
+                  <td>assess → crystallize → execute → review</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+
+      <!-- ===== ARTIFACT 04 — section markdown ===== -->
+      <article class="artifact" id="a4">
+        <div class="art-head">
+          <span class="art-no">04</span>
+          <span class="art-title">왜 모놀리식 단일 크레이트인가</span>
+          <span class="art-sub">markdown · rationale<br>ARCHITECTURE.md §10</span>
+        </div>
+        <div class="art-body md">
+          <h3>왜 모놀리식 단일 크레이트인가</h3>
+          <p>순환 의존성을 원천 차단하고, <code>pub(crate)</code> 경계로 모듈을 분리한다.</p>
+          <p>8개 크레이트로 쪼개면 빌드 시간은 늘고 인지 비용만 커진다.</p>
+          <p>커널은 <strong>"의도적으로 모놀리식"</strong>이다 — 분할 제안은 거부한다.</p>
+        </div>
+      </article>
+
+      <!-- ===== ARTIFACT 05 — ERROR (full pane width) ===== -->
+      <article class="artifact is-error err-card" id="a5">
+        <div class="art-head">
+          <span class="art-no">05</span>
+          <span class="art-title">트레이드오프 비교표<span class="err-tag">failed</span></span>
+          <span class="art-sub" style="color:var(--error)">gpt-4o (openai)<br>quota_exceeded · 0.4s</span>
+        </div>
+        <div class="art-body">
+          <div class="err-top">
+            <div class="err-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+            </div>
+            <div class="err-text">
+              <div class="err-title">선택한 프로바이더에 토큰이 남아있지 않습니다.</div>
+              <p class="err-detail"><code>gpt-4o</code> (openai) — <code>quota_exceeded</code>. 다른 모델로 전환하거나 토큰을 충전한 뒤 다시 시도하세요.</p>
+              <div class="err-actions">
+                <button class="btn-retry" id="retryBtn">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9M13.5 8a5.5 5.5 0 0 1-9.4 3.9"/><path d="M12 2v3h-3M4 14v-3h3"/></svg>
+                  다시 시도
+                </button>
+                <button class="btn-ghost">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" style="width:13px;height:13px"><path d="M3 5h10M5 5l1 8a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-8"/><path d="M6.5 5V3.5A1.5 1.5 0 0 1 8 2h0a1.5 1.5 0 0 1 1.5 1.5V5"/></svg>
+                  폐기
+                </button>
+                <span class="err-switch">대체 라우트 — <b>claude-sonnet-4.5</b> · <b>gpt-4.1</b></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Theme (auto + toggle) ---------- */
+  var root = document.documentElement;
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  function applyTheme(t) { root.classList.toggle('dark', t === 'dark'); }
+  // respect saved choice, else follow OS
+  try {
+    var saved = localStorage.getItem('oxios-theme');
+    applyTheme(saved ? saved : (mq.matches ? 'dark' : 'light'));
+  } catch (e) { applyTheme(mq.matches ? 'dark' : 'light'); }
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var next = root.classList.contains('dark') ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem('oxios-theme', next); } catch (e) {}
+  });
+
+  /* ---------- Rust syntax highlighter ---------- */
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  var KW = ['use','pub','struct','impl','fn','let','self','Self','mut','return','ref','move',
+            'crate','mod','enum','trait','as','dyn','unsafe','const','static','type','for',
+            'in','if','else','match','loop','while','break','continue','await','async','where'];
+  var RE = new RegExp(
+    '(\\/\\/.*$)' +                                               // 1 comment
+    '|(' + '"(?:[^"\\\\]|\\\\.)*"' + ')' +                       // 2 string
+    '|(' + '\\b(?:' + KW.join('|') + ')\\b' + ')' +              // 3 keyword
+    '|(' + '[a-z_][A-Za-z0-9_]*!' + ')' +                        // 4 macro
+    '|(' + '\\b[A-Z][A-Za-z0-9_]*\\b' + ')' +                    // 5 type
+    '|(' + '[a-z_][A-Za-z0-9_]*(?=\\s*\\()' + ')' +              // 6 fn call
+    '|(' + '\\b\\d[\\d_]*\\b' + ')',                              // 7 number
+    'gm'
+  );
+  function hl(code) {
+    return esc(code).replace(RE, function (m, cmt, str, kw, macro, type, fn, num) {
+      if (cmt)   return '<span class="t-cmt">' + cmt + '</span>';
+      if (str)   return '<span class="t-str">' + str + '</span>';
+      if (kw)    return '<span class="t-kw">' + kw + '</span>';
+      if (macro) return '<span class="t-macro">' + macro + '</span>';
+      if (type)  return '<span class="t-type">' + type + '</span>';
+      if (fn)    return '<span class="t-fn">' + fn + '</span>';
+      if (num)   return '<span class="t-num">' + num + '</span>';
+      return m;
+    });
+  }
+
+  var src = document.getElementById('rust-src');
+  if (src) { src.innerHTML = hl(src.textContent); }
+
+  // build gutter from actual line count
+  var gutter = document.getElementById('rust-gutter');
+  if (gutter && src) {
+    var n = src.textContent.replace(/\n$/, '').split('\n').length;
+    var nums = [];
+    for (var i = 1; i <= n; i++) nums.push(i);
+    gutter.textContent = nums.join('\n');
+  }
+
+  /* ---------- Copy button ---------- */
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-copy');
+      var el = id ? document.getElementById(id) : null;
+      var text = el ? el.textContent : '';
+      var done = function () {
+        btn.classList.add('done');
+        btn.querySelector('svg').innerHTML = '<path d="M3.5 8.5 7 12l6-7"/>';
+        var old = btn.lastChild; btn.appendChild(document.createTextNode(' 복사됨'));
+        setTimeout(function () {
+          btn.classList.remove('done');
+          btn.querySelector('svg').innerHTML = '<rect x="5" y="5" width="8" height="8" rx="1.5"/><path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11"/>';
+          if (btn.lastChild.nodeType === 3) btn.removeChild(btn.lastChild);
+        }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, done);
+      } else { done(); }
+    });
+  });
+
+  /* ---------- Spine chip → scroll pane to artifact (instant, reliable everywhere) ---------- */
+  var pane = document.getElementById('pane');
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.chip'));
+  function clampScroll(v) { return Math.max(0, Math.min(v, pane.scrollHeight - pane.clientHeight)); }
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var target = document.getElementById(chip.getAttribute('data-target'));
+      if (!target) return;
+      var top = target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop - 14;
+      pane.scrollTop = clampScroll(top);
+      highlight(chip.getAttribute('data-target'));
+      suppressSpy = true;
+      setTimeout(function () { suppressSpy = false; }, 80);
+      target.classList.remove('flash');
+      void target.offsetWidth; // reflow to restart animation
+      target.classList.add('flash');
+    });
+  });
+
+  /* ---------- Scroll-spy: deterministic focus-line + bottom clamp ---------- */
+  var arts = Array.prototype.slice.call(document.querySelectorAll('.artifact'));
+  function setActive() {
+    var focus = 110; // px from pane viewport top
+    var current = arts[0];
+    for (var i = 0; i < arts.length; i++) {
+      if (arts[i].getBoundingClientRect().top <= focus) current = arts[i];
+    }
+    if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 4) current = arts[arts.length - 1];
+    if (pane.scrollTop <= 4) current = arts[0];
+    var id = current.id;
+    highlight(id);
+  }
+  function highlight(id) {
+    chips.forEach(function (c) { c.classList.toggle('is-active', c.getAttribute('data-target') === id); });
+  }
+  var suppressSpy = false;
+  pane.addEventListener('scroll', function () { if (!suppressSpy) setActive(); }, { passive: true });
+  setActive();
+
+  /* ---------- Trace strip collapse ---------- */
+  document.querySelectorAll('.trace-toggle').forEach(function (t) {
+    t.addEventListener('click', function () {
+      var trace = t.closest('.trace');
+      var open = trace.getAttribute('data-open') === 'true';
+      trace.setAttribute('data-open', open ? 'false' : 'true');
+    });
+  });
+
+  /* ---------- Composer auto-grow + enter to send ---------- */
+  var ta = document.getElementById('composer');
+  if (ta) {
+    function grow() { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; }
+    ta.addEventListener('input', grow);
+    ta.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); grow(); }
+    });
+  }
+
+  /* ---------- Retry button micro-interaction ---------- */
+  var rb = document.getElementById('retryBtn');
+  if (rb) {
+    rb.addEventListener('click', function () {
+      rb.style.opacity = '0.6';
+      rb.querySelector('svg').style.animation = 'none';
+      void rb.offsetWidth;
+      rb.style.animation = 'flash 0.7s ease';
+      setTimeout(function () { rb.style.opacity = '1'; }, 700);
+    });
+  }
+})();
+</script>
+</body>
+</html>

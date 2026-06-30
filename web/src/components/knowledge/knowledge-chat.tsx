@@ -1,15 +1,19 @@
+import type { LucideIcon } from 'lucide-react'
 import {
   BookOpen,
   CheckSquare,
   Clock,
+  CornerDownLeft,
+  Inbox,
   MessageSquare,
   Newspaper,
-  Send,
   ShoppingCart,
   Square,
   Trash2,
   Tv,
+  X,
 } from 'lucide-react'
+import md5 from 'md5'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -43,6 +47,17 @@ interface ParsedMessage {
 interface DateGroup {
   date: string
   messages: ParsedMessage[]
+}
+
+/** Capture-time routing destinations. */
+type RouteKey = 'Later' | 'Read' | 'Shop' | 'Watch' | 'Journal'
+
+interface CaptureRoute {
+  key: RouteKey
+  labelKey: string
+  icon: LucideIcon
+  /** Checklist file path; absent for Journal (uses journal_add). */
+  path?: string
 }
 
 // ── Parsing ───────────────────────────────────────────────────
@@ -105,31 +120,36 @@ function groupMessages(raws: string[]): DateGroup[] {
 export async function msgHash(raw: string): Promise<string> {
   const stripped = raw.replace(/^- \[[ xX]\] /, '')
   const firstLine = stripped.split('\n')[0] ?? ''
-  try {
-    // Web Crypto API — MD5 via md5-js fallback
-    const { default: md5 } = await import('md5')
-    return md5(firstLine).slice(0, 11)
-  } catch {
-    // Fallback: simple non-crypto hash (deterministic across runs)
-    let h = 5381
-    for (let i = 0; i < firstLine.length; i++) {
-      h = Math.imul(33, h) ^ firstLine.charCodeAt(i)
-    }
-    return Math.abs(h >>> 0)
-      .toString(16)
-      .padStart(11, '0')
-      .slice(0, 11)
-  }
+  return md5(firstLine).slice(0, 11)
 }
 
-// ── Checklist targets ─────────────────────────────────────────
+// ── Destinations ──────────────────────────────────────────────
 
+/** Per-row "move out of inbox" targets (checklist files). */
 const CHECKLIST_TARGETS = [
   { labelKey: 'knowledge.later', icon: Clock, path: 'Later.md' },
   { labelKey: 'knowledge.read', icon: Newspaper, path: 'Read.md' },
   { labelKey: 'knowledge.shop', icon: ShoppingCart, path: 'Shop.md' },
   { labelKey: 'knowledge.watch', icon: Tv, path: 'Watch.md' },
 ] as const
+
+/** Capture-time routes (slash menu). Journal routes via journal_add. */
+const CAPTURE_ROUTES: CaptureRoute[] = [
+  { key: 'Later', labelKey: 'knowledge.later', icon: Clock, path: 'Later.md' },
+  { key: 'Read', labelKey: 'knowledge.read', icon: Newspaper, path: 'Read.md' },
+  { key: 'Shop', labelKey: 'knowledge.shop', icon: ShoppingCart, path: 'Shop.md' },
+  { key: 'Watch', labelKey: 'knowledge.watch', icon: Tv, path: 'Watch.md' },
+  { key: 'Journal', labelKey: 'knowledge.toJournal', icon: BookOpen },
+]
+
+/** Tint classes per route for chips/badges. */
+const ROUTE_TINT: Record<RouteKey, string> = {
+  Later: 'text-info bg-info-muted',
+  Read: 'text-warning bg-warning-muted',
+  Shop: 'text-destructive bg-destructive/10',
+  Watch: 'text-chart-4 bg-chart-4/10',
+  Journal: 'text-success bg-success-muted',
+}
 
 // ── Component ─────────────────────────────────────────────────
 
@@ -142,14 +162,18 @@ export function KnowledgeChat() {
   const checklistAdd = useChecklistAdd()
 
   const [input, setInput] = useState('')
+  const [route, setRoute] = useState<RouteKey | null>(null)
+  const [routeMenuOpen, setRouteMenuOpen] = useState(false)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set())
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null)
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const dragStart = useRef<number | null>(null)
+  const prevCountRef = useRef(0)
 
   // ── Grouped messages ──────────────────────────────────────
 
@@ -158,14 +182,26 @@ export function KnowledgeChat() {
     return groupMessages(rawMessages)
   }, [rawMessages])
 
-  // Flat parsed list for selection lookups
+  // Flat parsed list (original order) for selection lookups / bulk ops.
   const flatMessages = useMemo(() => groups.flatMap((g) => g.messages), [groups])
 
-  // ── Auto-scroll ───────────────────────────────────────────
+  // Display order: newest-first. Full reverse (group order + within-group)
+  // is a strictly-monotone remap of flatMessages, so index-based selection
+  // (min/max over msg.index) stays correct without re-mapping.
+  const displayGroups = useMemo(
+    () => groups.map((g) => ({ ...g, messages: [...g.messages].reverse() })).reverse(),
+    [groups],
+  )
 
+  // ── Auto-scroll to top when inbox grows ───────────────────
+  // Newest sits at the top now, so pin to top on mount and after appends.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
+    const count = flatMessages.length
+    if (count > prevCountRef.current) {
+      scrollRef.current?.scrollTo({ top: 0 })
+    }
+    prevCountRef.current = count
+  }, [flatMessages.length])
 
   // ── Auto-resize textarea ──────────────────────────────────
 
@@ -176,36 +212,74 @@ export function KnowledgeChat() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
   }, [input])
 
+  // ── Close route menu on outside click ─────────────────────
+
+  useEffect(() => {
+    if (!routeMenuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+        setRouteMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [routeMenuOpen])
+
   // ── Send / shortcuts ──────────────────────────────────────
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
     if (!text) return
 
-    // Journal shortcut: "some text jj"
+    // Legacy journal shortcut: "some text jj"
     if (text.toLowerCase().endsWith(' jj')) {
       const record = text.slice(0, -3).trim()
-      if (record) {
-        await journalAdd.mutateAsync(record)
+      if (record) await journalAdd.mutateAsync(record)
+    } else if (route === 'Journal') {
+      await journalAdd.mutateAsync(text)
+    } else if (route) {
+      const target = CAPTURE_ROUTES.find((r) => r.key === route)
+      if (target?.path) {
+        await checklistAdd.mutateAsync({ path: target.path, item: text })
+      } else {
+        await chatAppend.mutateAsync(text)
       }
-      setInput('')
-      return
+    } else {
+      await chatAppend.mutateAsync(text)
     }
 
-    await chatAppend.mutateAsync(text)
     setInput('')
+    setRoute(null)
+    setRouteMenuOpen(false)
     textareaRef.current?.focus()
-  }, [input, chatAppend, journalAdd])
+  }, [input, route, chatAppend, journalAdd, checklistAdd])
+
+  const pickRoute = useCallback((key: RouteKey | null) => {
+    setRoute(key)
+    setRouteMenuOpen(false)
+    // Strip the leading `/` the user typed to summon the menu.
+    setInput((v) => v.replace(/^\//, ''))
+    textareaRef.current?.focus()
+  }, [])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         handleSend()
+      } else if (e.key === 'Escape') {
+        setRouteMenuOpen(false)
+        if (route) setRoute(null)
       }
     },
-    [handleSend],
+    [handleSend, route],
   )
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value
+    setInput(v)
+    if (v === '/' && !route) setRouteMenuOpen(true)
+  }
 
   // ── Selection ─────────────────────────────────────────────
 
@@ -329,14 +403,101 @@ export function KnowledgeChat() {
   }, [flatMessages, selectedIndices, chatDelete])
 
   const hasSelection = selectedIndices.size > 0
+  const activeRoute = route ? CAPTURE_ROUTES.find((r) => r.key === route) : null
 
   // ── Render ────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col flex-1 h-full">
-      {/* Header */}
-      <div className="px-4 py-2 border-b shrink-0 bg-muted/30">
-        <p className="text-xs text-muted-foreground">{t('knowledge.chatHeader')}</p>
+      {/* Command bar (top) */}
+      <div ref={barRef} className="relative shrink-0 border-b px-4 py-3">
+        <div
+          className={cn(
+            'flex items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 transition-shadow',
+            'focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/30',
+          )}
+        >
+          {activeRoute && (
+            <button
+              type="button"
+              onClick={() => pickRoute(null)}
+              className={cn(
+                'mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium',
+                ROUTE_TINT[activeRoute.key],
+              )}
+            >
+              <activeRoute.icon className="h-3.5 w-3.5" />
+              {t(activeRoute.labelKey)}
+              <X className="h-3 w-3 opacity-60" />
+            </button>
+          )}
+
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={t('knowledge.chatPlaceholder')}
+            className="min-h-0 flex-1 resize-none border-0 bg-transparent px-0 py-1 text-sm shadow-none focus-visible:ring-0"
+            rows={1}
+          />
+        </div>
+
+        {/* Hint row — doubles as route-menu toggle */}
+        <div className="mt-1.5 flex items-center justify-between px-1">
+          <button
+            type="button"
+            onClick={() => setRouteMenuOpen((o) => !o)}
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span className="font-mono">/</span>
+            {route ? (
+              <span className="text-foreground">{t(activeRoute!.labelKey)}</span>
+            ) : (
+              t('knowledge.routeHint')
+            )}
+          </button>
+          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+            <CornerDownLeft className="h-3 w-3" />
+            {t('knowledge.pressEnterToSend')}
+          </span>
+        </div>
+
+        {/* Route menu popover */}
+        {routeMenuOpen && (
+          <div className="absolute left-4 top-full z-20 mt-1 w-56 overflow-hidden rounded-lg border bg-popover p-1 shadow-lg">
+            <button
+              type="button"
+              onClick={() => pickRoute(null)}
+              className={cn(
+                'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-accent',
+                !route && 'bg-accent',
+              )}
+            >
+              <Inbox className="h-4 w-4 text-muted-foreground" />
+              <span className="flex-1 text-left">{t('knowledge.inbox')}</span>
+              {!route && <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />}
+            </button>
+            {CAPTURE_ROUTES.map((r) => {
+              const Icon = r.icon
+              return (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => pickRoute(r.key)}
+                  className={cn(
+                    'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-accent',
+                    route === r.key && 'bg-accent',
+                  )}
+                >
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                  <span className="flex-1 text-left">{t(r.labelKey)}</span>
+                  {route === r.key && <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Bulk action bar */}
@@ -379,11 +540,15 @@ export function KnowledgeChat() {
         </div>
       )}
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 select-none" onClick={handleBackgroundClick}>
+      {/* Messages area — newest-first */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 select-none"
+        onClick={handleBackgroundClick}
+      >
         {isLoading ? (
           <div className="text-center text-muted-foreground py-12">{t('knowledge.loading')}</div>
-        ) : groups.length === 0 ? (
+        ) : displayGroups.length === 0 ? (
           <div className="flex flex-col items-center text-muted-foreground py-16">
             <MessageSquare className="h-10 w-10 opacity-20 mb-4" />
             <p className="font-medium text-foreground">{t('knowledge.noFilesYet')}</p>
@@ -391,7 +556,7 @@ export function KnowledgeChat() {
           </div>
         ) : (
           <div className="space-y-6">
-            {groups.map((group) => (
+            {displayGroups.map((group) => (
               <div key={group.date}>
                 {/* Date header */}
                 <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm py-1 mb-2">
@@ -425,30 +590,14 @@ export function KnowledgeChat() {
                         onDragEnter={() => handleDragEnter(msg)}
                         onDragEnd={handleDragEnd}
                       >
-                        {/* Checkbox — click to toggle completion */}
-                        <button
-                          type="button"
-                          className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                          title={
-                            msg.done ? t('knowledge.markIncomplete') : t('knowledge.markComplete')
-                          }
-                          disabled={chatDelete.isPending || chatAppend.isPending}
-                          onClick={async (e) => {
-                            e.stopPropagation()
-                            const hash = await msgHash(msg.raw)
-                            const oldPrefix = msg.done ? '- [x]' : '- [ ]'
-                            const newPrefix = msg.done ? '- [ ]' : '- [x]'
-                            const rest = msg.raw.replace(oldPrefix, '').trim()
-                            await chatDelete.mutateAsync(hash)
-                            await chatAppend.mutateAsync(`${newPrefix} ${rest}`)
-                          }}
-                        >
+                        {/* Completion state — visual only (no in-place toggle endpoint) */}
+                        <span className="mt-0.5 shrink-0 text-muted-foreground">
                           {msg.done ? (
                             <CheckSquare className="h-4 w-4 text-success" />
                           ) : (
                             <Square className="h-4 w-4" />
                           )}
-                        </button>
+                        </span>
 
                         {/* Timestamp */}
                         {msg.timestamp && (
@@ -525,29 +674,6 @@ export function KnowledgeChat() {
             ))}
           </div>
         )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input area */}
-      <div className="border-t p-3 shrink-0">
-        <div className="flex gap-2 items-end">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={t('knowledge.chatPlaceholder')}
-            className="flex-1 resize-none min-h-0 max-h-40 overflow-y-auto bg-background"
-            rows={1}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || chatAppend.isPending || journalAdd.isPending}
-            size="icon"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
     </div>
   )

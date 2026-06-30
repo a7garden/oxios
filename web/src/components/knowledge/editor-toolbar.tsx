@@ -1,10 +1,21 @@
 import { useRouterState } from '@tanstack/react-router'
-import { ArrowLeft, ArrowRight, Columns2, PanelRight, Save, X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Calendar as CalendarIcon,
+  Columns2,
+  PanelRight,
+  Save,
+  X,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { EventEditor } from '@/components/calendar/event-editor'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useCalendarCreate } from '@/hooks/use-calendar'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import type { CreateEventRequest } from '@/types/calendar'
 
 export function EditorToolbar() {
   const { t } = useTranslation()
@@ -20,6 +31,9 @@ export function EditorToolbar() {
     closeSplit,
     openSplit,
   } = useKnowledgeStore()
+
+  const [editorOpen, setEditorOpen] = useState(false)
+  const createMutation = useCalendarCreate()
 
   const canGoBack = historyIndex > 0
   const canGoForward = historyIndex < history.length - 1
@@ -144,6 +158,39 @@ export function EditorToolbar() {
           {infoPanelOpen ? t('knowledge.hideInfoPanel') : t('knowledge.showInfoPanel')}
         </TooltipContent>
       </Tooltip>
+
+      {/* Add to calendar — creates an event linked to this note */}
+      {currentFilePath && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setEditorOpen(true)}
+              disabled={createMutation.isPending}
+              aria-label={t('calendar.scheduleNote')}
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('calendar.scheduleNote')}</TooltipContent>
+        </Tooltip>
+      )}
+
+      <EventEditor
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+        defaultStart={new Date()}
+        defaultTitle={fileName}
+        isLoading={createMutation.isPending}
+        onSubmit={(formData) => {
+          createMutation.mutate(
+            { ...(formData as CreateEventRequest), note_path: currentFilePath ?? undefined },
+            { onSuccess: () => setEditorOpen(false) },
+          )
+        }}
+      />
     </div>
   )
 }

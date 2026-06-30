@@ -137,6 +137,9 @@ impl CalendarEngine {
         if let Some(ref repeat) = patch.repeat {
             event.rrule = repeat.as_ref().map(crate::rrule::simple_repeat_to_rrule);
         }
+        if let Some(np) = &patch.note_path {
+            event.note_path = np.clone();
+        }
 
         // Rebuild .ics
         let draft = EventDraft {
@@ -149,6 +152,7 @@ impl CalendarEngine {
             repeat: None, // RRULE is already a string; preserve it
             reminder_minutes: patch.reminder_minutes.unwrap_or_default(),
             source: event.source,
+            note_path: event.note_path.clone(),
         };
 
         let mut ics_content = ical::build_ics(&event.uid, &draft)?;
@@ -386,6 +390,48 @@ impl CalendarEngine {
         Ok(events)
     }
 
+    /// Find all events linked to a knowledge note by its path (`X-OXIOS-NOTE`).
+    ///
+    /// Scans every .ics file and parses it, then filters by `note_path`.
+    /// Used by the knowledge UI to surface the event(s) a note is scheduled as,
+    /// regardless of date range.
+    pub async fn list_by_note_path(&self, note_path: &str) -> anyhow::Result<Vec<Event>> {
+        let files: Vec<String> = {
+            let index = self.index.read();
+            index
+                .all_entries()
+                .into_iter()
+                .map(|e| e.file.clone())
+                .collect()
+        };
+
+        let mut events = Vec::new();
+        for filename in &files {
+            let path = self.dir.join(filename);
+            match fs::read_to_string(&path).await {
+                Ok(content) => match ical::parse_ics(&content, filename) {
+                    Ok(event) => {
+                        if event.note_path.as_deref() == Some(note_path) {
+                            events.push(event);
+                        }
+                    }
+                    Err(e) => tracing::warn!(
+                        file = %filename,
+                        error = %e,
+                        "Failed to parse calendar file during by-note lookup"
+                    ),
+                },
+                Err(e) => tracing::warn!(
+                    file = %filename,
+                    error = %e,
+                    "Failed to read calendar file during by-note lookup"
+                ),
+            }
+        }
+        events.sort_by_key(|e| e.start);
+        Ok(events)
+    }
+
     /// Compute free/busy slots in a time range `[from, to)`.
     ///
     /// Returns a list of slots alternating between free and busy, starting
@@ -562,6 +608,7 @@ impl CalendarEngine {
                 status: event.status.clone(),
                 source: event.source,
                 filename: event.filename.clone(),
+                note_path: event.note_path.clone(),
             });
         }
 
@@ -611,6 +658,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: EventSource::User,
+            note_path: None,
         };
 
         let result = engine.create(draft).await.unwrap();
@@ -636,6 +684,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: EventSource::Agent,
+            note_path: None,
         };
 
         let result = engine.create(draft).await.unwrap();
@@ -664,6 +713,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: EventSource::Agent,
+            note_path: None,
         };
 
         let result = engine.create(draft).await.unwrap();
@@ -690,6 +740,7 @@ mod tests {
                 repeat: None,
                 reminder_minutes: vec![],
                 source: EventSource::Agent,
+                note_path: None,
             };
             engine.create(draft).await.unwrap();
         }
@@ -714,6 +765,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: EventSource::Agent,
+            note_path: None,
         };
         engine.create(draft).await.unwrap();
 
@@ -736,6 +788,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: EventSource::Agent,
+            note_path: None,
         };
         engine.create(draft).await.unwrap();
 
@@ -763,6 +816,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: EventSource::Agent,
+            note_path: None,
         };
         engine.create(draft1).await.unwrap();
 
@@ -776,6 +830,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: EventSource::Agent,
+            note_path: None,
         };
         let result = engine.create(draft2).await.unwrap();
         assert_eq!(result.conflicts.len(), 1);

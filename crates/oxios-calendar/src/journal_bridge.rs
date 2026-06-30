@@ -278,6 +278,7 @@ More text.";
             status: "CONFIRMED".to_string(),
             source: EventSource::Agent,
             filename: "abc123.ics".to_string(),
+            note_path: None,
         }];
 
         let section = bridge.build_event_section(date, &events);
@@ -316,6 +317,7 @@ More text.";
             status: "CONFIRMED".to_string(),
             source: EventSource::User,
             filename: "lunch.ics".to_string(),
+            note_path: None,
         }];
 
         let section = bridge.build_event_section(date, &events);

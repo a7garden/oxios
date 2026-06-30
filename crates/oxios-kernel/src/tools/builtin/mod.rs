@@ -27,6 +27,7 @@ pub mod persona_tool;
 pub mod project_tool;
 pub mod resource_tool;
 pub mod security_tool;
+pub mod skill_forge_tool;
 
 pub use agent_tool::AgentTool as KernelAgentTool;
 pub use budget_tool::BudgetTool;
@@ -40,6 +41,7 @@ pub use persona_tool::PersonaTool;
 pub use project_tool::ProjectTool;
 pub use resource_tool::ResourceTool;
 pub use security_tool::SecurityTool;
+pub use skill_forge_tool::SkillForgeTool;
 
 use crate::KernelHandle;
 use crate::tools::AskUserTool;
@@ -100,6 +102,9 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
 
     // Marketplace (ClawHub — search, install, update)
     registry.register(MarketplaceTool::from_kernel(kernel));
+
+    // Skill Forge (authoring: create/validate/package/import/list/get/delete)
+    registry.register(SkillForgeTool::from_kernel(kernel));
 
     // Calendar (optional — only if [calendar] is enabled)
     if let Some(calendar_tool) = CalendarTool::try_from_kernel(kernel) {

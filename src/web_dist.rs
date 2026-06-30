@@ -33,6 +33,47 @@ pub fn active_marker_path() -> Option<PathBuf> {
     user_web_root().map(|r| r.join(".active"))
 }
 
+/// Diagnosis of the active web-dist, used by `oxios status` to report UI
+/// integrity independently of process liveness. A daemon can be alive while
+/// serving a dangling marker (a raced update deleted the active dir) —
+/// exactly the "status says Running but the UI 404s" confusion this
+/// disambiguates. Reads the *persisted* marker (not another process's
+/// in-memory pointer).
+pub enum WebUiHealth {
+    /// Resolves to a self-consistent directory, optionally with a version.
+    Ok {
+        /// Absolute path of the served dist.
+        path: PathBuf,
+        /// Version string from `version.json`, when present.
+        version: Option<String>,
+    },
+    /// Marker present but resolves to no usable directory.
+    Broken {
+        /// The marker path that would not resolve.
+        marker: PathBuf,
+    },
+    /// No marker / nothing installed on this machine.
+    NotInstalled,
+}
+
+/// Resolve the active web-dist health for status reporting.
+pub fn diagnose_active() -> WebUiHealth {
+    let Some(marker) = active_marker_path() else {
+        return WebUiHealth::NotInstalled;
+    };
+    let legacy = user_web_dist_dir();
+    match oxios_gateway::ActiveWebDist::resolve(&marker, legacy.as_deref()) {
+        Some(p) => {
+            let version = std::fs::read(p.join("version.json"))
+                .ok()
+                .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+                .and_then(|v| v["version"].as_str().map(str::to_string));
+            WebUiHealth::Ok { path: p, version }
+        }
+        None => WebUiHealth::Broken { marker },
+    }
+}
+
 /// Result of ensuring web UI availability.
 #[derive(Debug)]
 pub enum WebDistResult {
@@ -102,10 +143,23 @@ async fn fetch_latest_release_tag() -> Result<String> {
 /// Returns the number of files extracted. `dest` is cleared first if it
 /// already exists (e.g. an interrupted prior run).
 pub fn extract_zip_into(dest: &std::path::Path, bytes: &[u8]) -> Result<usize> {
-    if dest.exists() {
-        std::fs::remove_dir_all(dest)?;
+    // Extract into a temp sibling first, then rename atomically into `dest`.
+    // A crash mid-extract therefore never leaves a half-populated `dest`
+    // that a later health check might publish, and two extracts to the same
+    // deterministic staging path can't interleave (each owns its own temp
+    // dir). `dest` is overwritten only once the new tree is fully written.
+    let parent = dest.parent().context("staging dir has no parent")?;
+    let tmp_name = format!(
+        ".{}-extract.tmp",
+        dest.file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("staging")
+    );
+    let tmp = parent.join(tmp_name);
+    if tmp.exists() {
+        std::fs::remove_dir_all(&tmp)?;
     }
-    std::fs::create_dir_all(dest)?;
+    std::fs::create_dir_all(&tmp)?;
 
     let reader = std::io::Cursor::new(bytes);
     let mut archive = zip::ZipArchive::new(reader).context("invalid zip file")?;
@@ -113,7 +167,7 @@ pub fn extract_zip_into(dest: &std::path::Path, bytes: &[u8]) -> Result<usize> {
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).context("zip read error")?;
         let outpath = match file.enclosed_name() {
-            Some(path) => dest.join(path),
+            Some(path) => tmp.join(path),
             None => continue,
         };
         if file.is_dir() {
@@ -129,6 +183,15 @@ pub fn extract_zip_into(dest: &std::path::Path, bytes: &[u8]) -> Result<usize> {
             count += 1;
         }
     }
+
+    // Publish the complete tree into place. Rename is atomic on the same
+    // filesystem (parent is the same dir); remove a prior dest first so the
+    // rename target never pre-exists.
+    if dest.exists() {
+        std::fs::remove_dir_all(dest)?;
+    }
+    std::fs::rename(&tmp, dest)
+        .with_context(|| format!("failed to publish staging dir into {}", dest.display()))?;
     Ok(count)
 }
 
@@ -270,9 +333,12 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
         return WebDistResult::UserDir(p);
     }
 
-    // 2. ~/.oxios/web/dist/ (legacy / user override)
-    if let Some(ref dist) = legacy
-        && dist.join("index.html").is_file()
+    // 2. ~/.oxios/web/dist/ (legacy / user override). Must be internally
+    //    self-consistent — a dir that mixes two builds (entry chunk 404s)
+    //    is skipped so we fall through to a fresh download instead of
+    //    serving a broken page forever.
+    if let Some(dist) = &legacy
+        && oxios_gateway::ActiveWebDist::dist_is_consistent(dist)
     {
         tracing::info!(path = ?dist, "Serving web UI from ~/.oxios/web/dist/");
         return WebDistResult::UserDir(dist.clone());
@@ -280,7 +346,7 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
 
     // 3. workspace/web/dist/ (bundled / dev)
     let workspace_dist = workspace.join("web").join("dist");
-    if workspace_dist.join("index.html").is_file() {
+    if oxios_gateway::ActiveWebDist::dist_is_consistent(&workspace_dist) {
         tracing::info!(path = ?workspace_dist, "Serving web UI from workspace (web/dist/)");
         return WebDistResult::WorkspaceDir(workspace_dist);
     }
@@ -308,12 +374,29 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
         };
 
         if let Some((tag, path)) = outcome {
-            // Publish the freshly-extracted staging dir so restarts
-            // resolve it via the marker.
-            if let Some(m) = marker.as_ref() {
-                let _ = std::fs::write(m, path.to_string_lossy().as_bytes());
+            // Validate the freshly-extracted dist is internally consistent
+            // before honoring it — a corrupt release asset (or a zip that
+            // drops the entry chunk) must not strand the daemon serving a
+            // broken page. Treat a failed check like a download failure so
+            // the bounded retry loop kicks in.
+            if !oxios_gateway::ActiveWebDist::dist_is_consistent(&path) {
+                last_reason = format!(
+                    "extracted dist for {tag} is not self-consistent \
+                     (index.html references missing assets)"
+                );
+                tracing::warn!(
+                    attempt,
+                    tag = %tag,
+                    "extracted web dist is not self-consistent; retrying"
+                );
+            } else {
+                // Publish the freshly-extracted staging dir so restarts
+                // resolve it via the marker.
+                if let Some(m) = marker.as_ref() {
+                    let _ = std::fs::write(m, path.to_string_lossy().as_bytes());
+                }
+                return WebDistResult::Downloaded { path, version: tag };
             }
-            return WebDistResult::Downloaded { path, version: tag };
         }
 
         if attempt < MAX_ATTEMPTS {

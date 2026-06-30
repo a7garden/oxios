@@ -43,3 +43,45 @@ The `oxios-ouroboros` crate incorporates the **specification-first protocol conc
 from the Ouroboros project by Q00. The Rust implementation in Oxios is original —
 no source code was copied. The concept, naming, and protocol phases are derived from
 the Ouroboros specification framework.
+
+---
+
+## Anthropic `skill-creator`
+
+- **Repository:** https://github.com/anthropics/skills/tree/main/skills/skill-creator
+- **Copyright:** Copyright (c) Anthropic, PBC
+- **License:** Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0
+
+```
+Copyright (c) Anthropic, PBC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+### Usage in Oxios
+
+The bundled `skill-creator` default skill (`share/default-skills/skill-creator/`)
+incorporates the skill-authoring methodology from Anthropic's `skill-creator`:
+the SKILL.md anatomy, the three-level progressive-disclosure model, the writing
+guide, and the with/without-skill evaluation workflow. The `references/schemas.md`
+JSON schemas and the `agents/{grader,analyzer,comparator}.md` subagent prompts are
+ported from the original.
+
+**Modifications:** The deterministic operations that Anthropic implements as
+Python scripts (`quick_validate.py`, `package_skill.py`, `aggregate_benchmark.py`,
+`generate_review.py`) are reimplemented from scratch in Rust as the native
+`skill_forge` agent tool — no Python source was copied. The subagent prompts were
+adapted from Claude-Code-specific wording to tool-agnostic agent-run framing so
+they work under Oxios's fork/exec + task-subagent model. The LLM grading and
+description-improvement steps remain agent-orchestrated (an Oxios agent spawns a
+grader/improver subagent), matching Anthropic's original agent-spawns-grader design.

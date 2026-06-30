@@ -55,6 +55,9 @@ pub struct EventDraft {
     pub location: Option<String>,
     /// Optional repeat rule.
     pub repeat: Option<Repeat>,
+    /// Optional path of a linked knowledge note (stored as `X-OXIOS-NOTE`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note_path: Option<String>,
     /// Reminder offsets in minutes before the event.
     #[serde(default)]
     pub reminder_minutes: Vec<u32>,
@@ -83,6 +86,9 @@ pub struct EventPatch {
     pub location: Option<Option<String>>,
     /// Set or clear repeat rule. `Some(None)` clears it.
     pub repeat: Option<Option<Repeat>>,
+    /// Set or clear linked knowledge note. `Some(None)` clears it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note_path: Option<Option<String>>,
     /// Replace reminder minutes.
     pub reminder_minutes: Option<Vec<u32>>,
 }
@@ -112,6 +118,9 @@ pub struct Event {
     pub source: EventSource,
     /// Filename of the .ics file (e.g. `abc123.ics`).
     pub filename: String,
+    /// Optional path of a linked knowledge note (stored as `X-OXIOS-NOTE`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note_path: Option<String>,
 }
 
 /// Index entry for fast lookup without parsing .ics files.

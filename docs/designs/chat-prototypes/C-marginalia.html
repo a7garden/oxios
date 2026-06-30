@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Oxios — Marginalia · 의존성 경계</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+<!-- Newsreader (serif display / question treatment) -->
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!-- Geist (body) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist/500.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist/600.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist/700.css">
+<!-- Geist Mono (margin notes + code) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist-mono/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist-mono/500.css">
+
+<style>
+  /* ───────────────────────────────────────────────────────────
+     Oxios OKLCH tokens — verbatim from SPEC.md
+     ─────────────────────────────────────────────────────────── */
+  :root {
+    --radius: 0.625rem;
+    --background: oklch(0.99 0 0);
+    --foreground: oklch(0.141 0.005 285.823);
+    --card: oklch(1 0 0);
+    --muted: oklch(0.967 0.001 286.375);
+    --muted-foreground: oklch(0.552 0.016 285.938);
+    --primary: oklch(0.23 0.025 265);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.967 0.001 286.375);
+    --accent: oklch(0.967 0.003 265);
+    --accent-foreground: oklch(0.23 0.025 265);
+    --border: oklch(0.92 0.004 286.32);
+    --ring: oklch(0.45 0.04 265);
+    --success: oklch(0.596 0.145 163);
+    --warning: oklch(0.669 0.162 70);
+    --error: oklch(0.577 0.245 27.325);
+    --info: oklch(0.623 0.214 259.815);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+    --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
+    --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.08);
+    /* derived, on-palette */
+    --connector: oklch(0.70 0.012 286);
+    --prose-soft: oklch(0.40 0.014 286);
+    --panel: oklch(0.978 0.002 286);
+    color-scheme: light;
+  }
+  .dark {
+    --background: oklch(0.13 0.005 285.823);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.19 0.008 265);
+    --muted: oklch(0.274 0.006 286.033);
+    --muted-foreground: oklch(0.705 0.015 286.067);
+    --primary: oklch(0.91 0.03 265);
+    --primary-foreground: oklch(0.15 0.02 265);
+    --border: oklch(1 0 0 / 10%);
+    --ring: oklch(0.6 0.05 265);
+    --success: oklch(0.723 0.219 149.579);
+    --warning: oklch(0.769 0.188 70.08);
+    --error: oklch(0.704 0.191 22.216);
+    --info: oklch(0.685 0.196 259);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
+    --shadow-md: 0 2px 8px oklch(0 0 0 / 0.3);
+    /* derived */
+    --connector: oklch(0.55 0.02 286);
+    --prose-soft: oklch(0.80 0.012 286);
+    --panel: oklch(0.165 0.006 265);
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'Geist', system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 17px;
+    line-height: 1.7;
+    font-feature-settings: "kern", "liga", "calt", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    padding-bottom: 120px; /* room for sticky composer */
+  }
+  ::selection { background: oklch(0.23 0.025 265 / 0.14); }
+  .dark ::selection { background: oklch(0.6 0.05 265 / 0.32); }
+
+  /* ── topbar ──────────────────────────────────────────────── */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    background: color-mix(in oklch, var(--background) 86%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(10px);
+    backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    display: flex; align-items: baseline; gap: 10px;
+    font-family: 'Newsreader', Georgia, serif;
+    font-weight: 600; font-size: 1.16rem; letter-spacing: -0.01em;
+  }
+  .brand .mark {
+    display: inline-block; width: 9px; height: 9px; transform: rotate(45deg);
+    background: var(--foreground); margin-right: 4px; position: relative; top: -1px;
+  }
+  .brand .crumb {
+    font-family: 'Geist Mono', monospace;
+    font-weight: 400; font-size: 0.74rem; letter-spacing: 0.04em;
+    color: var(--muted-foreground);
+  }
+  .topbar-right { display: flex; align-items: center; gap: 14px; }
+  .model-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: 'Geist Mono', monospace; font-size: 0.76rem;
+    padding: 5px 11px; border: 1px solid var(--border); border-radius: 999px;
+    color: var(--muted-foreground); background: var(--card);
+    box-shadow: var(--shadow-sm);
+  }
+  .model-chip .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--success);
+    box-shadow: 0 0 0 3px oklch(0.596 0.145 163 / 0.16);
+  }
+  .theme-toggle {
+    width: 34px; height: 34px; display: inline-grid; place-items: center;
+    border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+    background: var(--card); color: var(--muted-foreground);
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .theme-toggle:hover { color: var(--foreground); border-color: var(--muted-foreground); }
+  .theme-toggle svg { width: 15px; height: 15px; }
+  html:not(.dark) .theme-toggle .i-sun { display: none; }
+  html.dark .theme-toggle .i-moon { display: none; }
+
+  /* ── page layout ─────────────────────────────────────────── */
+  .page { max-width: 1200px; margin: 0 auto; padding: 56px 32px 32px; }
+
+  .turn { position: relative; }
+
+  /* THE PARADIGM — central prose (62%) + persistent margin rail (30%),
+     with an 8% breathing gap where the connector hairlines live. */
+  .turn-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: 62% 30%;
+    column-gap: 8%;
+    align-items: start;
+  }
+  .prose-col { position: relative; z-index: 3; min-width: 0; }
+  .rail {
+    position: relative; z-index: 3; align-self: stretch;
+    background: var(--muted);
+  }
+  .rail-spine {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 1px;
+    background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+  }
+
+  /* SVG connector overlay (sits behind content, lives in the gap) */
+  svg.connectors {
+    position: absolute; top: 0; left: 0; z-index: 1;
+    overflow: visible; pointer-events: none;
+  }
+  .connector { fill: none; stroke: var(--connector); stroke-width: 1; opacity: 0.72; }
+  .connector-dot { fill: var(--ring); opacity: 0.85; }
+
+  /* ── turn eyebrow (process-step feel) ───────────────────── */
+  .eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    margin: 0 0 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow .seq { color: var(--foreground); }
+  .eyebrow .bar { flex: 0 0 28px; height: 1px; background: var(--border); }
+
+  /* ── the user's question (reader's-letter treatment) ────── */
+  .question {
+    margin: 0 0 48px;
+    padding: 2px 0 2px 22px;
+    border-left: 2px solid var(--ring);
+    position: relative;
+  }
+  .question .q-label {
+    display: block;
+    font-family: 'Newsreader', Georgia, serif;
+    font-style: italic; font-weight: 500;
+    font-size: 0.78rem; letter-spacing: 0.16em;
+    color: var(--muted-foreground);
+    margin-bottom: 8px;
+  }
+  .question .q-label::before { content: "_Query_  ·  "; font-style: normal; font-variant: small-caps; letter-spacing: 0.18em; color: var(--ring); }
+  .question p {
+    margin: 0;
+    font-family: 'Newsreader', Georgia, serif;
+    font-style: italic; font-weight: 400;
+    font-size: 1.42rem; line-height: 1.5;
+    color: var(--prose-soft);
+    max-width: 30ch;
+    letter-spacing: -0.005em;
+  }
+
+  /* ── the answer body = the page ──────────────────────────── */
+  .answer { position: relative; }
+  .answer h2 {
+    font-family: 'Newsreader', Georgia, serif;
+    font-weight: 600; font-size: 2.05rem; line-height: 1.22;
+    letter-spacing: -0.014em;
+    margin: 0 0 20px;
+    color: var(--foreground);
+  }
+  .answer p {
+    margin: 0 0 20px;
+    font-size: 1.0625rem; line-height: 1.78;
+    color: var(--foreground);
+    max-width: 38rem;
+  }
+  .answer p.lede { font-size: 1.125rem; }
+  .answer strong { font-weight: 600; }
+  .answer em { font-style: italic; }
+
+  code, .mono {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.85em;
+    background: var(--muted);
+    padding: 1.5px 6px;
+    border-radius: 5px;
+    color: var(--foreground);
+    font-feature-settings: "calt" 0;
+  }
+  .dark code, .dark .mono { background: oklch(1 0 0 / 0.07); }
+
+  .twin-list { margin: 26px 0 34px; }
+  .twin-list p {
+    margin: 0 0 10px; font-size: 1rem; line-height: 1.6;
+    padding-left: 16px; position: relative;
+  }
+  .twin-list p::before {
+    content: ""; position: absolute; left: 0; top: 0.7em;
+    width: 7px; height: 1px; background: var(--muted-foreground);
+  }
+  .twin-list strong { font-weight: 600; }
+
+  /* code figure — hero content, FULL width of central column */
+  .code-figure { margin: 34px 0 38px; }
+  .code-figure figcaption {
+    display: flex; align-items: baseline; gap: 10px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.76rem; color: var(--muted-foreground);
+    padding: 0 2px 10px;
+  }
+  .code-figure figcaption .figtag {
+    color: var(--ring); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .code-figure pre {
+    margin: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    overflow-x: auto;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.84rem; line-height: 1.78;
+    color: var(--foreground);
+    box-shadow: var(--shadow-sm);
+    tab-size: 4;
+  }
+  .code-figure pre code { background: none; padding: 0; font-size: inherit; border-radius: 0; }
+  .t-com  { color: var(--muted-foreground); font-style: italic; }
+  .t-kw   { color: var(--primary); }
+  .t-type { color: var(--ring); }
+  .t-fn   { color: var(--foreground); font-weight: 500; }
+  .dark .t-kw { color: var(--primary); }
+  .dark .t-type { color: var(--ring); }
+
+  /* table — editorial, FULL width, no vertical rules */
+  .table-wrap { margin: 6px 0 42px; overflow-x: auto; }
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 0.96rem;
+  }
+  thead th {
+    text-align: left;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.72rem; font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    padding: 8px 16px 12px 0;
+    border-bottom: 2px solid var(--foreground);
+  }
+  thead th:last-child { padding-right: 0; }
+  tbody td {
+    padding: 14px 16px 14px 0;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  tbody td:last-child { padding-right: 0; }
+  tbody tr:last-child td { border-bottom: 1px solid var(--foreground); }
+  td .src { font-family: 'Geist Mono', monospace; font-size: 0.82rem; color: var(--muted-foreground); }
+  .dark td .src { color: var(--muted-foreground); }
+
+  .answer h3 {
+    font-family: 'Newsreader', Georgia, serif;
+    font-weight: 600; font-size: 1.46rem; line-height: 1.3;
+    letter-spacing: -0.012em;
+    margin: 44px 0 14px;
+    color: var(--foreground);
+  }
+
+  /* anchor markers in the prose (footnote-style numerals) */
+  .anchor {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.62em; font-weight: 500;
+    color: var(--ring);
+    margin-left: 3px;
+    vertical-align: super; line-height: 0;
+    cursor: help;
+    transition: color .15s;
+  }
+  .anchor:hover { color: var(--foreground); }
+  .anchor.err { color: var(--error); }
+
+  /* ── margin notes ────────────────────────────────────────── */
+  .notes { position: static; margin: 0; padding: 0; list-style: none; }
+  .note {
+    font-family: 'Geist Mono', monospace;
+    color: var(--muted-foreground);
+    line-height: 1.6;
+  }
+  .note-head {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .note-num {
+    font-size: 0.72rem; font-weight: 600;
+    color: var(--ring);
+    font-variant-numeric: tabular-nums;
+  }
+  .note-kind {
+    font-size: 0.66rem; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .note-dur {
+    margin-left: auto;
+    font-size: 0.64rem; color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums; opacity: 0.85;
+  }
+  .note-thinking .note-kind { color: var(--muted-foreground); }
+  .note-thinking .note-kind::before { content: "◷  "; letter-spacing: 0; opacity: 0.8; }
+  .note-tool .note-kind { color: var(--info); }
+  .note-tool .note-kind::before { content: "▸  "; color: var(--muted-foreground); letter-spacing: 0; }
+  .note-body {
+    font-size: 0.77rem; line-height: 1.62;
+    color: var(--prose-soft);
+  }
+  .note-body code { font-size: 0.95em; }
+  .note-input {
+    font-size: 0.74rem; color: var(--foreground);
+    margin-bottom: 6px;
+  }
+  .note-input .k { color: var(--muted-foreground); }
+  .note-excerpt {
+    font-size: 0.73rem; line-height: 1.6;
+    color: var(--prose-soft);
+    border-left: 2px solid var(--border);
+    padding: 2px 0 2px 9px;
+    margin-bottom: 7px;
+  }
+  .note-excerpt.code {
+    font-family: 'Geist Mono', monospace;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--foreground);
+    background: oklch(0 0 0 / 0.03);
+    border-left-color: var(--info);
+  }
+  .dark .note-excerpt.code { background: oklch(1 0 0 / 0.04); }
+  .note-meta {
+    font-size: 0.68rem; color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* the turn-footer meta note — citation style, pinned to bottom */
+  .note-meta-turn {
+    border-top: 1px solid var(--border);
+    padding-top: 14px; margin-top: 4px;
+  }
+  .note-meta-turn .note-body {
+    font-size: 0.72rem; line-height: 1.7;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+  .note-meta-turn .note-body .model { color: var(--foreground); }
+
+  /* ── error annotation (turn 2) ───────────────────────────── */
+  .answer-failed { min-height: 220px; }
+  .fail-marker {
+    display: flex; align-items: center; gap: 12px;
+    padding-top: 6px;
+  }
+  .fail-rule {
+    flex: 1; height: 0; border-top: 1px dashed var(--border);
+  }
+  .fail-stub {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.74rem; color: var(--muted-foreground);
+    letter-spacing: 0.02em;
+  }
+  .note-error {
+    border-left: 2px solid var(--error);
+    padding-left: 14px;
+  }
+  .note-error .note-kind { color: var(--error); }
+  .note-error .note-kind::before { content: "◆  "; letter-spacing: 0; }
+  .err-title {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 0.98rem; font-weight: 500; line-height: 1.4;
+    color: var(--foreground);
+    margin: 0 0 8px;
+  }
+  .err-detail {
+    font-size: 0.76rem; line-height: 1.6;
+    color: var(--prose-soft);
+    margin: 0 0 14px;
+  }
+  .err-detail code { color: var(--foreground); }
+  .retry {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: 'Geist Mono', monospace; font-size: 0.74rem; font-weight: 500;
+    color: var(--error);
+    background: color-mix(in oklch, var(--error) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--error) 35%, transparent);
+    border-radius: 999px;
+    padding: 6px 13px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .retry:hover {
+    background: color-mix(in oklch, var(--error) 16%, transparent);
+    border-color: color-mix(in oklch, var(--error) 55%, transparent);
+  }
+  .retry svg { width: 13px; height: 13px; }
+
+  /* ── turn separator ──────────────────────────────────────── */
+  .turn-sep {
+    display: flex; align-items: center; justify-content: center;
+    gap: 14px; margin: 72px 0;
+  }
+  .turn-sep .line { width: 80px; height: 1px; background: var(--border); }
+  .turn-sep .gem {
+    width: 7px; height: 7px; transform: rotate(45deg);
+    border: 1px solid var(--muted-foreground); opacity: 0.7;
+  }
+
+  /* ── composer (quiet, single underlined field) ───────────── */
+  .composer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    background: color-mix(in oklch, var(--background) 90%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(10px);
+    backdrop-filter: saturate(1.4) blur(10px);
+    border-top: 1px solid var(--border);
+    padding: 16px 32px 18px;
+  }
+  .composer-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .composer .field {
+    flex: 1; position: relative;
+  }
+  .composer input {
+    width: 100%; border: none; border-bottom: 1px solid var(--border);
+    background: transparent;
+    padding: 10px 2px 9px;
+    font-family: 'Geist', sans-serif; font-size: 1.05rem;
+    color: var(--foreground); outline: none;
+    transition: border-color .18s;
+  }
+  .composer input::placeholder { color: var(--muted-foreground); }
+  .composer input:focus { border-bottom-color: var(--foreground); }
+  .composer .send {
+    flex: 0 0 auto;
+    width: 34px; height: 34px; display: inline-grid; place-items: center;
+    border: 1px solid var(--border); border-radius: 999px;
+    background: var(--card); color: var(--muted-foreground);
+    cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+  }
+  .composer .send:hover { color: var(--foreground); border-color: var(--muted-foreground); }
+  .composer .send svg { width: 15px; height: 15px; }
+  .composer-hint {
+    max-width: 1200px; margin: 9px auto 0;
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem; color: var(--muted-foreground);
+  }
+  .composer-hint .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--muted-foreground); opacity: 0.6; }
+  .composer-hint .model { color: var(--foreground); }
+
+  /* ── responsive: collapse rail below prose ───────────────── */
+  @media (max-width: 980px) {
+    .page { padding: 36px 22px 24px; }
+    .turn-grid { grid-template-columns: 1fr; column-gap: 0; row-gap: 30px; }
+    .rail { align-self: auto; background: transparent; border-top: 1px solid var(--border); padding-top: 22px; }
+    .rail-spine, svg.connectors { display: none; }
+    .note { position: static !important; left: auto !important; right: auto !important; top: auto !important; margin-bottom: 22px; }
+    .question p { max-width: none; }
+    .answer p { max-width: none; }
+  }
+  @media (max-width: 620px) {
+    body { font-size: 16px; }
+    .topbar, .composer { padding-left: 18px; padding-right: 18px; }
+    .page { padding: 28px 18px 24px; }
+    .answer h2 { font-size: 1.7rem; }
+    .question p { font-size: 1.22rem; }
+    .brand .crumb { display: none; }
+    .turn-sep { margin: 48px 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>oxios
+    <span class="crumb">agent · kernel-architecture</span>
+  </div>
+  <div class="topbar-right">
+    <span class="model-chip"><span class="dot" aria-hidden="true"></span>claude-sonnet-4.5</span>
+    <button class="theme-toggle" id="themeToggle" aria-label="라이트/다크 전환" aria-pressed="false">
+      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.4M12 19.6V22M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2 12h2.4M19.6 12H22M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- ══════════════ TURN 1 ══════════════ -->
+  <article class="turn" id="turn-1">
+    <div class="turn-grid">
+
+      <div class="prose-col">
+        <div class="eyebrow"><span class="seq">turn 01</span><span class="bar"></span><span>read · architecture</span></div>
+
+        <!-- USER PROMPT — reader's-letter treatment, NOT a bubble -->
+        <div class="question">
+          <span class="q-label">질문</span>
+          <p>Oxios 커널이 oxi-sdk에 의존하는 부분과 자체 구현하는 부분을 구분해줘. 그리고 왜 커널을 단일 크레이트로 유지하는지도.</p>
+        </div>
+
+        <!-- ANSWER BODY = the page -->
+        <div class="answer">
+          <h2 id="a1-h2">의존성 경계 — oxi-sdk vs 자체 구현<sup class="anchor" data-note="1">1</sup></h2>
+
+          <p class="lede">Oxios 커널(<code>oxios-kernel</code>)은 의도적으로 <strong>단일 모놀리식 크레이트</strong>다. <code>oxi-sdk</code>는 crates.io 전용 의존성이라 재구현이 금지되며, 커널은 이를 <em>래핑</em>만 하고 자체 수명 주기·보안·메모리를 얹는 구조다.<sup class="anchor" data-note="2">2</sup></p>
+
+          <div class="twin-list">
+            <p><strong>oxi-sdk에서 가져옴</strong> — <code>AgentConfig</code>, tool-calling loop, <code>Oxi</code>, <code>ModelCatalog</code></p>
+            <p><strong>커널이 자체 구현</strong> — <code>Supervisor</code>, <code>EventBus</code>, <code>StateStore</code>, <code>AccessManager</code>, <code>OxiosEngine</code>(래퍼)<sup class="anchor" data-note="3">3</sup></p>
+          </div>
+
+          <!-- CODE BLOCK — full width of central column -->
+          <figure class="code-figure">
+            <figcaption><span class="figtag">Fig. 1</span>crates/oxios-kernel/src/lib.rs — star topology around AgentId<sup class="anchor" data-note="4">4</sup></figcaption>
+<pre><code><span class="t-com">// crates/oxios-kernel/src/lib.rs — star topology around AgentId</span>
+<span class="t-kw">use</span> oxios_memory::<span class="t-type">MemoryManager</span>;
+<span class="t-kw">use</span> oxios_ouroboros::<span class="t-type">Orchestrator</span>;
+<span class="t-kw">use</span> oxi_sdk::{<span class="t-type">AgentConfig</span>, <span class="t-type">Oxi</span>};
+
+<span class="t-kw">pub struct</span> <span class="t-type">Kernel</span> {
+    bus: <span class="t-type">EventBus</span>,          <span class="t-com">// pub/sub across all subsystems</span>
+    state: <span class="t-type">StateStore</span>,      <span class="t-com">// durable, keyed by AgentId</span>
+    supervisor: <span class="t-type">Supervisor</span>, <span class="t-com">// fork / exec / wait / kill</span>
+    access: <span class="t-type">AccessManager</span>,  <span class="t-com">// RBAC + path sandbox + Merkle audit</span>
+    memory: <span class="t-type">MemoryManager</span>,  <span class="t-com">// tiered: Hot / Warm / Cold</span>
+    engine: <span class="t-type">OxiosEngine</span>,    <span class="t-com">// wraps oxi_sdk::Oxi + ModelCatalog</span>
+}
+
+<span class="t-kw">impl</span> <span class="t-type">Kernel</span> {
+    <span class="t-com">/// Fork a new agent process — Unix semantics.</span>
+    <span class="t-kw">pub fn</span> <span class="t-fn">fork</span>(<span class="t-kw">&amp;self</span>, parent: <span class="t-type">AgentId</span>, spec: <span class="t-type">AgentSpec</span>) -&gt; <span class="t-type">AgentId</span> {
+        <span class="t-kw">let</span> id = <span class="t-kw">self</span>.state.next_id();
+        <span class="t-kw">self</span>.supervisor.spawn(id, spec);
+        <span class="t-kw">self</span>.bus.emit(<span class="t-type">Event</span>::Forked { parent, child: id });
+        id
+    }
+}</code></pre>
+          </figure>
+
+          <!-- TABLE — full width, editorial -->
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Component</th><th>Source</th><th>Why</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>AgentConfig</code>, tool loop, <code>Oxi</code>, <code>ModelCatalog</code></td>
+                  <td><span class="src">oxi-sdk (crates.io)</span></td>
+                  <td>업스트림 재구현 금지</td>
+                </tr>
+                <tr>
+                  <td><code>OxiosEngine</code> (wrapper)</td>
+                  <td><span class="src">kernel</span></td>
+                  <td>프로바이더/모델 해석 + 핫스왑</td>
+                </tr>
+                <tr>
+                  <td><code>Supervisor</code>, <code>EventBus</code>, <code>StateStore</code></td>
+                  <td><span class="src">kernel (자체)</span></td>
+                  <td>프로세스 수명 주기 — Unix 핵심</td>
+                </tr>
+                <tr>
+                  <td><code>AccessManager</code></td>
+                  <td><span class="src">kernel (자체)</span></td>
+                  <td>RBAC + 샌드박스 + Merkle 감사</td>
+                </tr>
+                <tr>
+                  <td><code>MemoryManager</code></td>
+                  <td><span class="src"><code>oxios-memory</code> 크레이트</span></td>
+                  <td>계층 메모리, Dream, HNSW</td>
+                </tr>
+                <tr>
+                  <td><code>Orchestrator</code></td>
+                  <td><span class="src"><code>oxios-ouroboros</code> 크레이트</span></td>
+                  <td>assess → crystallize → execute → review</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3 id="a1-h3">왜 모놀리식 단일 크레이트인가</h3>
+          <p>순환 의존성을 원천 차단하고, <code>pub(crate)</code> 경계로 모듈을 분리한다. 8개 크레이트로 쪼개면 빌드 시간은 늘고 인지 비용만 커진다. 커널은 “의도적으로 모놀리식”이다 — 분할 제안은 거부한다.<sup class="anchor" data-note="5">5</sup></p>
+        </div>
+      </div>
+
+      <!-- MARGIN RAIL -->
+      <aside class="rail" aria-label="추적 메모">
+        <span class="rail-spine" aria-hidden="true"></span>
+        <div class="notes">
+
+          <div class="note note-thinking" data-note="1">
+            <div class="note-head"><span class="note-num">1</span><span class="note-kind">thinking</span></div>
+            <div class="note-body">사용자가 커널↔oxi-sdk 의존성 경계를 묻고 있음. ARCHITECTURE.md §10(모놀리식 근거)과 워크스페이스 Cargo.toml을 확인해야 함.</div>
+          </div>
+
+          <div class="note note-tool" data-note="2">
+            <div class="note-head">
+              <span class="note-num">2</span><span class="note-kind">read_file</span>
+              <span class="note-dur">198 ms</span>
+            </div>
+            <div class="note-input"><span class="k">path </span>docs/ARCHITECTURE.md</div>
+            <div class="note-excerpt">§10 Monolithic Rationale — The kernel is intentionally a single crate. Star topology around <code>AgentId</code> / <code>EventBus</code> / <code>StateStore</code> prevents circular deps. Internal boundaries via <code>pub(crate)</code> + directory mod files. Do not propose splitting.</div>
+            <div class="note-meta">2,340 lines</div>
+          </div>
+
+          <div class="note note-thinking" data-note="3">
+            <div class="note-head"><span class="note-num">3</span><span class="note-kind">thinking</span></div>
+            <div class="note-body">star topology 확인. oxi-sdk는 crates.io 전용 정책 — path dep 금지, 재구현 금지.</div>
+          </div>
+
+          <div class="note note-tool" data-note="4">
+            <div class="note-head">
+              <span class="note-num">4</span><span class="note-kind">grep</span>
+              <span class="note-dur">42 ms</span>
+            </div>
+            <div class="note-input"><span class="k">pattern </span>oxi-sdk <span class="k"> · glob </span>**/Cargo.toml</div>
+            <div class="note-excerpt code">Cargo.toml:31:             oxi-sdk = "0.45"
+crates/oxios-kernel/Cargo.toml:12: oxi-sdk = { workspace = true }
+crates/oxios-memory/Cargo.toml:8:  oxi-sdk = { workspace = true }</div>
+            <div class="note-meta">3 matches</div>
+          </div>
+
+          <div class="note note-meta-turn" data-note="5">
+            <div class="note-head"><span class="note-num">5</span><span class="note-kind">turn</span></div>
+            <div class="note-body">in 1,240 tok · out 380 tok<br><span class="model">claude-sonnet-4.5</span> · $0.0089 · 4.2s</div>
+          </div>
+
+        </div>
+      </aside>
+
+      <svg class="connectors" aria-hidden="true"></svg>
+    </div>
+  </article>
+
+  <div class="turn-sep" aria-hidden="true"><span class="line"></span><span class="gem"></span><span class="line"></span></div>
+
+  <!-- ══════════════ TURN 2 — failure ══════════════ -->
+  <article class="turn" id="turn-2">
+    <div class="turn-grid">
+
+      <div class="prose-col">
+        <div class="eyebrow"><span class="seq">turn 02</span><span class="bar"></span><span>generate · comparison-table</span></div>
+
+        <div class="question">
+          <span class="q-label">질문</span>
+          <p>트레이드오프 비교표도 만들어줘.</p>
+        </div>
+
+        <div class="answer answer-failed">
+          <div class="fail-marker">
+            <sup class="anchor err" data-note="e" title="응답 생성 실패">!</sup>
+            <span class="fail-rule"></span>
+            <span class="fail-stub">응답이 생성되지 않았습니다 — margin note 참조</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="rail" aria-label="오류 메모">
+        <span class="rail-spine" aria-hidden="true"></span>
+        <div class="notes">
+          <div class="note note-error" data-note="e">
+            <div class="note-head"><span class="note-num">!</span><span class="note-kind">오류</span></div>
+            <p class="err-title">선택한 프로바이더에 토큰이 남아있지 않습니다.</p>
+            <p class="err-detail"><code>gpt-4o</code> (openai) — <code>quota_exceeded</code>. 다른 모델로 전환하거나 토큰을 충전한 뒤 다시 시도하세요.</p>
+            <button class="retry" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg>
+              다시 시도
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <svg class="connectors" aria-hidden="true"></svg>
+    </div>
+  </article>
+
+</main>
+
+<footer class="composer">
+  <div class="composer-inner">
+    <div class="field">
+      <input type="text" placeholder="답변에 덧붙일 질문을 입력하세요…" aria-label="메시지 입력" />
+    </div>
+    <button class="send" type="button" aria-label="전송">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+  <div class="composer-hint">
+    <span class="model">claude-sonnet-4.5</span>
+    <span class="dot"></span><span>auto-route across providers</span>
+    <span class="dot"></span><span>Enter to send · Shift+Enter newline</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  var toggle = document.getElementById('themeToggle');
+
+  /* ── theme ─────────────────────────────────────────────── */
+  var stored = null;
+  try { stored = localStorage.getItem('ox-marginalia-theme'); } catch (e) {}
+  function applyTheme(dark, persist) {
+    root.classList.toggle('dark', !!dark);
+    if (toggle) toggle.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    if (persist) { try { localStorage.setItem('ox-marginalia-theme', dark ? 'dark' : 'light'); } catch (e) {} }
+    relayout();
+  }
+  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var initialDark = (stored === 'dark') || (stored === null && prefersDark);
+  applyTheme(initialDark, false);
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      applyTheme(!root.classList.contains('dark'), true);
+    });
+  }
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var handler = function (e) {
+      var s; try { s = localStorage.getItem('ox-marginalia-theme'); } catch (err) {}
+      if (s === null) applyTheme(e.matches, false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', handler);
+    else if (mq.addListener) mq.addListener(handler);
+  }
+
+  /* ── margin-note positioning + connector hairlines ─────── */
+  function isNarrow() {
+    return window.matchMedia && window.matchMedia('(max-width: 980px)').matches;
+  }
+
+  function relayoutTurn(turn) {
+    var grid = turn.querySelector('.turn-grid');
+    if (!grid) return;
+    var rail = grid.querySelector('.rail');
+    var proseCol = grid.querySelector('.prose-col');
+    var svg = turn.querySelector('svg.connectors');
+    var notes = rail ? rail.querySelectorAll('.note') : [];
+    var i;
+
+    if (isNarrow()) {
+      for (i = 0; i < notes.length; i++) {
+        notes[i].style.position = '';
+        notes[i].style.top = '';
+        notes[i].style.left = '';
+        notes[i].style.right = '';
+      }
+      if (rail) rail.style.minHeight = '';
+      if (svg) svg.innerHTML = '';
+      return;
+    }
+
+    var gridRect = grid.getBoundingClientRect();
+
+    /* position each note vertically aligned to its anchor (collision-safe) */
+    var prevBottom = 0;
+    for (i = 0; i < notes.length; i++) {
+      var note = notes[i];
+      var id = note.getAttribute('data-note');
+      var anchor = proseCol.querySelector('.anchor[data-note="' + cssEsc(id) + '"]');
+      var targetTop = prevBottom;
+      if (anchor) {
+        targetTop = anchor.getBoundingClientRect().top - gridRect.top - 6;
+      }
+      note.style.position = 'absolute';
+      note.style.left = '22px';
+      note.style.right = '18px';
+      var top = Math.max(targetTop, prevBottom + 4);
+      note.style.top = top + 'px';
+      prevBottom = top + note.getBoundingClientRect().height;
+    }
+
+    /* keep the muted rail tall enough that the spine reaches the last note */
+    if (rail) {
+      var minH = prevBottom + 24;
+      rail.style.minHeight = minH + 'px';
+    }
+
+    /* draw connector hairlines from each anchor to its note */
+    if (!svg) return;
+    var w = Math.max(gridRect.width, 1);
+    var h = Math.max(grid.scrollHeight, gridRect.height, 1);
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    svg.style.width = w + 'px';
+    svg.style.height = h + 'px';
+    svg.innerHTML = '';
+    var NS = 'http://www.w3.org/2000/svg';
+
+    var railLeft = rail.getBoundingClientRect().left - gridRect.left;
+
+    for (i = 0; i < notes.length; i++) {
+      var n = notes[i];
+      var nid = n.getAttribute('data-note');
+      var a = proseCol.querySelector('.anchor[data-note="' + cssEsc(nid) + '"]');
+      if (!a) continue;
+      var ar = a.getBoundingClientRect();
+      var nr = n.getBoundingClientRect();
+      var x1 = ar.right - gridRect.left + 2;
+      var y1 = ar.top + ar.height / 2 - gridRect.top;
+      var x2 = railLeft;            // meet the spine
+      var y2 = nr.top + 9 - gridRect.top; // note-head line
+
+      var midX = x1 + (x2 - x1) * 0.55;
+      var d = 'M ' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
+              ' C ' + midX.toFixed(1) + ' ' + y1.toFixed(1) +
+              ', ' + midX.toFixed(1) + ' ' + y2.toFixed(1) +
+              ', ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
+      var path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'connector');
+      svg.appendChild(path);
+
+      var dot = document.createElementNS(NS, 'circle');
+      dot.setAttribute('cx', x2.toFixed(1));
+      dot.setAttribute('cy', y2.toFixed(1));
+      dot.setAttribute('r', '2');
+      dot.setAttribute('class', 'connector-dot');
+      svg.appendChild(dot);
+    }
+  }
+
+  function cssEsc(s) {
+    if (String(s).match(/^[A-Za-z0-9_-]+$/)) return s;
+    return String(s).replace(/["\\]/g, '\\$&');
+  }
+
+  function relayout() {
+    var turns = document.querySelectorAll('.turn');
+    for (var i = 0; i < turns.length; i++) relayoutTurn(turns[i]);
+  }
+
+  var t;
+  function debounced() { clearTimeout(t); t = setTimeout(relayout, 90); }
+  window.addEventListener('resize', debounced);
+  window.addEventListener('load', relayout);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(relayout).catch(function(){});
+  }
+  /* run a couple of times to absorb late font/layout shifts */
+  requestAnimationFrame(relayout);
+  setTimeout(relayout, 60);
+  setTimeout(relayout, 300);
+})();
+</script>
+</body>
+</html>

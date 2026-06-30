@@ -97,12 +97,26 @@ impl DaemonManager {
         let log_file = self.log_dir.join("oxios.log");
         let exe = std::env::current_exe().context("failed to locate oxios binary")?;
 
+        // Append-mode shared handle for stdout+stderr: O_APPEND writes land
+        // atomically at EOF and never truncate previous runs, so a panic
+        // message (written synchronously to stderr by the panic hook before
+        // abort) survives a restart and stays diagnosable. Two separate
+        // `File::create` handles (O_TRUNC, offset 0) used to clobber each
+        // other and wipe the evidence on every restart.
+        let log_handle = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file)
+            .with_context(|| format!("failed to open log file {}", log_file.display()))?;
+        let stderr_handle = log_handle
+            .try_clone()
+            .context("failed to duplicate log handle for stderr")?;
         let child = std::process::Command::new(&exe)
             .arg("--foreground")
             .arg("--config")
             .arg(config_path)
-            .stdout(std::fs::File::create(&log_file)?)
-            .stderr(std::fs::File::create(&log_file)?)
+            .stdout(log_handle)
+            .stderr(stderr_handle)
             .spawn()
             .context("failed to spawn oxios daemon")?;
 

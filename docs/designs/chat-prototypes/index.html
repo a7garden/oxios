@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Oxios Chat — Prototype Comparison</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist@5.0.1/index.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/geist-mono@5.0.1/index.min.css" />
+<style>
+  :root {
+    --radius: 0.625rem;
+    --background: oklch(0.99 0 0);
+    --foreground: oklch(0.141 0.005 285.823);
+    --card: oklch(1 0 0);
+    --muted: oklch(0.967 0.001 286.375);
+    --muted-foreground: oklch(0.552 0.016 285.938);
+    --primary: oklch(0.23 0.025 265);
+    --primary-foreground: oklch(0.985 0 0);
+    --accent: oklch(0.967 0.003 265);
+    --border: oklch(0.92 0.004 286.32);
+    --ring: oklch(0.45 0.04 265);
+    --success: oklch(0.596 0.145 163);
+    --warning: oklch(0.669 0.162 70);
+    --error: oklch(0.577 0.245 27.325);
+    --info: oklch(0.623 0.214 259.815);
+    --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
+    --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.08);
+  }
+  .dark {
+    --background: oklch(0.13 0.005 285.823);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.19 0.008 265);
+    --muted: oklch(0.274 0.006 286.033);
+    --muted-foreground: oklch(0.705 0.015 286.067);
+    --primary: oklch(0.91 0.03 265);
+    --primary-foreground: oklch(0.15 0.02 265);
+    --accent: oklch(0.274 0.01 265);
+    --border: oklch(1 0 0 / 10%);
+    --ring: oklch(0.6 0.05 265);
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: light dark; }
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'Geist', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+  }
+  .mono { font-family: 'Geist Mono', monospace; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 56px 24px 96px; }
+  .eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--info);
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 40px);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    font-weight: 600;
+  }
+  .lede { font-size: 16px; color: var(--muted-foreground); max-width: 68ch; margin: 0 0 8px; }
+  .lede strong { color: var(--foreground); font-weight: 600; }
+  .toggle {
+    position: fixed; top: 16px; right: 16px; z-index: 50;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border);
+    padding: 7px 12px; border-radius: 999px; cursor: pointer;
+    font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted-foreground);
+    box-shadow: var(--shadow-md);
+  }
+  /* problem callout */
+  .problem {
+    margin: 36px 0 8px; padding: 20px 22px;
+    background: color-mix(in oklch, var(--error) 5%, var(--card));
+    border: 1px solid color-mix(in oklch, var(--error) 25%, var(--border));
+    border-radius: calc(var(--radius) * 1.4);
+  }
+  .problem .label {
+    font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--error);
+    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .problem p { margin: 0; font-size: 14.5px; }
+  .problem code { font-family: 'Geist Mono', monospace; font-size: 12.5px; background: var(--muted); padding: 1px 5px; border-radius: 4px; }
+
+  /* shared-content note */
+  .shared {
+    margin: 20px 0 40px; font-size: 13px; color: var(--muted-foreground);
+    display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  }
+  .chip {
+    font-family: 'Geist Mono', monospace; font-size: 11px;
+    background: var(--muted); color: var(--muted-foreground);
+    padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border);
+  }
+
+  /* prototype cards */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    position: relative; display: flex; flex-direction: column;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.8); overflow: hidden;
+    text-decoration: none; color: inherit;
+    transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s, border-color .25s;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: color-mix(in oklch, var(--ring) 50%, var(--border)); }
+  .card .preview { height: 168px; position: relative; overflow: hidden; border-bottom: 1px solid var(--border); }
+  .card .body { padding: 18px 20px 20px; }
+  .card .tag { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .card h2 { font-size: 19px; margin: 0 0 6px; font-weight: 600; letter-spacing: -0.01em; }
+  .card .desc { font-size: 13.5px; color: var(--muted-foreground); margin: 0 0 14px; }
+  .card .traits { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .card .traits span { font-family: 'Geist Mono', monospace; font-size: 10.5px; color: var(--muted-foreground); background: var(--muted); padding: 2px 8px; border-radius: 999px; }
+  .card .open {
+    font-family: 'Geist Mono', monospace; font-size: 12px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px; color: var(--info);
+  }
+  .card:hover .open .arrow { transform: translateX(3px); }
+  .arrow { transition: transform .2s; }
+
+  /* mini schematic previews per paradigm (pure CSS) */
+  .sch { position: absolute; inset: 0; opacity: .9; }
+  .sch .bar { position: absolute; }
+  /* A transcript */
+  .schA { background: color-mix(in oklch, var(--info) 6%, var(--card)); padding: 14px; display: flex; flex-direction: column; gap: 5px; font-family: 'Geist Mono', monospace; font-size: 8.5px; }
+  .schA .row { display: flex; gap: 8px; align-items: center; }
+  .schA .pid { color: var(--muted-foreground); width: 30px; }
+  .schA .st { padding: 1px 5px; border-radius: 3px; font-size: 7.5px; }
+  .schA .ok { background: color-mix(in oklch, var(--success) 18%, transparent); color: var(--success); }
+  .schA .run { background: color-mix(in oklch, var(--warning) 18%, transparent); color: var(--warning); }
+  .schA .ln { flex: 1; height: 5px; border-radius: 2px; background: var(--muted); }
+  .schA .ln.w { width: 80%; }
+  /* B canvas */
+  .schB { display: flex; }
+  .schB .left { width: 38%; background: color-mix(in oklch, var(--primary) 4%, var(--card)); border-right: 1px solid var(--border); padding: 14px 10px; display: flex; flex-direction: column; gap: 9px; }
+  .schB .left i { display: block; height: 6px; border-radius: 3px; background: var(--muted); }
+  .schB .left i.s { width: 50%; }
+  .schB .right { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .schB .right .art { background: var(--card); border: 1px solid var(--border); border-radius: 7px; height: 40px; box-shadow: var(--shadow-md); }
+  .schB .right .art.t { height: 60px; }
+  /* C marginalia */
+  .schC { display: flex; }
+  .schC .mid { flex: 1; padding: 18px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .schC .mid i { display: block; height: 5px; border-radius: 2px; background: var(--muted); }
+  .schC .mid i.h { height: 9px; width: 55%; background: var(--foreground); opacity: .7; }
+  .schC .rail { width: 34%; background: color-mix(in oklch, var(--muted) 50%, var(--card)); border-left: 1px solid var(--border); padding: 16px 10px; display: flex; flex-direction: column; gap: 8px; }
+  .schC .rail i { display: block; height: 4px; border-radius: 2px; background: var(--muted-foreground); opacity: .5; }
+  .schC .rail i.w { width: 70%; }
+  /* D stream */
+  .schD { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .schD .blk { display: flex; gap: 10px; align-items: center; }
+  .schD .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .schD .dot.i { background: var(--info); }
+  .schD .dot.s { background: var(--success); }
+  .schD .dot.a { background: var(--primary); }
+  .schD .dot.e { background: var(--error); }
+  .schD .ln { flex: 1; height: 5px; border-radius: 2px; background: var(--muted); }
+  .schD .ln.f { width: 70%; }
+
+  /* criteria */
+  .criteria { margin-top: 56px; }
+  .criteria h3 { font-size: 13px; font-family: 'Geist Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 14px; }
+  .criteria ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; }
+  @media (max-width: 760px) { .criteria ul { grid-template-columns: 1fr; } }
+  .criteria li { font-size: 14px; color: var(--muted-foreground); padding-left: 22px; position: relative; }
+  .criteria li::before { content: '◇'; position: absolute; left: 0; color: var(--info); }
+  .criteria li strong { color: var(--foreground); font-weight: 600; }
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted-foreground); font-family: 'Geist Mono', monospace; }
+</style>
+</head>
+<body>
+<button class="toggle" onclick="document.documentElement.classList.toggle('dark')">
+  <span id="tg">◐ theme</span>
+</button>
+
+<div class="wrap">
+  <div class="eyebrow">Oxios · Web UI · Chat Redesign</div>
+  <h1>채팅 화면, 네 가지 패러다임</h1>
+  <p class="lede">
+    현재 디자인은 풍부한 어시스턴트 출력 — <strong>30줄 코드 블록, 6행 테이블, 도구 호출 타임라인, 에러 카드</strong> —
+    을 좁은 <strong>80% 폭 채팅 버블</strong> 안에 욱여넣는다. 버블이 코드를 깨뜨리는 게 진짜 문제다.
+    아래 네 프로토타입은 <strong>동일한 콘텐츠</strong>를 네 가지 <strong>구조적으로 다른 공간 패러다임</strong>으로 렌더한다.
+  </p>
+
+  <div class="problem">
+    <div class="label">The wart</div>
+    <p><code>message-bubble.tsx:63-135</code> — 어시스턴트 메시지가 <code>max-w-[80%]</code> <code>bg-muted</code> 버블 안에서 렌더된다. 코드와 테이블은 전폭으로 숨 쉬어야 한다.</p>
+  </div>
+
+  <div class="shared">
+    <span>모든 프로토타입이 동일하게 렌더:</span>
+    <span class="chip">30-line Rust block</span>
+    <span class="chip">6-row table</span>
+    <span class="chip">2 tool calls</span>
+    <span class="chip">2 reasoning steps</span>
+    <span class="chip">error card</span>
+    <span class="chip">same OKLCH tokens</span>
+  </div>
+
+  <div class="grid">
+    <!-- A -->
+    <a class="card" href="A-transcript.html">
+      <div class="preview">
+        <div class="sch schA">
+          <div class="row"><span class="pid">7f1a</span><span class="st ok">DONE</span><span class="ln w"></span></div>
+          <div class="row"><span class="pid">7f1b</span><span class="st run">FORK</span><span class="ln"></span></div>
+          <div class="row"><span class="pid">7f1c</span><span class="st ok">EXIT0</span><span class="ln w"></span></div>
+          <div class="row"><span class="pid">7f1d</span><span class="st ok">EXIT0</span><span class="ln"></span></div>
+          <div class="row"><span class="pid">7f1e</span><span class="st ok">DONE</span><span class="ln w"></span></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="tag" style="color:var(--info)">A · Process Transcript</div>
+        <h2>운영 콘솔 / 프로세스 로그</h2>
+        <p class="desc">채팅이 아니라 감사 로그다. 각 턴 = PID·상태·자원 사용량을 가진 프로세스. 도구 호출은 <span class="mono">fork → exec → exit</span> 차일드. Agent OS 정체성을 극대화.</p>
+        <div class="traits"><span>full-width</span><span>monospace meta</span><span>dark-first</span></div>
+        <span class="open">열기 <span class="arrow">→</span></span>
+      </div>
+    </a>
+
+    <!-- B -->
+    <a class="card" href="B-canvas.html">
+      <div class="preview">
+        <div class="sch schB">
+          <div class="left"><i></i><i class="s"></i><i></i><i class="s"></i></div>
+          <div class="right"><div class="art"></div><div class="art t"></div></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="tag" style="color:var(--info)">B · Split Canvas</div>
+        <h2>대화 + 산출물 이분할</h2>
+        <p class="desc">좌측은 대화 흥줄(프롬프트 + 요약 칩), 우측은 산출물 창. 코드·테이블이 전체 캔버스 폭으로 렌더된다 — 버블 압박 문제를 구조적으로 해결.</p>
+        <div class="traits"><span>40 / 60 split</span><span>artifact hero</span><span>IDE energy</span></div>
+        <span class="open">열기 <span class="arrow">→</span></span>
+      </div>
+    </a>
+
+    <!-- C -->
+    <a class="card" href="C-marginalia.html">
+      <div class="preview">
+        <div class="sch schC">
+          <div class="mid"><i class="h"></i><i></i><i></i><i class="h"></i><i></i></div>
+          <div class="rail"><i class="w"></i><i></i><i class="w"></i></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="tag" style="color:var(--info)">C · Marginalia</div>
+        <h2>중앙 본문 + 여백 메모</h2>
+        <p class="desc">넓은 중앙 리딩 컬럼이 답변 본문(세리프 디스플레이), 우측 여백 레일이 도구·추론·토큰을 <strong>메모</strong>로 단다. Tufte식. 차분하고 편집적.</p>
+        <div class="traits"><span>serif display</span><span>margin rail</span><span>editorial</span></div>
+        <span class="open">열기 <span class="arrow">→</span></span>
+      </div>
+    </a>
+
+    <!-- D -->
+    <a class="card" href="D-stream.html">
+      <div class="preview">
+        <div class="sch schD">
+          <div class="blk"><span class="dot i"></span><span class="ln"></span></div>
+          <div class="blk"><span class="dot a"></span><span class="ln f"></span></div>
+          <div class="blk"><span class="dot s"></span><span class="ln"></span></div>
+          <div class="blk"><span class="dot a"></span><span class="ln f"></span></div>
+          <div class="blk"><span class="dot e"></span><span class="ln"></span></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="tag" style="color:var(--info)">D · Event Stream</div>
+        <h2>수직 이벤트 스트림</h2>
+        <p class="desc">모든 원자 단위(프롬프트·추론·도구·코드·답변·에러)가 풀폭 블록. 좌측 타임스탬프 레일이 Git 그래프처럼 잇는다. 연대기가 1축, 산출물이 동등한 시민.</p>
+        <div class="traits"><span>full-width blocks</span><span>timeline rail</span><span>narrative</span></div>
+        <span class="open">열기 <span class="arrow">→</span></span>
+      </div>
+    </a>
+  </div>
+
+  <div class="criteria">
+    <h3>비교 기준 — 어떤 것을 보고 고를 것인가</h3>
+    <ul>
+      <li><strong>코드/테이블 호흡</strong> — 전폭으로 읽히는가? (필수)</li>
+      <li><strong>패러다임 차별성</strong> — 서로 다른 공간 구성인가? (필수)</li>
+      <li><strong>Agent OS 정체성</strong> — fork/exec/wait/kill 감성이 드러나는가?</li>
+      <li><strong>투명성(RFC-015)</strong> — 도구·추론·토큰이 자연스럽게 보이는가?</li>
+      <li><strong>에러 가시성</strong> — 토큰 부족 실패가 즉시 인지되는가?</li>
+      <li><strong>확장성</strong> — 멀티 턴·멀티 에이전트(A2A)로 확장되는가?</li>
+    </ul>
+  </div>
+
+  <footer>
+    Oxios Web UI · chat-prototypes · 2026-06-29 · shared content + OKLCH tokens across all four
+  </footer>
+</div>
+</body>
+</html>

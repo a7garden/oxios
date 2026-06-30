@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oxios · Quick Memo Input — 4 directions</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --radius:0.625rem;
+    --background:oklch(0.13 0.005 285.823);
+    --foreground:oklch(0.985 0 0);
+    --card:oklch(0.19 0.008 265);
+    --card-2:oklch(0.21 0.009 265);
+    --muted:oklch(0.274 0.006 286.033);
+    --muted-2:oklch(0.23 0.007 266);
+    --muted-foreground:oklch(0.705 0.015 286.067);
+    --muted-fg-dim:oklch(0.55 0.012 286);
+    --primary:oklch(0.91 0.03 265);
+    --primary-foreground:oklch(0.15 0.02 265);
+    --accent:oklch(0.274 0.01 265);
+    --border:oklch(1 0 0 / 10%);
+    --border-strong:oklch(1 0 0 / 16%);
+    --input:oklch(1 0 0 / 15%);
+    --success:oklch(0.723 0.219 149.579);
+    --warning:oklch(0.769 0.188 70.08);
+    --error:oklch(0.704 0.191 22.216);
+    --info:oklch(0.685 0.196 259);
+    --purple:oklch(0.627 0.265 303.9);
+    --shadow-lg:0 12px 40px oklch(0 0 0 / 0.5);
+    --shadow-md:0 4px 16px oklch(0 0 0 / 0.4);
+    --r-sm:calc(var(--radius)*0.6);
+    --r-md:calc(var(--radius)*0.8);
+    --r-lg:var(--radius);
+    --r-xl:calc(var(--radius)*1.4);
+    --r-2xl:calc(var(--radius)*1.8);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Geist',system-ui,-apple-system,sans-serif;
+    background:var(--background);
+    color:var(--foreground);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    overflow-x:hidden;
+  }
+  .mono{font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+  /* ── Layout shell ─────────────────────────────────── */
+  .page{max-width:1180px;margin:0 auto;padding:32px 24px 96px}
+  .topbar{display:flex;align-items:center;gap:10px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--r-xl);background:color-mix(in oklch,var(--card) 60%,transparent);margin-bottom:28px}
+  .crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-foreground)}
+  .crumb b{color:var(--foreground);font-weight:600}
+  .crumb .dot{opacity:.4}
+  .spacer{flex:1}
+  .kbd{display:inline-flex;align-items:center;gap:3px;font-family:'Geist Mono',monospace;font-size:11px;color:var(--muted-foreground);border:1px solid var(--border);background:color-mix(in oklch,var(--muted) 40%,transparent);padding:2px 7px;border-radius:6px}
+  .dotlogo{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--primary),oklch(0.8 0.05 265));display:grid;place-items:center;color:var(--primary-foreground);font-weight:700;font-size:13px}
+
+  h1{font-size:15px;font-weight:600;letter-spacing:-.01em;margin-bottom:6px}
+  .sub{font-size:13px;color:var(--muted-foreground);max-width:640px;line-height:1.6;margin-bottom:22px}
+
+  /* ── Direction switcher ───────────────────────────── */
+  .tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .tab{
+    appearance:none;cursor:pointer;font-family:inherit;
+    display:flex;align-items:center;gap:8px;
+    padding:9px 14px;border-radius:var(--r-lg);
+    border:1px solid var(--border);
+    background:color-mix(in oklch,var(--card) 50%,transparent);
+    color:var(--muted-foreground);font-size:13px;font-weight:500;
+    transition:all .18s cubic-bezier(.16,1,.3,1);
+  }
+  .tab:hover{color:var(--foreground);border-color:var(--border-strong);background:var(--accent)}
+  .tab.active{background:var(--primary);color:var(--primary-foreground);border-color:transparent;font-weight:600}
+  .tab .num{font-family:'Geist Mono',monospace;font-size:11px;opacity:.7}
+  .tab.active .num{opacity:.6}
+  .desc{font-size:13px;color:var(--muted-fg-dim);line-height:1.6;min-height:42px;margin-bottom:24px;padding:12px 16px;border-left:2px solid var(--accent);background:color-mix(in oklch,var(--accent) 30%,transparent);border-radius:0 var(--r-md) var(--r-md) 0}
+  .desc b{color:var(--foreground);font-weight:600}
+
+  /* ── Two-column: panel + tradeoffs ────────────────── */
+  .stage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+  @media(max-width:920px){.stage{grid-template-columns:1fr}}
+
+  .panel{
+    height:640px;border:1px solid var(--border);border-radius:var(--r-xl);
+    background:var(--background);overflow:hidden;position:relative;
+    display:flex;flex-direction:column;
+    box-shadow:var(--shadow-md);
+  }
+  .panel-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);background:color-mix(in oklch,var(--muted) 22%,transparent)}
+  .panel-head .title{font-size:12px;color:var(--muted-foreground)}
+  .panel-head .count{margin-left:auto;font-size:11px;color:var(--muted-fg-dim);font-family:'Geist Mono',monospace}
+
+  .scroll{flex:1;overflow-y:auto;padding:6px 8px}
+  .scroll::-webkit-scrollbar{width:8px}
+  .scroll::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:8px}
+  .scroll::-webkit-scrollbar-track{background:transparent}
+
+  /* date group */
+  .group{padding:6px 6px 14px}
+  .group-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-fg-dim);padding:8px 10px 6px;position:sticky;top:0;background:color-mix(in oklch,var(--background) 92%,transparent);backdrop-filter:blur(6px)}
+
+  /* item row */
+  .item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:var(--r-md);cursor:default;transition:background .14s}
+  .item:hover{background:color-mix(in oklch,var(--accent) 60%,transparent)}
+  .item.done .text{color:var(--muted-fg-dim);text-decoration:line-through;text-decoration-color:color-mix(in oklch,var(--muted-foreground) 60%,transparent)}
+  .check{flex-shrink:0;margin-top:1px;color:var(--muted-foreground);cursor:pointer}
+  .item.done .check{color:var(--success)}
+  .item .time{flex-shrink:0;font-size:11px;color:var(--muted-fg-dim);margin-top:2px;min-width:38px}
+  .item .text{font-size:13.5px;line-height:1.5;color:var(--foreground);flex:1;word-break:break-word}
+  .route-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:1px 7px;border-radius:99px;margin-right:6px;vertical-align:1px}
+  .r-Later{background:color-mix(in oklch,var(--info) 22%,transparent);color:var(--info)}
+  .r-Read{background:color-mix(in oklch,var(--warning) 22%,transparent);color:var(--warning)}
+  .r-Shop{background:color-mix(in oklch,var(--error) 22%,transparent);color:var(--error)}
+  .r-Watch{background:color-mix(in oklch,var(--purple) 22%,transparent);color:var(--purple)}
+  .r-Journal{background:color-mix(in oklch,var(--success) 22%,transparent);color:var(--success)}
+
+  /* ── DIR 1: capture command bar ───────────────────── */
+  .bar1{border-top:1px solid var(--border);padding:10px 12px;background:color-mix(in oklch,var(--card) 50%,transparent)}
+  .bar1-inner{display:flex;align-items:center;gap:8px;border:1px solid var(--input);border-radius:var(--r-lg);background:var(--background);padding:0 10px 0 12px;transition:border-color .15s,box-shadow .15s}
+  .bar1-inner:focus-within{border-color:color-mix(in oklch,var(--primary) 50%,transparent);box-shadow:0 0 0 3px color-mix(in oklch,var(--primary) 14%,transparent)}
+  .bar1 .chip-prefix{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;flex-shrink:0}
+  .bar1 input{flex:1;background:transparent;border:0;outline:0;color:var(--foreground);font-family:inherit;font-size:13.5px;padding:11px 0}
+  .bar1 input::placeholder{color:var(--muted-fg-dim)}
+  .bar1 .hint{font-size:10px;color:var(--muted-fg-dim);font-family:'Geist Mono',monospace;white-space:nowrap}
+  .slash-menu{position:absolute;bottom:64px;left:18px;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:6px;width:200px;box-shadow:var(--shadow-lg);z-index:20;animation:pop .14s cubic-bezier(.16,1,.3,1)}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .slash-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--r-sm);cursor:pointer;font-size:12.5px;color:var(--foreground)}
+  .slash-item:hover,.slash-item.sel{background:var(--accent)}
+  .slash-item .key{margin-left:auto;font-family:'Geist Mono',monospace;font-size:10px;color:var(--muted-fg-dim)}
+
+  /* ── DIR 2: floating composer ─────────────────────── */
+  .fab{position:absolute;right:20px;bottom:20px;width:48px;height:48px;border-radius:50%;border:0;cursor:pointer;background:var(--primary);color:var(--primary-foreground);display:grid;place-items:center;box-shadow:0 6px 20px color-mix(in oklch,var(--primary) 35%,transparent);transition:transform .16s cubic-bezier(.16,1,.3,1);z-index:5}
+  .fab:hover{transform:scale(1.06) rotate(90deg)}
+  .fab-hint{position:absolute;right:78px;bottom:32px;font-size:11px;color:var(--muted-fg-dim);font-family:'Geist Mono',monospace}
+  .empty-strip{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted-fg-dim);gap:8px;text-align:center;padding:24px}
+  .empty-strip .big{font-size:13px;color:var(--muted-foreground);font-weight:500}
+  .overlay{position:absolute;inset:0;background:oklch(0 0 0 / 0.6);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:30;animation:fade .18s}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .composer{width:min(440px,86%);background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-2xl);box-shadow:var(--shadow-lg);overflow:hidden;animation:pop .2s cubic-bezier(.16,1,.3,1)}
+  .composer-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border)}
+  .composer-head .t{font-size:13px;font-weight:600}
+  .composer textarea{width:100%;min-height:96px;resize:none;border:0;outline:0;background:transparent;color:var(--foreground);font-family:inherit;font-size:14px;line-height:1.55;padding:14px 16px}
+  .composer-foot{display:flex;align-items:center;gap:8px;padding:10px 16px 14px;border-top:1px solid var(--border)}
+  .composer-foot .routes{display:flex;gap:5px;flex-wrap:wrap}
+  .composer .send{margin-left:auto}
+
+  /* shared small buttons */
+  .btn{appearance:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-md);font-size:12px;font-weight:500;padding:7px 11px;border:1px solid var(--border);background:transparent;color:var(--foreground);transition:all .14s}
+  .btn:hover{background:var(--accent)}
+  .btn-primary{background:var(--primary);color:var(--primary-foreground);border-color:transparent;font-weight:600}
+  .btn-primary:hover{background:color-mix(in oklch,var(--primary) 92%,oklch(0.8 0 0))}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+  .iconbtn{appearance:none;cursor:pointer;border:1px solid var(--border);background:color-mix(in oklch,var(--card) 40%,transparent);color:var(--foreground);border-radius:var(--r-sm);width:30px;height:30px;display:grid;place-items:center;transition:all .14s}
+  .iconbtn:hover{background:var(--accent);border-color:var(--border-strong)}
+  .route-pill{appearance:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;border:1px solid transparent;transition:all .14s}
+  .route-pill[data-r="Later"]{background:color-mix(in oklch,var(--info) 16%,transparent);color:var(--info)}
+  .route-pill[data-r="Read"]{background:color-mix(in oklch,var(--warning) 16%,transparent);color:var(--warning)}
+  .route-pill[data-r="Shop"]{background:color-mix(in oklch,var(--error) 16%,transparent);color:var(--error)}
+  .route-pill[data-r="Watch"]{background:color-mix(in oklch,var(--purple) 16%,transparent);color:var(--purple)}
+  .route-pill[data-r="Journal"]{background:color-mix(in oklch,var(--success) 16%,transparent);color:var(--success)}
+  .route-pill.on{box-shadow:0 0 0 2px color-mix(in oklch,currentColor 40%,transparent);filter:brightness(1.08)}
+
+  /* ── DIR 3: top feed ──────────────────────────────── */
+  .topfeed-bar{border-bottom:1px solid var(--border);padding:12px 14px;background:color-mix(in oklch,var(--card) 45%,transparent)}
+  .tf-inner{display:flex;align-items:center;gap:8px;border:1px solid var(--input);border-radius:var(--r-lg);background:var(--background);padding:0 8px 0 12px;transition:border-color .15s,box-shadow .15s}
+  .tf-inner:focus-within{border-color:color-mix(in oklch,var(--primary) 50%,transparent);box-shadow:0 0 0 3px color-mix(in oklch,var(--primary) 14%,transparent)}
+  .tf-inner input{flex:1;background:transparent;border:0;outline:0;color:var(--foreground);font-family:inherit;font-size:13.5px;padding:11px 0}
+  .tf-inner input::placeholder{color:var(--muted-fg-dim)}
+  .new-flash{animation:flash .8s cubic-bezier(.16,1,.3,1)}
+  @keyframes flash{0%{background:color-mix(in oklch,var(--primary) 18%,transparent)}100%{background:transparent}}
+
+  /* ── DIR 4: routing chips ─────────────────────────── */
+  .chips4{border-top:1px solid var(--border);padding:10px 12px;background:color-mix(in oklch,var(--card) 50%,transparent)}
+  .chips4-row{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+  .chips4-input{display:flex;align-items:center;gap:8px;border:1px solid var(--input);border-radius:var(--r-lg);background:var(--background);padding:0 8px 0 12px;transition:border-color .15s,box-shadow .15s}
+  .chips4-input:focus-within{border-color:color-mix(in oklch,var(--primary) 50%,transparent);box-shadow:0 0 0 3px color-mix(in oklch,var(--primary) 14%,transparent)}
+  .chips4-input input{flex:1;background:transparent;border:0;outline:0;color:var(--foreground);font-family:inherit;font-size:13.5px;padding:10px 0}
+  .chips4-input input::placeholder{color:var(--muted-fg-dim)}
+
+  /* ── Tradeoff side panel ──────────────────────────── */
+  .side{position:sticky;top:16px;border:1px solid var(--border);border-radius:var(--r-xl);background:color-mix(in oklch,var(--card) 45%,transparent);padding:18px}
+  .side h3{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-fg-dim);margin-bottom:12px}
+  .pros,.cons{list-style:none;margin-bottom:14px}
+  .pros li,.cons li{display:flex;gap:8px;font-size:12.5px;line-height:1.5;color:var(--foreground);padding:5px 0}
+  .pros li::before{content:"+";color:var(--success);font-weight:700;flex-shrink:0}
+  .cons li::before{content:"!";color:var(--warning);font-weight:700;flex-shrink:0}
+  .side .cost{font-size:11px;color:var(--muted-fg-dim);border-top:1px solid var(--border);padding-top:12px;line-height:1.6}
+  .side .cost b{color:var(--foreground);font-weight:600}
+  .verdict{margin-top:10px;font-size:11.5px;padding:9px 11px;border-radius:var(--r-md);background:color-mix(in oklch,var(--info) 12%,transparent);color:var(--info);line-height:1.5}
+  .dir-only{display:none}
+  .foot-note{margin-top:40px;font-size:11px;color:var(--muted-fg-dim);line-height:1.6;border-top:1px solid var(--border);padding-top:18px}
+  svg{display:block}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- faux app topbar -->
+  <div class="topbar">
+    <div class="dotlogo">O</div>
+    <div class="crumb">
+      <span>Knowledge</span><span class="dot">/</span><b>Quick Notes</b>
+    </div>
+    <div class="spacer"></div>
+    <span class="kbd">⌘K</span><span class="kbd">⌘N</span>
+  </div>
+
+  <h1>빠른 메모 입력 — 4가지 방향 프로토타입</h1>
+  <p class="sub">동일한 캡처 인박스를 보여주되, <b>입력 메커니즘만 바꿔</b> 느낌을 비교합니다. 실제 타이핑 + <span class="mono">Enter</span>로 캡처해 보세요. 데이터 모델(Chat.md 체크리스트)과 백엔드 훅은 그대로 유지하는 전제입니다.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-d="1"><span class="num">01</span> 캡처 커맨드 바</button>
+    <button class="tab" data-d="2"><span class="num">02</span> 플로팅 컴포저</button>
+    <button class="tab" data-d="3"><span class="num">03</span> 최상위 피드</button>
+    <button class="tab" data-d="4"><span class="num">04</span> 라우팅 칩스</button>
+  </div>
+  <div class="desc" id="desc"></div>
+
+  <div class="stage">
+    <div class="panel" id="panel">
+      <!-- panel-head + scroll + input rendered per direction -->
+    </div>
+    <aside class="side">
+      <h3>트레이드오프</h3>
+      <ul class="pros" id="pros"></ul>
+      <ul class="cons" id="cons"></ul>
+      <div class="verdict" id="verdict"></div>
+      <div class="cost" id="cost"></div>
+    </aside>
+  </div>
+
+  <p class="foot-note">
+    모든 방향은 동일한 데이터 계층(<span class="mono">chat_append / chat_delete / checklist_add / journal_add</span>)을 재사용합니다.
+    라인 포맷 <span class="mono">- [ ] \`HH:MM\` text</span>와 msgHash 기반 삭제는 변경하지 않습니다.
+    최상위 피드(03) 선택 인덱스 매핑은 실구현 시 별도 처리 필요합니다.
+  </p>
+</div>
+
+<script>
+/* ── icons ─────────────────────────────────────────── */
+const I={
+  check:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+  square:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>`,
+  clock:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+  news:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v16a2 2 0 0 0 2 2zM8 6h8M8 10h8M8 14h6"/></svg>`,
+  cart:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1.6"/><circle cx="19" cy="21" r="1.6"/><path d="M2 3h3l2.6 13.4a2 2 0 0 0 2 1.6h8.5a2 2 0 0 0 2-1.6L22 7H5"/></svg>`,
+  tv:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="m7 2 5 4 5-4"/></svg>`,
+  book:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14M3 5a2 2 0 0 1 2-2h14v18H5a2 2 0 0 1-2-2zM21 5a2 2 0 0 0-2-2H5"/></svg>`,
+  send:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4 20-7z"/></svg>`,
+  plus:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  enter:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 10-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>`,
+  x:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
+  spark:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/></svg>`,
+};
+const ROUTE_ICON={Later:I.clock,Read:I.news,Shop:I.cart,Watch:I.tv,Journal:I.book};
+const ROUTES=['Later','Read','Shop','Watch','Journal'];
+
+/* ── shared state ──────────────────────────────────── */
+let state={
+  items:[
+    {t:'Refactor token-mixing provider filter — billing_model = "subscription" check',time:'14:32',done:false,route:null},
+    {t:'Idea: A2A 모니터를 Agents 카테고리로 이동',time:'13:10',done:true,route:null},
+    {t:'USB-C 허브 — 책상용 정리',time:'11:05',done:false,route:'Shop'},
+    {t:'read: zakirullin/files.md 라이브 렌더링 접근법 비교',time:'09:48',done:false,route:'Read'},
+  ],
+  yesterday:[
+    {t:'watch: RustConf async 토크 다시 보기',time:'22:15',done:false,route:'Watch'},
+    {t:'스킬 재설계 — Claude 웹 UI처럼 .skill 파일 임포트',time:'19:30',done:false,route:null},
+    {t:'저녁 산책 — 머리 식히기',time:'18:40',done:true,route:'Journal'},
+  ],
+};
+for(const x of [...state.items,...state.yesterday]) x._id=uid();
+
+function nowTime(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function uid(){return Math.random().toString(36).slice(2);}
+function newItem(t,route){return{t,time:nowTime(),done:false,route,_id:uid()};}
+
+function routeTag(r){if(!r)return'';return `<span class="route-tag r-${r}">${ROUTE_ICON[r]||''}${r}</span>`;}
+function itemHTML(it,id,prefix){
+  return `<div class="item ${it.done?'done':''}" data-id="${id}">
+    <span class="check" onclick="toggleDone('${prefix}','${id}')">${it.done?I.check:I.square}</span>
+    <span class="time mono">${it.time}</span>
+    <span class="text">${routeTag(it.route)}${escapeHtml(it.t)}</span>
+  </div>`;
+}
+function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+window.toggleDone=function(prefix,id){
+  const arr=prefix==='t'?state.items:state.yesterday;
+  const it=arr.find(x=>x._id===id);
+  if(it){it.done=!it.done;render();}
+};
+
+/* list block shared (today + yesterday), reversed flag for top-feed */
+function listHTML(reversed){
+  const today=state.items.map(x=>({...x}));
+  const yest=state.yesterday.map(x=>({...x}));
+  let html='';
+  const groups=[{label:'오늘',arr:today,p:'t'},{label:'어제',arr:yest,p:'y'}];
+  if(reversed) groups[0].arr=[...today].reverse();
+  for(const g of groups){
+    html+=`<div class="group"><div class="group-label">${g.label}</div>`;
+    for(const it of g.arr) html+=itemHTML(it,it._id,g.p);
+    html+=`</div>`;
+  }
+  return html;
+}
+
+/* ── direction metadata ────────────────────────────── */
+const META={
+  1:{desc:'<b>캡처 커맨드 바.</b> 하단 슬림 1줄 입력. <span class="mono">/</span>를 누르면 목적지 메뉴가 떠 캡처 시점에 라우팅. Send 버튼 없이 <span class="mono">Enter</span>로 즉시 저장. "채팅" 메타포를 버리고 인박스 본질에 충실.',
+    pros:['textarea 박스 + Send 버튼의 세로 공간 낭비 제거','캡처 시점 라우팅 → 사후 이동 버튼 최소화','명령행 감각, 키보드 중심'],
+    cons:['다중줄 입력(Shift+Enter) 직관성↓','슬래시 메뉴 학습 필요'],
+    verdict:'가장 개념적 정합성이 높음 — "가짜 채팅"을 "캡처 인박스"로 재정의.',
+    cost:'구현: input + 슬래시 popover. 데이터 변경 <b>없음</b>. 평균 변경량 작음.'},
+  2:{desc:'<b>플로팅 컴포저.</b> 하단 바를 없애 리스트가 전체 높이 확보. <span class="kbd">⌘Enter</span> 또는 우하단 + 버튼으로 오버레이 컴포저 호출. 포커스가 분리되고 화면이 넓어짐.',
+    pros:['리스트 전체 높이 → 한눈에 많이 보임','캡처 순간에 집중(composer가 전경)','다중줄/긴 메모에 적합'],
+    cons:['항상 입력창이 보이지 않음 → 진입 1회 비용','오버레이가 리스트 맥락을 가림'],
+    verdict:'메모가 길거나 드문 경우에 적합. 잦은 빠른 캡처엔 마찰.',
+    cost:'구현: composer 모달 + FAB + ⌘Enter 단축키. 기존 textarea 로직 재사용.'},
+  3:{desc:'<b>최상위 피드.</b> 입력을 <b>상단</b>으로. 새 캡처가 맨 위에 쌓임(Tana/Notion 캡처 스타일). 가장 최근 항목이 항상 눈앞.',
+    pros:['최근 항목 즉시 가시 → 회고 빠름','입력→출력이 같은 위치(상단)라 인지 부담↓','캡처 직후 피드백 강함'],
+    cons:['<b>선택 인덱스 매핑 재작업 필요</b>(advisory 2)','기존 "최신 하단" 자동스크롤 의존 깨짐','시간 역순 정렬이 익숙치 않을 수 있음'],
+    verdict:'가장 시각적으로 다른 느낌. 단 변경 파급이 가장 큼.',
+    cost:'구현: 입력 위치 이동 + 표시 역순 + <b>selectedIndices/lastClickedIndex/drag-range 인덱스 재매핑</b>.'},
+  4:{desc:'<b>라우팅 칩스.</b> 하단 위치는 유지하되, 입력 바 위에 목적지 칩 행 추가. 칩 선택 후 Enter → 해당 목적지로 캡처. 가장 작은 변경으로 사후 이동 최소화.',
+    pros:['위치/레이아웃 거의 그대로 → 위험 최소','라우팅이 명시적 칩이라 발견성 좋음','기존 selection/스크롤 로직 그대로'],
+    cons:['여전히 하단 바가 세로 공간 차지','칩 행이 추가되어 약간 더 두꺼움','채팅→인박스 재정의 효과는 약함'],
+    verdict:'가장 안전한 점진적 개선. "다른 방식"의 임팩트는 가장 작음.',
+    cost:'구현: 칩 행 + 선택 상태. selection/스크롤/해시 <b>변경 없음</b>.'},
+};
+
+let current=1;
+function render(){
+  const m=META[current];
+  document.getElementById('desc').innerHTML=m.desc;
+  document.getElementById('pros').innerHTML=m.pros.map(p=>`<li>${p}</li>`).join('');
+  document.getElementById('cons').innerHTML=m.cons.map(c=>`<li>${c}</li>`).join('');
+  document.getElementById('verdict').innerHTML=m.verdict;
+  document.getElementById('cost').innerHTML=m.cost;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',+t.dataset.d===current));
+  const p=document.getElementById('panel');
+  p.innerHTML='';
+  if(current===1) renderBar(p);
+  else if(current===2) renderFab(p);
+  else if(current===3) renderTop(p);
+  else renderChips(p);
+}
+
+/* ── DIR 1: command bar ────────────────────────────── */
+function renderBar(p){
+  p.innerHTML=`
+    <div class="panel-head"><span class="title">Quick Notes</span><span class="count">${state.items.length+state.yesterday.length} items</span></div>
+    <div class="scroll" id="scroll1">${listHTML(false)}</div>
+    <div class="bar1">
+      <div class="bar1-inner" id="bar1inner">
+        <span id="chip1"></span>
+        <input id="in1" placeholder="메모를 입력… / 로 목적지 지정" autocomplete="off">
+        <span class="hint">/ route · ⏎ save</span>
+      </div>
+    </div>
+    <div id="slash1" style="display:none"></div>`;
+  const input=document.getElementById('in1');
+  const chip=document.getElementById('chip1');
+  let route=null;
+  let menuOpen=false;
+  function setRoute(r){
+    route=r;
+    input.value=input.value.replace(/^\//,'');
+    chip.innerHTML = r? `<span class="chip-prefix r-${r}">${ROUTE_ICON[r]}${r}</span>`:'';
+    input.focus();
+  }
+  function openMenu(sel){
+    menuOpen=true;
+    const m=document.getElementById('slash1');
+    m.className='slash-menu';
+    m.style.display='block';
+    m.innerHTML=ROUTES.map((r,i)=>`<div class="slash-item ${i===sel?'sel':''}" data-r="${r}">${ROUTE_ICON[r]}<span>${r}</span><span class="key">${r[0]}</span></div>`).join('')
+      +`<div class="slash-item" data-r=""><span style="opacity:.5">${I.x}</span><span>Inbox (no route)</span><span class="key">esc</span></div>`;
+    m.querySelectorAll('.slash-item').forEach(el=>el.onclick=()=>{setRoute(el.dataset.r||null);closeMenu();});
+  }
+  function closeMenu(){menuOpen=false;document.getElementById('slash1').style.display='none';}
+  input.addEventListener('input',()=>{
+    if(input.value==='/'&&!route) openMenu(0);
+  });
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();
+      const v=route? input.value : input.value.replace(/^\//,'');
+      const txt=v.trim(); if(!txt)return;
+      state.items.unshift(newItem(txt,route));
+      setRoute(null); input.value=''; closeMenu(); render();
+    }
+    if(e.key===' '&&input.value==='/'){e.preventDefault();openMenu(0);}
+    if(e.key==='Escape'){closeMenu();setRoute(null);input.value='';}
+  });
+  // demo: click placeholder chip area to try slash
+  setTimeout(()=>input.focus(),30);
+  window._closeMenu=closeMenu;
+}
+
+/* ── DIR 2: floating composer ──────────────────────── */
+function renderFab(p){
+  p.innerHTML=`
+    <div class="panel-head"><span class="title">Quick Notes</span><span class="count">${state.items.length+state.yesterday.length} items</span></div>
+    <div class="scroll">${listHTML(false)}</div>
+    <div class="fab-hint">⌘Enter</div>
+    <button class="fab" id="fab">${I.plus}</button>
+    <div id="ov2"></div>`;
+  function open(){
+    const ov=document.getElementById('ov2');
+    ov.className='overlay';
+    ov.innerHTML=`<div class="composer">
+      <div class="composer-head"><span class="t">새 캡처</span><button class="iconbtn" id="close2">${I.x}</button></div>
+      <textarea id="ta2" placeholder="지금 머릿속에 있는 걸 다 쏟아내세요…"></textarea>
+      <div class="composer-foot">
+        <div class="routes" id="routes2"></div>
+        <button class="btn btn-primary send" id="send2">${I.send}<span>저장</span></button>
+      </div>
+    </div>`;
+    const routes=ROUTES.map(r=>`<button class="route-pill" data-r="${r}">${ROUTE_ICON[r]}${r}</button>`).join('');
+    document.getElementById('routes2').innerHTML=routes;
+    let route=null;
+    ov.querySelectorAll('.route-pill').forEach(el=>el.onclick=()=>{route=el.dataset.r;ov.querySelectorAll('.route-pill').forEach(x=>x.classList.toggle('on',x===el));});
+    const ta=document.getElementById('ta2');setTimeout(()=>ta.focus(),20);
+    const send=()=>{
+      const txt=ta.value.trim();if(!txt){close();return;}
+      state.items.unshift(newItem(txt,route));
+      render();
+    };
+    document.getElementById('send2').onclick=send;
+    document.getElementById('close2').onclick=close;
+    ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}if(e.key==='Escape'){e.preventDefault();close();}});
+    ov.addEventListener('click',e=>{if(e.target===ov)close();});
+  }
+  function close(){document.getElementById('ov2').className='';document.getElementById('ov2').innerHTML='';}
+  document.getElementById('fab').onclick=open;
+}
+
+/* ── DIR 3: top feed ───────────────────────────────── */
+function renderTop(p){
+  p.innerHTML=`
+    <div class="panel-head"><span class="title">Quick Notes</span><span class="count">${state.items.length+state.yesterday.length} items</span></div>
+    <div class="topfeed-bar">
+      <div class="tf-inner">
+        <span style="color:var(--muted-fg-dim)">${I.spark}</span>
+        <input id="in3" placeholder="방금 떠오른 걸 여기에…" autocomplete="off">
+        <span class="hint mono" style="font-size:10px;color:var(--muted-fg-dim)">⏎ capture</span>
+      </div>
+    </div>
+    <div class="scroll" id="scroll3">${listHTML(true)}</div>`;
+  const input=document.getElementById('in3');
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();const txt=input.value.trim();if(!txt)return;
+      state.items.unshift(newItem(txt,null));input.value='';render();
+      // flash newest
+      requestAnimationFrame(()=>{const first=document.querySelector('#scroll3 .item');if(first)first.classList.add('new-flash');});
+    }
+  });
+  setTimeout(()=>input.focus(),30);
+}
+
+/* ── DIR 4: routing chips ──────────────────────────── */
+function renderChips(p){
+  p.innerHTML=`
+    <div class="panel-head"><span class="title">Quick Notes</span><span class="count">${state.items.length+state.yesterday.length} items</span></div>
+    <div class="scroll">${listHTML(false)}</div>
+    <div class="chips4">
+      <div class="chips4-row" id="chips4row"></div>
+      <div class="chips4-input">
+        <input id="in4" placeholder="목적지 칩 선택 후 메모 입력…" autocomplete="off">
+        <span class="hint mono" style="font-size:10px;color:var(--muted-fg-dim)">⏎ save</span>
+      </div>
+    </div>`;
+  const row=document.getElementById('chips4row');
+  row.innerHTML=`<button class="route-pill on" data-r="">Inbox</button>`+ROUTES.map(r=>`<button class="route-pill" data-r="${r}">${ROUTE_ICON[r]}${r}</button>`).join('');
+  let route=null;
+  row.querySelectorAll('.route-pill').forEach(el=>el.onclick=()=>{
+    route=el.dataset.r||null;
+    row.querySelectorAll('.route-pill').forEach(x=>x.classList.toggle('on',x===el));
+    document.getElementById('in4').focus();
+  });
+  const input=document.getElementById('in4');
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();const txt=input.value.trim();if(!txt)return;
+      state.items.unshift(newItem(txt,route));input.value='';render();}
+  });
+  setTimeout(()=>input.focus(),30);
+}
+
+/* ── wire tabs ─────────────────────────────────────── */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{current=+t.dataset.d;render();});
+render();
+</script>
+</body>
+</html>

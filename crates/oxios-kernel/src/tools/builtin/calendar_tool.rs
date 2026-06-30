@@ -285,6 +285,7 @@ impl CalendarTool {
             repeat: opt_repeat(params),
             reminder_minutes: opt_reminder_minutes(params).unwrap_or_default(),
             source: oxios_calendar::EventSource::Agent,
+            note_path: opt_str(params, "note_path").map(|s| s.to_string()),
         };
 
         match self.engine.create(draft).await {
@@ -315,6 +316,7 @@ impl CalendarTool {
             description: opt_str(params, "description").map(|s| Some(s.to_string())),
             location: opt_str(params, "location").map(|s| Some(s.to_string())),
             repeat: opt_repeat(params).map(Some),
+            note_path: opt_str(params, "note_path").map(|s| Some(s.to_string())),
             reminder_minutes: opt_reminder_minutes(params),
         };
 

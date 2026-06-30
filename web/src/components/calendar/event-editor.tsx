@@ -26,6 +26,8 @@ interface Props {
   onClose: () => void
   event?: CalendarEvent
   defaultStart?: Date
+  /** Pre-fill title when creating from a note (note's basename). */
+  defaultTitle?: string
   onSubmit: (data: CreateEventRequest | UpdateEventRequest) => void
   isLoading?: boolean
 }
@@ -48,7 +50,15 @@ function defaultEnd(start: Date): Date {
   return d
 }
 
-export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLoading }: Props) {
+export function EventEditor({
+  open,
+  onClose,
+  event,
+  defaultStart,
+  defaultTitle,
+  onSubmit,
+  isLoading,
+}: Props) {
   const { t } = useTranslation()
   const isEdit = !!event
 
@@ -74,7 +84,7 @@ export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLo
       setReminders([]) // not stored on event directly
     } else {
       const startDate = defaultStart ?? new Date()
-      setTitle('')
+      setTitle(defaultTitle ?? '')
       setStart(toDatetimeLocal(startDate))
       setEnd(toDatetimeLocal(defaultEnd(startDate)))
       setAllDay(false)
@@ -83,7 +93,7 @@ export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLo
       setRepeat(undefined)
       setReminders([])
     }
-  }, [event, defaultStart, open])
+  }, [event, defaultStart, defaultTitle, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

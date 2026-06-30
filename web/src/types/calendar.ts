@@ -13,6 +13,7 @@ export interface CalendarEvent {
   status: string
   source: 'agent' | 'user' | 'cron'
   filename: string
+  note_path?: string | null
 }
 
 /** Repeat rule for recurring events. */
@@ -34,6 +35,7 @@ export interface CreateEventRequest {
   location?: string
   repeat?: RepeatRule
   reminder_minutes?: number[]
+  note_path?: string
 }
 
 /** Request body for updating an existing event. */
@@ -46,6 +48,7 @@ export interface UpdateEventRequest {
   location?: string | null
   repeat?: RepeatRule | null
   reminder_minutes?: number[]
+  note_path?: string | null
 }
 
 /** Response for listing events. */

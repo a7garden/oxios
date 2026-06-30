@@ -56,9 +56,9 @@ pub(crate) use budget_routes::{
     handle_budget_reset, handle_budget_set,
 };
 pub(crate) use calendar_routes::{
-    handle_calendar_event_create, handle_calendar_event_delete, handle_calendar_event_get,
-    handle_calendar_event_update, handle_calendar_events, handle_calendar_freebusy,
-    handle_calendar_search,
+    handle_calendar_by_note, handle_calendar_event_create, handle_calendar_event_delete,
+    handle_calendar_event_get, handle_calendar_event_update, handle_calendar_events,
+    handle_calendar_freebusy, handle_calendar_search,
 };
 pub(crate) use chat::{
     handle_ask_user_respond, handle_chat, handle_chat_stream, handle_chat_ticket,
@@ -455,6 +455,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         .route("/api/calendar/search", get(handle_calendar_search))
         .route("/api/calendar/freebusy", get(handle_calendar_freebusy))
+        .route("/api/calendar/by-note", get(handle_calendar_by_note))
         // Email
         .route("/api/email/status", get(handle_email_status))
         .route("/api/email/history", get(handle_email_history))

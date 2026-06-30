@@ -195,7 +195,7 @@ function ChatPage() {
         >
           <div className="max-w-3xl mx-auto px-4 py-6">
             {messages.length === 0 && <EmptyChatState />}
-            <div className="space-y-5">
+            <div className="space-y-1">
               {messages.map((msg, _idx) => {
                 // Compute assistant-only index for knowledge save tracking
                 const assistantIndex =

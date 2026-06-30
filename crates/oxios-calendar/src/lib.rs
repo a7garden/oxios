@@ -34,6 +34,7 @@
 //!         repeat: None,
 //!         reminder_minutes: vec![15],
 //!         source: oxios_calendar::EventSource::Agent,
+//!         note_path: None,
 //!     };
 //!
 //!     let result = engine.create(draft).await?;

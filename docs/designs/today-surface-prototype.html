@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oxios · Today Surface — 메모+저널 통합 프로토타입</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --radius:0.625rem;
+    --background:oklch(0.13 0.005 285.823);
+    --bg-2:oklch(0.155 0.006 286);
+    --card:oklch(0.19 0.008 265);
+    --card-2:oklch(0.21 0.009 265);
+    --muted:oklch(0.274 0.006 286.033);
+    --muted-foreground:oklch(0.705 0.015 286.067);
+    --muted-dim:oklch(0.52 0.012 286);
+    --primary:oklch(0.91 0.03 265);
+    --primary-foreground:oklch(0.15 0.02 265);
+    --accent:oklch(0.274 0.01 265);
+    --border:oklch(1 0 0 / 10%);
+    --border-strong:oklch(1 0 0 / 16%);
+    --input:oklch(1 0 0 / 15%);
+    --success:oklch(0.723 0.219 149.579);
+    --warning:oklch(0.769 0.188 70.08);
+    --error:oklch(0.704 0.191 22.216);
+    --info:oklch(0.685 0.196 259);
+    --purple:oklch(0.627 0.265 303.9);
+    --shadow-lg:0 12px 40px oklch(0 0 0 / 0.5);
+    --r-sm:calc(var(--radius)*0.6);
+    --r-md:calc(var(--radius)*0.8);
+    --r-lg:var(--radius);
+    --r-xl:calc(var(--radius)*1.4);
+    --r-2xl:calc(var(--radius)*1.8);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Geist',system-ui,-apple-system,sans-serif;background:var(--background);color:var(--foreground);color:oklch(0.985 0 0);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden}
+  .mono{font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  ::selection{background:color-mix(in oklch,var(--primary) 30%,transparent)}
+
+  .page{max-width:760px;margin:0 auto;padding:28px 22px 80px}
+
+  /* ── topbar ─────────────────────────────────────── */
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .dotlogo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--primary),oklch(0.8 0.05 265));display:grid;place-items:center;color:var(--primary-foreground);font-weight:700;font-size:14px}
+  .dateblock{display:flex;flex-direction:column;gap:1px}
+  .dateblock .day{font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .dateblock .sub{font-size:11px;color:var(--muted-foreground)}
+  .spacer{flex:1}
+  .global-hint{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:var(--muted-foreground);border:1px solid var(--border);background:color-mix(in oklch,var(--card) 50%,transparent);padding:6px 10px;border-radius:99px}
+  .kbd{font-family:'Geist Mono',monospace;font-size:10px;background:color-mix(in oklch,var(--muted) 50%,transparent);border:1px solid var(--border);padding:1px 5px;border-radius:4px;color:var(--foreground)}
+
+  .lede{font-size:13px;color:var(--muted-foreground);line-height:1.6;margin-bottom:22px}
+  .lede b{color:oklch(0.985 0 0);font-weight:600}
+
+  /* ── capture command bar ────────────────────────── */
+  .capture{position:relative;margin-bottom:18px}
+  .capture-shell{display:flex;align-items:flex-start;gap:8px;border:1px solid var(--input);border-radius:var(--r-xl);background:var(--card);padding:6px 8px 6px 10px;transition:border-color .15s,box-shadow .15s}
+  .capture-shell:focus-within{border-color:color-mix(in oklch,var(--primary) 45%,transparent);box-shadow:0 0 0 3px color-mix(in oklch,var(--primary) 12%,transparent)}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:5px 8px;border-radius:7px;flex-shrink:0;margin-top:1px;cursor:pointer}
+  .chip .x{opacity:.55;margin-left:1px}
+  .r-Inbox{background:color-mix(in oklch,var(--muted-foreground) 18%,transparent);color:var(--muted-foreground)}
+  .r-Journal{background:color-mix(in oklch,var(--success) 18%,transparent);color:var(--success)}
+  .r-Later{background:color-mix(in oklch,var(--info) 18%,transparent);color:var(--info)}
+  .r-Read{background:color-mix(in oklch,var(--warning) 18%,transparent);color:var(--warning)}
+  .r-Shop{background:color-mix(in oklch,var(--error) 18%,transparent);color:var(--error)}
+  .r-Watch{background:color-mix(in oklch,var(--purple) 18%,transparent);color:var(--purple)}
+  .capture input{flex:1;background:transparent;border:0;outline:0;color:inherit;font-family:inherit;font-size:14px;padding:9px 0}
+  .capture input::placeholder{color:var(--muted-dim)}
+  .capture-meta{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:0 4px}
+  .route-toggle{appearance:none;cursor:pointer;font-family:inherit;background:none;border:0;color:var(--muted-foreground);font-size:11px;display:inline-flex;align-items:center;gap:5px}
+  .route-toggle:hover{color:inherit}
+  .enter-hint{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted-dim)}
+
+  /* route popover */
+  .routes{position:absolute;left:0;top:calc(100% + 6px);z-index:30;width:230px;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:6px;box-shadow:var(--shadow-lg);animation:pop .14s cubic-bezier(.16,1,.3,1)}
+  @keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+  .route-item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 9px;border-radius:var(--r-sm);cursor:pointer;font-size:13px;color:inherit;background:none;border:0;font-family:inherit;text-align:left}
+  .route-item:hover,.route-item.sel{background:var(--accent)}
+  .route-item .lbl{flex:1}
+  .route-item .key{font-family:'Geist Mono',monospace;font-size:10px;color:var(--muted-dim)}
+
+  /* ── section headers ────────────────────────────── */
+  .sec-head{display:flex;align-items:center;gap:8px;margin:4px 2px 10px}
+  .sec-head .tag{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:2px 8px;border-radius:99px}
+  .sec-head .name{font-size:13px;font-weight:600}
+  .sec-head .count{font-size:11px;color:var(--muted-dim);font-family:'Geist Mono',monospace}
+  .sec-head .ln{flex:1;height:1px;background:var(--border)}
+
+  .tag-feed{background:color-mix(in oklch,var(--info) 16%,transparent);color:var(--info)}
+  .tag-journal{background:color-mix(in oklch,var(--success) 16%,transparent);color:var(--success)}
+
+  /* ── feed ───────────────────────────────────────── */
+  .feed{display:flex;flex-direction:column;gap:2px;margin-bottom:26px}
+  .item{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:var(--r-md);transition:background .14s;group:1}
+  .item:hover{background:color-mix(in oklch,var(--accent) 55%,transparent)}
+  .item .time{flex-shrink:0;font-size:11px;color:var(--muted-dim);margin-top:2px;min-width:38px}
+  .item .txt{flex:1;font-size:13.5px;line-height:1.5;color:oklch(0.95 0 0);word-break:break-word}
+  .item .actions{display:flex;gap:3px;flex-shrink:0;opacity:0;transition:opacity .12s}
+  .item:hover .actions{opacity:1}
+  .mini{appearance:none;cursor:pointer;border:1px solid transparent;background:color-mix(in oklch,var(--muted) 35%,transparent);color:var(--muted-foreground);border-radius:6px;padding:4px 7px;font-size:10.5px;font-family:inherit;display:inline-flex;align-items:center;gap:4px;transition:all .12s;white-space:nowrap}
+  .mini:hover{background:var(--accent);color:inherit}
+  .mini.promote{color:var(--success)}
+  .mini.promote:hover{background:color-mix(in oklch,var(--success) 16%,transparent)}
+  .route-badge{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:600;padding:1px 6px;border-radius:99px;margin-right:5px;vertical-align:1px}
+  .new-flash{animation:flash 1s cubic-bezier(.16,1,.3,1)}
+  @keyframes flash{0%{background:color-mix(in oklch,var(--primary) 16%,transparent)}100%{background:transparent}}
+  .feed-empty{text-align:center;color:var(--muted-dim);font-size:13px;padding:24px;border:1px dashed var(--border);border-radius:var(--r-lg)}
+
+  /* ── journal ────────────────────────────────────── */
+  .journal{border:1px solid var(--border);border-radius:var(--r-xl);background:var(--card);padding:16px 18px;position:relative}
+  .journal::before{content:'';position:absolute;left:0;top:18px;bottom:18px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(var(--success),color-mix(in oklch,var(--success) 30%,transparent))}
+  .journal textarea{width:100%;min-height:120px;resize:vertical;background:transparent;border:0;outline:0;color:oklch(0.95 0 0);font-family:inherit;font-size:14px;line-height:1.7;padding:0}
+  .journal textarea::placeholder{color:var(--muted-dim)}
+  .journal-foot{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .journal-foot .meta{font-size:11px;color:var(--muted-dim);display:flex;gap:14px}
+  .journal-foot .meta b{color:var(--muted-foreground);font-weight:600}
+  .saved{font-size:11px;color:var(--success);opacity:0;transition:opacity .3s}
+  .saved.show{opacity:1}
+
+  /* ── toast ──────────────────────────────────────── */
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--card);border:1px solid var(--border-strong);color:oklch(0.95 0 0);padding:10px 16px;border-radius:99px;font-size:12.5px;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.16,1,.3,1);z-index:50;display:flex;align-items:center;gap:8px}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .caption{margin-top:30px;font-size:11px;color:var(--muted-dim);line-height:1.7;border-top:1px solid var(--border);padding-top:16px}
+  .caption b{color:var(--muted-foreground);font-weight:600}
+  svg{display:block}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <div class="dotlogo">O</div>
+    <div class="dateblock">
+      <span class="day" id="today-day">오늘</span>
+      <span class="sub" id="today-sub"></span>
+    </div>
+    <div class="spacer"></div>
+    <div class="global-hint">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 2-3 7h6l-3 7"/><path d="M5 14a8 8 0 1 1 14 0"/></svg>
+      <span class="kbd">⌘⇧N</span> 어디서나 캡처
+    </div>
+  </div>
+
+  <p class="lede">메모와 저널이 <b>같은 날, 같은 서피스</b>에. 위는 떠오른 즉시 흘러드는 <b>캡처 피드</b>, 아래는 하루의 <b>저널</b>. 직접 타이핑 + <span class="kbd" style="font-size:10px;padding:1px 5px">⏎</span> 로 캡처해 보세요. <span class="kbd" style="font-size:10px;padding:1px 5px">/</span> 로 목적지 지정.</p>
+
+  <!-- capture command bar -->
+  <div class="capture">
+    <div class="capture-shell" id="cap-shell">
+      <span id="chip-slot"></span>
+      <input id="cap-input" placeholder="방금 떠오른 걸 여기에…" autocomplete="off">
+    </div>
+    <div class="capture-meta">
+      <button class="route-toggle" id="route-toggle"><span class="mono">/</span> <span id="route-label">목적지</span></button>
+      <span class="enter-hint">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 10-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
+        저장
+      </span>
+    </div>
+    <div id="route-pop" style="display:none"></div>
+  </div>
+
+  <!-- feed section -->
+  <div class="sec-head">
+    <span class="tag tag-feed">Feed</span>
+    <span class="name">오늘의 캡처</span>
+    <span class="count" id="feed-count">0</span>
+    <span class="ln"></span>
+  </div>
+  <div class="feed" id="feed"></div>
+
+  <!-- journal section -->
+  <div class="sec-head">
+    <span class="tag tag-journal">Journal</span>
+    <span class="name">오늘의 저널</span>
+    <span class="ln"></span>
+  </div>
+  <div class="journal">
+    <textarea id="journal" placeholder="오늘 하루를 한 줄이라도…"></textarea>
+    <div class="journal-foot">
+      <div class="meta">
+        <span><b id="wc">0</b> 자</span>
+        <span><b id="memo-into">0</b> 개 메모 흡수</span>
+      </div>
+      <span class="saved" id="saved">자동 저장됨</span>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>저장은 그대로</b> — 피드는 <span class="mono">Chat.md</span>(오늘 섹션), 저널은 <span class="mono">journal/오늘.md</span>. 이 화면은 두 포맷을 <b>같은 날짜 기준</b>으로 머지해 보여줄 뿐.
+    메모의 <b>→ 저널</b> 버튼은 "날 것 → 회고"로 고도를 바꾸는 제스처(텍스트를 저널로 흡수). 캡처 바의 <span class="kbd" style="font-size:10px;padding:1px 5px">⌘⇧N</span> 힌트는 — 글로벌 팔레트로 확장하면 앱 어디서든 이 흐름에 도달한다는 의미.
+  </p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const I={
+  bolt:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 2-3 7h6l-3 7"/></svg>`,
+  inbox:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.5z"/></svg>`,
+  book:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14M3 5a2 2 0 0 1 2-2h14v18H5a2 2 0 0 1-2-2zM21 5a2 2 0 0 0-2-2H5"/></svg>`,
+  clock:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+  news:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v16a2 2 0 0 0 2 2zM8 6h8M8 10h8M8 14h6"/></svg>`,
+  cart:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1.6"/><circle cx="19" cy="21" r="1.6"/><path d="M2 3h3l2.6 13.4a2 2 0 0 0 2 1.6h8.5a2 2 0 0 0 2-1.6L22 7H5"/></svg>`,
+  tv:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="m7 2 5 4 5-4"/></svg>`,
+  down:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`,
+  check:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+  x:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
+};
+const ROUTES=[
+  {key:'Inbox',  label:'인박스',   icon:I.inbox, kind:'feed',  hint:'그냥 두기'},
+  {key:'Journal',label:'저널',     icon:I.book,  kind:'journal',hint:'오늘 회고로'},
+  {key:'Later',  label:'나중에',   icon:I.clock, kind:'file', file:'Later.md'},
+  {key:'Read',   label:'읽기',     icon:I.news,  kind:'file', file:'Read.md'},
+  {key:'Shop',   label:'쇼핑',     icon:I.cart,  kind:'file', file:'Shop.md'},
+  {key:'Watch',  label:'볼 것',   icon:I.tv,    kind:'file', file:'Watch.md'},
+];
+const meta=r=>ROUTES.find(x=>x.key===r);
+
+// ── date ───────────────────────────────────────────
+const now=new Date();
+const dayName=['일','월','화','수','목','금','토'][now.getDay()];
+document.getElementById('today-sub').textContent=`${now.getMonth()+1}월 ${now.getDate()}일 ${dayName}요일`;
+function hhmm(){return String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');}
+
+// ── state ──────────────────────────────────────────
+let route=null;           // active capture route
+let menuOpen=false;
+let memos=[               // today's feed (newest first)
+  {id:1,time:'14:32',text:'토큰맥싱 — 구독형 프로바이더 필터, billing_model 점검',badge:null},
+  {id:2,time:'13:10',text:'A2A 모니터 → Agents 카테고리로 이동',badge:null},
+  {id:3,time:'11:05',text:'USB-C 허브 — 책상용 정리',badge:'Shop'},
+  {id:4,time:'09:48',text:'files.md 라이브 렌더링 — 헤딩 크기 처리 비교',badge:'Read'},
+];
+let journalText='오늘은 지식 UI 재설계에 집중했다. 핵심 깨달음: 빠른 메모가 탭에 갖혀 있으면 이미 빠르지 않다. 캡처(순간)와 검토(지속)를 분리하기로 했다. 커맨드 바를 상단으로 올리고 슬래시 라우팅까지 붙였다. 그 와중에 백엔드 chat_append가 - [ ] 마커 없이 쓰는 버그도 발견해서 수정.\n\n내일은 이 "오늘" 서피스를 실제 컴포넌트로 옮겨볼까.';
+let nextId=5;
+let memoIntoJournal=0;
+
+const $=id=>document.getElementById(id);
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function badge(b){return b?`<span class="route-badge r-${b}">${meta(b).icon}${b}</span>`:'';}
+
+// ── render ─────────────────────────────────────────
+function renderChip(){
+  const slot=$('chip-slot');const m=route?meta(route):null;
+  slot.innerHTML=m?`<span class="chip r-${route}">${m.icon} ${m.label} <span class="x">${I.x}</span></span>`:'';
+  $('route-label').textContent=route?meta(route).label:'목적지';
+}
+function renderFeed(){
+  const f=$('feed');$('feed-count').textContent=memos.length;
+  if(memos.length===0){f.innerHTML='<div class="feed-empty">오늘 캡처한 것이 없습니다 — 위 입력창에 떠오른 걸 적어보세요.</div>';return;}
+  f.innerHTML=memos.map(m=>`
+    <div class="item" data-id="${m.id}">
+      <span class="time mono">${m.time}</span>
+      <span class="txt">${badge(m.badge)}${esc(m.text)}</span>
+      <span class="actions">
+        <button class="mini promote" data-act="promote" data-id="${m.id}">${I.down} 저널로</button>
+        <button class="mini" data-act="del" data-id="${m.id}">삭제</button>
+      </span>
+    </div>`).join('');
+}
+function renderJournal(){
+  const j=$('journal');j.value=journalText;
+  $('wc').textContent=journalText.length;
+  $('memo-into').textContent=memoIntoJournal;
+}
+function renderMenu(sel){
+  const p=$('route-pop');p.className='routes';p.style.display='block';
+  p.innerHTML=ROUTES.map((r,i)=>`<button class="route-item ${i===sel?'sel':''}" data-r="${r.key}">${r.icon}<span class="lbl">${r.label}</span><span class="key">${r.hint}</span></button>`).join('');
+  p.querySelectorAll('.route-item').forEach(el=>el.onclick=()=>pickRoute(el.dataset.r));
+}
+function closeMenu(){menuOpen=false;$('route-pop').style.display='none';}
+function pickRoute(k){route=k==='Inbox'?null:k;renderChip();closeMenu();$('cap-input').value=$('cap-input').value.replace(/^\//,'');$('cap-input').focus();}
+
+function toast(msg){
+  const t=$('toast');t.innerHTML=msg;t.classList.add('show');
+  clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),1700);
+}
+function flashSaved(){$('saved').classList.add('show');clearTimeout(flashSaved._t);flashSaved._t=setTimeout(()=>$('saved').classList.remove('show'),1400);}
+
+// ── capture ────────────────────────────────────────
+function capture(){
+  const inp=$('cap-input');const text=inp.value.trim();if(!text)return;
+  const m=route?meta(route):meta('Inbox');
+  if(m.kind==='feed'){
+    memos.unshift({id:nextId++,time:hhmm(),text,badge:null});
+    renderFeed();
+    requestAnimationFrame(()=>{const first=document.querySelector('.feed .item');if(first)first.classList.add('new-flash');});
+  }else if(m.kind==='journal'){
+    journalText=(journalText.trim()?journalText.trimEnd()+'\n':'')+text;
+    memoIntoJournal++;renderJournal();flashSaved();
+    toast(`${I.book} 저널에 추가 — ${m.label}`);
+  }else{ // file route
+    memos.unshift({id:nextId++,time:hhmm(),text,badge:m.key});
+    renderFeed();
+    toast(`${m.icon} ${m.file}에 라우팅`);
+  }
+  inp.value='';route=null;renderChip();
+}
+function promote(id){
+  const i=memos.findIndex(m=>m.id===id);if(i<0)return;const m=memos[i];
+  journalText=(journalText.trim()?journalText.trimEnd()+'\n':'')+'• '+m.text;
+  memoIntoJournal++;memos.splice(i,1);
+  renderFeed();renderJournal();flashSaved();
+}
+function del(id){memos=memos.filter(m=>m.id!==id);renderFeed();}
+
+// ── wire ───────────────────────────────────────────
+const inp=$('cap-input');
+inp.addEventListener('input',()=>{if(inp.value==='/'&&!route){menuOpen=true;renderMenu(0);}});
+inp.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();if(menuOpen){return;}capture();}
+  if(e.key==='Escape'){closeMenu();if(route){route=null;renderChip();}}
+});
+$('route-toggle').onclick=()=>{menuOpen=!menuOpen;if(menuOpen)renderMenu(0);else closeMenu();};
+$('chip-slot').onclick=e=>{if(e.target.closest('.chip')){route=null;renderChip();}};
+document.addEventListener('mousedown',e=>{
+  if(menuOpen&&!e.target.closest('.capture'))closeMenu();
+});
+// feed actions
+$('feed').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const id=+b.dataset.id;
+  if(b.dataset.act==='promote')promote(id);
+  if(b.dataset.act==='del')del(id);
+});
+// journal autosave (simulated)
+$('journal').addEventListener('input',e=>{journalText=e.target.value;$('wc').textContent=journalText.length;clearTimeout(window._jt);window._jt=setTimeout(flashSaved,500);});
+
+// global ⌘⇧N → focus capture (simulate global palette)
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.shiftKey&&(e.key==='n'||e.key==='N')){e.preventDefault();inp.focus();}
+});
+
+renderChip();renderFeed();renderJournal();
+</script>
+</body>
+</html>

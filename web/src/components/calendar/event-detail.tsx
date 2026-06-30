@@ -1,3 +1,5 @@
+import { useNavigate } from '@tanstack/react-router'
+import { FileText, Unlink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,17 +10,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useKnowledgeStore } from '@/stores/knowledge'
+import { useNotificationCenter } from '@/stores/notification-center'
 import type { CalendarEvent } from '@/types/calendar'
 
 interface Props {
   event: CalendarEvent
   onEdit?: () => void
   onDelete?: () => void
+  onUnlinkNote?: () => void
   onClose: () => void
 }
 
-export function EventDetail({ event, onEdit, onDelete, onClose }: Props) {
+export function EventDetail({ event, onEdit, onDelete, onUnlinkNote, onClose }: Props) {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
+  const openFile = useKnowledgeStore((s) => s.openFile)
+  const closeCenter = useNotificationCenter((s) => s.closeCenter)
 
   const SOURCE_LABELS: Record<CalendarEvent['source'], string> = {
     agent: t('calendar.sourceAgent'),
@@ -37,6 +45,19 @@ export function EventDetail({ event, onEdit, onDelete, onClose }: Props) {
       weekday: 'short',
     })
   }
+
+  const noteName = event.note_path
+    ? (event.note_path.split('/').pop()?.replace(/\.md$/, '') ?? event.note_path)
+    : ''
+
+  function handleOpenNote() {
+    if (!event.note_path) return
+    openFile(event.note_path)
+    closeCenter()
+    navigate({ to: '/knowledge' })
+    onClose()
+  }
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg">
@@ -78,6 +99,27 @@ export function EventDetail({ event, onEdit, onDelete, onClose }: Props) {
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground">{t('calendar.repeat')}</p>
               <p className="text-sm font-mono text-xs">{event.rrule}</p>
+            </div>
+          )}
+
+          {/* Linked knowledge note */}
+          {event.note_path && (
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">
+                {t('calendar.linkedNote')}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleOpenNote}>
+                  <FileText className="mr-1.5 h-3.5 w-3.5" />
+                  {noteName}
+                </Button>
+                {onUnlinkNote && (
+                  <Button variant="ghost" size="sm" onClick={onUnlinkNote}>
+                    <Unlink className="mr-1.5 h-3.5 w-3.5" />
+                    {t('calendar.unlink')}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

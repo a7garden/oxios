@@ -33,6 +33,14 @@ export function useCalendarSearch(query: string) {
   })
 }
 
+export function useCalendarByNote(path: string | null) {
+  return useQuery({
+    queryKey: ['calendar', 'by-note', path],
+    queryFn: () => api.get<EventsResponse>('/api/calendar/by-note', { path: path! }),
+    enabled: !!path,
+  })
+}
+
 export function useCalendarFreeBusy(from: string, to: string) {
   return useQuery({
     queryKey: ['calendar', 'freebusy', from, to],

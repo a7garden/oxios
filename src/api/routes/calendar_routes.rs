@@ -8,12 +8,23 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use oxios_calendar::{EventDraft, EventPatch};
 
 use crate::api::error::AppError;
 use crate::api::server::AppState;
+
+/// Distinguish an absent field (`None` = don't change) from an explicit JSON
+/// `null` (`Some(None)` = clear). Without this, serde maps both to `None`,
+/// so unlinking (`note_path: null`) would be a silent no-op.
+fn deserialize_some<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(Some)
+}
 
 // ---------------------------------------------------------------------------
 // Request / query types
@@ -48,6 +59,8 @@ pub struct CreateEventRequest {
     pub repeat: Option<oxios_calendar::Repeat>,
     /// Reminder offsets in minutes before the event.
     pub reminder_minutes: Option<Vec<u32>>,
+    /// Optional path of a linked knowledge note.
+    pub note_path: Option<String>,
 }
 
 /// Request body for updating an existing event.
@@ -72,6 +85,9 @@ pub struct UpdateEventRequest {
     pub repeat: Option<Option<oxios_calendar::Repeat>>,
     /// Replace reminder minutes.
     pub reminder_minutes: Option<Vec<u32>>,
+    /// Set or clear linked knowledge note. `Some(None)` (JSON `null`) clears it.
+    #[serde(default, deserialize_with = "deserialize_some")]
+    pub note_path: Option<Option<String>>,
 }
 
 /// Query parameters for the search endpoint.
@@ -155,6 +171,7 @@ pub(crate) async fn handle_calendar_event_create(
         repeat: body.repeat,
         reminder_minutes: body.reminder_minutes.unwrap_or_default(),
         source: oxios_calendar::EventSource::User,
+        note_path: body.note_path,
     };
 
     let result = api
@@ -197,6 +214,9 @@ pub(crate) async fn handle_calendar_event_update(
     }
     if let Some(reminders) = body.reminder_minutes {
         patch.reminder_minutes = Some(reminders);
+    }
+    if let Some(np) = body.note_path {
+        patch.note_path = Some(np);
     }
 
     let result = api
@@ -251,4 +271,26 @@ pub(crate) async fn handle_calendar_freebusy(
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(serde_json::json!({ "slots": slots })))
+}
+
+/// Query parameters for the by-note endpoint.
+#[derive(Debug, Deserialize)]
+pub(crate) struct NotePathParams {
+    /// Knowledge note path to look up.
+    pub path: String,
+}
+
+/// GET /api/calendar/by-note?path=... — Events linked to a knowledge note.
+pub(crate) async fn handle_calendar_by_note(
+    state: State<Arc<AppState>>,
+    Query(params): Query<NotePathParams>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let api = calendar_api!(state)?;
+
+    let events = api
+        .list_by_note_path(&params.path)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({ "events": events })))
 }

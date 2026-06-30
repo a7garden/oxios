@@ -76,6 +76,7 @@ mod tests {
             repeat: None,
             reminder_minutes: vec![],
             source: crate::types::EventSource::Agent,
+            note_path: None,
         };
 
         let result = engine.create(draft).await.unwrap();

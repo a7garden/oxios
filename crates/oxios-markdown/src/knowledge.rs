@@ -413,7 +413,7 @@ impl KnowledgeBase {
     pub fn chat_append(&self, message: &str) -> Result<()> {
         let header = today_chat_header();
         let timestamp = chrono::Local::now().format("`15:04`").to_string();
-        let entry = format!("{timestamp} {message}");
+        let entry = format!("- [ ] {timestamp} {message}");
 
         let mut content = self.note_read(CHAT_FILENAME)?.unwrap_or_default();
         if !content.contains(&header) {
@@ -871,7 +871,15 @@ mod tests {
         let kb = make_test_kb();
         kb.chat_append("Test message").unwrap();
         let messages = kb.chat_messages().unwrap();
-        assert!(!messages.is_empty());
+        // The captured message must be a parseable marker block (- [ ] `HH:MM` text),
+        // not merged into the date header. chat_append must emit the `- [ ]` prefix
+        // that read_chat_msgs splits on.
+        assert!(
+            messages
+                .iter()
+                .any(|m| m.starts_with("- [") && m.contains("Test message")),
+            "captured message should be a parseable marker block: {messages:?}"
+        );
     }
 
     #[test]

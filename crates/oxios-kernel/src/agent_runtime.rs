@@ -74,6 +74,10 @@ fn get_llm_circuit_breaker() -> &'static oxi_sdk::ProviderCircuitBreaker {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum StreamDelta {
+    /// One-shot model announcement. Emitted exactly once at the start of a
+    /// streaming turn so the chat UI can mark the response with the actual
+    /// model after fallback resolution.
+    Model(String),
     /// One text chunk from the model.
     Text(String),
 
@@ -1053,8 +1057,17 @@ async fn run_agent(
     let streaming_sinks_for_cb: Arc<crate::streaming_sink::StreamingSinkRegistry> =
         Arc::clone(&kernel_handle.streaming_sinks);
     // Run the agent with streaming events.
+    let mut sent_model_for_cb: bool = false;
     let result = agent
         .run_streaming(prompt, move |event| {
+            if !sent_model_for_cb
+                && let Some(ref sid) = transparency_session
+                && !model_id_for_callback.is_empty()
+                && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+            {
+                let _ = tx.send(StreamDelta::Model(model_id_for_callback.clone()));
+                sent_model_for_cb = true;
+            }
             let mut s = exec_state_cb.lock();
             match event {
                 AgentEvent::ToolExecutionStart {

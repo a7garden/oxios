@@ -84,7 +84,7 @@ export function SearchModal({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!pathnameRef.current.startsWith('/knowledge')) return
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'p')) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
         e.preventDefault()
         e.stopPropagation()
         setOpen(true)

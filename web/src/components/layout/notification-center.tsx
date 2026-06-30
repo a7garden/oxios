@@ -342,6 +342,15 @@ function ScheduleWidget() {
           onDelete={() => {
             deleteMutation.mutate(detailEvent.uid, { onSuccess: () => setDetailEvent(null) })
           }}
+          onUnlinkNote={
+            detailEvent.note_path
+              ? () =>
+                  updateMutation.mutate(
+                    { uid: detailEvent.uid, note_path: null },
+                    { onSuccess: () => setDetailEvent(null) },
+                  )
+              : undefined
+          }
           onClose={() => setDetailEvent(null)}
         />
       )}

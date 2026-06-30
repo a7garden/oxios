@@ -1,18 +1,24 @@
-import { PanelRightClose } from 'lucide-react'
+import { PanelRightClose, Plus, Unlink } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { EventEditor } from '@/components/calendar/event-editor'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useCalendarByNote, useCalendarCreate, useCalendarUpdate } from '@/hooks/use-calendar'
 import {
   useKnowledgeBacklinks,
   useKnowledgeFileHistory,
   useKnowledgeFileRestore,
 } from '@/hooks/use-knowledge'
+import { isSubsystemUnavailable } from '@/lib/api-client'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { useNotificationCenter } from '@/stores/notification-center'
+import { useHour12 } from '@/stores/ui-prefs'
+import type { CreateEventRequest } from '@/types/calendar'
 import { Copilot } from './copilot'
 import { LinkGraph } from './link-graph'
 
-type Tab = 'backlinks' | 'copilot' | 'graph' | 'history'
+type Tab = 'backlinks' | 'copilot' | 'graph' | 'history' | 'calendar'
 
 export function InfoPanel() {
   const { t } = useTranslation()
@@ -46,7 +52,7 @@ export function InfoPanel() {
         className="shrink-0 px-2 pt-2 border-b"
       >
         <TabsList className="w-full">
-          {(['backlinks', 'copilot', 'graph', 'history'] as Tab[]).map((tabValue) => (
+          {(['backlinks', 'copilot', 'graph', 'history', 'calendar'] as Tab[]).map((tabValue) => (
             <TabsTrigger key={tabValue} value={tabValue} className="capitalize">
               {tabValue}
             </TabsTrigger>
@@ -95,6 +101,11 @@ export function InfoPanel() {
               {t('knowledge.versionHistory', 'Version History')}
             </h3>
             <FileHistoryPanel />
+          </div>
+        )}
+        {tab === 'calendar' && (
+          <div className="p-3">
+            <CalendarPanel />
           </div>
         )}
       </div>
@@ -172,4 +183,103 @@ function formatTimestamp(ts: string): string {
   } catch {
     return ts
   }
+}
+
+/** Calendar panel — events linked to the current note (note ↔ calendar bridge). */
+function CalendarPanel() {
+  const { t, i18n } = useTranslation()
+  const { currentFilePath } = useKnowledgeStore()
+  const hour12 = useHour12()
+  const openCenter = useNotificationCenter((s) => s.openCenter)
+  const [editorOpen, setEditorOpen] = useState(false)
+
+  const { data, isLoading, error } = useCalendarByNote(currentFilePath)
+  const createMutation = useCalendarCreate()
+  const updateMutation = useCalendarUpdate()
+
+  const events = data?.events ?? []
+
+  if (!currentFilePath) {
+    return <p className="text-xs text-muted-foreground">{t('knowledge.noFileSelectedHint')}</p>
+  }
+
+  if (isSubsystemUnavailable(error)) {
+    return (
+      <p className="text-xs text-muted-foreground">{t('notificationCenter.calendarDisabled')}</p>
+    )
+  }
+
+  function formatEventTime(iso: string): string {
+    return new Date(iso).toLocaleString(i18n.language, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12,
+    })
+  }
+
+  return (
+    <>
+      <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+        {t('calendar.linkedEvents')}
+      </h3>
+
+      {isLoading ? (
+        <p className="text-xs text-muted-foreground">{t('knowledge.loading')}</p>
+      ) : events.length > 0 ? (
+        <ul className="space-y-1 mb-3">
+          {events.map((ev) => (
+            <li key={ev.uid} className="group flex items-center gap-2">
+              <button
+                type="button"
+                onClick={openCenter}
+                className="flex-1 min-w-0 text-left"
+                title={t('calendar.openInCalendar')}
+              >
+                <span className="block truncate text-sm text-primary">{ev.title}</span>
+                <span className="text-xs text-muted-foreground">
+                  {ev.all_day ? t('calendar.allDay') : formatEventTime(ev.start)}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => updateMutation.mutate({ uid: ev.uid, note_path: null })}
+                className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                title={t('calendar.unlink')}
+              >
+                <Unlink className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mb-3 text-xs text-muted-foreground">{t('calendar.noLinkedEvents')}</p>
+      )}
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={() => setEditorOpen(true)}
+        disabled={createMutation.isPending}
+      >
+        <Plus className="mr-1.5 h-3.5 w-3.5" />
+        {t('calendar.scheduleNote')}
+      </Button>
+
+      <EventEditor
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+        defaultStart={new Date()}
+        isLoading={createMutation.isPending}
+        onSubmit={(formData) => {
+          createMutation.mutate(
+            { ...(formData as CreateEventRequest), note_path: currentFilePath },
+            { onSuccess: () => setEditorOpen(false) },
+          )
+        }}
+      />
+    </>
+  )
 }

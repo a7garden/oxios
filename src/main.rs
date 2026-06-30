@@ -5,6 +5,7 @@
 //! First run without credentials triggers an interactive setup wizard.
 
 mod commands;
+mod default_skills;
 mod kernel;
 mod otel;
 mod surface;
@@ -856,6 +857,26 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
             style(daemon_status.to_string()).yellow()
         );
     }
+    // Web UI integrity: reported independently of process liveness. A daemon
+    // can be alive (Daemon: Running) while serving a dangling marker — a
+    // raced update deleted the active dir — which is exactly the "status
+    // says Running but the UI 404s" confusion this line disambiguates.
+    let web_ui = match crate::web_dist::diagnose_active() {
+        crate::web_dist::WebUiHealth::Ok { path, version } => {
+            let v = version
+                .filter(|v| !v.is_empty())
+                .map(|v| format!(" (v{v})"))
+                .unwrap_or_default();
+            style(format!("✓ {}{}", path.display(), v)).green()
+        }
+        crate::web_dist::WebUiHealth::Broken { marker } => style(format!(
+            "✗ broken — marker {} does not resolve to a consistent dist",
+            marker.display()
+        ))
+        .red(),
+        crate::web_dist::WebUiHealth::NotInstalled => style(String::from("not installed")).dim(),
+    };
+    println!("  {:<16}  {}", "Web UI:", web_ui);
     println!();
 
     // Credential source
@@ -1713,8 +1734,44 @@ fn cmd_web(config: &OxiosConfig, port_override: Option<u16>) -> Result<()> {
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
+/// Install a panic hook that records the panic synchronously *before* the
+/// process aborts.
+///
+/// Release builds use `panic = "abort"` (root `Cargo.toml`), so any panic —
+/// in a request handler, a background loop, or a spawned task — calls
+/// `abort()` immediately. The default hook writes to stderr (which the
+/// daemon launcher redirects to `oxios.log`), but without a stable marker
+/// and without append-mode logging the message was truncated/lost on
+/// restart, and the in-process `TaskSupervisor` could not observe it at
+/// all. This hook writes a greppable `PANIC` line synchronously to stderr
+/// (the non-blocking tracing appender is NOT flushed on abort), then chains
+/// to the previous hook for the full backtrace. Paired with append-mode
+/// logging, a panic-death is finally diagnosable instead of invisible.
+fn install_panic_hook() {
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "<unknown>".to_string());
+        let payload = info
+            .payload()
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| info.payload().downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("<non-string panic payload>");
+        eprintln!(
+            "\nPANIC in oxios daemon @ {location}: {payload}\n  \
+             thread: {thread} — process will abort",
+            thread = std::thread::current().name().unwrap_or("<unnamed>")
+        );
+        prev(info);
+    }));
+}
+
 #[tokio::main]
 async fn main() {
+    install_panic_hook();
     if let Err(e) = run().await {
         eprintln!();
         eprintln!("  {} {}", style("error:").red().bold(), e);
@@ -2582,6 +2639,7 @@ async fn run() -> Result<()> {
                                 repeat: None,
                                 reminder_minutes: reminder.clone().unwrap_or_default(),
                                 source: oxios_calendar::EventSource::User,
+                                note_path: None,
                             };
                             match api.create(draft).await {
                                 Ok(r) => {
@@ -2788,16 +2846,85 @@ async fn run() -> Result<()> {
     }
 }
 
+/// Acquire an exclusive, non-blocking advisory lock on `<pid_file>.lock`,
+/// held for the daemon's lifetime (keep the returned guard in scope).
+///
+/// This is the single source of truth for "an oxios daemon owns this home":
+/// unlike the PID file (bypassed by a direct `--foreground`) or the port
+/// bind (which misses background-only orphans), a held `flock` is
+/// cross-process, binary-agnostic, and auto-released by the kernel on
+/// process death — so two daemons can never mutate the shared `~/.oxios`
+/// state concurrently (the root cause of the web-dist race that 404'd the
+/// UI). Returns `Err` with a hint when another instance already holds it.
+#[cfg(unix)]
+fn acquire_instance_lock(pid_file: &Path) -> Result<std::fs::File> {
+    use std::os::unix::io::AsRawFd;
+
+    let lock_path = pid_file.with_extension("lock");
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&lock_path)
+        .with_context(|| format!("failed to open instance lock {}", lock_path.display()))?;
+
+    // LOCK_EX | LOCK_NB: fail fast (EWOULDBLOCK) rather than block forever.
+    let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+    if rc != 0 {
+        let err = std::io::Error::last_os_error();
+        if err.raw_os_error() == Some(libc::EWOULDBLOCK) {
+            let pid_hint = std::fs::read_to_string(&lock_path)
+                .ok()
+                .and_then(|s| s.trim().parse::<u32>().ok())
+                .map(|pid| format!(" — likely PID {pid}"))
+                .unwrap_or_default();
+            anyhow::bail!(
+                "another oxios daemon is already running{pid_hint}.\n  \
+                 Run `oxios stop` first, or kill the existing process, then retry.\n  \
+                 (lock file: {})",
+                lock_path.display(),
+            );
+        }
+        anyhow::bail!("failed to lock {}: {err}", lock_path.display());
+    }
+
+    // Best-effort: record our PID in the lock file for diagnostics. Written
+    // through a fresh handle; the lock itself lives on `file` (held by the
+    // caller for the daemon's lifetime).
+    let _ = std::fs::write(&lock_path, std::process::id().to_string());
+    Ok(file)
+}
+
+/// Non-Unix fallback: daemon install is Unix-only, so on Windows the guard
+/// is a no-op (the foreground path still compiles).
+#[cfg(not(unix))]
+fn acquire_instance_lock(_pid_file: &Path) -> Result<()> {
+    Ok(())
+}
+
 // ─── Server mode (foreground) ────────────────────────────────────────────────
 
 async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
+    // ── Single-instance guard ──────────────────────────────────────────
+    // Acquire an exclusive advisory lock BEFORE any background task starts.
+    // See `acquire_instance_lock`. The guard stays in scope for the whole
+    // supervised lifetime (released automatically when cmd_serve returns).
+    let _instance_lock = {
+        let pid_file = oxios_kernel::config::expand_home(&kernel.config().daemon.pid_file);
+        acquire_instance_lock(&pid_file)?
+    };
+
     // Initialize MCP servers
     if let Err(e) = kernel.init_mcp_servers().await {
         tracing::warn!(error = %e, "Some MCP servers failed to initialize");
     }
 
-    // Initialize default skills and programs
-    let share_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("share");
+    // Initialize default skills. In an installed binary the compile-time
+    // CARGO_MANIFEST_DIR/share path does not exist, so fall back to the
+    // embedded tree extracted into the workspace (see `default_skills`).
+    let workspace = PathBuf::from(&kernel.config().kernel.workspace);
+    let share_dir = default_skills::resolve_share_dir(&workspace);
     if let Err(e) = kernel.init_default_skills(&share_dir).await {
         tracing::warn!(error = %e, "Failed to initialize default skills");
     }
