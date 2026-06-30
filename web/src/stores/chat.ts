@@ -864,7 +864,7 @@ export const useChatStore = create<ChatStore>()(
               }
               // P4 (§7 persistence): restore reasoning record for this turn.
               const reasoning = reasoningRecords[i]
-              if (reasoning && reasoning.content) {
+              if (reasoning?.content) {
                 const r = reasoningToActivity(reasoning, i)
                 activitiesForThisTurn = activitiesForThisTurn ? [...activitiesForThisTurn, r] : [r]
               }

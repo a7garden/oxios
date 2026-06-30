@@ -3,7 +3,7 @@ import { FilePlus, FolderKanban, FolderPlus, Theater, Timer, Zap } from 'lucide-
 import type { ReactNode } from 'react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { PaletteItem, CommandProvider, QueryContext } from './types'
+import type { CommandProvider, PaletteItem, QueryContext } from './types'
 
 interface NewTarget {
   key: string
@@ -20,12 +20,42 @@ interface NewTarget {
  * the palette is a later enhancement requiring cross-component state.
  */
 const TARGETS: NewTarget[] = [
-  { key: 'skill', titleKey: 'commandPalette.newSkill', href: '/skills', icon: <Zap className="h-4 w-4" /> },
-  { key: 'persona', titleKey: 'commandPalette.newPersona', href: '/personas', icon: <Theater className="h-4 w-4" /> },
-  { key: 'project', titleKey: 'commandPalette.newProject', href: '/projects', icon: <FolderKanban className="h-4 w-4" /> },
-  { key: 'cron', titleKey: 'commandPalette.newCron', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
-  { key: 'note', titleKey: 'commandPalette.newNote', href: '/knowledge', icon: <FilePlus className="h-4 w-4" /> },
-  { key: 'mount', titleKey: 'commandPalette.newMount', href: '/mounts', icon: <FolderPlus className="h-4 w-4" /> },
+  {
+    key: 'skill',
+    titleKey: 'commandPalette.newSkill',
+    href: '/skills',
+    icon: <Zap className="h-4 w-4" />,
+  },
+  {
+    key: 'persona',
+    titleKey: 'commandPalette.newPersona',
+    href: '/personas',
+    icon: <Theater className="h-4 w-4" />,
+  },
+  {
+    key: 'project',
+    titleKey: 'commandPalette.newProject',
+    href: '/projects',
+    icon: <FolderKanban className="h-4 w-4" />,
+  },
+  {
+    key: 'cron',
+    titleKey: 'commandPalette.newCron',
+    href: '/cron-jobs',
+    icon: <Timer className="h-4 w-4" />,
+  },
+  {
+    key: 'note',
+    titleKey: 'commandPalette.newNote',
+    href: '/knowledge',
+    icon: <FilePlus className="h-4 w-4" />,
+  },
+  {
+    key: 'mount',
+    titleKey: 'commandPalette.newMount',
+    href: '/mounts',
+    icon: <FolderPlus className="h-4 w-4" />,
+  },
 ]
 
 /**

@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest'
-import { EditorState } from '@codemirror/state'
-import { EditorView } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { ensureSyntaxTree, syntaxTree } from '@codemirror/language'
-import { buildDecorations } from '@/lib/live-preview-extension'
+import { EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
 import { Strikethrough, Table, TaskList } from '@lezer/markdown'
+import { describe, expect, it, vi } from 'vitest'
+import { buildDecorations } from '@/lib/live-preview-extension'
 
 /**
  * Parse `doc` (GFM-enabled, matching the editor config) and collect, per line:
@@ -15,7 +15,9 @@ import { Strikethrough, Table, TaskList } from '@lezer/markdown'
 function inspect(doc: string) {
   const state = EditorState.create({
     doc,
-    extensions: [markdown({ base: markdownLanguage, extensions: [Strikethrough, Table, TaskList] })],
+    extensions: [
+      markdown({ base: markdownLanguage, extensions: [Strikethrough, Table, TaskList] }),
+    ],
   })
   // Canary: prove the parse completed synchronously before we walk it.
   expect(ensureSyntaxTree(state, state.doc.length)).toBeTruthy()
@@ -87,7 +89,9 @@ describe('live-preview-extension buildDecorations — block elements', () => {
   it('toggles the marker on checkbox click', () => {
     const state = EditorState.create({
       doc: '# Title\n\n- [ ] todo',
-      extensions: [markdown({ base: markdownLanguage, extensions: [Strikethrough, Table, TaskList] })],
+      extensions: [
+        markdown({ base: markdownLanguage, extensions: [Strikethrough, Table, TaskList] }),
+      ],
     })
     ensureSyntaxTree(state, state.doc.length)
     const set = buildDecorations(state)
@@ -121,7 +125,9 @@ describe('live-preview-extension buildDecorations — block elements', () => {
 function hasNode(doc: string, name: string): boolean {
   const state = EditorState.create({
     doc,
-    extensions: [markdown({ base: markdownLanguage, extensions: [Strikethrough, Table, TaskList] })],
+    extensions: [
+      markdown({ base: markdownLanguage, extensions: [Strikethrough, Table, TaskList] }),
+    ],
   })
   ensureSyntaxTree(state, state.doc.length)
   let found = false

@@ -1,11 +1,11 @@
 import { BookOpen, Clock, Inbox, Newspaper, Plus, ShoppingCart, Tv } from 'lucide-react'
-import { useMemo } from 'react'
 import type { ReactNode } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useChatAppend, useChecklistAdd, useJournalAdd } from '@/hooks/use-knowledge'
 import { matchScore, modePrimaryVerb } from './ranker'
-import type { PaletteItem, CommandProvider, QueryContext } from './types'
+import type { CommandProvider, PaletteItem, QueryContext } from './types'
 
 /** A capture destination (checklist file or journal). */
 interface CaptureRoute {
@@ -23,11 +23,35 @@ interface CaptureRoute {
  * the structure here is the single place to swap in a tree-derived list.
  */
 const ROUTES: CaptureRoute[] = [
-  { key: 'Later', labelKey: 'knowledge.later', icon: <Clock className="h-4 w-4 text-info" />, path: 'Later.md' },
-  { key: 'Read', labelKey: 'knowledge.read', icon: <Newspaper className="h-4 w-4 text-warning" />, path: 'Read.md' },
-  { key: 'Shop', labelKey: 'knowledge.shop', icon: <ShoppingCart className="h-4 w-4 text-destructive" />, path: 'Shop.md' },
-  { key: 'Watch', labelKey: 'knowledge.watch', icon: <Tv className="h-4 w-4 text-chart-4" />, path: 'Watch.md' },
-  { key: 'Journal', labelKey: 'knowledge.toJournal', icon: <BookOpen className="h-4 w-4 text-success" /> },
+  {
+    key: 'Later',
+    labelKey: 'knowledge.later',
+    icon: <Clock className="h-4 w-4 text-info" />,
+    path: 'Later.md',
+  },
+  {
+    key: 'Read',
+    labelKey: 'knowledge.read',
+    icon: <Newspaper className="h-4 w-4 text-warning" />,
+    path: 'Read.md',
+  },
+  {
+    key: 'Shop',
+    labelKey: 'knowledge.shop',
+    icon: <ShoppingCart className="h-4 w-4 text-destructive" />,
+    path: 'Shop.md',
+  },
+  {
+    key: 'Watch',
+    labelKey: 'knowledge.watch',
+    icon: <Tv className="h-4 w-4 text-chart-4" />,
+    path: 'Watch.md',
+  },
+  {
+    key: 'Journal',
+    labelKey: 'knowledge.toJournal',
+    icon: <BookOpen className="h-4 w-4 text-success" />,
+  },
 ]
 
 /** kbd hint for a route shortcut, e.g. `/later`. */
@@ -60,9 +84,7 @@ export function useCaptureProvider(): CommandProvider {
           const target = ROUTES.find((r) => r.key === routeKey)
           if (target?.path) {
             await checklistAdd.mutateAsync({ path: target.path, item: body })
-            toast.success(
-              t('commandPalette.capturedRoute', { route: t(target.labelKey) }),
-            )
+            toast.success(t('commandPalette.capturedRoute', { route: t(target.labelKey) }))
           }
         } else {
           await chatAppend.mutateAsync(body)
@@ -117,11 +139,7 @@ export function useCaptureProvider(): CommandProvider {
 
         // Bare text → mode-primary. CaptureProvider owns knowledge-mode memos.
         const trimmed = ctx.text.trim()
-        if (
-          ctx.verb === null &&
-          modePrimaryVerb(ctx.mode) === 'capture' &&
-          trimmed
-        ) {
+        if (ctx.verb === null && modePrimaryVerb(ctx.mode) === 'capture' && trimmed) {
           return [
             {
               id: 'capture-inbox',

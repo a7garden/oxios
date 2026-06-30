@@ -202,10 +202,7 @@ function MountsPage() {
       <EditMountDialog mount={editingMount} onOpenChange={setEditingMount} />
 
       {/* Delete confirm */}
-      <Dialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('mounts.deleteConfirmTitle', 'Delete mount?')}</DialogTitle>

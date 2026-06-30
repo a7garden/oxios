@@ -36,7 +36,6 @@ export function BillingBadge({ billingModel }: { billingModel: BillingModel | nu
           {t('tokenMaxing.billing.metered')}
         </Badge>
       )
-    case 'unknown':
     default:
       return (
         <Badge

@@ -17,7 +17,7 @@
  * Round-trip safe: purely visual; the markdown source is preserved.
  */
 import { syntaxTree } from '@codemirror/language'
-import { type EditorState, type Range } from '@codemirror/state'
+import type { EditorState, Range } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -29,7 +29,10 @@ import {
 } from '@codemirror/view'
 
 class ImageWidget extends WidgetType {
-  constructor(readonly url: string, readonly alt: string) {
+  constructor(
+    readonly url: string,
+    readonly alt: string,
+  ) {
     super()
   }
   eq(other: ImageWidget) {
@@ -63,10 +66,7 @@ export function resolveImageUrl(rawUrl: string, fileDir: string): string {
   return `/api/knowledge/asset/${encodeURI(full)}`
 }
 
-export function buildImageDecorations(
-  state: EditorState,
-  getFileDir: () => string,
-): DecorationSet {
+export function buildImageDecorations(state: EditorState, getFileDir: () => string): DecorationSet {
   const builder: Range<Decoration>[] = []
   const { doc } = state
   const cursorLine = doc.lineAt(state.selection.main.head).number
@@ -85,7 +85,9 @@ export function buildImageDecorations(
       const altMatch = text.match(/^!\[([\s\S]*)\]/)
       const url = resolveImageUrl(urlMatch[1], fileDir)
       const alt = altMatch?.[1] ?? ''
-      builder.push(Decoration.replace({ widget: new ImageWidget(url, alt) }).range(node.from, node.to))
+      builder.push(
+        Decoration.replace({ widget: new ImageWidget(url, alt) }).range(node.from, node.to),
+      )
     },
   })
 

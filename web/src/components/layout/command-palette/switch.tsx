@@ -1,13 +1,13 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
 import { Cpu, LayoutDashboard, MessageSquare, NotebookPen, Theater } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { useModels } from '@/hooks/use-engine'
 import { api } from '@/lib/api-client'
 import { useChatStore } from '@/stores/chat'
-import { toast } from 'sonner'
-import type { PaletteItem, CommandProvider, QueryContext } from './types'
+import type { CommandProvider, PaletteItem, QueryContext } from './types'
 
 interface Persona {
   id: string

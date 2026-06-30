@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-06-30
+
+### Fixed
+- **CI frontend lint conformance** — Resolved biome `noAssignInExpressions` in the emoji/math CodeMirror fold-extension regex loops (refactored the `while ((m = re.exec(text)))` scan to a `for` loop so `continue` stays safe) and auto-applied the remaining `useTemplate`, `useOptionalChain`, import-sorting, and formatter fixes across the web app. The CI `frontend` job (lint/typecheck/test/build) is green again.
+
+### Changed
+- **Version bump to 1.17.0** — All workspace crates updated to 1.17.0 (package + internal dependency versions); Cargo.lock re-synced.
+
 ## [1.15.0] - 2026-06-29
 
 ### Added

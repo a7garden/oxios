@@ -45,11 +45,9 @@ export function lex(raw: string): LexResult {
     if (tok) {
       const colon = tok.indexOf(':')
       entity =
-        colon !== -1
-          ? { type: tok.slice(0, colon), name: tok.slice(colon + 1) }
-          : { name: tok }
+        colon !== -1 ? { type: tok.slice(0, colon), name: tok.slice(colon + 1) } : { name: tok }
       // Splice the `@token` out of the remainder.
-      rest = (rest.slice(0, at) + ' ' + after.slice(tok.length)).trim()
+      rest = `${rest.slice(0, at)} ${after.slice(tok.length)}`.trim()
     }
   }
 

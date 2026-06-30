@@ -14,7 +14,7 @@
  * preserved.
  */
 import { syntaxTree } from '@codemirror/language'
-import { type EditorState, type Range } from '@codemirror/state'
+import type { EditorState, Range } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -71,7 +71,7 @@ export function buildEmojiDecorations(state: EditorState): DecorationSet {
   const text = doc.toString()
   EMOJI_RE.lastIndex = 0
   let m: RegExpExecArray | null
-  while ((m = EMOJI_RE.exec(text))) {
+  for (m = EMOJI_RE.exec(text); m !== null; m = EMOJI_RE.exec(text)) {
     const code = m[1]
     if (!code) continue
     const glyph = EMOJI_SHORTCODES[code]

@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { consoleNavGroups } from '@/components/layout/sidebar'
 import { matchScore } from './ranker'
-import type { PaletteItem, CommandProvider, QueryContext } from './types'
+import type { CommandProvider, PaletteItem, QueryContext } from './types'
 
 /**
  * Navigation provider — verb `go`.
@@ -19,9 +19,7 @@ export function useNavProvider(): CommandProvider {
 
   const flatNav = useMemo(
     () =>
-      consoleNavGroups.flatMap((g) =>
-        g.items.map((i) => ({ ...i, groupLabelKey: g.labelKey })),
-      ),
+      consoleNavGroups.flatMap((g) => g.items.map((i) => ({ ...i, groupLabelKey: g.labelKey }))),
     [],
   )
 
@@ -33,9 +31,7 @@ export function useNavProvider(): CommandProvider {
         // `go` is bare-text only; an explicit verb prefix belongs to another provider.
         if (ctx.verb !== null) return []
         const q = (ctx.text || ctx.raw).trim().toLowerCase()
-        const src = q
-          ? flatNav.filter((i) => t(i.labelKey).toLowerCase().includes(q))
-          : flatNav
+        const src = q ? flatNav.filter((i) => t(i.labelKey).toLowerCase().includes(q)) : flatNav
         const cap = q ? 8 : flatNav.length
         return src.slice(0, cap).map(
           (i): PaletteItem => ({

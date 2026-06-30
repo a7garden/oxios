@@ -23,8 +23,7 @@
  * Round-trip safe: purely visual — the markdown source is never modified.
  */
 import { HighlightStyle, syntaxTree } from '@codemirror/language'
-import { type EditorState, type Range } from '@codemirror/state'
-import { tags } from '@lezer/highlight'
+import type { EditorState, Range } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -34,6 +33,7 @@ import {
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
+import { tags } from '@lezer/highlight'
 
 const HEADING_RE = /(?:ATX|Setext)Heading(\d)$/
 
@@ -71,9 +71,7 @@ class TaskWidget extends WidgetType {
     super()
   }
   eq(other: TaskWidget) {
-    return (
-      other.checked === this.checked && other.from === this.from && other.to === this.to
-    )
+    return other.checked === this.checked && other.from === this.from && other.to === this.to
   }
   toDOM() {
     const el = document.createElement('input')
@@ -142,7 +140,12 @@ export function buildDecorations(state: EditorState): DecorationSet {
           if (!inActiveRegion(node.from, node.to)) {
             const text = state.doc.sliceString(node.from, node.to)
             const checked = /\[[xX]\]/.test(text)
-            builder.push(Decoration.replace({ widget: new TaskWidget(checked, node.from, node.to) }).range(node.from, node.to))
+            builder.push(
+              Decoration.replace({ widget: new TaskWidget(checked, node.from, node.to) }).range(
+                node.from,
+                node.to,
+              ),
+            )
           }
           return
         case 'Blockquote':

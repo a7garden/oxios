@@ -1,12 +1,12 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ban, Flame, Play, Power } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
 import { toast } from 'sonner'
-import type { AgentListResponse } from '@/types/agent'
+import { api } from '@/lib/api-client'
 import type { Skill } from '@/types'
-import type { PaletteItem, CommandProvider, QueryContext } from './types'
+import type { AgentListResponse } from '@/types/agent'
+import type { CommandProvider, PaletteItem, QueryContext } from './types'
 
 interface CronJob {
   id: string
@@ -76,8 +76,7 @@ export function useControlProvider(): CommandProvider {
     onError: () => toast.error(t('commandPalette.controlFailed')),
   })
   const maxingMutation = useMutation({
-    mutationFn: (start: boolean) =>
-      api.post(`/api/token-maxing/${start ? 'start' : 'stop'}`),
+    mutationFn: (start: boolean) => api.post(`/api/token-maxing/${start ? 'start' : 'stop'}`),
     onSuccess: (_d, start) =>
       toast.success(t(start ? 'commandPalette.maxingStarted' : 'commandPalette.maxingStopped')),
     onError: () => toast.error(t('commandPalette.controlFailed')),
@@ -117,7 +116,9 @@ export function useControlProvider(): CommandProvider {
               id: `control-maxing-${action}`,
               verb: 'control',
               icon: <Flame className="h-4 w-4" />,
-              title: t(action === 'start' ? 'commandPalette.maxingStart' : 'commandPalette.maxingStop'),
+              title: t(
+                action === 'start' ? 'commandPalette.maxingStart' : 'commandPalette.maxingStop',
+              ),
               score: 100,
               onSelect: () => maxingMutation.mutate(action === 'start'),
             },

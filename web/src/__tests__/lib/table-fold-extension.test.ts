@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
-import { EditorState } from '@codemirror/state'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { ensureSyntaxTree } from '@codemirror/language'
+import { EditorState } from '@codemirror/state'
 import { Table } from '@lezer/markdown'
+import { describe, expect, it } from 'vitest'
 import { buildTableDecorations } from '@/lib/table-fold-extension'
 
 /** Run buildTableDecorations for `doc` and return the first TableWidget found (or undefined). */
@@ -54,9 +54,9 @@ describe('table-fold-extension', () => {
   })
 
   it('parses columns and rows from the source', () => {
-    const w = widget('# Title\n\n| a | b | c |\n| --- | --- | --- |\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |') as
-      | { headers: string[]; rows: string[][]; alignments: string[] }
-      | undefined
+    const w = widget(
+      '# Title\n\n| a | b | c |\n| --- | --- | --- |\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |',
+    ) as { headers: string[]; rows: string[][]; alignments: string[] } | undefined
     expect(w).toBeTruthy()
     expect(w!.headers).toEqual(['a', 'b', 'c'])
     expect(w!.rows).toEqual([
@@ -67,9 +67,9 @@ describe('table-fold-extension', () => {
   })
 
   it('reads alignments from :-- / :-: / --: delimiters', () => {
-    const w = widget(
-      '# Title\n\n| L | C | R |\n| :--- | :---: | ---: |\n| a | b | c |',
-    ) as { alignments: string[] } | undefined
+    const w = widget('# Title\n\n| L | C | R |\n| :--- | :---: | ---: |\n| a | b | c |') as
+      | { alignments: string[] }
+      | undefined
     expect(w!.alignments).toEqual(['left', 'center', 'right'])
   })
 
@@ -87,9 +87,7 @@ describe('table-fold-extension', () => {
   })
 
   it('falls back gracefully when the delimiter row is missing', () => {
-    const out = inspect(
-      '# Title\n\n| a | b |\n| 1 | 2 |\nno delimiter row here',
-    )
+    const out = inspect('# Title\n\n| a | b |\n| 1 | 2 |\nno delimiter row here')
     expect(out.find((o) => o.kind === 'widget:TableWidget')).toBeUndefined()
   })
 })

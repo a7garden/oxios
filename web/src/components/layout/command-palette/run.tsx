@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
 import { FolderKanban, MessageSquare, Zap } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
@@ -6,9 +7,8 @@ import { useProjects } from '@/hooks/use-projects'
 import { api } from '@/lib/api-client'
 import { useChatStore } from '@/stores/chat'
 import type { Skill } from '@/types'
-import { useQuery } from '@tanstack/react-query'
 import { modePrimaryVerb } from './ranker'
-import type { PaletteItem, CommandProvider, QueryContext } from './types'
+import type { CommandProvider, PaletteItem, QueryContext } from './types'
 
 /**
  * Run provider — verb `run` (prefix `>`).
@@ -64,18 +64,16 @@ export function useRunProvider(): CommandProvider {
           const name = ent.name.toLowerCase()
           const wantsSkill = ent.type === 'skill'
           const wantsProject = ent.type === 'project'
-          const skill =
-            !wantsProject
-              ? skills.find(
-                  (s) => s.name.toLowerCase() === name || s.name.toLowerCase().includes(name),
-                )
-              : undefined
-          const project =
-            !wantsSkill
-              ? projects.find(
-                  (p) => p.name.toLowerCase() === name || p.name.toLowerCase().includes(name),
-                )
-              : undefined
+          const skill = !wantsProject
+            ? skills.find(
+                (s) => s.name.toLowerCase() === name || s.name.toLowerCase().includes(name),
+              )
+            : undefined
+          const project = !wantsSkill
+            ? projects.find(
+                (p) => p.name.toLowerCase() === name || p.name.toLowerCase().includes(name),
+              )
+            : undefined
 
           // Explicit @skill:… with no match → nothing (avoid a dead action).
           if (wantsSkill && !skill) return []

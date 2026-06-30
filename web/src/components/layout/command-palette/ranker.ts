@@ -47,11 +47,7 @@ export class RecencyLog {
  * Call this AFTER providers have already filtered to matching items and
  * computed their own base score (incl. prefix/verb/entity/fuzzy match terms).
  */
-export function rank(
-  items: PaletteItem[],
-  ctx: QueryContext,
-  recency: RecencyLog,
-): PaletteItem[] {
+export function rank(items: PaletteItem[], ctx: QueryContext, recency: RecencyLog): PaletteItem[] {
   const primary = modePrimaryVerb(ctx.mode)
   return items
     .map((it) => {

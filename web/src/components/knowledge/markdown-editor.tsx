@@ -24,12 +24,12 @@ import {
 } from '@codemirror/autocomplete'
 import { history, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { Strikethrough, Table, TaskList } from '@lezer/markdown'
 import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { EditorSelection } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { keymap } from '@codemirror/view'
+import { Strikethrough, Table, TaskList } from '@lezer/markdown'
 import CodeMirror, { EditorView, type ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -41,8 +41,8 @@ import { createImageFoldExtension } from '@/lib/image-fold-extension'
 import { livePreviewExtension, livePreviewHighlight } from '@/lib/live-preview-extension'
 import { mathFoldExtension } from '@/lib/math-fold-extension'
 import { mermaidDarkObserver, mermaidExtension } from '@/lib/mermaid-extension'
-import { tokenHideExtension } from '@/lib/token-hide-extension'
 import { tableFoldExtension } from '@/lib/table-fold-extension'
+import { tokenHideExtension } from '@/lib/token-hide-extension'
 import { cn } from '@/lib/utils'
 import { wikilinkExtension } from '@/lib/wikilink-extension'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -403,7 +403,11 @@ export function MarkdownEditor({
             activateOnTyping: true,
             closeOnBlur: true,
           }),
-          markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [Strikethrough, Table, TaskList] }),
+          markdown({
+            base: markdownLanguage,
+            codeLanguages: languages,
+            extensions: [Strikethrough, Table, TaskList],
+          }),
           baseTheme,
           mermaidExtension,
           mermaidDarkObserver,

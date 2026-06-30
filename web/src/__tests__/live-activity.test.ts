@@ -7,7 +7,7 @@ const NOW = new Date().toISOString()
 /** Convenience: build a minimal tool_call activity with the running flag. */
 function toolCall(overrides: Partial<ChatActivity> & { isRunning?: boolean }): ChatActivity {
   return {
-    id: 'tool-' + Math.random().toString(36).slice(2),
+    id: `tool-${Math.random().toString(36).slice(2)}`,
     type: 'tool_call',
     timestamp: NOW,
     toolName: 'read_file',
@@ -18,7 +18,7 @@ function toolCall(overrides: Partial<ChatActivity> & { isRunning?: boolean }): C
 
 function reasoning(): ChatActivity {
   return {
-    id: 'reason-' + Math.random().toString(36).slice(2),
+    id: `reason-${Math.random().toString(36).slice(2)}`,
     type: 'reasoning',
     timestamp: NOW,
     content: 'thinking about it',
@@ -28,7 +28,7 @@ function reasoning(): ChatActivity {
 
 function usage(): ChatActivity {
   return {
-    id: 'usage-' + Math.random().toString(36).slice(2),
+    id: `usage-${Math.random().toString(36).slice(2)}`,
     type: 'usage',
     timestamp: NOW,
     inputTokens: 10,

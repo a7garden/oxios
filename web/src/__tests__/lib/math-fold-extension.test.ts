@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { ensureSyntaxTree } from '@codemirror/language'
+import { EditorState } from '@codemirror/state'
+import { describe, expect, it } from 'vitest'
 import { buildMathDecorations } from '@/lib/math-fold-extension'
 
 /** Map line number → MathWidget presence for the decorations of `doc`. */

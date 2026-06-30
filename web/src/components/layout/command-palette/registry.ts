@@ -1,4 +1,4 @@
-import type { PaletteItem, CommandProvider, QueryContext } from './types'
+import type { CommandProvider, PaletteItem, QueryContext } from './types'
 
 /**
  * The federated command registry.

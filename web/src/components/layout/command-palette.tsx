@@ -10,8 +10,8 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import { deriveSidebarMode, useSidebarStore } from '@/stores/sidebar'
 import { useCommandPaletteStore } from '@/stores/command-palette'
+import { deriveSidebarMode, useSidebarStore } from '@/stores/sidebar'
 import { useCaptureProvider } from './command-palette/capture'
 import { useControlProvider } from './command-palette/control'
 import { buildContext } from './command-palette/lexer'
@@ -193,11 +193,7 @@ export function CommandPalette() {
         {groups.map(([heading, groupItems]) => (
           <CommandGroup key={heading} heading={t(heading)}>
             {groupItems.map((item) => (
-              <CommandItem
-                key={item.id}
-                value={item.id}
-                onSelect={() => handleSelect(item)}
-              >
+              <CommandItem key={item.id} value={item.id} onSelect={() => handleSelect(item)}>
                 {item.icon}
                 <span className="flex-1">
                   {item.title}

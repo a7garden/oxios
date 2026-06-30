@@ -18,7 +18,7 @@
  * Round-trip safe: purely visual; the markdown source is preserved.
  */
 import { syntaxTree } from '@codemirror/language'
-import { type EditorState, type Range } from '@codemirror/state'
+import type { EditorState, Range } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,

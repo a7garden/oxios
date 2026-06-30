@@ -17,7 +17,7 @@
  * preserved.
  */
 import { syntaxTree } from '@codemirror/language'
-import { type EditorState, type Range } from '@codemirror/state'
+import type { EditorState, Range } from '@codemirror/state'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import {
@@ -34,7 +34,10 @@ import {
 const MATH_RE = /\$\$([\s\S]+?)\$\$|\$([^\s$](?:[^$\n]*[^\s$])?)\$/g
 
 class MathWidget extends WidgetType {
-  constructor(readonly expr: string, readonly display: boolean) {
+  constructor(
+    readonly expr: string,
+    readonly display: boolean,
+  ) {
     super()
   }
   eq(other: MathWidget) {
@@ -84,7 +87,7 @@ export function buildMathDecorations(state: EditorState): DecorationSet {
   const text = doc.toString()
   MATH_RE.lastIndex = 0
   let m: RegExpExecArray | null
-  while ((m = MATH_RE.exec(text))) {
+  for (m = MATH_RE.exec(text); m !== null; m = MATH_RE.exec(text)) {
     const display = m[1] !== undefined
     const expr = display ? m[1] : m[2]
     if (!expr) continue

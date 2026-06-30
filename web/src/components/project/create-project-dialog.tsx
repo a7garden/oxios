@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import {
   BarChart3,
   BookOpen,
@@ -31,7 +32,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useMounts } from '@/hooks/use-mounts'
 import { useCreateProject, useUpdateProject } from '@/hooks/use-projects'
-import { Link } from '@tanstack/react-router'
 
 interface CreateProjectDialogProps {
   open: boolean
