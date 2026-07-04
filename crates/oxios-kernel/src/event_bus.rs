@@ -236,6 +236,21 @@ pub enum KernelEvent {
         source: String,
     },
 
+    /// Compaction was triggered (RFC-035 gap 2 observability).
+    ///
+    /// Emitted when `oxi_sdk::CompactionEvent::Triggered` fires (0.53.0+).
+    /// `source` is one of:
+    /// - `"provider-reported"` — provider-reported `usage.input_tokens` drove
+    ///   the trigger (ground truth; gap 2's primary signal)
+    /// - `"bytes/4 heuristic (cold start)"` — legacy heuristic; only on turn 1
+    ///   before any `ProviderEvent::Done` has been observed
+    /// - `"empty"` — empty context (no trigger source)
+    CompactionTriggered {
+        /// Session this compaction belongs to.
+        session_id: Option<String>,
+        /// The trigger source label from `CompactionEvent::Triggered::source`.
+        source: String,
+    },
     // ── RFC-015 Chat Transparency: lifecycle phases (P3) ────────────────
     // Real-time events emitted by the Orchestrator as it transitions
     // between ouroboros phases (assess → crystallize → execute → review).
@@ -461,6 +476,9 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::ReasoningFragment { source, .. } => AuditAction::Other {
             detail: format!("reasoning:{source}"),
         },
+        KernelEvent::CompactionTriggered { source, .. } => AuditAction::Other {
+            detail: format!("compaction:triggered:{source}"),
+        },
         KernelEvent::CalendarEventCreated { uid, title, .. } => AuditAction::Other {
             detail: format!("calendar:created:{uid}:{title}"),
         },
@@ -533,6 +551,10 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         KernelEvent::PhaseCompleted { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::KnowledgePersisted { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::KnowledgeRemoved { session_id, .. } => format!("session:{session_id}"),
+        KernelEvent::CompactionTriggered { session_id, .. } => session_id
+            .as_ref()
+            .map(|s| format!("session:{s}"))
+            .unwrap_or_else(|| "system".to_string()),
         _ => "system".to_string(),
     }
 }

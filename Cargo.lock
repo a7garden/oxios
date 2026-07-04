@@ -5329,9 +5329,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.51.0"
+version = "0.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15f104d8166fdbbfca583ee7959e86fb2965204aea1b0578e52cb1f5d0b3c974"
+checksum = "6e4b3255bc3739c181578c77547f85395bc01173d7c26c62c76cb5cc4877a779"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5359,9 +5359,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.51.0"
+version = "0.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c5c314fdee51209d46af413e4b0010466c3f65ba9c4dd813ea120f3c0eb37b7"
+checksum = "a558e2ce76c5cc0dde04f9321460e14982d3a6b03d56bc4fe5bf2a7536f11fa0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5396,9 +5396,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-hashline"
-version = "0.51.0"
+version = "0.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b384fbf8bfe210140500e7e9be9e3816905fcea8f96e2532d05b0221ba0b2bd6"
+checksum = "fac0fe05830506ef6b6bc4945b504907fedf3ebcdbf17cf849be39a840edc0b2"
 dependencies = [
  "async-trait",
  "lru 0.18.0",
@@ -5410,9 +5410,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.51.0"
+version = "0.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "690998714785e408588b13b59a118139d660359d940cde762b79c5e880a19024"
+checksum = "abd3a931d260ed6d75396a5635fd41ac4d5a0e4267376c515f06048121f59270"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5661,6 +5661,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-stdout",
  "opentelemetry_sdk",
+ "oxi-agent",
  "oxi-sdk",
  "oxios-calendar",
  "oxios-gateway",

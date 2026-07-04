@@ -1271,6 +1271,30 @@ async fn run_agent(
                                 });
                     }
                 }
+                AgentEvent::Compaction {
+                    event: CompactionEvent::Triggered { source, .. },
+                } => {
+                    // RFC-035 gap 2: surface the trigger source so the
+                    // 3-4× heuristic drift (pre-0.53 silent no-op) is
+                    // observable end-to-end. The match arm itself does
+                    // not act on compaction — the SDK handles the
+                    // actual trigger — we only publish a KernelEvent.
+                    if let Some(ref sid) = transparency_session {
+                        let _ = kernel_handle_for_cb
+                            .infra
+                            .publish(KernelEvent::CompactionTriggered {
+                                session_id: Some(sid.clone()),
+                                source,
+                            });
+                    } else {
+                        let _ = kernel_handle_for_cb
+                            .infra
+                            .publish(KernelEvent::CompactionTriggered {
+                                session_id: None,
+                                source,
+                            });
+                    }
+                }
                 AgentEvent::TextChunk { text } => {
                     // P1 chat transparency: push live text delta through the
                     // streaming-sink registry. The gateway has already

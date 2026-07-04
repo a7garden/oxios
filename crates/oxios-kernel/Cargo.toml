@@ -25,6 +25,10 @@ oxios-calendar = { version = "1.17.0", path = "../oxios-calendar" }
 oxios-mcp = { version = "1.17.0", path = "../oxios-mcp" }
 oxios-memory = { version = "1.17.0", path = "../oxios-memory" }
 oxi-sdk = { workspace = true }
+# oxi-agent: direct access to MemoryBackend + memory_* tools (the SDK doesn't
+# re-export these). Unified with oxi-sdk 0.53.0's transitive dep, so no
+# duplicate compile.
+oxi-agent = "0.53.0"
 # oxi-ai no longer needed directly — all types re-exported via oxi-sdk
 tokio = { workspace = true }
 futures = { workspace = true }

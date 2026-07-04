@@ -429,6 +429,11 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "content": content,
             "source": source,
         }),
+        KernelEvent::CompactionTriggered { session_id, source } => serde_json::json!({
+            "type": "compaction_triggered",
+            "session_id": session_id,
+            "source": source,
+        }),
         KernelEvent::CalendarEventCreated { uid, title, .. } => serde_json::json!({
             "type": "calendar_event_created",
             "uid": uid,
