@@ -58,9 +58,18 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     // ExecTool (stores Arc<KernelHandle>)
     registry.register(crate::tools::ExecTool::from_kernel(kernel));
 
-    // Memory tools (each stores Arc<KernelHandle>)
-    registry.register(crate::tools::MemoryReadTool::from_kernel(kernel));
-    registry.register(crate::tools::MemorySearchTool::from_kernel(kernel));
+    // Memory tools — oxi-agent's `memory_*` tools, backed by AgentConfig.memory
+    // (the OxiosMemoryBackend bridge over oxios-memory, RFC-034 Part B).
+    registry.register(oxi_agent::MemoryRecallTool);
+    registry.register(oxi_agent::MemoryRetainTool);
+    registry.register(oxi_agent::MemoryEditTool);
+    registry.register(oxi_agent::MemoryReflectTool);
+
+    // Subagent tool — oxi-agent's native `subagent` tool (RFC-035 gap 3).
+    // Wired via AgentConfig.subagent_runner (set in agent_runtime.rs).
+    // When the runner is Some, executes in-process; when None, falls back
+    // to the CLI spawn path (which is dormant in oxios — no `oxi` binary).
+    registry.register(oxi_agent::SubagentTool::new());
 
     // Kernel domain tools (take &KernelHandle)
     registry.register(ProjectTool::from_kernel(kernel));

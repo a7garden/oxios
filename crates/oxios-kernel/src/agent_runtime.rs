@@ -122,6 +122,14 @@ pub struct AgentRuntimeConfig {
     /// Provider-level RPM for rate-limited provider pool. 0 = no pooling.
     /// When set, uses `OxiosEngine::pooled_provider()` instead of `create_provider()`.
     pub provider_rpm: u32,
+    /// Maximum bytes of a tool result before truncation (RFC-035 gap 1).
+    /// When set, tool results exceeding this are truncated in the message
+    /// history with a `"... [truncated: N bytes omitted]"` marker.
+    /// `None` = unlimited (opt-in). Threaded to `AgentConfig::max_tool_result_bytes`.
+    pub max_tool_result_bytes: Option<usize>,
+    // NOTE: subagent_max_depth was removed — oxi-agent hardcodes the
+    // in-process recursion cap to 3 (subagent.rs:649). `AgentConfig.subagent_depth`
+    // is the CURRENT depth (always 0 for top-level agents), not a max.
 }
 
 impl Default for AgentRuntimeConfig {
@@ -137,6 +145,7 @@ impl Default for AgentRuntimeConfig {
             token_budget: 0,
             audit_tool_calls: false,
             provider_rpm: 0,
+            max_tool_result_bytes: None,
         }
     }
 }
@@ -907,6 +916,19 @@ async fn run_agent(
         // set, so no ownership identity is needed here; set `Some(...)` only if
         // oxios agents start using oxi ownership-gated tools.
         session_id: None,
+        // RFC-035 Phase B/C: pass through gap 1/3 config to oxi-sdk 0.54.0+.
+        max_tool_result_bytes: config.max_tool_result_bytes,
+        // subagent_depth = CURRENT depth (0 = top-level). The in-process
+        // max is hardcoded to 3 in oxi-agent (subagent.rs:649). Do NOT
+        // wire a "max depth" config here — it would make the agent start
+        // at depth N and fail every subagent call immediately.
+        subagent_depth: 0,
+        // RFC-035 Phase C: wire the in-process sub-agent runner so the
+        // `subagent` tool delegates in-process (no CLI subprocess).
+        subagent_runner: Some(
+            crate::subagent_runner::OxiosSubagentRunner::new(engine.oxi().clone())
+                .into_trait_object(),
+        ),
         ..Default::default()
     };
 
