@@ -1080,305 +1080,306 @@ async fn run_agent(
         Arc::clone(&kernel_handle.streaming_sinks);
     // Run the agent with streaming events.
     let mut sent_model_for_cb: bool = false;
-    let result = agent
-        .run_streaming(prompt, move |event| {
-            if !sent_model_for_cb
-                && let Some(ref sid) = transparency_session
-                && !model_id_for_callback.is_empty()
-                && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
-            {
-                let _ = tx.send(StreamDelta::Model(model_id_for_callback.clone()));
-                sent_model_for_cb = true;
-            }
-            let mut s = exec_state_cb.lock();
-            match event {
-                AgentEvent::ToolExecutionStart {
-                    tool_name,
-                    tool_call_id,
-                    args,
-                    context,
-                    ..
-                } => {
-                    // Record start time and push a placeholder step.
-                    let idx = s.trajectory_steps.len();
-                    s.pending_tools
-                        .insert(tool_call_id.clone(), (std::time::Instant::now(), idx));
-                    s.tool_args_map.insert(
-                        tool_call_id.clone(),
-                        serde_json::to_string(&args).unwrap_or_default(),
-                    );
-                    s.tool_timestamps
-                        .insert(tool_call_id.clone(), chrono::Utc::now());
-                    s.tool_call_ids.push(tool_call_id.clone());
-                    s.trajectory_steps
-                        .push(oxios_memory::memory::sona::TrajectoryStep {
-                            input: tool_name.clone(),
-                            output: String::new(),
-                            duration_ms: 0,
-                            confidence: 0.0,
-                        });
-                    // RFC-015: broadcast tool start so Web UI can show progress.
-                    if let Some(ref sid) = transparency_session {
-                        let context_json = context
-                            .as_ref()
-                            .map(serde_json::to_value)
-                            .transpose()
-                            .unwrap_or(None);
-                        let _ =
-                            kernel_handle_for_cb
-                                .infra
-                                .publish(KernelEvent::ToolExecutionStarted {
+    let result =
+        agent
+            .run_streaming(prompt, move |event| {
+                if !sent_model_for_cb
+                    && let Some(ref sid) = transparency_session
+                    && !model_id_for_callback.is_empty()
+                    && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                {
+                    let _ = tx.send(StreamDelta::Model(model_id_for_callback.clone()));
+                    sent_model_for_cb = true;
+                }
+                let mut s = exec_state_cb.lock();
+                match event {
+                    AgentEvent::ToolExecutionStart {
+                        tool_name,
+                        tool_call_id,
+                        args,
+                        context,
+                        ..
+                    } => {
+                        // Record start time and push a placeholder step.
+                        let idx = s.trajectory_steps.len();
+                        s.pending_tools
+                            .insert(tool_call_id.clone(), (std::time::Instant::now(), idx));
+                        s.tool_args_map.insert(
+                            tool_call_id.clone(),
+                            serde_json::to_string(&args).unwrap_or_default(),
+                        );
+                        s.tool_timestamps
+                            .insert(tool_call_id.clone(), chrono::Utc::now());
+                        s.tool_call_ids.push(tool_call_id.clone());
+                        s.trajectory_steps
+                            .push(oxios_memory::memory::sona::TrajectoryStep {
+                                input: tool_name.clone(),
+                                output: String::new(),
+                                duration_ms: 0,
+                                confidence: 0.0,
+                            });
+                        // RFC-015: broadcast tool start so Web UI can show progress.
+                        if let Some(ref sid) = transparency_session {
+                            let context_json = context
+                                .as_ref()
+                                .map(serde_json::to_value)
+                                .transpose()
+                                .unwrap_or(None);
+                            let _ = kernel_handle_for_cb.infra.publish(
+                                KernelEvent::ToolExecutionStarted {
                                     session_id: sid.clone(),
                                     tool_name: tool_name.clone(),
                                     tool_call_id: tool_call_id.clone(),
                                     tool_args: args.clone(),
                                     context: context_json,
-                                });
-                    }
-                }
-                AgentEvent::ToolExecutionUpdate {
-                    tool_call_id,
-                    tool_name,
-                    partial_result,
-                    tab_id,
-                    context,
-                } => {
-                    // RFC-015: forward real-time progress to the event bus
-                    // so the Web UI can show a spinner and progress text
-                    // while the tool is still executing. Best-effort —
-                    // publish failures (e.g. lagged subscribers) are ignored.
-                    //
-                    // `tab_id` and `context` come from oxi-agent 0.29+
-                    // (ToolCallContext: PageVisit, WebSearch, etc.).
-                    // Older agent versions won't send these — they default
-                    // to None and the UI gracefully ignores them.
-                    if let Some(ref sid) = transparency_session {
-                        let context_json = context
-                            .as_ref()
-                            .map(serde_json::to_value)
-                            .transpose()
-                            .unwrap_or(None);
-                        let _ = kernel_handle_for_cb.infra.publish(
-                            KernelEvent::ToolExecutionProgress {
-                                session_id: sid.clone(),
-                                tool_call_id: tool_call_id.clone(),
-                                tool_name: tool_name.clone(),
-                                progress: partial_result,
-                                tab_id,
-                                context: context_json,
-                            },
-                        );
-                    }
-                }
-                AgentEvent::ToolExecutionEnd {
-                    tool_name,
-                    tool_call_id,
-                    is_error,
-                    result,
-                    ..
-                } => {
-                    if !is_error {
-                        s.steps_completed += 1;
-                    }
-                    // Look up the exact step by tool_call_id.
-                    let mut duration_ms: u64 = 0;
-                    let mut summary = String::new();
-                    if let Some((start, idx)) = s.pending_tools.remove(tool_call_id.as_str()) {
-                        duration_ms = start.elapsed().as_millis() as u64;
-                        if let Some(step) = s.trajectory_steps.get_mut(idx) {
-                            summary = summarize_tool_result(&result.content, 200);
-                            step.output = summary.clone();
-                            step.duration_ms = duration_ms;
-                            step.confidence = if is_error { 0.3 } else { 0.8 };
+                                },
+                            );
                         }
                     }
-                    s.tool_error_map.insert(tool_call_id.clone(), is_error);
-                    // RFC-015: broadcast tool completion.
-                    if let Some(ref sid) = transparency_session {
-                        let _ = kernel_handle_for_cb.infra.publish(
-                            KernelEvent::ToolExecutionFinished {
-                                session_id: sid.clone(),
-                                tool_call_id: tool_call_id.clone(),
-                                tool_name: tool_name.clone(),
-                                duration_ms,
-                                is_error,
-                                output_summary: summary,
+                    AgentEvent::ToolExecutionUpdate {
+                        tool_call_id,
+                        tool_name,
+                        partial_result,
+                        tab_id,
+                        context,
+                    } => {
+                        // RFC-015: forward real-time progress to the event bus
+                        // so the Web UI can show a spinner and progress text
+                        // while the tool is still executing. Best-effort —
+                        // publish failures (e.g. lagged subscribers) are ignored.
+                        //
+                        // `tab_id` and `context` come from oxi-agent 0.29+
+                        // (ToolCallContext: PageVisit, WebSearch, etc.).
+                        // Older agent versions won't send these — they default
+                        // to None and the UI gracefully ignores them.
+                        if let Some(ref sid) = transparency_session {
+                            let context_json = context
+                                .as_ref()
+                                .map(serde_json::to_value)
+                                .transpose()
+                                .unwrap_or(None);
+                            let _ = kernel_handle_for_cb.infra.publish(
+                                KernelEvent::ToolExecutionProgress {
+                                    session_id: sid.clone(),
+                                    tool_call_id: tool_call_id.clone(),
+                                    tool_name: tool_name.clone(),
+                                    progress: partial_result,
+                                    tab_id,
+                                    context: context_json,
+                                },
+                            );
+                        }
+                    }
+                    AgentEvent::ToolExecutionEnd {
+                        tool_name,
+                        tool_call_id,
+                        is_error,
+                        result,
+                        ..
+                    } => {
+                        if !is_error {
+                            s.steps_completed += 1;
+                        }
+                        // Look up the exact step by tool_call_id.
+                        let mut duration_ms: u64 = 0;
+                        let mut summary = String::new();
+                        if let Some((start, idx)) = s.pending_tools.remove(tool_call_id.as_str()) {
+                            duration_ms = start.elapsed().as_millis() as u64;
+                            if let Some(step) = s.trajectory_steps.get_mut(idx) {
+                                summary = summarize_tool_result(&result.content, 200);
+                                step.output = summary.clone();
+                                step.duration_ms = duration_ms;
+                                step.confidence = if is_error { 0.3 } else { 0.8 };
+                            }
+                        }
+                        s.tool_error_map.insert(tool_call_id.clone(), is_error);
+                        // RFC-015: broadcast tool completion.
+                        if let Some(ref sid) = transparency_session {
+                            let _ = kernel_handle_for_cb.infra.publish(
+                                KernelEvent::ToolExecutionFinished {
+                                    session_id: sid.clone(),
+                                    tool_call_id: tool_call_id.clone(),
+                                    tool_name: tool_name.clone(),
+                                    duration_ms,
+                                    is_error,
+                                    output_summary: summary,
+                                },
+                            );
+                        }
+                    }
+                    AgentEvent::AgentEnd {
+                        messages,
+                        stop_reason,
+                        ..
+                    } => {
+                        if let Some(oxi_sdk::Message::Assistant(a)) = messages.last() {
+                            s.final_content = a.text_content();
+                        }
+                        // oxi 0.32.0: loop exits naturally when LLM produces text-only
+                        // response (StopReason::Stop). Error/Aborted = failure.
+                        // ToolUse should not occur at AgentEnd in 0.32.0 (the loop
+                        // continues until text-only), but treat it as non-failure
+                        // since tool calls were executed successfully.
+                        s.success =
+                            matches!(stop_reason.as_deref(), Some("Stop") | Some("ToolUse"));
+                    }
+                    AgentEvent::Error { message, .. } => {
+                        s.final_content = message.clone();
+                        s.success = false;
+                    }
+                    AgentEvent::Usage {
+                        input_tokens,
+                        output_tokens,
+                    } => {
+                        // Accumulate totals for ExecutionResult.
+                        s.total_input_tokens += input_tokens as u64;
+                        s.total_output_tokens += output_tokens as u64;
+
+                        // Record token usage to cost tracker (existing).
+                        let agent_label = format!("agent-{agent_id_for_callback}");
+                        crate::observability::cost_tracker().record(
+                            &agent_label,
+                            &oxi_sdk::Model::new(
+                                &model_id_for_callback,
+                                &model_id_for_callback,
+                                oxi_sdk::Api::OpenAiCompletions,
+                                "unknown",
+                                "https://unknown.com",
+                            ),
+                            oxi_sdk::TokenUsage {
+                                input: input_tokens as u64,
+                                output: output_tokens as u64,
+                                cache_read: 0,
+                                cache_write: 0,
                             },
                         );
-                    }
-                }
-                AgentEvent::AgentEnd {
-                    messages,
-                    stop_reason,
-                    ..
-                } => {
-                    if let Some(oxi_sdk::Message::Assistant(a)) = messages.last() {
-                        s.final_content = a.text_content();
-                    }
-                    // oxi 0.32.0: loop exits naturally when LLM produces text-only
-                    // response (StopReason::Stop). Error/Aborted = failure.
-                    // ToolUse should not occur at AgentEnd in 0.32.0 (the loop
-                    // continues until text-only), but treat it as non-failure
-                    // since tool calls were executed successfully.
-                    s.success = matches!(stop_reason.as_deref(), Some("Stop") | Some("ToolUse"));
-                }
-                AgentEvent::Error { message, .. } => {
-                    s.final_content = message.clone();
-                    s.success = false;
-                }
-                AgentEvent::Usage {
-                    input_tokens,
-                    output_tokens,
-                } => {
-                    // Accumulate totals for ExecutionResult.
-                    s.total_input_tokens += input_tokens as u64;
-                    s.total_output_tokens += output_tokens as u64;
 
-                    // Record token usage to cost tracker (existing).
-                    let agent_label = format!("agent-{agent_id_for_callback}");
-                    crate::observability::cost_tracker().record(
-                        &agent_label,
-                        &oxi_sdk::Model::new(
-                            &model_id_for_callback,
-                            &model_id_for_callback,
-                            oxi_sdk::Api::OpenAiCompletions,
-                            "unknown",
-                            "https://unknown.com",
-                        ),
-                        oxi_sdk::TokenUsage {
-                            input: input_tokens as u64,
-                            output: output_tokens as u64,
-                            cache_read: 0,
-                            cache_write: 0,
-                        },
-                    );
-
-                    // Record to routing stats (RFC-011).
-                    if let Some(stats) = &routing_stats_for_cb {
-                        let cost = crate::kernel_handle::engine_api::estimate_cost(
-                            &model_id_for_callback,
-                            input_tokens as u64,
-                            output_tokens as u64,
+                        // Record to routing stats (RFC-011).
+                        if let Some(stats) = &routing_stats_for_cb {
+                            let cost = crate::kernel_handle::engine_api::estimate_cost(
+                                &model_id_for_callback,
+                                input_tokens as u64,
+                                output_tokens as u64,
+                            );
+                            stats.record_model_usage(&model_id_for_callback, cost);
+                        }
+                        // RFC-015: publish cumulative token usage.
+                        if let Some(ref sid) = transparency_session {
+                            let _ =
+                                kernel_handle_for_cb
+                                    .infra
+                                    .publish(KernelEvent::TokenUsageUpdate {
+                                        session_id: sid.clone(),
+                                        input_tokens: input_tokens as u64,
+                                        output_tokens: output_tokens as u64,
+                                    });
+                        }
+                    }
+                    AgentEvent::Compaction {
+                        event: CompactionEvent::Completed { result, .. },
+                    } => {
+                        handle_compaction(
+                            result.summary.clone(),
+                            session_id_for_callback.clone(),
+                            memory_for_callback.clone(),
                         );
-                        stats.record_model_usage(&model_id_for_callback, cost);
-                    }
-                    // RFC-015: publish cumulative token usage.
-                    if let Some(ref sid) = transparency_session {
-                        let _ = kernel_handle_for_cb
-                            .infra
-                            .publish(KernelEvent::TokenUsageUpdate {
-                                session_id: sid.clone(),
-                                input_tokens: input_tokens as u64,
-                                output_tokens: output_tokens as u64,
-                            });
-                    }
-                }
-                AgentEvent::Compaction {
-                    event: CompactionEvent::Completed { result, .. },
-                } => {
-                    handle_compaction(
-                        result.summary.clone(),
-                        session_id_for_callback.clone(),
-                        memory_for_callback.clone(),
-                    );
-                    // RFC-015: compaction is a form of reasoning — expose it.
-                    if let Some(ref sid) = transparency_session {
-                        let _ =
-                            kernel_handle_for_cb
-                                .infra
-                                .publish(KernelEvent::ReasoningFragment {
+                        // RFC-015: compaction is a form of reasoning — expose it.
+                        if let Some(ref sid) = transparency_session {
+                            let _ = kernel_handle_for_cb.infra.publish(
+                                KernelEvent::ReasoningFragment {
                                     session_id: sid.clone(),
                                     content: result.summary.clone(),
                                     source: "compaction".to_string(),
-                                });
-                    }
-                }
-                AgentEvent::Compaction {
-                    event: CompactionEvent::Triggered { source, .. },
-                } => {
-                    // RFC-035 gap 2: surface the trigger source so the
-                    // 3-4× heuristic drift (pre-0.53 silent no-op) is
-                    // observable end-to-end. The match arm itself does
-                    // not act on compaction — the SDK handles the
-                    // actual trigger — we only publish a KernelEvent.
-                    if let Some(ref sid) = transparency_session {
-                        let _ = kernel_handle_for_cb
-                            .infra
-                            .publish(KernelEvent::CompactionTriggered {
-                                session_id: Some(sid.clone()),
-                                source,
-                            });
-                    } else {
-                        let _ = kernel_handle_for_cb
-                            .infra
-                            .publish(KernelEvent::CompactionTriggered {
-                                session_id: None,
-                                source,
-                            });
-                    }
-                }
-                AgentEvent::TextChunk { text } => {
-                    // P1 chat transparency: push live text delta through the
-                    // streaming-sink registry. The gateway has already
-                    // registered a strong sender under `session_id`; the
-                    // collector there converts each delta into a partial
-                    // `OutgoingMessage` with `partial = Some(true)` and
-                    // `target_conn_id = Some(conn_id)` so the WS handler
-                    // forwards it as a bare `token` chunk (no `done`).
-                    //
-                    // Lookup uses `transparency_session` (the same session_id
-                    // already plumbed for RFC-015 event publishing). A miss
-                    // here means no gateway has registered for this session —
-                    // silent skip; non-streaming callers see no behavior
-                    // change.
-                    if let Some(ref sid) = transparency_session
-                        && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
-                    {
-                        let _ = tx.send(StreamDelta::Text(text.clone()));
-                    }
-                }
-                AgentEvent::Thinking => {
-                    // P4: signal-only — LiveActivityBar flips to "추론 중".
-                    // Sent through the same connection-scoped sink so the
-                    // state change is visible to the live chat only (no
-                    // EventBus broadcast for a transient UI signal).
-                    if let Some(ref sid) = transparency_session
-                        && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
-                    {
-                        let _ = tx.send(StreamDelta::Thinking);
-                    }
-                }
-                AgentEvent::ThinkingDelta { text } => {
-                    // P4: each thinking delta goes through the same
-                    // connection-scoped sink as Text deltas. The collector
-                    // converts each into a `reasoning` WS chunk (partial,
-                    // no assign_seq). Frontend appends them to the
-                    // ThinkingPanel. No batching here — the sink is a
-                    // per-session mpsc, fan-out is bounded by active turns,
-                    // and the per-token load is well below 100 Hz in
-                    // practice (verified empirically with reasoning models).
-                    // P4 (§7 persistence): append to the accumulator too so
-                    // the full reasoning text surfaces via ExecutionResult
-                    // metadata at turn end. Capped at ~4 KB to bound
-                    // storage — matches the design doc §7 truncation
-                    // rationale (matches `tool_calls.output_summary`).
-                    const REASONING_CAP: usize = 4096;
-                    if s.reasoning_text.len() < REASONING_CAP {
-                        s.reasoning_text.push_str(&text);
-                        if s.reasoning_text.len() > REASONING_CAP {
-                            s.reasoning_text.truncate(REASONING_CAP);
+                                },
+                            );
                         }
                     }
-                    if let Some(ref sid) = transparency_session
-                        && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
-                    {
-                        let _ = tx.send(StreamDelta::ThinkingDelta(text.clone()));
+                    AgentEvent::Compaction {
+                        event: CompactionEvent::Triggered { source, .. },
+                    } => {
+                        // RFC-035 gap 2: surface the trigger source so the
+                        // 3-4× heuristic drift (pre-0.53 silent no-op) is
+                        // observable end-to-end. The match arm itself does
+                        // not act on compaction — the SDK handles the
+                        // actual trigger — we only publish a KernelEvent.
+                        if let Some(ref sid) = transparency_session {
+                            let _ = kernel_handle_for_cb.infra.publish(
+                                KernelEvent::CompactionTriggered {
+                                    session_id: Some(sid.clone()),
+                                    source,
+                                },
+                            );
+                        } else {
+                            let _ = kernel_handle_for_cb.infra.publish(
+                                KernelEvent::CompactionTriggered {
+                                    session_id: None,
+                                    source,
+                                },
+                            );
+                        }
                     }
+                    AgentEvent::TextChunk { text } => {
+                        // P1 chat transparency: push live text delta through the
+                        // streaming-sink registry. The gateway has already
+                        // registered a strong sender under `session_id`; the
+                        // collector there converts each delta into a partial
+                        // `OutgoingMessage` with `partial = Some(true)` and
+                        // `target_conn_id = Some(conn_id)` so the WS handler
+                        // forwards it as a bare `token` chunk (no `done`).
+                        //
+                        // Lookup uses `transparency_session` (the same session_id
+                        // already plumbed for RFC-015 event publishing). A miss
+                        // here means no gateway has registered for this session —
+                        // silent skip; non-streaming callers see no behavior
+                        // change.
+                        if let Some(ref sid) = transparency_session
+                            && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                        {
+                            let _ = tx.send(StreamDelta::Text(text.clone()));
+                        }
+                    }
+                    AgentEvent::Thinking => {
+                        // P4: signal-only — LiveActivityBar flips to "추론 중".
+                        // Sent through the same connection-scoped sink so the
+                        // state change is visible to the live chat only (no
+                        // EventBus broadcast for a transient UI signal).
+                        if let Some(ref sid) = transparency_session
+                            && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                        {
+                            let _ = tx.send(StreamDelta::Thinking);
+                        }
+                    }
+                    AgentEvent::ThinkingDelta { text } => {
+                        // P4: each thinking delta goes through the same
+                        // connection-scoped sink as Text deltas. The collector
+                        // converts each into a `reasoning` WS chunk (partial,
+                        // no assign_seq). Frontend appends them to the
+                        // ThinkingPanel. No batching here — the sink is a
+                        // per-session mpsc, fan-out is bounded by active turns,
+                        // and the per-token load is well below 100 Hz in
+                        // practice (verified empirically with reasoning models).
+                        // P4 (§7 persistence): append to the accumulator too so
+                        // the full reasoning text surfaces via ExecutionResult
+                        // metadata at turn end. Capped at ~4 KB to bound
+                        // storage — matches the design doc §7 truncation
+                        // rationale (matches `tool_calls.output_summary`).
+                        const REASONING_CAP: usize = 4096;
+                        if s.reasoning_text.len() < REASONING_CAP {
+                            s.reasoning_text.push_str(&text);
+                            if s.reasoning_text.len() > REASONING_CAP {
+                                s.reasoning_text.truncate(REASONING_CAP);
+                            }
+                        }
+                        if let Some(ref sid) = transparency_session
+                            && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                        {
+                            let _ = tx.send(StreamDelta::ThinkingDelta(text.clone()));
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-        })
-        .await;
+            })
+            .await;
 
     // Record circuit breaker result after agent execution.
     let circuit = get_llm_circuit_breaker();

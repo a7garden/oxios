@@ -14,8 +14,8 @@ pub mod agent_runtime;
 pub mod daemon;
 pub mod readiness;
 pub mod streaming_sink;
-pub mod supervisor;
 pub mod subagent_runner;
+pub mod supervisor;
 
 // ─── Agent History Log ──────────────────────────────────────────────
 // 에이전트 실행 기록 — SQLite + JSON dual storage.
