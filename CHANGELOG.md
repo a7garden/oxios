@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-07-05
+
+### Added
+- **RFC-035 Phase A** — oxi-sdk 0.53.0: `KernelEvent::CompactionTriggered` makes provider-reported token accounting observable end-to-end via the EventBus; resolves the 3-4× heuristic drift that made `Threshold(0.8)` auto-compaction a silent no-op.
+- **RFC-035 Phase B+C** — agent-loop tool-result eviction (gap 1) and sub-agent delegation (gap 3) via `max_tool_result_bytes`, `subagent_runner`, and `subagent_depth`.
+
+### Changed
+- Bumped `oxi-sdk`/`oxi-agent` 0.53.0 → 0.54.0.
+- Codebase-wide `cargo fmt` pass; the `agent_log_db` TTL prune test is now deterministic (anchored to `Utc::now()`) instead of hardcoded calendar dates that expired 2026-07-01.
+
 ## [1.17.0] - 2026-06-30
 
 ### Fixed
