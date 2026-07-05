@@ -1458,10 +1458,15 @@ mod tests {
     fn test_prune_by_ttl() {
         let (db, _dir) = make_test_db();
 
+        // Anchor timestamps to `now` so the TTL boundary is deterministic
+        // regardless of when the test runs (hardcoded calendar dates rot).
+        let old = (Utc::now() - chrono::Duration::hours(800)).to_rfc3339();
+        let recent = (Utc::now() - chrono::Duration::hours(100)).to_rfc3339();
+
         db.upsert_agent(&sample_agent(
             "11111111-1111-4114-a716-446655440000",
             AgentStatus::Completed,
-            "2026-03-01T00:00:00Z",
+            &old,
             0.01,
         ))
         .unwrap();
@@ -1469,7 +1474,7 @@ mod tests {
         db.upsert_agent(&sample_agent(
             "22222222-2222-4114-a716-446655440000",
             AgentStatus::Completed,
-            "2026-06-01T00:00:00Z",
+            &recent,
             0.02,
         ))
         .unwrap();
