@@ -313,7 +313,7 @@ implementation detail, not a blocker (Q2).
 No construction-site change: oxios never constructs `CompactionEvent`; the
 `source` field is additive on a *received* variant, so the bump is non-breaking.
 
-### 5.3 Gap 1 — tool-result eviction — **BLOCKED on upstream**
+### 5.3 Gap 1 — tool-result eviction — ✅ **Implemented (0.54.0, commit a10e2a9)**
 
 **Phase B verification (2026-07-04)** against oxi-sdk 0.53.0 source discovered
 that `max_tool_result_bytes` exists **only** on `AgentLoopConfig`
@@ -360,7 +360,7 @@ rewire the `DelegationHandler` closure (`src/kernel.rs:1402`) to dispatch throug
 still wraps the lifecycle manager, so security is preserved). Under **γ**, this
 section is deferred entirely.
 
-> **⚠ Phase C blocker — entire path unverified (verified 2026-07-04 against 0.53.0):**
+> **✅ RESOLVED (0.54.0, commit a10e2a9):** oxi-sdk 0.54.0 added all three fields as `#[serde(skip, default)]` passthroughs on `AgentConfig` (`config.rs:209,216,222`), threaded through both `AgentLoopConfig` construction sites in `agent.rs` (lines 553-555, 957-959). Oxios wires them directly in the `AgentConfig` literal at `agent_runtime.rs:920-931`. The blocker analysis below is preserved for historical context.
 >
 > Two injection paths exist in 0.53.0, but BOTH share the same fate:
 >
@@ -420,7 +420,7 @@ ordered by risk ascending. Phase C branches on the Q2 decision.
 - Compaction now fires on turn 2+ using provider-reported tokens (gap 2) — a free
   consequence of the upgrade; oxios only *observes* the new event.
 - Heuristic↔real drift becomes visible via the new event.
-### Phase B — Gap 1 tool-result eviction — **⛔ BLOCKED on upstream**
+### Phase B — Gap 1 tool-result eviction — ✅ **Implemented (commit a10e2a9)**
 
 > See §5.3 for the blocker analysis. `max_tool_result_bytes` exists only on
 > `AgentLoopConfig` in 0.53.0; oxios has no injection point. Do not implement
@@ -445,7 +445,7 @@ cargo test -p oxios-kernel --features sqlite-memory -- --nocapture \
 - A run that previously blew past the threshold silently now emits a
   `Triggered { source: "provider-reported" }` event.
 - Cold-start (turn 1) still reports `source: "bytes/4 heuristic (cold start)"`.
-### Phase C — Gap 3 sub-agent recursion — **⛔ BLOCKED pending ToolContext trace**
+### Phase C — Gap 3 sub-agent recursion — ✅ **Implemented (commit a10e2a9)**
 
 > See §5.4 for the blocker analysis. Both `subagent_runner` and
 > `subagent_depth` share the same fate: either the `ToolContext` injection
