@@ -61,7 +61,7 @@ pub(crate) use calendar_routes::{
     handle_calendar_freebusy, handle_calendar_search,
 };
 pub(crate) use chat::{
-    handle_ask_user_respond, handle_chat, handle_chat_stream, handle_chat_ticket,
+    handle_ask_user_respond, handle_chat, handle_chat_seed, handle_chat_stream, handle_chat_ticket,
     handle_knowledge_saves, handle_remove_knowledge_save, handle_save_to_knowledge,
     handle_session_tool_calls, handle_tool_approval_respond,
 };
@@ -81,8 +81,8 @@ pub(crate) use engine_routes::{
     handle_engine_config, handle_engine_delete_api_key, handle_engine_models,
     handle_engine_providers, handle_engine_roles, handle_engine_routing_fallbacks,
     handle_engine_routing_stats, handle_engine_set_api_key, handle_engine_set_model,
-    handle_engine_set_provider_options, handle_engine_set_roles, handle_engine_set_routing,
-    handle_engine_validate_key,
+    handle_engine_set_provider_options, handle_engine_set_quick_ask_model, handle_engine_set_roles,
+    handle_engine_set_routing, handle_engine_validate_key,
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
@@ -130,8 +130,8 @@ pub(crate) use resource_routes::{
 pub(crate) use system::{
     handle_agent_get, handle_agent_kill, handle_agent_logs, handle_agent_stats, handle_agent_trace,
     handle_agents_list, handle_audit_verify_api, handle_backup, handle_config_get,
-    handle_config_patch, handle_config_put, handle_doctor, handle_health, handle_log,
-    handle_readiness, handle_status, handle_update_changelog, handle_update_check,
+    handle_config_meta, handle_config_patch, handle_config_put, handle_doctor, handle_health,
+    handle_log, handle_readiness, handle_status, handle_update_changelog, handle_update_check,
     handle_update_run,
 };
 pub(crate) use token_maxing_routes::{
@@ -229,6 +229,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Chat
         .route("/api/chat", post(handle_chat))
         .route("/api/chat/ticket", post(handle_chat_ticket))
+        .route("/api/chat/seed", post(handle_chat_seed))
         .route("/api/chat/stream", get(handle_chat_stream))
         // RFC-017: runtime tool capability escalation
         .route(
@@ -265,11 +266,16 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/config", get(handle_config_get))
         .route("/api/config", put(handle_config_put))
         .route("/api/config", patch(handle_config_patch))
+        .route("/api/config/meta", get(handle_config_meta))
         // Engine
         .route("/api/engine/providers", get(handle_engine_providers))
         .route("/api/engine/models", get(handle_engine_models))
         .route("/api/engine/config", get(handle_engine_config))
         .route("/api/engine/model", put(handle_engine_set_model))
+        .route(
+            "/api/engine/quick-ask-model",
+            put(handle_engine_set_quick_ask_model),
+        )
         .route(
             "/api/engine/api-key",
             put(handle_engine_set_api_key).delete(handle_engine_delete_api_key),

@@ -40,7 +40,6 @@ const toggleField: SettingsFieldDef = {
   labelKey: 'settings.allowShellMode',
   descriptionKey: 'settings.allowShellModeDescription',
   type: 'toggle',
-  hotReload: true,
 }
 
 export const Toggle: Story = {
@@ -58,7 +57,6 @@ const selectField: SettingsFieldDef = {
     { value: 'structured', labelKey: 'settings.structuredRecommended' },
     { value: 'shell', labelKey: 'settings.shellDangerous' },
   ],
-  hotReload: true,
 }
 
 export const Select: Story = {
@@ -73,7 +71,6 @@ const numberField: SettingsFieldDef = {
   descriptionKey: 'settings.defaultTimeoutSDescription',
   type: 'number',
   placeholder: '120',
-  hotReload: false,
   restartScope: 'kernel',
 }
 
@@ -89,7 +86,6 @@ const textField: SettingsFieldDef = {
   descriptionKey: 'settings.workspacePathDescription',
   type: 'text',
   placeholder: '~/.oxios/workspace',
-  hotReload: false,
   restartScope: 'kernel',
 }
 

@@ -29,6 +29,15 @@ pub struct SetModelRequest {
     pub model_id: String,
 }
 
+/// Request body for PUT /api/engine/quick-ask-model
+#[derive(Debug, Deserialize)]
+pub struct SetQuickAskModelRequest {
+    /// Model ID in "provider/model" format, or null/empty to clear
+    /// (fall back to default_model).
+    #[serde(default)]
+    pub model_id: Option<String>,
+}
+
 /// Request body for PUT /api/engine/api-key
 #[derive(Debug, Deserialize)]
 pub struct SetApiKeyRequest {
@@ -159,6 +168,35 @@ pub(crate) async fn handle_engine_set_model(
     Ok(Json(serde_json::json!({
         "ok": true,
         "model": body.model_id,
+    })))
+}
+
+/// PUT /api/engine/quick-ask-model — Set the default one-shot (QuickAsk) model.
+///
+/// A pure config write (no hot-swap); the one-shot WS message carries this as
+/// `model` → `model_override`, validated by the agent runtime at execute time.
+pub(crate) async fn handle_engine_set_quick_ask_model(
+    state: State<Arc<AppState>>,
+    Json(body): Json<SetQuickAskModelRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let model_id = body.model_id.as_deref().filter(|s| !s.is_empty());
+
+    state
+        .kernel
+        .engine
+        .set_quick_ask_model(model_id)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    // Mirror into the shared AppState config.
+    {
+        let mut cfg = state.config.write();
+        cfg.engine.quick_ask_model = model_id.map(String::from);
+    }
+
+    tracing::info!(model = ?model_id, "QuickAsk model updated");
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "model": model_id,
     })))
 }
 

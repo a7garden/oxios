@@ -133,7 +133,6 @@ telegram = []
 browser = []
 sqlite-memory = ["oxios-kernel/sqlite-memory"]
 embedding-gguf = ["oxios-kernel/embedding-gguf"]
-otel = ["oxios-kernel/otel", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 
 [dependencies]
 oxios-kernel = { version = "1.18.0", path = "crates/oxios-kernel", default-features = false }
@@ -178,8 +177,6 @@ indicatif = "0.17"
 clap_complete = "4"
 webbrowser = "1.0"
  reqwest = { workspace = true }
- opentelemetry = { version = "0.27", optional = true }
- opentelemetry_sdk = { version = "0.27", optional = true }
  zip = { workspace = true }
  dirs = { workspace = true }
  sha2 = { workspace = true }

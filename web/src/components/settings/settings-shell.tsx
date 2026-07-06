@@ -1,4 +1,4 @@
-import { Menu } from 'lucide-react'
+import { ChevronRight, Menu, Settings2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { useUiPrefs } from '@/stores/ui-prefs'
 import { type RailGroup, SettingsRail } from './settings-rail'
 
 export interface SettingsShellSection {
@@ -71,6 +72,7 @@ export function SettingsShell({
   children,
 }: SettingsShellProps) {
   const { t } = useTranslation()
+  const { showAdvancedSettings, setShowAdvancedSettings } = useUiPrefs()
   const [searchQuery, setSearchQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -78,20 +80,24 @@ export function SettingsShell({
   const orderedSectionIds = useMemo(() => sections.map((s) => s.id), [sections])
 
   // Build rail groups from flat (group, sections) lists.
+  // The 'advanced' group is hidden when showAdvancedSettings is false.
   const railGroups: RailGroup[] = useMemo(() => {
-    return groups.map((g) => ({
-      id: g.id,
-      labelKey: g.labelKey,
-      items: sections
-        .filter((s) => s.groupId === g.id)
-        .map((s) => ({
-          id: s.id,
-          labelKey: s.labelKey,
-          status: (unsavedBySection[s.id] ?? 0) > 0 ? ('modified' as const) : ('default' as const),
-          badge: unsavedBySection[s.id],
-        })),
-    }))
-  }, [groups, sections, unsavedBySection])
+    return groups
+      .filter((g) => showAdvancedSettings || g.id !== 'advanced')
+      .map((g) => ({
+        id: g.id,
+        labelKey: g.labelKey,
+        items: sections
+          .filter((s) => s.groupId === g.id)
+          .map((s) => ({
+            id: s.id,
+            labelKey: s.labelKey,
+            status:
+              (unsavedBySection[s.id] ?? 0) > 0 ? ('modified' as const) : ('default' as const),
+            badge: unsavedBySection[s.id],
+          })),
+      }))
+  }, [groups, sections, unsavedBySection, showAdvancedSettings])
 
   // Reset search when active section changes (mobile drawer UX).
   useEffect(() => {
@@ -189,15 +195,32 @@ export function SettingsShell({
         className={cn('hidden md:block shrink-0', 'w-[200px] lg:w-[240px] xl:w-[280px]')}
         aria-label={t('settings.title')}
       >
-        <div className="sticky top-[5.5rem] max-h-[calc(100vh-6rem)]">
-          <SettingsRail
-            groups={railGroups}
-            activeId={activeId}
-            onNavigate={onNavigate}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            searchInputRef={searchInputRef}
-          />
+        <div className="sticky top-[5.5rem] max-h-[calc(100vh-6rem)] flex flex-col">
+          <div className="flex-1 min-h-0">
+            <SettingsRail
+              groups={railGroups}
+              activeId={activeId}
+              onNavigate={onNavigate}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              searchInputRef={searchInputRef}
+            />
+          </div>
+          {/* Advanced settings toggle */}
+          <button
+            type="button"
+            onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+            className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            <span className="flex-1 text-left">{t('settings.groupAdvanced')}</span>
+            <ChevronRight
+              className={cn(
+                'h-3.5 w-3.5 transition-transform',
+                showAdvancedSettings && 'rotate-90',
+              )}
+            />
+          </button>
         </div>
       </aside>
 

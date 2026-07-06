@@ -13,7 +13,7 @@ interface ExecAllowlistEditorProps {
   /**
    * If provided, every committed value is validated before being added.
    * Returns an i18n key for the error message, or null if valid.
-   * Used by CORS origin editor to validate URLs.
+   * Used by tag inputs to validate a value before adding.
    */
   validate?: (value: string) => string | null
   /**
@@ -25,12 +25,12 @@ interface ExecAllowlistEditorProps {
 }
 
 /**
- * Multi-line tag input for `exec.allowed_commands`, `cors_origins`,
- * `allowed_tools`, etc. Enter or comma adds a new tag; backspace on
+ * Multi-line tag input for `exec.allowed_commands`, `allowed_tools`,
+ * etc. Enter or comma adds a new tag; backspace on
  * empty input removes the last tag.
  *
  * - `suggestions` prop → suggestion popover (tool catalog)
- * - `validate` prop → inline error on invalid input (CORS origins)
+ * - `validate` prop → inline error on invalid input
  */
 export function ExecAllowlistEditor({
   value,

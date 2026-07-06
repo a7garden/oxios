@@ -47,6 +47,12 @@ interface ChatRuntimeState {
   connected: boolean
   /** Queue of messages waiting for WS connection. */
   _sendQueue: string[]
+  /** User messages queued while an assistant turn is streaming. Drained (in
+   *  order) when the turn completes via `done`/`error`; cleared on a hard
+   *  reset (disconnect / new session). The matching user message is added to
+   *  the list only when the queue drains, so there are no ghost messages to
+   *  clean up. */
+  _pendingQueue: string[]
   /** The session ID from the last "done" chunk. */
   _lastDoneSessionId: string | null
   /** The project ID from the last "done" chunk. */
@@ -107,6 +113,9 @@ interface ChatActions {
   stopPingTimer: () => void
   /** Send a message using the active session. */
   sendMessage: (content: string) => void
+  /** Dispatch the next queued user message (if any) now that the in-flight
+   *  turn has completed. Reuses sendMessage's normal path. */
+  _drainPendingQueue: () => void
   /** Load a previous session's message history from the API. */
   loadSession: (sessionId: string) => Promise<void>
   /** Start a fresh session (clears messages). */
@@ -163,7 +172,7 @@ const KNOWN_CHUNK_TYPES = new Set<StreamChunk['type']>([
   'model',
 ])
 
-function parseChunk(raw: unknown): StreamChunk {
+export function parseChunk(raw: unknown): StreamChunk {
   if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
     const obj = raw as Record<string, unknown>
     const t = obj.type
@@ -174,7 +183,7 @@ function parseChunk(raw: unknown): StreamChunk {
   return { type: 'error', error: 'Malformed chunk' }
 }
 
-function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
+export function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
   const ts = new Date().toISOString()
   const baseId = (id?: string) => `${id ?? crypto.randomUUID()}`
   switch (chunk.type) {
@@ -297,7 +306,7 @@ function reasoningToActivity(
   }
 }
 
-function getToken(): string {
+export function getToken(): string {
   return useAuthStore.getState().token || ''
 }
 
@@ -339,7 +348,7 @@ async function isAuthEnabled(): Promise<boolean> {
   return true
 }
 
-async function buildWsUrl(): Promise<string> {
+export async function buildWsUrl(): Promise<string> {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const base = `${protocol}//${window.location.host}/api/chat/stream`
 
@@ -533,6 +542,7 @@ export const useChatStore = create<ChatStore>()(
       pendingModel: null as string | null,
       connected: false,
       _sendQueue: [],
+      _pendingQueue: [],
       _lastDoneSessionId: null,
       _lastDoneProjectId: null,
       detectedProject: null,
@@ -683,7 +693,7 @@ export const useChatStore = create<ChatStore>()(
           // connect()).
           get().stopPingTimer()
 
-          set({ connected: false, isStreaming: false, _ws: null })
+          set({ connected: false, isStreaming: false, _ws: null, _pendingQueue: [] })
 
           // Auto-reconnect with exponential backoff.
           const attempt = get()._reconnectAttempts
@@ -742,6 +752,7 @@ export const useChatStore = create<ChatStore>()(
         set({
           connected: false,
           isStreaming: false,
+          _pendingQueue: [],
           _ws: null,
           _reconnectTimer: null,
           _reconnectAttempts: 0,
@@ -767,6 +778,15 @@ export const useChatStore = create<ChatStore>()(
           if (!q.includes(content)) {
             set({ _sendQueue: [...q, content] })
           }
+          return
+        }
+        // Streaming: defer this message until the in-flight turn completes.
+        // The caller has already cleared the textarea; we just stash the
+        // content. It is dispatched (and added to the message list) when the
+        // done/error handler drains the queue — so there are no ghost
+        // messages to clean up on cancel/reconnect.
+        if (get().isStreaming) {
+          set((s) => ({ _pendingQueue: [...s._pendingQueue, content] }))
           return
         }
 
@@ -796,6 +816,17 @@ export const useChatStore = create<ChatStore>()(
           model: activeModelId ?? '',
         }
         _ws.send(JSON.stringify(payload))
+      },
+
+      _drainPendingQueue() {
+        const { _pendingQueue } = get()
+        if (_pendingQueue.length === 0) return
+        // Shift the head before dispatching: sendMessage's normal path runs
+        // here because isStreaming was just cleared by the done/error handler.
+        const next = _pendingQueue[0]
+        if (next === undefined) return
+        set({ _pendingQueue: _pendingQueue.slice(1) })
+        get().sendMessage(next)
       },
 
       async loadSession(sessionId: string) {
@@ -886,6 +917,7 @@ export const useChatStore = create<ChatStore>()(
             activeSessionId: sessionId,
             activeProjectId: projectId,
             isStreaming: false,
+            _pendingQueue: [],
           })
         } catch {
           // Silently fail — network issues shouldn't break the UI
@@ -898,6 +930,7 @@ export const useChatStore = create<ChatStore>()(
         set(() => ({
           messages: [],
           isStreaming: false,
+          _pendingQueue: [],
           pendingModel: null,
           activeSessionId: null,
           _lastDoneSessionId: null,
@@ -915,6 +948,7 @@ export const useChatStore = create<ChatStore>()(
           activeProjectId: projectId,
           activeSessionId: null,
           messages: [],
+          _pendingQueue: [],
           detectedProject: null,
         })
       },
@@ -976,6 +1010,7 @@ export const useChatStore = create<ChatStore>()(
           activeRole: null,
           activeModelId: null,
           messages: [],
+          _pendingQueue: [],
           activeInterview: null,
           interviewRound: 0,
           interviewAmbiguity: 0,
@@ -1182,6 +1217,28 @@ export const useChatStore = create<ChatStore>()(
                   }
                 }
               }
+              // Reasoning fragments stream as deltas (per token/word). Merge
+              // consecutive same-source fragments into a single activity so the
+              // timeline shows one "thinking" block per reasoning span, not one
+              // card per token — matching the "one reasoning record per turn"
+              // persisted contract (reasoningToActivity, §7 persistence).
+              if (activity.type === 'reasoning') {
+                const lastAct = existing[existing.length - 1]
+                if (
+                  lastAct &&
+                  lastAct.type === 'reasoning' &&
+                  lastAct.reasoningSource === activity.reasoningSource
+                ) {
+                  const newActivities = [...existing]
+                  newActivities[newActivities.length - 1] = {
+                    ...lastAct,
+                    content: (lastAct.content ?? '') + (activity.content ?? ''),
+                  }
+                  return {
+                    messages: [...updated.slice(0, -1), { ...last, activities: newActivities }],
+                  }
+                }
+              }
               return {
                 messages: [
                   ...updated.slice(0, -1),
@@ -1367,6 +1424,9 @@ export const useChatStore = create<ChatStore>()(
             if (mountIds.length > 0) {
               set({ detectedMountIds: mountIds })
             }
+            // Queue drain: if the user queued follow-ups while this turn
+            // streamed, dispatch the next one now that the turn is idle.
+            get()._drainPendingQueue()
             break
           }
           case 'error': {
@@ -1406,6 +1466,8 @@ export const useChatStore = create<ChatStore>()(
               }
               return { messages: [...updated, errorMsg], isStreaming: false }
             })
+            // Turn ended — advance the queue (same as done).
+            get()._drainPendingQueue()
             break
           }
         }

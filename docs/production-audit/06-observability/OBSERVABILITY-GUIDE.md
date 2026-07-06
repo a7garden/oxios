@@ -14,7 +14,6 @@ Oxios provides three layers of observability:
 |-------|---------|---------|
 | **Structured logging** | Development & production debugging | ✅ Enabled (`tracing`) |
 | **Metrics** | Operational health monitoring | ✅ Enabled (counters/gauges) |
-| **Distributed tracing** | Request flow across components | ⬜ Disabled (requires `otel` feature) |
 
 ---
 
@@ -164,121 +163,14 @@ oxios_agents_running
 
 ---
 
-## 4. OpenTelemetry (Distributed Tracing)
+## 4. Distributed Tracing (Removed)
 
-### 4.1 Build with OTel Support
-
-```bash
-cargo build --features otel
-```
-
-This enables:
-- `opentelemetry` + `opentelemetry-otlp` (gRPC)
-- `opentelemetry_sdk` (Tokio runtime)
-- `tracing-opentelemetry` bridge
-
-### 4.2 Configuration
-
-```toml
-# ~/.oxios/config.toml
-
-[otel]
-enabled = true
-endpoint = "http://localhost:4317"    # OTLP gRPC collector
-service_name = "oxios"                # Service name in traces
-sampling_ratio = 1.0                  # Sample all traces
-```
-
-### 4.3 Local Collector Setup
-
-**Option A: Docker (recommended)**
-
-```bash
-docker run -d \
-  --name otel-collector \
-  -p 4317:4317 \
-  -p 16686:16686 \
-  jaegertracing/all-in-one:latest
-
-# Collector now at localhost:4317 (OTLP gRPC)
-# Jaeger UI at http://localhost:16686
-```
-
-**Option B: OpenTelemetry Collector**
-
-```yaml
-# otel-collector-config.yaml
-receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-
-exporters:
-  jaeger:
-    endpoint: localhost:14250
-    tls:
-      insecure: true
-
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      exporters: [jaeger]
-```
-
-```bash
-docker run -d \
-  --name otel-collector \
-  -p 4317:4317 \
-  -v $(pwd)/otel-collector-config.yaml:/etc/otelcol/config.yaml \
-  otel/opentelemetry-collector:latest
-```
-
-### 4.4 Verified Build Matrix
-
-| Command | Status |
-|---------|--------|
-| `cargo build` | ✅ Compiles (default features) |
-| `cargo build --features otel` | ✅ Compiles (OTel enabled) |
-| `cargo test --workspace` | ✅ All tests pass (both configurations) |
-
-### 4.5 How It Works
-
-When `otel` feature is enabled AND `[otel].enabled = true` in config:
-
-1. `src/otel.rs` calls `build_otlp_provider(endpoint, service_name)`
-2. Creates OTLP gRPC exporter → batch processor → TracerProvider
-3. `create_otel_layer(provider)` creates a `tracing_subscriber` layer
-4. Layer bridges `tracing` spans to OpenTelemetry spans
-5. Spans export to the OTLP collector in batches
-
-**Current limitation:** The OTel layer must be added to the subscriber *before* `init()`. The current architecture calls `init_otel()` after the subscriber is already initialized. To fix this, the subscriber setup in `main.rs` should be refactored to:
-
-```rust
-// Recommended: build subscriber with OTel layer from the start
-let subscriber = tracing_subscriber::registry()
-    .with(env_filter);
-
-if config.otel.enabled {
-    let provider = telemetry_otel::build_otlp_provider(&config.otel.endpoint, &config.otel.service_name)?;
-    let layer = telemetry_otel::create_otel_layer(provider);
-    // subscriber = subscriber.with(layer);  // Add OTel layer
-}
-
-subscriber.with(fmt_layer).init();
-```
-
-### 4.6 Span Coverage
-
-| Span | Location | Active |
-|------|----------|--------|
-| `seed-{id}` | `agent_runtime.rs:412` | ✅ Always |
-| (future) `orchestrator.handle_message` | orchestrator.rs | Planned |
-| (future) `phase.interview` | orchestrator.rs | Planned |
-| (future) `phase.execute` | orchestrator.rs | Planned |
-| (future) `phase.evaluate` | orchestrator.rs | Planned |
-| (future) `tool.{name}` | gated_tool.rs | Planned |
+OpenTelemetry/OTLP export has been **removed** from Oxios. The feature was
+never implemented end-to-end (the exporter was a no-op stub and no span
+instrumentation existed), and the optional `otel` feature gate carried heavy
+dependencies for no runtime value. Local observability — structured logs
+(`tracing_subscriber::fmt`) and Prometheus metrics — remains fully supported
+(see §2 and §3).
 
 ---
 
@@ -394,7 +286,6 @@ cat ~/.oxios/logs/oxios.log | jq 'select(.spans[]?.agent_id == "xyz789")'
 │    ┌────┴─────┐                                              │
 │    │ Subscriber│── EnvFilter → fmt (pretty/json/compact)      │
 │    │          │── file appender (rolling daily)                │
-│    │          │── [optional] OpenTelemetryLayer (OTLP gRPC)   │
 │    └──────────┘                                              │
 │                                                              │
 │  ┌──────────────────┐                                        │
@@ -430,9 +321,4 @@ cat ~/.oxios/logs/oxios.log | jq 'select(.spans[]?.agent_id == "xyz789")'
 
 | Change | File | Description |
 |--------|------|-------------|
-| Feature gate | `Cargo.toml` | Added `otel` feature propagating to `oxios-kernel/otel` |
 | Metrics init | `src/kernel.rs` | Call `register_builtin_metrics()` + `observability::init()` at startup |
-| OTLP pipeline | `telemetry_otel.rs` | Real OTLP provider builder using opentelemetry-otlp 0.27 API |
-| OTel guard | `src/otel.rs` | Real shutdown guard with `force_flush()` + proper cfg gating |
-| gRPC feature | `oxios-kernel/Cargo.toml` | Added `grpc-tonic` feature to `opentelemetry-otlp` dep |
-| Binary deps | `Cargo.toml` | Added optional `opentelemetry`/`opentelemetry_sdk` deps |

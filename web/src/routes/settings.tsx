@@ -8,6 +8,11 @@ import { AddProviderCard, ProviderCard } from '@/components/engine/provider-card
 import { ProviderOptionsPanel } from '@/components/engine/provider-options'
 import { RoleSection } from '@/components/engine/role-section'
 import { RoutingSection } from '@/components/engine/routing-section'
+import {
+  csvToPayload,
+  numbersToPayload,
+  tagsToPayload,
+} from '@/components/settings/array-transforms'
 import { ChannelsSection } from '@/components/settings/channels-section'
 import { DiffPreview } from '@/components/settings/diff-preview'
 import {
@@ -32,12 +37,14 @@ import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { SystemToolsPanel } from '@/components/system/system-tools'
 import { SystemUpdateCard } from '@/components/system/system-update'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
 import {
   type ConfigDiffEntry,
   type ConfigPatchResponse,
   diffConfigs,
   useConfig,
+  useConfigMeta,
   useSaveConfig,
 } from '@/hooks/use-config'
 import {
@@ -72,7 +79,6 @@ interface LegacyField {
   type: FieldType
   placeholder?: string
   options?: { value: string; labelKey: string }[]
-  hotReload: boolean
   restartScope?: 'kernel' | 'gateway' | 'logging' | 'memory' | 'engine' | 'audit'
   min?: number
   max?: number
@@ -135,7 +141,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         descriptionKey: tKeys.workspacePathDescription,
         type: 'text',
         placeholder: '~/.oxios/workspace',
-        hotReload: false,
         restartScope: 'kernel',
       },
       {
@@ -146,16 +151,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         min: 1,
         max: 50,
         placeholder: '10',
-        hotReload: false,
-        restartScope: 'kernel',
-      },
-      {
-        key: 'event_bus_capacity',
-        labelKey: tKeys.eventBusCapacity,
-        descriptionKey: tKeys.eventBusCapacityDescription,
-        type: 'number',
-        placeholder: '256',
-        hotReload: false,
         restartScope: 'kernel',
       },
     ],
@@ -171,7 +166,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         min: 1,
         max: 10,
         placeholder: '3',
-        hotReload: false,
         restartScope: 'kernel',
       },
       {
@@ -183,7 +177,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         max: 1,
         step: 0.05,
         placeholder: '0.8',
-        hotReload: false,
         restartScope: 'kernel',
       },
     ],
@@ -197,7 +190,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         descriptionKey: tKeys.activeTokenLimitDescription,
         type: 'number',
         placeholder: '100000',
-        hotReload: false,
         restartScope: 'kernel',
       },
       {
@@ -209,7 +201,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         max: 200,
         step: 5,
         placeholder: '50',
-        hotReload: false,
         restartScope: 'kernel',
       },
     ],
@@ -223,7 +214,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         descriptionKey: tKeys.hostDescription,
         type: 'text',
         placeholder: '0.0.0.0',
-        hotReload: false,
         restartScope: 'gateway',
       },
       {
@@ -232,7 +222,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         descriptionKey: tKeys.portDescription,
         type: 'number',
         placeholder: '4200',
-        hotReload: false,
         restartScope: 'gateway',
       },
     ],
@@ -249,7 +238,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         max: 500,
         step: 10,
         placeholder: '100',
-        hotReload: false,
         restartScope: 'kernel',
       },
       {
@@ -261,7 +249,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         max: 720,
         step: 24,
         placeholder: '168',
-        hotReload: false,
         restartScope: 'kernel',
       },
       {
@@ -269,7 +256,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         labelKey: tKeys.autoPrune,
         descriptionKey: tKeys.autoPruneDescription,
         type: 'toggle',
-        hotReload: false,
         restartScope: 'kernel',
       },
     ],
@@ -287,7 +273,6 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
           { value: 'json', labelKey: tKeys.jsonElkLoki },
           { value: 'compact', labelKey: tKeys.compact },
         ],
-        hotReload: false,
         restartScope: 'logging',
       },
     ],
@@ -490,10 +475,9 @@ function EnginePanel() {
 //
 // We import them lazily at the bottom to keep the engine panel close to
 // the other legacy form code that uses the same primitives.
-import { Bot } from 'lucide-react'
+import { Bot, ChevronRight } from 'lucide-react'
 import { AllowedToolsPicker } from '@/components/settings/allowed-tools-picker'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { validateCorsOrigin } from '@/lib/cors-validator'
 
 // ─── Settings Page ─────────────────────────────────────────────
 
@@ -505,9 +489,11 @@ function SettingsPage() {
   const [showDiff, setShowDiff] = useState(false)
   const [formValues, setFormValues] = useState<Record<string, Record<string, unknown>>>({})
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [formVersion, setFormVersion] = useState(0)
 
   const { data: config, isLoading, isError, refetch } = useConfig()
   const saveMutation = useSaveConfig()
+  const { data: configMeta } = useConfigMeta()
 
   // Deep-link recovery: if the URL points at a section that isn't in
   // SECTION_META (e.g. an unimplemented id like `persona`), fall back
@@ -562,7 +548,8 @@ function SettingsPage() {
             | undefined
           if (tg) {
             const v = getNestedValue(tg, dottedKey)
-            bucket[dottedKey] = field.type === 'toggle' ? v === true : String(v ?? '')
+            bucket[dottedKey] =
+              field.type === 'toggle' ? v === true : Array.isArray(v) ? v : String(v ?? '')
           }
         } else {
           const sectionConfig = config[section.key] as Record<string, unknown> | undefined
@@ -572,14 +559,16 @@ function SettingsPage() {
               ? raw === true
               : field.type === 'multiline' && typeof raw === 'object'
                 ? JSON.stringify(raw, null, 2)
-                : String(raw ?? '')
+                : Array.isArray(raw)
+                  ? raw
+                  : String(raw ?? '')
         }
       }
       next[section.key] = bucket
     }
 
     setFormValues(next)
-  }, [config])
+  }, [config, formVersion])
 
   const buildPayload = (): Record<string, unknown> => {
     const payload: Record<string, unknown> = {}
@@ -606,24 +595,11 @@ function SettingsPage() {
         if (field.type === 'toggle') {
           setNestedValue(bucket, field.key, Boolean(raw))
         } else if (field.type === 'tags') {
-          const arr = Array.isArray(raw)
-            ? raw
-            : String(raw)
-                .split(/[\s,]+/)
-                .filter(Boolean)
-          setNestedValue(bucket, field.key, arr)
+          setNestedValue(bucket, field.key, tagsToPayload(raw))
         } else if (field.type === 'csv') {
-          const arr = String(raw)
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-          setNestedValue(bucket, field.key, arr)
+          setNestedValue(bucket, field.key, csvToPayload(raw))
         } else if (field.type === 'numbers') {
-          const arr = String(raw)
-            .split('\n')
-            .map((s) => Number(s.trim()))
-            .filter((n) => !Number.isNaN(n))
-          setNestedValue(bucket, field.key, arr)
+          setNestedValue(bucket, field.key, numbersToPayload(raw))
         } else if (field.type === 'number' || field.type === 'range') {
           const num = Number(raw)
           if (!Number.isNaN(num)) setNestedValue(bucket, field.key, num)
@@ -652,24 +628,41 @@ function SettingsPage() {
 
   const annotatedDiff: ConfigDiffEntry[] = useMemo(() => {
     return diff.map((entry) => {
+      // ── hotReload: backend is the single source of truth ──
+      // The previous approach read `f.hotReload` from field-defs, which
+      // silently drifted from the backend's actual propagation logic.
+      // Now we query GET /api/config/meta and classify here.
+      const top = entry.path.split('.')[0] ?? entry.path
+      const isHotReloadable = configMeta
+        ? configMeta.hot_reloadable_sections.includes(top) &&
+          !configMeta.always_restart_fields.includes(entry.path)
+        : false // safe default before meta loads
+
+      // ── restartScope: UI-only metadata, still from field defs ──
+      let scope: string | undefined
       for (const section of NEW_SECTIONS) {
         const f = section.fields.find(
           (field) => field.key === entry.path || `${section.key}.${field.key}` === entry.path,
         )
-        if (f) {
-          return { ...entry, hotReload: f.hotReload, scope: f.restartScope }
+        if (f?.restartScope) {
+          scope = f.restartScope
+          break
         }
       }
-      for (const [sectionKey, fields] of legacyFieldDefs) {
-        const f = fields.find((field) => `${sectionKey}.${field.key}` === entry.path)
-        if (f) {
-          return { ...entry, hotReload: f.hotReload, scope: f.restartScope }
+      if (!scope) {
+        for (const [sectionKey, fields] of legacyFieldDefs) {
+          const f = fields.find((field) => `${sectionKey}.${field.key}` === entry.path)
+          if (f?.restartScope) {
+            scope = f.restartScope
+            break
+          }
         }
       }
-      return { ...entry, hotReload: false }
+
+      return { ...entry, hotReload: isHotReloadable, scope }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diff])
+  }, [diff, configMeta])
 
   const hasUnsaved = annotatedDiff.length > 0
   const restartCount = annotatedDiff.filter((d) => !d.hotReload).length
@@ -724,7 +717,11 @@ function SettingsPage() {
   }
 
   const handleDiscard = () => {
-    setFormValues({})
+    // Bump formVersion to force the populate-useEffect to re-run even
+    // when React Query's structural sharing keeps the same `config`
+    // reference (identical server data → no reference change →
+    // useEffect([config]) would never fire → form stays blank).
+    setFormVersion((v) => v + 1)
     refetch()
   }
 
@@ -898,7 +895,7 @@ function renderActiveSection(
     )
   }
 
-  // Security: dedicated SectionCard with AllowedToolsPicker + CORS validation.
+  // Security: dedicated SectionCard with AllowedToolsPicker.
   if (sectionId === 'security') {
     return (
       <SecuritySectionCard
@@ -923,24 +920,60 @@ function renderActiveSection(
         modified={unsavedCount > 0}
         onReset={onDiscardAll}
       >
-        {newSection.fields.map((field) => (
-          <FieldRow
-            key={field.key}
-            sectionKey={newSection.key}
-            field={field}
-            value={
-              formValues[newSection.key]?.[field.key] as
-                | string
-                | boolean
-                | string[]
-                | number
-                | undefined
-            }
-            onChange={(val) => setField(newSection.key, field.key, val)}
-            modified={unsavedCount > 0 && formValues[newSection.key]?.[field.key] !== undefined}
-            sectionValues={formValues[newSection.key]}
-          />
-        ))}
+        {newSection.fields
+          .filter((f) => f.tier !== 'advanced')
+          .map((field) => (
+            <FieldRow
+              key={field.key}
+              sectionKey={newSection.key}
+              field={field}
+              value={
+                formValues[newSection.key]?.[field.key] as
+                  | string
+                  | boolean
+                  | string[]
+                  | number
+                  | undefined
+              }
+              onChange={(val) => setField(newSection.key, field.key, val)}
+              modified={unsavedCount > 0 && formValues[newSection.key]?.[field.key] !== undefined}
+              sectionValues={formValues[newSection.key]}
+            />
+          ))}
+        {(() => {
+          const advancedFields = newSection.fields.filter((f) => f.tier === 'advanced')
+          if (advancedFields.length === 0) return null
+          return (
+            <Collapsible>
+              <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors pt-2">
+                <ChevronRight className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-90" />
+                {t('settings.advancedOptions')} ({advancedFields.length})
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                {advancedFields.map((field) => (
+                  <FieldRow
+                    key={field.key}
+                    sectionKey={newSection.key}
+                    field={field}
+                    value={
+                      formValues[newSection.key]?.[field.key] as
+                        | string
+                        | boolean
+                        | string[]
+                        | number
+                        | undefined
+                    }
+                    onChange={(val) => setField(newSection.key, field.key, val)}
+                    modified={
+                      unsavedCount > 0 && formValues[newSection.key]?.[field.key] !== undefined
+                    }
+                    sectionValues={formValues[newSection.key]}
+                  />
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          )
+        })()}
       </SectionCard>
     )
   }
@@ -1006,7 +1039,6 @@ function LegacySectionCard({
           type: field.type,
           placeholder: field.placeholder,
           options: field.options,
-          hotReload: field.hotReload,
           restartScope: field.restartScope,
           min: field.min,
           max: field.max,
@@ -1030,7 +1062,7 @@ function LegacySectionCard({
 
 // ─── SecuritySectionCard ─────────────────────────────────────
 
-/** Security section card with AllowedToolsPicker + CORS validation. */
+/** Security section card with AllowedToolsPicker. */
 function SecuritySectionCard({
   securityValues,
   onFieldChange,
@@ -1058,7 +1090,6 @@ function SecuritySectionCard({
       {section.fields.map((field) => {
         const v = securityValues?.[field.key]
         const isAllowedTools = field.key === 'allowed_tools'
-        const isCorsOrigins = field.key === 'cors_origins'
 
         if (isAllowedTools) {
           return (
@@ -1089,7 +1120,6 @@ function SecuritySectionCard({
               }
               onChange={(val) => onFieldChange(field.key, val)}
               sectionValues={securityValues}
-              validate={isCorsOrigins ? validateCorsOrigin : undefined}
             />
           </div>
         )

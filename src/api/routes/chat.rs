@@ -330,6 +330,115 @@ pub(crate) async fn handle_chat(
     }
 }
 
+// ---------------------------------------------------------------------------
+// One-shot promote: seed a session from a captured exchange (no inference)
+// ---------------------------------------------------------------------------
+
+/// Request body for `POST /api/chat/seed` — persist a captured one-shot
+/// exchange (user message + agent response) as a new session, with no
+/// gateway/orchestrator call. Used by the QuickAsk "promote to chat" flow.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SeedRequest {
+    pub user_message: String,
+    pub agent_response: String,
+    #[serde(default)]
+    pub project_id: Option<String>,
+    #[serde(default)]
+    pub trajectory_steps: Option<Vec<serde_json::Value>>,
+    #[serde(default)]
+    pub reasoning_text: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct SeedResponse {
+    pub session_id: String,
+}
+
+/// POST /api/chat/seed — Persist a captured one-shot exchange as a new session.
+///
+/// Writes the user message + agent response verbatim (plus any captured
+/// trajectory/reasoning) directly to the StateStore with no gateway call. This
+/// is what makes QuickAsk "promote to chat" instant and drift-free: the user
+/// sees the exact answer they read in the dialog, now in a real session.
+pub(crate) async fn handle_chat_seed(
+    state: State<Arc<AppState>>,
+    Json(body): Json<SeedRequest>,
+) -> Result<Json<SeedResponse>, AppError> {
+    const MAX_SEED_LENGTH: usize = 64 * 1024;
+    if body.user_message.len() > MAX_SEED_LENGTH || body.agent_response.len() > MAX_SEED_LENGTH {
+        return Err(AppError::PayloadTooLarge {
+            size: body.user_message.len().max(body.agent_response.len()),
+            limit: MAX_SEED_LENGTH,
+        });
+    }
+
+    let mut session = oxios_kernel::state_store::Session::new("default".to_string());
+    session.add_user_message(&body.user_message);
+
+    // Trajectory steps (tool calls) if the one-shot captured them.
+    if let Some(steps_raw) = body.trajectory_steps {
+        let steps: Vec<oxios_kernel::state_store::TrajectoryStepRecord> = steps_raw
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| oxios_kernel::state_store::TrajectoryStepRecord {
+                tool_name: c
+                    .get("tool")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                tool_args: c.get("input").cloned().unwrap_or(serde_json::Value::Null),
+                output_summary: c
+                    .get("output")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                duration_ms: c.get("duration_ms").and_then(|v| v.as_u64()).unwrap_or(0),
+                is_error: false,
+                tool_call_id: format!("seed-{i}"),
+                timestamp: chrono::Utc::now(),
+            })
+            .collect();
+        session.extend_trajectory(steps);
+    }
+
+    // Reasoning text if captured.
+    if let Some(rt) = body.reasoning_text
+        && !rt.is_empty()
+    {
+        session.add_reasoning(oxios_kernel::state_store::ReasoningRecord {
+            content: rt,
+            source: "thinking".to_string(),
+            timestamp: chrono::Utc::now(),
+        });
+    }
+
+    session.add_agent_response(oxios_kernel::state_store::AgentResponse {
+        content: body.agent_response,
+        session_id: Some(session.id.0.clone()),
+        phase_reached: None,
+        evaluation_passed: None,
+        timestamp: chrono::Utc::now(),
+        trajectory_range: None,
+    });
+
+    if let Some(ref pid) = body.project_id
+        && !pid.is_empty()
+    {
+        session.project_id = Some(pid.clone());
+    }
+
+    let session_id = session.id.0.clone();
+    if let Err(e) = state.kernel.state.save_session(&session).await {
+        tracing::warn!(error = %e, "Failed to persist seeded session");
+        return Err(AppError::Internal(
+            "failed to persist seeded session".into(),
+        ));
+    }
+
+    tracing::info!(session_id = %session_id, "Seeded one-shot session via /api/chat/seed");
+    Ok(Json(SeedResponse { session_id }))
+}
+
 /// Query parameters for WebSocket connections.
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct WsParams {
@@ -804,6 +913,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             .and_then(|v| v.as_str())
                             .filter(|s| !s.is_empty())
                             .map(String::from);
+                        // One-shot (QuickAsk) requests set `ephemeral: true`.
+                        // The recv task skips the pending-message insert so
+                        // the send task's persist guard finds no
+                        // PendingMessage and never writes a session.
+                        let incoming_ephemeral = parsed
+                            .get("ephemeral")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
 
                         match msg_type {
                             // RFC-024 SP2 / C2 (replay): client announces its
@@ -932,8 +1049,16 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 incoming
                                     .metadata
                                     .insert("conn_id".into(), conn_id_for_send.clone());
+                                if incoming_ephemeral {
+                                    incoming.metadata.insert("ephemeral".into(), "true".into());
+                                }
 
-                                {
+                                // Ephemeral (one-shot) requests skip the
+                                // pending map: the send task's persist guard
+                                // (`if let Some(pm) = pm`) then returns None
+                                // and persist_session is never called — no
+                                // StateStore write, no sidebar entry.
+                                if !incoming_ephemeral {
                                     let mut pending = pending_for_send.lock().await;
                                     pending.insert(
                                         incoming.id,

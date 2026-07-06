@@ -12,18 +12,30 @@ export type TimeFormat = '12h' | '24h'
 interface UiPrefsState {
   /** Clock format preference. */
   timeFormat: TimeFormat
+  /** Whether to surface advanced settings in the UI. */
+  showAdvancedSettings: boolean
   /** Update the clock format and persist. */
   setTimeFormat: (tf: TimeFormat) => void
+  /** Update the advanced settings visibility and persist. */
+  setShowAdvancedSettings: (v: boolean) => void
 }
 
-const STORAGE_KEY = 'oxios-time-format'
-const saved = (localStorage.getItem(STORAGE_KEY) as TimeFormat) || '24h'
+const TIME_FORMAT_STORAGE_KEY = 'oxios-time-format'
+const SHOW_ADVANCED_SETTINGS_STORAGE_KEY = 'oxios-show-advanced-settings'
+const savedTimeFormat = (localStorage.getItem(TIME_FORMAT_STORAGE_KEY) as TimeFormat) || '24h'
+const savedShowAdvancedSettings =
+  localStorage.getItem(SHOW_ADVANCED_SETTINGS_STORAGE_KEY) === 'true'
 
 export const useUiPrefs = create<UiPrefsState>((set) => ({
-  timeFormat: saved,
+  timeFormat: savedTimeFormat,
+  showAdvancedSettings: savedShowAdvancedSettings,
   setTimeFormat: (timeFormat) => {
-    localStorage.setItem(STORAGE_KEY, timeFormat)
+    localStorage.setItem(TIME_FORMAT_STORAGE_KEY, timeFormat)
     set({ timeFormat })
+  },
+  setShowAdvancedSettings: (showAdvancedSettings) => {
+    localStorage.setItem(SHOW_ADVANCED_SETTINGS_STORAGE_KEY, String(showAdvancedSettings))
+    set({ showAdvancedSettings })
   },
 }))
 

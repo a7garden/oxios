@@ -8,7 +8,6 @@ repository = "https://github.com/a7garden/oxios"
 
 [features]
 default = ["sqlite-memory"]
-otel = ["tracing-opentelemetry", "opentelemetry", "opentelemetry_sdk", "opentelemetry-otlp", "opentelemetry-stdout"]
 wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
 native-browser = ["oxi-sdk/native-browser"]
 sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec", "oxios-memory/sqlite-memory"]
@@ -82,12 +81,6 @@ llama-gguf = { version = "0.14", optional = true, features = ["cpu", "huggingfac
 hf-hub = { version = "0.4", optional = true }
 
 
-# OpenTelemetry (optional)
-tracing-opentelemetry = { version = "0.28", optional = true }
-opentelemetry = { version = "0.27", optional = true }
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"], optional = true }
-opentelemetry-otlp = { version = "0.27", optional = true }
-opentelemetry-stdout = { version = "0.27", optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

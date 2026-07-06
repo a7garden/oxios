@@ -49,6 +49,7 @@ function ChatPage() {
     connect,
     newSession,
   } = useChatStore()
+  const queuedCount = useChatStore((s) => s._pendingQueue.length)
   const { data: rolesData } = useRoles()
   const roles = Object.entries(rolesData?.roles ?? {}).map(([name, model]) => ({ name, model }))
   const { data: mountsData } = useMounts()
@@ -105,7 +106,7 @@ function ChatPage() {
   }
 
   const handleSend = (content: string, contextItems: ContextAttachment[]) => {
-    if (!content.trim() || isStreaming) return
+    if (!content.trim()) return
 
     // Build message with context references
     let enrichedContent = content
@@ -256,10 +257,10 @@ function ChatPage() {
               activeModelId={activeModelId}
               setActiveModelId={setActiveModelId}
               onCancel={handleCancel}
-              disabled={isStreaming}
               isStreaming={isStreaming}
               connected={connected}
               activeMounts={activeMounts}
+              queuedCount={queuedCount}
               onAttachMount={handleAttachMount}
               onRemoveMount={handleRemoveMount}
             />

@@ -88,6 +88,30 @@ export function useConfig() {
   })
 }
 
+/** Backend hot-reload classification metadata (single source of truth). */
+export interface ConfigMeta {
+  /** Top-level section keys whose fields are hot-reloadable. */
+  hot_reloadable_sections: string[]
+  /** Dotted field paths that always require restart, even in hot-reloadable sections. */
+  always_restart_fields: string[]
+}
+
+/**
+ * Fetches the backend's authoritative hot-reload classification.
+ *
+ * This is the **single source of truth** for the frontend's pre-save
+ * Diff Preview badges and SaveDock counts. The previous approach
+ * maintained a parallel `hotReload` boolean per field in `field-defs.ts`
+ * that silently drifted from the backend's actual propagation logic.
+ */
+export function useConfigMeta() {
+  return useQuery({
+    queryKey: ['config-meta'],
+    queryFn: () => api.get<ConfigMeta>('/api/config/meta'),
+    staleTime: Infinity, // classification changes only on daemon restart
+  })
+}
+
 export interface SaveConfigOpts {
   /** Local representation of the new config (used for optimistic diffing). */
   nextConfig: Record<string, unknown>

@@ -133,12 +133,6 @@ format = "pretty"
 # Log level override. Falls back to RUST_LOG env var, then "info".
 # level = "info"
 
-[otel]
-enabled = false
-endpoint = "http://localhost:4317"
-service_name = "oxios"
-sampling_ratio = 1.0
-
 [channels]
 enabled = ["web"]
 

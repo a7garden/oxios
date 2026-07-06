@@ -401,6 +401,8 @@
     "groupSecurity": "Security",
     "groupMemory": "Memory",
     "groupChannels": "Channels",
+    "groupExecSecurity": "Execution & Security",
+    "groupAdvanced": "Advanced",
     "routing": {
       "title": "Routing",
       "desc": "Auto model selection and fallback config",

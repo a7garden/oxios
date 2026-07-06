@@ -90,15 +90,7 @@ pub mod engine;
 pub mod error;
 pub mod metrics;
 pub mod observability;
-#[cfg(feature = "otel")]
-pub mod telemetry_otel;
 pub mod types;
-#[cfg(feature = "otel")]
-pub use telemetry_otel as telemetry;
-#[cfg(not(feature = "otel"))]
-pub mod telemetry_stub;
-#[cfg(not(feature = "otel"))]
-pub use telemetry_stub as telemetry;
 
 // ─── API Surface ────────────────────────────────────────────────────
 // 외부에 노출하는 typed facade.

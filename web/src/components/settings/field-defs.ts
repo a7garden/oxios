@@ -3,11 +3,9 @@
 // Each entry is a triple:
 //   [sectionKey, descriptionKey, fields[]]
 //
-// `field.hotReload` mirrors the backend classification in
-// `src/api/routes/system.rs::is_restart_required`. The two
-// MUST stay in sync — the field-defs version is the source of truth for
-// the UI (badges, diff preview) and the backend is the source of truth
-// for the actual hot-reload behaviour.
+// Hot-reload classification is determined by the backend
+// (`GET /api/config/meta`) — the UI queries it at runtime rather than
+// maintaining a parallel `hotReload` boolean that can silently drift.
 //
 // Sections not listed here (engine, kernel legacy fields, logging legacy
 // fields) fall back to the original `routes/settings.tsx` definitions.
@@ -19,7 +17,7 @@ export type FieldType =
   | 'toggle'
   | 'select'
   | 'multiline'
-  | 'csv' // comma-separated list (e.g. cors_origins)
+  | 'csv' // comma-separated list
   | 'tags' // multi-line tag list (e.g. allowed_commands)
   | 'numbers' // multi-line number list (e.g. telegram allowed_users)
   | 'range' // bounded numeric slider (requires min/max)
@@ -57,8 +55,15 @@ export interface SettingsFieldDef {
   max?: number
   /** Step increment (for `range` types; defaults to 1). */
   step?: number
-  /** If false, the field requires a daemon restart to take effect. */
-  hotReload: boolean
+  /**
+   * Visibility tier. 'advanced' fields are hidden behind a
+   * disclosure toggle within their section card. Defaults to 'standard'.
+   *
+   * Hot-reload classification is now determined by the backend
+   * (`GET /api/config/meta`) — the UI no longer maintains a parallel
+   * `hotReload` boolean (which silently drifted from backend reality).
+   */
+  tier?: 'standard' | 'advanced'
   /** Sub-system that consumes this value (used in tooltips). */
   restartScope?: 'kernel' | 'gateway' | 'logging' | 'memory' | 'engine' | 'audit'
   /**
@@ -76,7 +81,9 @@ export interface SettingsSectionDef {
   descriptionKey: string
   iconKey: SectionIconKey
   /** Group id this section belongs to. */
-  groupId: 'ai' | 'system' | 'security' | 'memory' | 'channels'
+  groupId: 'ai' | 'exec_security' | 'system' | 'security' | 'memory' | 'channels' | 'advanced'
+  /** Section tier. 'advanced' sections are collapsed in the rail. */
+  tier?: 'standard' | 'advanced'
   fields: SettingsFieldDef[]
 }
 
@@ -100,21 +107,18 @@ const execSection: SettingsSectionDef = {
         { value: 'structured', labelKey: 'settings.structuredRecommended' },
         { value: 'shell', labelKey: 'settings.shellDangerous' },
       ],
-      hotReload: true,
     },
     {
       key: 'allow_shell_mode',
       labelKey: 'settings.allowShellMode',
       descriptionKey: 'settings.allowShellModeDescription',
       type: 'toggle',
-      hotReload: true,
     },
     {
       key: 'allowed_commands',
       labelKey: 'settings.allowedCommands',
       descriptionKey: 'settings.allowedCommandsDescription',
       type: 'tags',
-      hotReload: true,
       restartScope: 'kernel',
       dependsOn: { field: 'allowlist_mode', value: 'enforced' },
     },
@@ -127,7 +131,6 @@ const execSection: SettingsSectionDef = {
         { value: 'permissive', labelKey: 'settings.allowlistModePermissive' },
         { value: 'enforced', labelKey: 'settings.allowlistModeEnforced' },
       ],
-      hotReload: true,
       restartScope: 'kernel',
     },
     {
@@ -139,7 +142,6 @@ const execSection: SettingsSectionDef = {
       max: 600,
       step: 10,
       placeholder: '120',
-      hotReload: true,
     },
     {
       key: 'max_timeout_secs',
@@ -150,7 +152,7 @@ const execSection: SettingsSectionDef = {
       max: 3600,
       step: 30,
       placeholder: '600',
-      hotReload: true,
+      tier: 'advanced',
     },
   ],
 }
@@ -164,7 +166,7 @@ const securitySection: SettingsSectionDef = {
   labelKey: 'settings.security',
   descriptionKey: 'settings.securityDescription',
   iconKey: 'security',
-  groupId: 'security',
+  groupId: 'exec_security',
   fields: [
     {
       key: 'auth_enabled',
@@ -174,7 +176,6 @@ const securitySection: SettingsSectionDef = {
       // The security subsystem is constructed at boot. PATCH on this
       // section persists the new value but the running AccessManager
       // keeps using the boot-time value. Restart is required to apply.
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -183,7 +184,6 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.allowedToolsDescription',
       type: 'tags',
       placeholder: 'read, write, edit, bash',
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -192,7 +192,6 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.corsOriginsDescription',
       type: 'tags',
       placeholder: 'http://localhost:4200, http://localhost:3000',
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -200,7 +199,6 @@ const securitySection: SettingsSectionDef = {
       labelKey: 'settings.networkAccess',
       descriptionKey: 'settings.networkAccessDescription',
       type: 'toggle',
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -208,7 +206,6 @@ const securitySection: SettingsSectionDef = {
       labelKey: 'settings.allowForking',
       descriptionKey: 'settings.allowForkingDescription',
       type: 'toggle',
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -220,7 +217,6 @@ const securitySection: SettingsSectionDef = {
       max: 3600,
       step: 30,
       placeholder: '300',
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -232,17 +228,8 @@ const securitySection: SettingsSectionDef = {
       max: 4096,
       step: 64,
       placeholder: '512',
-      hotReload: false,
       restartScope: 'gateway',
-    },
-    {
-      key: 'max_audit_entries',
-      labelKey: 'settings.maxAuditEntries',
-      descriptionKey: 'settings.maxAuditEntriesDescription',
-      type: 'number',
-      placeholder: '10000',
-      hotReload: false,
-      restartScope: 'audit',
+      tier: 'advanced',
     },
     {
       key: 'audit_log_path',
@@ -250,7 +237,6 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.auditLogPathDescription',
       type: 'text',
       placeholder: '~/.oxios/audit.log',
-      hotReload: false,
       restartScope: 'audit',
     },
     {
@@ -262,8 +248,8 @@ const securitySection: SettingsSectionDef = {
       max: 300,
       step: 10,
       placeholder: '120',
-      hotReload: false,
       restartScope: 'gateway',
+      tier: 'advanced',
     },
   ],
 }
@@ -288,7 +274,6 @@ const memorySection: SettingsSectionDef = {
       labelKey: 'settings.memoryEnabled',
       descriptionKey: 'settings.memoryEnabledDescription',
       type: 'toggle',
-      hotReload: false,
       restartScope: 'memory',
     },
     {
@@ -297,7 +282,6 @@ const memorySection: SettingsSectionDef = {
       descriptionKey: 'settings.memoryStoragePathDescription',
       type: 'text',
       placeholder: '~/.oxios/workspace/memory.db',
-      hotReload: false,
       restartScope: 'memory',
       dependsOn: { field: 'enabled', value: true },
     },
@@ -311,7 +295,6 @@ const memorySection: SettingsSectionDef = {
         { value: 'mlx', labelKey: 'settings.embeddingProviderMlx' },
         { value: 'tfidf', labelKey: 'settings.embeddingProviderTfidf' },
       ],
-      hotReload: false,
       restartScope: 'memory',
       dependsOn: { field: 'enabled', value: true },
     },
@@ -320,7 +303,6 @@ const memorySection: SettingsSectionDef = {
       labelKey: 'settings.sonaEnabled',
       descriptionKey: 'settings.sonaEnabledDescription',
       type: 'toggle',
-      hotReload: false,
       restartScope: 'memory',
       dependsOn: { field: 'enabled', value: true },
     },
@@ -335,7 +317,6 @@ const memorySection: SettingsSectionDef = {
         { value: 'aggressive', labelKey: 'settings.presetAggressive' },
         { value: 'custom', labelKey: 'settings.presetCustom' },
       ],
-      hotReload: false,
       restartScope: 'memory',
       dependsOn: { field: 'enabled', value: true },
     },
@@ -344,7 +325,6 @@ const memorySection: SettingsSectionDef = {
       labelKey: 'settings.dreamEnabled',
       descriptionKey: 'settings.dreamEnabledDescription',
       type: 'toggle',
-      hotReload: false,
       restartScope: 'memory',
       dependsOn: { field: 'enabled', value: true },
     },
@@ -356,9 +336,9 @@ const memorySection: SettingsSectionDef = {
       min: 1,
       max: 72,
       placeholder: '24',
-      hotReload: false,
       restartScope: 'memory',
       dependsOn: { field: 'consolidation.dream_enabled', value: true },
+      tier: 'advanced',
     },
   ],
 }
@@ -388,7 +368,6 @@ const telegramSection: SettingsSectionDef = {
       descriptionKey: 'settings.telegramBotTokenEnvDescription',
       type: 'text',
       placeholder: 'TELEGRAM_BOT_TOKEN',
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -397,7 +376,6 @@ const telegramSection: SettingsSectionDef = {
       descriptionKey: 'settings.telegramAllowedUsersDescription',
       type: 'numbers',
       placeholder: '123456789',
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -408,7 +386,6 @@ const telegramSection: SettingsSectionDef = {
       min: 1,
       max: 48,
       placeholder: '2',
-      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -417,7 +394,6 @@ const telegramSection: SettingsSectionDef = {
       descriptionKey: 'settings.telegramSessionMaxMessagesDescription',
       type: 'number',
       placeholder: '0',
-      hotReload: false,
       restartScope: 'gateway',
     },
   ],
@@ -442,7 +418,6 @@ const auditSection: SettingsSectionDef = {
       labelKey: 'settings.auditEnabled',
       descriptionKey: 'settings.auditEnabledDescription',
       type: 'toggle',
-      hotReload: false,
       restartScope: 'audit',
     },
     {
@@ -451,7 +426,6 @@ const auditSection: SettingsSectionDef = {
       descriptionKey: 'settings.auditMaxEntriesDescription',
       type: 'number',
       placeholder: '100000',
-      hotReload: false,
       restartScope: 'audit',
       dependsOn: { field: 'enabled', value: true },
     },
@@ -474,7 +448,6 @@ const calendarSection: SettingsSectionDef = {
       labelKey: 'settings.calendarEnabled',
       descriptionKey: 'settings.calendarEnabledDesc',
       type: 'toggle',
-      hotReload: false,
     },
     {
       key: 'timezone',
@@ -482,21 +455,18 @@ const calendarSection: SettingsSectionDef = {
       descriptionKey: 'settings.calendarTimezoneDesc',
       type: 'text',
       placeholder: 'Asia/Seoul',
-      hotReload: false,
     },
     {
       key: 'default_reminder_minutes',
       labelKey: 'settings.calendarReminders',
       descriptionKey: 'settings.calendarRemindersDesc',
       type: 'numbers',
-      hotReload: false,
     },
     {
       key: 'alarm_channels',
       labelKey: 'settings.calendarAlarmChannels',
       descriptionKey: 'settings.calendarAlarmChannelsDesc',
       type: 'tags',
-      hotReload: false,
     },
     {
       key: 'journal_sync',
@@ -508,21 +478,19 @@ const calendarSection: SettingsSectionDef = {
         { value: 'midnight', labelKey: 'settings.calendarJournalMidnight' },
         { value: 'both', labelKey: 'settings.calendarJournalBoth' },
       ],
-      hotReload: false,
     },
     {
       key: 'system_calendar',
       labelKey: 'settings.calendarSystemCalendar',
       descriptionKey: 'settings.calendarSystemCalendarDesc',
       type: 'toggle',
-      hotReload: false,
     },
     {
       key: 'archive_after_days',
       labelKey: 'settings.calendarArchiveDays',
       descriptionKey: 'settings.calendarArchiveDaysDesc',
       type: 'number',
-      hotReload: false,
+      tier: 'advanced',
     },
   ],
 }
@@ -537,13 +505,13 @@ const otelSection: SettingsSectionDef = {
   descriptionKey: 'settings.otelDescription',
   iconKey: 'otel',
   groupId: 'system',
+  tier: 'advanced',
   fields: [
     {
       key: 'enabled',
       labelKey: 'settings.otelEnabled',
       descriptionKey: 'settings.otelEnabledDesc',
       type: 'toggle',
-      hotReload: false,
     },
     {
       key: 'endpoint',
@@ -551,7 +519,6 @@ const otelSection: SettingsSectionDef = {
       descriptionKey: 'settings.otelEndpointDesc',
       type: 'text',
       placeholder: 'http://localhost:4317',
-      hotReload: false,
     },
     {
       key: 'service_name',
@@ -559,7 +526,6 @@ const otelSection: SettingsSectionDef = {
       descriptionKey: 'settings.otelServiceNameDesc',
       type: 'text',
       placeholder: 'oxios',
-      hotReload: false,
     },
     {
       key: 'sampling_ratio',
@@ -569,7 +535,6 @@ const otelSection: SettingsSectionDef = {
       min: 0,
       max: 1,
       step: 0.1,
-      hotReload: false,
     },
   ],
 }
@@ -584,42 +549,19 @@ const agentLogSection: SettingsSectionDef = {
   descriptionKey: 'settings.agentLogDescription',
   iconKey: 'agentLog',
   groupId: 'system',
+  tier: 'advanced',
   fields: [
     {
       key: 'max_entries',
       labelKey: 'settings.agentLogMaxEntries',
       descriptionKey: 'settings.agentLogMaxEntriesDesc',
       type: 'number',
-      hotReload: false,
     },
     {
       key: 'ttl_hours',
       labelKey: 'settings.agentLogTtlHours',
       descriptionKey: 'settings.agentLogTtlHoursDesc',
       type: 'number',
-      hotReload: false,
-    },
-    {
-      key: 'max_tool_calls_per_agent',
-      labelKey: 'settings.agentLogMaxToolCalls',
-      descriptionKey: 'settings.agentLogMaxToolCallsDesc',
-      type: 'number',
-      hotReload: false,
-    },
-    {
-      key: 'prune_batch_size',
-      labelKey: 'settings.agentLogPruneBatch',
-      descriptionKey: 'settings.agentLogPruneBatchDesc',
-      type: 'number',
-      hotReload: false,
-    },
-    {
-      key: 'db_path',
-      labelKey: 'settings.agentLogDbPath',
-      descriptionKey: 'settings.agentLogDbPathDesc',
-      type: 'text',
-      placeholder: '(default location)',
-      hotReload: false,
     },
   ],
 }
@@ -634,21 +576,8 @@ const resourceMonitorSection: SettingsSectionDef = {
   descriptionKey: 'settings.resourceMonitorDescription',
   iconKey: 'resourceMonitor',
   groupId: 'system',
+  tier: 'advanced',
   fields: [
-    {
-      key: 'interval_secs',
-      labelKey: 'settings.rmInterval',
-      descriptionKey: 'settings.rmIntervalDesc',
-      type: 'number',
-      hotReload: false,
-    },
-    {
-      key: 'history_max',
-      labelKey: 'settings.rmHistoryMax',
-      descriptionKey: 'settings.rmHistoryMaxDesc',
-      type: 'number',
-      hotReload: false,
-    },
     {
       key: 'cpu_threshold',
       labelKey: 'settings.rmCpuThreshold',
@@ -657,7 +586,6 @@ const resourceMonitorSection: SettingsSectionDef = {
       min: 0,
       max: 100,
       step: 1,
-      hotReload: false,
     },
     {
       key: 'memory_threshold',
@@ -667,14 +595,12 @@ const resourceMonitorSection: SettingsSectionDef = {
       min: 0,
       max: 100,
       step: 1,
-      hotReload: false,
     },
     {
       key: 'load_threshold',
       labelKey: 'settings.rmLoadThreshold',
       descriptionKey: 'settings.rmLoadThresholdDesc',
       type: 'number',
-      hotReload: false,
     },
   ],
 }
@@ -695,7 +621,6 @@ const browserSection: SettingsSectionDef = {
       labelKey: 'settings.browserEnabled',
       descriptionKey: 'settings.browserEnabledDesc',
       type: 'toggle',
-      hotReload: false,
     },
     {
       key: 'engine',
@@ -703,7 +628,6 @@ const browserSection: SettingsSectionDef = {
       descriptionKey: 'settings.browserEngineDesc',
       type: 'multiline',
       placeholder: '{\n  "user_agent": "MyBot/1.0"\n}',
-      hotReload: false,
     },
   ],
 }
@@ -724,28 +648,25 @@ const budgetSection: SettingsSectionDef = {
       labelKey: 'settings.budgetEnabled',
       descriptionKey: 'settings.budgetEnabledDesc',
       type: 'toggle',
-      hotReload: false,
     },
     {
       key: 'default_token_budget',
       labelKey: 'settings.budgetTokenBudget',
       descriptionKey: 'settings.budgetTokenBudgetDesc',
       type: 'number',
-      hotReload: false,
     },
     {
       key: 'default_calls_budget',
       labelKey: 'settings.budgetCallsBudget',
       descriptionKey: 'settings.budgetCallsBudgetDesc',
       type: 'number',
-      hotReload: false,
     },
     {
       key: 'default_window_secs',
       labelKey: 'settings.budgetWindowSecs',
       descriptionKey: 'settings.budgetWindowSecsDesc',
       type: 'number',
-      hotReload: false,
+      tier: 'advanced',
     },
   ],
 }
@@ -773,7 +694,7 @@ export const NEW_SECTIONS: SettingsSectionDef[] = [
 // ---------------------------------------------------------------------------
 
 export interface SettingsGroup {
-  id: 'ai' | 'system' | 'security' | 'memory' | 'channels'
+  id: 'ai' | 'exec_security' | 'memory' | 'channels' | 'system' | 'advanced'
   labelKey: string
   sectionKeys: string[]
 }
@@ -785,29 +706,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     sectionKeys: ['engine'],
   },
   {
-    id: 'system',
-    labelKey: 'settings.groupSystem',
-    sectionKeys: [
-      'kernel',
-      'exec',
-      'orchestrator',
-      'context',
-      'gateway',
-      'session',
-      'logging',
-      'update',
-      'otel',
-      'agent_log',
-      'resource_monitor',
-      'browser',
-      'budget',
-      'notifications',
-    ],
-  },
-  {
-    id: 'security',
-    labelKey: 'settings.groupSecurity',
-    sectionKeys: ['security', 'audit', 'secrets'],
+    id: 'exec_security',
+    labelKey: 'settings.groupExecSecurity',
+    sectionKeys: ['exec', 'security', 'audit', 'secrets'],
   },
   {
     id: 'memory',
@@ -818,6 +719,16 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     id: 'channels',
     labelKey: 'settings.groupChannels',
     sectionKeys: ['channels.telegram', 'calendar'],
+  },
+  {
+    id: 'system',
+    labelKey: 'settings.groupSystem',
+    sectionKeys: ['kernel', 'session', 'logging', 'update', 'browser', 'budget', 'notifications'],
+  },
+  {
+    id: 'advanced',
+    labelKey: 'settings.groupAdvanced',
+    sectionKeys: ['orchestrator', 'context', 'gateway', 'otel', 'agent_log', 'resource_monitor'],
   },
 ]
 
@@ -892,9 +803,11 @@ export interface SectionMeta {
   /** i18n key for the section description (used by the rail/section card). */
   descriptionKey: string
   /** Group id for rail grouping. Must match a group in SETTINGS_GROUPS. */
-  groupId: 'ai' | 'system' | 'security' | 'memory' | 'channels'
+  groupId: 'ai' | 'exec_security' | 'memory' | 'channels' | 'system' | 'advanced'
   /** Icon key for the rail/section card icon. */
   iconKey: SectionIconKey
+  /** Section tier. 'advanced' sections are collapsed in the rail by default. */
+  tier?: 'standard' | 'advanced'
   /** Whether this section renders its own custom component (EnginePanel, SystemUpdateCard, etc.). */
   custom: boolean
 }
@@ -909,6 +822,65 @@ export const SECTION_META: SectionMeta[] = [
     iconKey: 'engine',
     custom: true,
   },
+  // Execution & Security
+  {
+    id: 'exec',
+    labelKey: 'settings.sectionExec',
+    descriptionKey: 'settings.executionDescription',
+    groupId: 'exec_security',
+    iconKey: 'exec',
+    custom: false,
+  },
+  {
+    id: 'security',
+    labelKey: 'settings.sectionSecurity',
+    descriptionKey: 'settings.securityDescription',
+    groupId: 'exec_security',
+    iconKey: 'security',
+    custom: false,
+  },
+  {
+    id: 'audit',
+    labelKey: 'settings.sectionAudit',
+    descriptionKey: 'settings.auditDescription',
+    groupId: 'exec_security',
+    iconKey: 'audit',
+    custom: false,
+  },
+  {
+    id: 'secrets',
+    labelKey: 'settings.sectionSecrets',
+    descriptionKey: 'settings.secretsDescription',
+    groupId: 'exec_security',
+    iconKey: 'secrets',
+    custom: true,
+  },
+  // Memory
+  {
+    id: 'memory',
+    labelKey: 'settings.sectionMemory',
+    descriptionKey: 'settings.memoryDescription',
+    groupId: 'memory',
+    iconKey: 'memory',
+    custom: false,
+  },
+  // Channels
+  {
+    id: 'channels.telegram',
+    labelKey: 'settings.sectionTelegram',
+    descriptionKey: 'settings.telegramDescription',
+    groupId: 'channels',
+    iconKey: 'channels',
+    custom: false,
+  },
+  {
+    id: 'calendar',
+    labelKey: 'settings.sectionCalendar',
+    descriptionKey: 'settings.calendarDescription',
+    groupId: 'channels',
+    iconKey: 'calendar',
+    custom: false,
+  },
   // System
   {
     id: 'kernel',
@@ -916,38 +888,6 @@ export const SECTION_META: SectionMeta[] = [
     descriptionKey: 'settings.kernelDescription',
     groupId: 'system',
     iconKey: 'kernel',
-    custom: false,
-  },
-  {
-    id: 'exec',
-    labelKey: 'settings.sectionExec',
-    descriptionKey: 'settings.executionDescription',
-    groupId: 'system',
-    iconKey: 'exec',
-    custom: false,
-  },
-  {
-    id: 'orchestrator',
-    labelKey: 'settings.sectionOrchestrator',
-    descriptionKey: 'settings.orchestratorDescription',
-    groupId: 'system',
-    iconKey: 'orchestrator',
-    custom: false,
-  },
-  {
-    id: 'context',
-    labelKey: 'settings.sectionContext',
-    descriptionKey: 'settings.contextDescription',
-    groupId: 'system',
-    iconKey: 'context',
-    custom: false,
-  },
-  {
-    id: 'gateway',
-    labelKey: 'settings.sectionGateway',
-    descriptionKey: 'settings.gatewayDescription',
-    groupId: 'system',
-    iconKey: 'gateway',
     custom: false,
   },
   {
@@ -974,74 +914,6 @@ export const SECTION_META: SectionMeta[] = [
     iconKey: 'update',
     custom: true,
   },
-  // Security
-  {
-    id: 'security',
-    labelKey: 'settings.sectionSecurity',
-    descriptionKey: 'settings.securityDescription',
-    groupId: 'security',
-    iconKey: 'security',
-    custom: false,
-  },
-  {
-    id: 'audit',
-    labelKey: 'settings.sectionAudit',
-    descriptionKey: 'settings.auditDescription',
-    groupId: 'security',
-    iconKey: 'audit',
-    custom: false,
-  },
-  // Memory
-  {
-    id: 'memory',
-    labelKey: 'settings.sectionMemory',
-    descriptionKey: 'settings.memoryDescription',
-    groupId: 'memory',
-    iconKey: 'memory',
-    custom: false,
-  },
-  // Channels
-  {
-    id: 'channels.telegram',
-    labelKey: 'settings.sectionTelegram',
-    descriptionKey: 'settings.telegramDescription',
-    groupId: 'channels',
-    iconKey: 'channels',
-    custom: false,
-  },
-  // RFC-028 SP-2a: declarative config sections
-  {
-    id: 'calendar',
-    labelKey: 'settings.sectionCalendar',
-    descriptionKey: 'settings.calendarDescription',
-    groupId: 'channels',
-    iconKey: 'calendar',
-    custom: false,
-  },
-  {
-    id: 'otel',
-    labelKey: 'settings.sectionOtel',
-    descriptionKey: 'settings.otelDescription',
-    groupId: 'system',
-    iconKey: 'otel',
-    custom: false,
-  },
-  {
-    id: 'agent_log',
-    labelKey: 'settings.sectionAgentLog',
-    descriptionKey: 'settings.agentLogDescription',
-    groupId: 'system',
-    iconKey: 'agentLog',
-    custom: false,
-  },
-  {
-    id: 'resource_monitor',
-    labelKey: 'settings.sectionResourceMonitor',
-    descriptionKey: 'settings.resourceMonitorDescription',
-    groupId: 'system',
-    iconKey: 'resourceMonitor',
-    custom: false,
-  },
   {
     id: 'browser',
     labelKey: 'settings.sectionBrowser',
@@ -1058,15 +930,6 @@ export const SECTION_META: SectionMeta[] = [
     iconKey: 'budget',
     custom: false,
   },
-  // RFC-028 SP-2c / SP-1e: custom-rendered sections
-  {
-    id: 'secrets',
-    labelKey: 'settings.sectionSecrets',
-    descriptionKey: 'settings.secretsDescription',
-    groupId: 'security',
-    iconKey: 'secrets',
-    custom: true,
-  },
   {
     id: 'notifications',
     labelKey: 'settings.sectionNotifications',
@@ -1074,6 +937,61 @@ export const SECTION_META: SectionMeta[] = [
     groupId: 'system',
     iconKey: 'notifications',
     custom: true,
+  },
+  // Advanced (collapsed by default)
+  {
+    id: 'orchestrator',
+    labelKey: 'settings.sectionOrchestrator',
+    descriptionKey: 'settings.orchestratorDescription',
+    groupId: 'advanced',
+    iconKey: 'orchestrator',
+    tier: 'advanced',
+    custom: false,
+  },
+  {
+    id: 'context',
+    labelKey: 'settings.sectionContext',
+    descriptionKey: 'settings.contextDescription',
+    groupId: 'advanced',
+    iconKey: 'context',
+    tier: 'advanced',
+    custom: false,
+  },
+  {
+    id: 'gateway',
+    labelKey: 'settings.sectionGateway',
+    descriptionKey: 'settings.gatewayDescription',
+    groupId: 'advanced',
+    iconKey: 'gateway',
+    tier: 'advanced',
+    custom: false,
+  },
+  {
+    id: 'otel',
+    labelKey: 'settings.sectionOtel',
+    descriptionKey: 'settings.otelDescription',
+    groupId: 'advanced',
+    iconKey: 'otel',
+    tier: 'advanced',
+    custom: false,
+  },
+  {
+    id: 'agent_log',
+    labelKey: 'settings.sectionAgentLog',
+    descriptionKey: 'settings.agentLogDescription',
+    groupId: 'advanced',
+    iconKey: 'agentLog',
+    tier: 'advanced',
+    custom: false,
+  },
+  {
+    id: 'resource_monitor',
+    labelKey: 'settings.sectionResourceMonitor',
+    descriptionKey: 'settings.resourceMonitorDescription',
+    groupId: 'advanced',
+    iconKey: 'resourceMonitor',
+    tier: 'advanced',
+    custom: false,
   },
 ]
 

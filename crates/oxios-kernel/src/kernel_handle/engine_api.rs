@@ -698,6 +698,10 @@ pub struct EngineConfigResponse {
     /// Role-based model routing config (RFC-032).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role_routing: Option<crate::config::RoleRoutingConfig>,
+    /// Default model for one-shot (QuickAsk) requests. None ⇒ falls back to
+    /// `default_model`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quick_ask_model: Option<String>,
 }
 
 /// Result of an API key validation attempt.
@@ -952,6 +956,7 @@ impl EngineApi {
                 excluded_models: cfg.engine.excluded_models.clone(),
             },
             role_routing,
+            quick_ask_model: cfg.engine.quick_ask_model.clone(),
         }
     }
 
@@ -998,6 +1003,23 @@ impl EngineApi {
         self.persist(&snapshot)?;
         tracing::info!(model = %model_id, "Default model updated in config");
         self.rebuild_and_swap();
+        Ok(())
+    }
+
+    /// Set the default model for one-shot (QuickAsk) requests.
+    ///
+    /// Unlike `set_model`, this does NOT validate the model or hot-swap the
+    /// runtime — it is a pure config value. The one-shot WS message carries
+    /// it as `model` → `model_override`, which the agent runtime validates at
+    /// execute time (`agent_runtime.rs:481-484`).
+    pub fn set_quick_ask_model(&self, model_id: Option<&str>) -> anyhow::Result<()> {
+        let snapshot = {
+            let mut cfg = self.config.write();
+            cfg.engine.quick_ask_model = model_id.map(String::from);
+            cfg.clone()
+        };
+        self.persist(&snapshot)?;
+        tracing::info!(model = ?model_id, "QuickAsk model updated in config");
         Ok(())
     }
 
@@ -1439,6 +1461,7 @@ mod tests {
                 excluded_models: vec![],
             },
             role_routing: None,
+            quick_ask_model: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
         let restored: EngineConfigResponse = serde_json::from_str(&json).unwrap();

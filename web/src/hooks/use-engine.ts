@@ -978,6 +978,18 @@ export function useSetModel() {
   })
 }
 
+/** Set the default one-shot (QuickAsk) model. Pass null to clear (fall back to default_model). */
+export function useSetQuickAskModel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (modelId: string | null) =>
+      api.put('/api/engine/quick-ask-model', { model_id: modelId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['engine', 'config'] })
+    },
+  })
+}
+
 /** Set the API key for a provider. */
 export function useSetApiKey() {
   const qc = useQueryClient()

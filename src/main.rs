@@ -7,7 +7,6 @@
 mod commands;
 mod default_skills;
 mod kernel;
-mod otel;
 mod surface;
 mod web_dist;
 
@@ -1861,10 +1860,6 @@ async fn run() -> Result<()> {
                 .init();
         }
     }
-
-    // ── OpenTelemetry ──
-    let _otel_guard = otel::init_otel(&config.otel).await?;
-    Box::leak(Box::new(_otel_guard));
 
     // ── Fast-path: commands that never need the kernel ──
     match &cli.command {

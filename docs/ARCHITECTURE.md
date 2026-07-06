@@ -1583,7 +1583,7 @@ None of these conditions hold today.
 
 Instead of crate splitting, the kernel manages complexity through:
 
-- **Feature gates**: `sqlite-memory`, `embedding-gguf`, `otel`, `wasm-sandbox`, `browser` — only compile what you need
+- **Feature gates**: `sqlite-memory`, `embedding-gguf`, `wasm-sandbox`, `browser` — only compile what you need
 - **`pub(crate)` encapsulation**: Module internals stay internal
 - **Directory-level mod.rs**: Each subsystem controls its own visibility
 - **lib.rs section organization**: Clear logical grouping with labeled sections

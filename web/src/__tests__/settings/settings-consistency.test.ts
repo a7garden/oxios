@@ -90,6 +90,25 @@ describe('settings navigation consistency', () => {
   })
 })
 
+describe('hot-reload single source of truth', () => {
+  it('NEW_SECTIONS fields must not carry hotReload (backend is sole source)', () => {
+    for (const section of NEW_SECTIONS) {
+      for (const field of section.fields) {
+        expect(
+          (field as unknown as Record<string, unknown>).hotReload,
+          `${section.key}.${field.key}`,
+        ).toBeUndefined()
+      }
+    }
+  })
+
+  it('section definitions must not carry hotReload', () => {
+    for (const section of NEW_SECTIONS) {
+      expect((section as unknown as Record<string, unknown>).hotReload, section.key).toBeUndefined()
+    }
+  })
+})
+
 function findDuplicates(arr: string[]): string[] {
   const seen = new Set<string>()
   const dupes = new Set<string>()

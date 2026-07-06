@@ -493,15 +493,6 @@ cpu_threshold = 90.0     # CPU % overload threshold
 memory_threshold = 90.0  # Memory % overload threshold
 load_threshold = 8.0     # Load average overload threshold
 
-# ── OpenTelemetry ──────────────────────────────────────────────
-# Distributed tracing (disabled by default).
-
-[otel]
-enabled = false
-endpoint = "http://localhost:4317"  # OTLP gRPC endpoint
-service_name = "oxios"
-sampling_ratio = 1.0
-
 # ── Channels ───────────────────────────────────────────────────
 # Activate communication channels.
 

@@ -1174,6 +1174,42 @@ pub(crate) async fn handle_config_get(
     }
 }
 
+/// GET /api/config/meta — Hot-reload classification metadata.
+///
+/// Returns the backend's authoritative classification of which config
+/// sections/fields are hot-reloadable (applied immediately) vs which
+/// require a daemon restart. This is the **single source of truth** for
+/// the frontend's pre-save Diff Preview badges and SaveDock counts.
+///
+/// Without this endpoint, the frontend would need to maintain a parallel
+/// `hotReload` boolean per field in `field-defs.ts` that silently drifts
+/// from the backend's actual propagation logic (the `resource_monitor`
+/// drift bug was a concrete instance of this problem).
+pub(crate) async fn handle_config_meta() -> Json<ConfigMetaResponse> {
+    Json(ConfigMetaResponse {
+        hot_reloadable_sections: HOT_RELOADABLE_SECTIONS
+            .iter()
+            .map(|(s, _)| (*s).to_string())
+            .collect(),
+        always_restart_fields: RESTART_REQUIRED_FIELDS
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
+    })
+}
+
+/// Response for `GET /api/config/meta`.
+#[derive(Debug, Serialize)]
+pub(crate) struct ConfigMetaResponse {
+    /// Top-level config section keys whose fields are hot-reloadable
+    /// (e.g. `"exec"`, `"resource_monitor"`). Fields in these sections
+    /// that are NOT in `always_restart_fields` are applied immediately.
+    pub hot_reloadable_sections: Vec<String>,
+    /// Dotted field paths that always require a restart, even inside a
+    /// hot-reloadable section (e.g. `"gateway.host"`).
+    pub always_restart_fields: Vec<String>,
+}
+
 /// Deep-merge a patch into a base `serde_json::Value` (both must be objects).
 ///
 /// Sections and fields present in `patch` override those in `base`.
@@ -1337,8 +1373,7 @@ pub(crate) async fn handle_config_put(
 /// tooltips on the frontend).
 ///
 /// IMPORTANT: this list MUST match what `handle_config_patch` actually
-/// propagates. Sections not listed here (security, audit, orchestrator,
-/// context, session, logging, kernel, memory, …) are persisted to disk
+/// propagates. Sections not listed here (security, audit, context,
 /// but the running daemon keeps the boot-time values, so they are
 /// classified as `requires_restart`. Adding a section to this list
 /// without wiring the propagation in `handle_config_patch` would lie
@@ -1347,6 +1382,7 @@ const HOT_RELOADABLE_SECTIONS: &[(&str, &str)] = &[
     ("exec", "exec_api"),
     ("resource_monitor", "resource_monitor"),
     ("token_maxing", "quota_tracker"),
+    ("orchestrator", "infra_api"),
 ];
 
 /// Subset of fields that always require a restart even inside a
@@ -1376,10 +1412,6 @@ const RESTART_REQUIRED_FIELDS: &[&str] = &[
     "channels.telegram.session.rotation_hours",
     "channels.telegram.session.max_messages",
     "surfaces",
-    "otel.enabled",
-    "otel.endpoint",
-    "otel.service_name",
-    "otel.sampling_ratio",
     "cron",
     "mcp",
     "browser",
@@ -1591,6 +1623,12 @@ pub(crate) async fn handle_config_patch(
             memory_percent: updated.resource_monitor.memory_threshold,
             load_avg: updated.resource_monitor.load_threshold,
         });
+
+    // Hot-reload orchestrator config (evolution iterations, eval score).
+    state
+        .kernel
+        .infra
+        .update_orchestrator_config(updated.orchestrator.clone());
 
     // RFC-031: hot-reload token-maxing config into the live QuotaTracker,
     // preserving usage counters for providers that remain eligible.

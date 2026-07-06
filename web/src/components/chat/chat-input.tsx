@@ -1,4 +1,4 @@
-import { BookOpen, Brain, FileText, HardDrive, Send, Square, X } from 'lucide-react'
+import { BookOpen, Brain, Clock, FileText, HardDrive, Send, Square, X } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,8 @@ interface ChatInputProps {
   disabled?: boolean
   isStreaming?: boolean
   connected?: boolean
+  /** Number of user messages queued behind the in-flight turn. */
+  queuedCount?: number
   /** RFC-032: available roles (role name + model ID). */
   roles?: { name: string; model: string }[]
   /** RFC-032: currently active role (null = default). */
@@ -71,6 +73,7 @@ export function ChatInput({
   disabled,
   isStreaming,
   connected,
+  queuedCount = 0,
   roles = [],
   activeRole = null,
   setActiveRole = () => {},
@@ -311,15 +314,15 @@ export function ChatInput({
 
   // ── Send ──
   const handleSend = useCallback(() => {
-    if (!value.trim() || isStreaming || !connected) return
+    if (!value.trim() || !connected) return
     onSend(value.trim(), contextAttachments)
     onChange('')
     setContextAttachments([])
     setMentionQuery(null)
     setMentionResults([])
-  }, [value, isStreaming, connected, contextAttachments, onSend, onChange])
+  }, [value, connected, contextAttachments, onSend, onChange])
 
-  const canSend = value.trim() && !isStreaming && connected
+  const canSend = value.trim() && connected
 
   return (
     <div className="w-full max-w-3xl mx-auto px-4 pb-4 pt-2 relative">
@@ -450,8 +453,14 @@ export function ChatInput({
               setActiveRole={setActiveRole}
             />
           </div>
-          <div className="flex items-center shrink-0">
-            {isStreaming ? (
+          <div className="flex items-center shrink-0 gap-1.5">
+            {queuedCount > 0 && (
+              <span className="mr-0.5 flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-2xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                {t('chat.queued', { count: queuedCount, defaultValue: '{{count}} queued' })}
+              </span>
+            )}
+            {isStreaming && (
               <Button
                 onClick={onCancel}
                 variant="destructive"
@@ -463,23 +472,22 @@ export function ChatInput({
                 <Square className="h-3 w-3 fill-current" />
                 {t('chat.stop', 'Stop')}
               </Button>
-            ) : (
-              <Button
-                onClick={handleSend}
-                disabled={!canSend}
-                size="icon"
-                className={cn(
-                  'h-8 w-8 rounded-lg transition-all',
-                  canSend
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
-                    : 'bg-muted text-muted-foreground',
-                )}
-                aria-label={t('common.sendMessage', 'Send')}
-                title={t('common.sendMessage', 'Send')}
-              >
-                <Send className="h-3.5 w-3.5" />
-              </Button>
             )}
+            <Button
+              onClick={handleSend}
+              disabled={!canSend}
+              size="icon"
+              className={cn(
+                'h-8 w-8 rounded-lg transition-all',
+                canSend
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
+                  : 'bg-muted text-muted-foreground',
+              )}
+              aria-label={isStreaming ? t('chat.queue', 'Queue') : t('common.sendMessage', 'Send')}
+              title={isStreaming ? t('chat.queue', 'Queue') : t('common.sendMessage', 'Send')}
+            >
+              <Send className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
       </div>

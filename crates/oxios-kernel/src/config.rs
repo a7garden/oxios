@@ -712,6 +712,11 @@ pub struct EngineConfig {
     /// When present, messages with a matching role will use the mapped model.
     #[serde(default)]
     pub role_routing: RoleRoutingConfig,
+    /// Default model for one-shot (QuickAsk) requests in "provider/model"
+    /// format. When None, one-shot falls back to `default_model`. Lets the
+    /// user point throwaway questions at a cheaper/faster model.
+    #[serde(default)]
+    pub quick_ask_model: Option<String>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -726,6 +731,7 @@ impl Default for EngineConfig {
             fallback_models: Vec::new(),
             excluded_models: Vec::new(),
             role_routing: RoleRoutingConfig::default(),
+            quick_ask_model: None,
         }
     }
 }
@@ -923,9 +929,6 @@ pub struct OxiosConfig {
     /// Resource monitor configuration.
     #[serde(default)]
     pub resource_monitor: ResourceMonitorConfig,
-    /// OpenTelemetry tracing configuration.
-    #[serde(default)]
-    pub otel: OtelConfig,
     /// Logging configuration.
     #[serde(default)]
     pub logging: LoggingConfig,
@@ -1770,46 +1773,6 @@ impl Default for ResourceMonitorConfig {
             cpu_threshold: default_rm_cpu_threshold(),
             memory_threshold: default_rm_mem_threshold(),
             load_threshold: default_rm_load_threshold(),
-        }
-    }
-}
-
-/// OpenTelemetry tracing configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct OtelConfig {
-    /// Enable OTLP export (default: false).
-    #[serde(default)]
-    pub enabled: bool,
-    /// OTLP gRPC endpoint.
-    #[serde(default = "default_otel_endpoint")]
-    pub endpoint: String,
-    /// Service name for traces.
-    #[serde(default = "default_otel_service_name")]
-    pub service_name: String,
-    /// Sampling ratio (0.0 to 1.0).
-    #[serde(default = "default_otel_sampling_ratio")]
-    pub sampling_ratio: f64,
-}
-
-fn default_otel_endpoint() -> String {
-    "http://localhost:4317".into()
-}
-
-fn default_otel_service_name() -> String {
-    "oxios".into()
-}
-
-fn default_otel_sampling_ratio() -> f64 {
-    1.0
-}
-
-impl Default for OtelConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            endpoint: default_otel_endpoint(),
-            service_name: default_otel_service_name(),
-            sampling_ratio: default_otel_sampling_ratio(),
         }
     }
 }

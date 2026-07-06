@@ -1,4 +1,7 @@
 /target
+# surface/: experimental Tauri macOS app (oxios-mac) — 1.6GB build cache (target/gen/binaries).
+# Out of scope per RFC-026 (surface/* merged into the binary). Do not commit.
+/surface/
 # RFC-026: React frontend (was surface/oxios-web/web/)
 web/node_modules/
 web/dist/

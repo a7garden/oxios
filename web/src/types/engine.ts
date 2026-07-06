@@ -98,6 +98,7 @@ export interface EngineConfigResponse {
   api_key_set: boolean
   api_key_source?: ApiKeySource
   provider?: string
+  quick_ask_model?: string
   routing: {
     routingEnabled: boolean
     preferCostEfficient: boolean

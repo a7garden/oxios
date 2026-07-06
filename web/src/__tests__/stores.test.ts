@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'
@@ -293,6 +293,39 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     })
   })
 
+  it('merges consecutive same-source reasoning fragments into one activity', () => {
+    // Reasoning streams as per-token deltas; each delta must append to the
+    // existing reasoning activity's content rather than create a new card
+    // (the "one block per word" explosion the user reported).
+    useChatStore.getState().handleChunk({ type: 'reasoning', content: 'Thi', source: 'thinking' })
+    useChatStore.getState().handleChunk({ type: 'reasoning', content: 's is', source: 'thinking' })
+    useChatStore
+      .getState()
+      .handleChunk({ type: 'reasoning', content: ' a thought', source: 'thinking' })
+    const last = useChatStore.getState().messages.at(-1)!
+    const reasoning = last.activities!.filter((a) => a.type === 'reasoning')
+    expect(reasoning).toHaveLength(1)
+    expect(reasoning[0]).toMatchObject({
+      type: 'reasoning',
+      content: 'This is a thought',
+      reasoningSource: 'thinking',
+    })
+  })
+
+  it('starts a new reasoning activity when the source changes', () => {
+    useChatStore
+      .getState()
+      .handleChunk({ type: 'reasoning', content: 'thinking…', source: 'thinking' })
+    useChatStore
+      .getState()
+      .handleChunk({ type: 'reasoning', content: 'compacting…', source: 'compaction' })
+    const last = useChatStore.getState().messages.at(-1)!
+    const reasoning = last.activities!.filter((a) => a.type === 'reasoning')
+    expect(reasoning).toHaveLength(2)
+    expect(reasoning[0]).toMatchObject({ content: 'thinking…', reasoningSource: 'thinking' })
+    expect(reasoning[1]).toMatchObject({ content: 'compacting…', reasoningSource: 'compaction' })
+  })
+
   it('token chunk does not add an activity', async () => {
     useChatStore.getState().handleChunk({ type: 'token', content: 'hello' })
     // F9: tokens are batched via requestAnimationFrame; wait one frame for flush.
@@ -387,5 +420,56 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     useChatStore.getState().removeMessage('a1')
     expect(useChatStore.getState().isStreaming).toBe(false)
     expect(useChatStore.getState().messages).toHaveLength(0)
+  })
+})
+
+describe('useChatStore message queueing (while streaming)', () => {
+  let sendSpy: Mock
+  const mockWs = (): WebSocket =>
+    ({ readyState: 1, send: sendSpy, close: vi.fn() }) as unknown as WebSocket
+
+  beforeEach(() => {
+    localStorage.clear()
+    sendSpy = vi.fn()
+    useChatStore.setState({
+      messages: [
+        { id: 'a1', role: 'assistant' as const, content: '', timestamp: new Date().toISOString() },
+      ],
+      isStreaming: true,
+      connected: true,
+      _ws: mockWs(),
+      _pendingQueue: [],
+      _reconnectTimer: null,
+      _pingTimer: null,
+      activeSessionId: 's1',
+    })
+  })
+
+  it('queues a message sent while streaming instead of dispatching', () => {
+    useChatStore.getState().sendMessage('follow-up')
+    const s = useChatStore.getState()
+    // Stashed in the pending queue — not yet on the wire or in the list.
+    expect(s._pendingQueue).toEqual(['follow-up'])
+    expect(s.messages.some((m) => m.role === 'user')).toBe(false)
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
+  it('drains the queue in order when the turn completes (done)', () => {
+    useChatStore.getState().sendMessage('first')
+    useChatStore.getState().sendMessage('second')
+    // Turn ends → drain dispatches 'first', leaves 'second' queued.
+    useChatStore.getState().handleChunk({ type: 'done', session_id: 's1', phase: 'execute' })
+    const s = useChatStore.getState()
+    expect(s._pendingQueue).toEqual(['second'])
+    expect(s.isStreaming).toBe(true)
+    expect(s.messages.some((m) => m.role === 'user' && m.content === 'first')).toBe(true)
+    expect(sendSpy).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(sendSpy.mock.calls[0]![0] as string).content).toBe('first')
+  })
+
+  it('clears the queue on disconnect (cancel drops unsent messages)', () => {
+    useChatStore.getState().sendMessage('ghost')
+    useChatStore.getState().disconnect()
+    expect(useChatStore.getState()._pendingQueue).toEqual([])
   })
 })

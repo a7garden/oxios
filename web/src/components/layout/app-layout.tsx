@@ -5,8 +5,10 @@ import { InfoPanel } from '@/components/knowledge/info-panel'
 import { MoveModal } from '@/components/knowledge/move-modal'
 import { SearchModal } from '@/components/knowledge/search-modal'
 import { CommandPalette } from '@/components/layout/command-palette'
+import { QuickAskDialog } from '@/components/quick-ask/quick-ask-dialog'
 import { useApprovalWatcher, useGlobalEvents } from '@/hooks/use-global-events'
 import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
+import { useQuickAskShortcut } from '@/hooks/use-quick-ask-shortcut'
 import { cn } from '@/lib/utils'
 import { useEventStore } from '@/stores/events'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -36,6 +38,7 @@ export function AppLayout() {
   useKnowledgeShortcuts()
   useGlobalEvents()
   useApprovalWatcher()
+  useQuickAskShortcut()
 
   // Bootstrap singleton SSE connection on first mount
   const connectEvents = useEventStore((s) => s.connect)
@@ -119,6 +122,7 @@ export function AppLayout() {
       {/* Global Notification Center slide-over (schedule + notifications) */}
       <NotificationCenter />
       <CommandPalette />
+      <QuickAskDialog />
     </div>
   )
 }
