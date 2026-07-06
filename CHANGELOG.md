@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.19.0] - 2026-07-06
+
+### Added
+- **Quick-ask dialog (Web)** — Global ⌘-triggered quick-ask dialog (`quick-ask-dialog`, `use-quick-ask-shortcut`, `quick-ask` store) for one-shot prompts without leaving the current view, backed by a dedicated one-shot chat API route.
+
+### Changed
+- **Settings array editors unified (Web)** — Replaced ad-hoc array editors with a shared `array-transforms` module and a `Collapsible` primitive; the field-defs framework is simplified. Adds an `array-roundtrip` test and extends the settings-consistency suite.
+
+### Removed
+- **OpenTelemetry export path** — Dropped the unused OTLP gRPC exporter (`telemetry_otel`, `telemetry_stub`, `src/otel`), the `[otel]` config block, and the `opentelemetry`/otel deps from the kernel and binary crate. Observability relies on the existing tracing layer.
+- **CORS origins editor (Web)** — Removed the redundant CORS origins editor (`cors-origins-editor`, `cors-validator`); CORS is enforced by the gateway.
+
 ## [1.18.0] - 2026-07-05
 
 ### Added
@@ -39,8 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Chat + sidebar hardening (RFC-032)** — Audit-driven fixes for chat state and sidebar reliability.
 - **Agent completion status** — Successful agents now correctly marked `Completed` instead of `Idle`.
-
-## [Unreleased]
 
 ## [1.16.0] - 2026-06-30
 
