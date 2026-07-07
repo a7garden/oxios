@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -43,6 +43,7 @@ function WorkspacePage() {
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
+  const [editedContent, setEditedContent] = useState<string | null>(null)
 
   // Current directory context for breadcrumb + create
   const currentDir = useMemo(() => {
@@ -158,6 +159,11 @@ function WorkspacePage() {
     },
     [selectedFile, saveFile],
   )
+  // Reset the lifted editor buffer whenever the open file changes, so the
+  // toolbar Save never writes a previous file's content into the new one.
+  useEffect(() => {
+    setEditedContent(null)
+  }, [selectedFile?.path])
 
   const handleCreate = useCallback(
     (fullPath: string, isDir: boolean) => {
@@ -337,9 +343,9 @@ function WorkspacePage() {
                       size="sm"
                       className="h-7 px-2 text-xs"
                       onClick={() => {
-                        if (fileData != null) handleSave(fileData)
+                        if (editedContent != null) handleSave(editedContent)
                       }}
-                      disabled={saveFile.isPending}
+                      disabled={editedContent == null || saveFile.isPending}
                     >
                       Save
                     </Button>
@@ -358,6 +364,7 @@ function WorkspacePage() {
                     path={selectedFile.path}
                     content={fileData ?? ''}
                     onSave={handleSave}
+                    onChange={setEditedContent}
                   />
                 ) : isImage(selectedFile.path) ? (
                   <div className="flex items-center justify-center h-full p-4">

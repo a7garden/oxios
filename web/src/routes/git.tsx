@@ -11,6 +11,7 @@ import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
 import type { GitCommit } from '@/types'
@@ -22,6 +23,7 @@ function GitPage() {
   const queryClient = useQueryClient()
   const [tagName, setTagName] = useState('')
   const [restoreHash, setRestoreHash] = useState('')
+  const [restoreConfirm, setRestoreConfirm] = useState(false)
 
   const {
     data: commits,
@@ -154,7 +156,7 @@ function GitPage() {
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => restoreMutation.mutate(restoreHash)}
+              onClick={() => setRestoreConfirm(true)}
               disabled={!restoreHash.trim() || restoreMutation.isPending}
             >
               {t('git.restore')}
@@ -182,9 +184,14 @@ function GitPage() {
             <div className="space-y-2">
               {commitList.map((commit) => (
                 <div key={commit.hash} className="flex items-start gap-3 rounded-lg border p-3">
-                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setRestoreHash(commit.hash)}
+                    title={t('git.useHashForRestore')}
+                    className="text-xs bg-muted px-1.5 py-0.5 rounded shrink-0 font-mono cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                  >
                     {commit.hash.slice(0, 7)}
-                  </code>
+                  </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{commit.message}</p>
                     <p className="text-xs text-muted-foreground">
@@ -197,6 +204,37 @@ function GitPage() {
           )}
         </CardContent>
       </Card>
+      <Dialog open={restoreConfirm} onOpenChange={setRestoreConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('git.restoreConfirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('git.restoreConfirmDesc', { hash: restoreHash.slice(0, 7) })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRestoreConfirm(false)}
+              disabled={restoreMutation.isPending}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={!restoreHash.trim() || restoreMutation.isPending}
+              onClick={() => {
+                restoreMutation.mutate(restoreHash)
+                setRestoreConfirm(false)
+              }}
+            >
+              {t('git.restore')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

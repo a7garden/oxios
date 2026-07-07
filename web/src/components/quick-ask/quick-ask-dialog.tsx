@@ -53,6 +53,7 @@ export function QuickAskDialog() {
   const [input, setInput] = useState('')
   const [copied, setCopied] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-scroll on new content.
   useEffect(() => {
@@ -74,8 +75,10 @@ export function QuickAskDialog() {
     setInput('')
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // IME guard: don't send while composing (e.g. confirming a Hangul candidate).
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit()
     }
@@ -134,7 +137,14 @@ export function QuickAskDialog() {
         if (!o) closeQuickAsk()
       }}
     >
-      <DialogContent className="flex h-[80vh] max-w-2xl flex-col gap-0 p-0 sm:rounded-xl">
+      <DialogContent
+        showCloseButton={false}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault()
+          inputRef.current?.focus()
+        }}
+        className="flex h-[80vh] max-w-2xl flex-col gap-0 p-0 sm:rounded-xl"
+      >
         <DialogHeader className="flex-row items-center justify-between border-b px-5 py-3">
           <div className="flex items-center gap-2">
             <DialogTitle className="text-sm font-medium">{t('quickAsk.title')}</DialogTitle>
@@ -182,6 +192,7 @@ export function QuickAskDialog() {
           <div className="flex items-end gap-2">
             <textarea
               value={input}
+              ref={inputRef}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t('quickAsk.placeholder')}
@@ -205,7 +216,9 @@ export function QuickAskDialog() {
           </div>
           <div className="mt-2 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-[10px] text-muted-foreground">⌘↵</span>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {`↵ ${t('quickAsk.hintSend')} · ⇧↵ ${t('quickAsk.hintNewline')}`}
+              </span>
               {hasResult && (
                 <>
                   <Button

@@ -58,6 +58,15 @@ function DashboardPage() {
   const memSeries = seriesFromSnapshots(Array.isArray(snapshots) ? snapshots : [], 'memory_percent')
   const cpuDelta = computeDelta(cpuSeries)
   const memDelta = computeDelta(memSeries)
+  const cpuNow = cpuSeries.length > 0 ? (cpuSeries[cpuSeries.length - 1] ?? 0) : 0
+  const memNow = memSeries.length > 0 ? (memSeries[memSeries.length - 1] ?? 0) : 0
+  // Threshold-based severity: normal load stays neutral (info); only high load
+  // escalates to warning/error. Avoids false-alarm amber/red on healthy metrics.
+  const sevText = { error: 'text-error', warning: 'text-warning', info: 'text-info' } as const
+  const sevOf = (v: number): 'error' | 'warning' | 'info' =>
+    v >= 90 ? 'error' : v >= 75 ? 'warning' : 'info'
+  const cpuSev = sevOf(cpuNow)
+  const memSev = sevOf(memNow)
 
   // Token rate from the SSE stream
   const { tokensPerMin, history: tokenHistory } = useTokenRate()
@@ -136,10 +145,10 @@ function DashboardPage() {
             cpuSeries.length > 0 ? `${(cpuSeries[cpuSeries.length - 1] ?? 0).toFixed(0)}%` : '—'
           }
           icon={<Cpu className="h-4 w-4" />}
-          iconClassName="text-warning"
+          iconClassName={sevText[cpuSev]}
           delta={cpuSeries.length > 1 ? cpuDelta : undefined}
           sparkline={cpuSeries}
-          sparkColor="warning"
+          sparkColor={cpuSev}
           href="/resources"
         />
         <StatCard
@@ -148,10 +157,10 @@ function DashboardPage() {
             memSeries.length > 0 ? `${(memSeries[memSeries.length - 1] ?? 0).toFixed(0)}%` : '—'
           }
           icon={<HardDrive className="h-4 w-4" />}
-          iconClassName="text-error"
+          iconClassName={sevText[memSev]}
           delta={memSeries.length > 1 ? memDelta : undefined}
           sparkline={memSeries}
-          sparkColor="error"
+          sparkColor={memSev}
           href="/resources"
         />
         <StatCard

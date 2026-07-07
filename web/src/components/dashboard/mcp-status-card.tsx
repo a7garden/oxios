@@ -29,6 +29,7 @@ export function McpStatusCard({ className }: { className?: string }) {
         </CardTitle>
         <Link
           to="/mcp"
+          search={{ tab: undefined }}
           className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
         >
           {t('dashboard.viewAll')}

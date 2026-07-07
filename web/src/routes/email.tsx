@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import DOMPurify from 'dompurify'
 import {
   ArrowRight,
@@ -18,7 +18,7 @@ import {
   Settings,
   Wrench,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -34,7 +34,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 
-export const Route = createFileRoute('/email')({ component: EmailPage })
+export const Route = createFileRoute('/email')({
+  component: EmailPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || undefined,
+  }),
+})
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -155,16 +160,17 @@ function providerDashboardLabel(provider: string | null): string | null {
 function EmailPage() {
   const { t } = useTranslation()
   const { data: status, isLoading, isError, refetch } = useEmailStatus()
-  const [activeTab, setActiveTab] = useState<string>('setup')
-  useEffect(() => {
-    // status loads asynchronously; once we know whether the user is
-    // already configured, jump them to the right tab. The previous
-    // useState initializer evaluated only once with `status === undefined`
-    // and stuck every user on the setup tab.
-    if (status?.configured) {
-      setActiveTab((cur) => (cur === 'setup' ? 'overview' : cur))
-    }
-  }, [status?.configured])
+  const navigate = useNavigate({ from: '/email' })
+  const { tab: tabParam } = Route.useSearch()
+  const validTabs = ['overview', 'setup', 'history', 'templates'] as const
+  const explicitTab = validTabs.includes(tabParam as (typeof validTabs)[number])
+    ? (tabParam as string)
+    : undefined
+  // Default lands configured users on overview, unconfigured on setup — but an
+  // explicit ?tab= is always respected (no forced jump away from user choice).
+  const activeTab = explicitTab ?? (status?.configured ? 'overview' : 'setup')
+  const setActiveTab = (v: string) =>
+    navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true })
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />

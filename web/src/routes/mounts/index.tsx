@@ -110,7 +110,7 @@ function MountsPage() {
             >
               {/* Action buttons: rescan + delete (top-right) */}
 
-              <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-70 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <div className="absolute right-2 top-2 flex items-center gap-0.5">
                 <Button
                   variant="ghost"
                   size="icon"

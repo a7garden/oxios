@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus, Server, Terminal, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -10,11 +10,19 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-export const Route = createFileRoute('/mcp')({ component: McpPage })
+export const Route = createFileRoute('/mcp')({
+  component: McpPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || undefined,
+  }),
+})
 
 function McpPage() {
   const { t } = useTranslation()
   const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const navigate = useNavigate({ from: Route.id })
+  const { tab: tabParam } = Route.useSearch()
+  const tab = tabParam === 'tools' || tabParam === 'test' ? tabParam : 'servers'
 
   return (
     <div className="space-y-6">
@@ -30,7 +38,7 @@ function McpPage() {
         </Button>
       </div>
 
-      <Tabs defaultValue="servers">
+      <Tabs value={tab} onValueChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v === 'servers' ? undefined : v }), replace: true })}>
         <TabsList>
           <TabsTrigger value="servers" className="flex items-center gap-1.5">
             <Server className="h-4 w-4" /> {t('mcp.servers', 'Servers')}

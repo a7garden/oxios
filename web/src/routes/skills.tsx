@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   Check,
   ChevronDown,
@@ -118,7 +118,8 @@ function FormatBadge({ format }: { format: SkillFormat }) {
 function SkillsPage() {
   const { t } = useTranslation()
   const search = Route.useSearch()
-  const [tab, setTab] = useState<Tab>(search.tab === 'marketplace' ? 'marketplace' : 'installed')
+  const navigate = useNavigate({ from: Route.id })
+  const tab: Tab = search.tab === 'marketplace' ? 'marketplace' : 'installed'
   const [mktSource, setMktSource] = useState<MarketplaceSource>('clawhub')
   const [filter, setFilter] = useState<'all' | SkillStatus>('all')
   const [searchQuery, setSearchQuery] = useState('' /* icon fallback */)
@@ -244,12 +245,18 @@ function SkillsPage() {
   }, [skills, filter, searchQuery])
 
   // Close detail panel when switching tabs
-  const handleTabChange = useCallback((newTab: Tab) => {
-    setTab(newTab)
-    setSelectedSkill(null)
-    setSelectedMktSlug(null)
-    setSelectedSkillsShId(null)
-  }, [])
+  const handleTabChange = useCallback(
+    (newTab: Tab) => {
+      navigate({
+        search: (prev) => ({ ...prev, tab: newTab === 'installed' ? undefined : newTab }),
+        replace: true,
+      })
+      setSelectedSkill(null)
+      setSelectedMktSlug(null)
+      setSelectedSkillsShId(null)
+    },
+    [navigate],
+  )
 
   // Gate the editor so edit mode opens only after SKILL.md content has loaded
   // (avoids seeding a blank body when the content query is still fetching).

@@ -492,7 +492,7 @@ function AgentsListPage() {
                       disabled={currentPage <= 1}
                       onClick={() => setParam('page', currentPage - 1)}
                     >
-                      ← Previous
+                      {t('agents.previous')}
                     </Button>
                     <Button
                       variant="outline"
@@ -500,7 +500,7 @@ function AgentsListPage() {
                       disabled={currentPage >= tableQuery.data.total_pages}
                       onClick={() => setParam('page', currentPage + 1)}
                     >
-                      Next →
+                      {t('agents.next')}
                     </Button>
                   </div>
                 </div>
