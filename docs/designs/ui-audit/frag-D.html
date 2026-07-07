@@ -1,732 +1,303 @@
-<!-- SCREEN 10 — 비용 -->
-<section class="screen" id="screen-10">
-  <div class="screen-head">
-    <div class="num">10</div>
-    <div class="titles">
-      <h2>비용</h2>
-      <div class="route">web/src/routes/budget.tsx · /budget</div>
-    </div>
-    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
-      <span class="h" style="color:var(--hi);font-weight:700">1 H</span> ·
-      <span style="color:var(--med);font-weight:700">4 M</span> ·
-      <span style="color:var(--lo);font-weight:700">2 L</span>
-    </div>
-  </div>
-  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
-    LLM 사용 비용을 월 한도·기간별 집계·프로바이더 쿼터·에이전트 별 토큰/콜 예산으로 추적하는 운영 화면. 상단 한도 카드 + 4단위 차트 + 2단 분해 + 프로바이더 행 + 에이전트 예산 카드가 세로로 적층된다.
-  </p>
-
-  <div class="rubric" aria-label="루브릭">
-    <div class="cell r3"><span class="sc">3</span>정보구조</div>
-    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
-    <div class="cell r3"><span class="sc">3</span>기능배치</div>
-    <div class="cell r4"><span class="sc">4</span>내비게이션</div>
-    <div class="cell r3"><span class="sc">3</span>일관성</div>
-    <div class="cell r2"><span class="sc">2</span>인터랙션</div>
-    <div class="cell r2"><span class="sc">2</span>접근성</div>
-    <div class="cell r3"><span class="sc">3</span>타이포</div>
-  </div>
-
-  <div class="compare">
-    <!-- CURRENT -->
-    <div class="panel cur">
-      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
-            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:6px 2px 3px">운영</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">⏱ 크론잡</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">💲 비용</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">⚡ 토큰맥싱</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:8px 2px 3px">인프라</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🔌 MCP</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">✉ 이메일</div>
-          </div>
-          <div style="flex:1;padding:10px 12px;overflow:hidden">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:14px;font-weight:600">비용</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">LLM 사용량 · 한도 · 예산</div></div>
-              <div style="display:flex;gap:4px;align-items:center">
-                <span style="font-size:9px;background:oklch(0.97 0.014 265);color:oklch(0.23 0.025 265);border-radius:999px;padding:2px 7px;font-weight:600">↻</span>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:8px;position:relative">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">월 한도</div>
-                <div style="font-size:13px;font-weight:700">$0.0000 <span style="font-size:9px;color:oklch(0.552 0.016 285.938);font-weight:400">/ $50.00</span></div>
-                <div style="height:4px;background:oklch(0.967 0.003 265);border-radius:2px;margin-top:3px;overflow:hidden"><div style="height:100%;width:0%;background:oklch(0.23 0.025 265)"></div></div>
-              </div>
-              <div style="grid-column:span 3;background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
-                <div style="display:inline-flex;gap:1px;background:oklch(0.967 0.003 265);border-radius:6px;padding:2px;font-size:9px">
-                  <span style="padding:2px 8px;border-radius:4px;background:#fff;font-weight:600">월</span>
-                  <span style="padding:2px 8px;color:oklch(0.552 0.016 285.938)">오늘</span>
-                  <span style="padding:2px 8px;color:oklch(0.552 0.016 285.938)">주</span>
-                  <span style="padding:2px 8px;color:oklch(0.552 0.016 285.938)">전체</span>
-                </div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px"><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">총 지출</div><div style="font-size:13px;font-weight:700">$0.0000</div></div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px"><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">토큰</div><div style="font-size:13px;font-weight:700">1,247k</div></div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px"><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">에이전트 실행</div><div style="font-size:13px;font-weight:700">38</div></div>
-            </div>
-            <div style="display:grid;grid-template-columns:2fr 1fr;gap:5px;margin-top:6px">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;height:80px;padding:6px">
-                <div style="font-size:9px;font-weight:600">일별 지출 (30d)</div>
-                <svg viewBox="0 0 200 50" style="width:100%;height:46px;margin-top:2px"><polyline fill="none" stroke="oklch(0.23 0.025 265)" stroke-width="1.2" points="0,40 20,38 40,30 60,32 80,28 100,20 120,22 140,15 160,18 180,12 200,8"/></svg>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;height:80px;padding:6px">
-                <div style="font-size:9px;font-weight:600">프로바이더 쿼터</div>
-                <div style="display:flex;gap:3px;margin-top:4px;flex-wrap:wrap">
-                  <span style="font-size:8px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:4px;padding:1px 5px">● anthropic</span>
-                  <span style="font-size:8px;background:oklch(0.967 0.003 265);color:oklch(0.552 0.016 285.938);border-radius:4px;padding:1px 5px">○ zai</span>
-                </div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:6px">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
-                <div style="font-size:9px;font-weight:600">에이전트: coder</div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938);margin-top:2px">토큰 45k / 50k</div>
-                <div style="height:4px;background:oklch(0.967 0.003 265);border-radius:2px;margin-top:3px;overflow:hidden"><div style="height:100%;width:90%;background:oklch(0.577 0.245 27.325)"></div></div>
-                <div style="display:flex;gap:3px;margin-top:4px">
-                  <span style="font-size:8px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:1px 5px">편집</span>
-                  <span style="font-size:8px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:1px 5px">초기화</span>
-                  <span style="font-size:8px;color:oklch(0.577 0.245 27.325);padding:1px 5px">제거</span>
-                </div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;opacity:.6">
-                <div style="font-size:9px;font-weight:600;color:oklch(0.552 0.016 285.938)">에이전트: researcher</div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938);margin-top:2px">예산 미설정</div>
-                <div style="font-size:8px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:1px 5px;display:inline-block;margin-top:4px">설정</div>
-              </div>
-              <div style="background:#fff;border:1px dashed oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">… +n 에이전트</div>
-            </div>
-          </div>
-        </div>
-        <span class="pin h" style="top:24px;right:14px" title="F1">1</span>
-        <span class="pin m" style="top:60px;left:152px" title="F2">2</span>
-        <span class="pin m" style="top:140px;right:12px" title="F3">3</span>
-        <span class="pin m" style="top:202px;left:170px" title="F4">4</span>
-        <span class="pin l" style="top:220px;left:240px" title="F5">5</span>
-        <span class="pin l" style="top:268px;right:14px" title="F6">6</span>
-        <span class="pin l" style="top:42px;right:84px" title="F7">7</span>
-      </div>
-    </div>
-
-    <!-- PROPOSED -->
-    <div class="panel prop">
-      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
-            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:6px 2px 3px">운영</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">⏱ 크론잡</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">💲 비용</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">⚡ 토큰맥싱</div>
-          </div>
-          <div style="flex:1;padding:10px 12px;overflow:hidden">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:14px;font-weight:600">비용</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">LLM 사용량 · 한도 · 예산</div></div>
-              <span style="font-size:11px;background:oklch(0.97 0.014 265);color:oklch(0.23 0.025 265);border-radius:999px;padding:2px 8px;font-weight:600;display:inline-flex;align-items:center;gap:4px">↻ 새로고침</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 3fr;gap:5px;margin-top:8px">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px">
-                <div style="font-size:9px;color:oklch(0.552 0.016 285.938);display:flex;align-items:center;gap:4px">🎯 월 한도</div>
-                <div style="font-size:15px;font-weight:700;margin-top:2px">$12.34 <span style="font-size:10px;color:oklch(0.552 0.016 285.938);font-weight:400">/ $50.00</span></div>
-                <div style="height:5px;background:oklch(0.967 0.003 265);border-radius:3px;margin-top:4px;overflow:hidden"><div style="height:100%;width:25%;background:oklch(0.596 0.145 163)"></div></div>
-                <div style="font-size:9px;color:oklch(0.669 0.162 70);margin-top:3px">남음 $37.66 · 25%</div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px">
-                <div style="font-size:9px;color:oklch(0.552 0.016 285.938);margin-bottom:4px">기간</div>
-                <div style="display:inline-flex;gap:1px;background:oklch(0.967 0.003 265);border-radius:6px;padding:2px;font-size:10px">
-                  <span style="padding:3px 10px;border-radius:4px;background:#fff;font-weight:600;color:oklch(0.23 0.025 265)">월</span>
-                  <span style="padding:3px 10px;color:oklch(0.552 0.016 285.938)">오늘</span>
-                  <span style="padding:3px 10px;color:oklch(0.552 0.016 285.938)">주</span>
-                  <span style="padding:3px 10px;color:oklch(0.552 0.016 285.938)">전체</span>
-                </div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:6px">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px"><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">총 지출</div><div style="font-size:15px;font-weight:700">$12.34</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">전월 대비 −18%</div></div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px"><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">토큰</div><div style="font-size:15px;font-weight:700">1.25M</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">$9.9/M tok</div></div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px"><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">에이전트 실행</div><div style="font-size:15px;font-weight:700">38</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">활성 4</div></div>
-            </div>
-            <div style="display:grid;grid-template-columns:2fr 1fr;gap:5px;margin-top:6px">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;height:80px;padding:7px">
-                <div style="font-size:9px;font-weight:600">일별 지출 (30d)</div>
-                <svg viewBox="0 0 200 50" style="width:100%;height:46px;margin-top:2px"><polyline fill="none" stroke="oklch(0.23 0.025 265)" stroke-width="1.4" points="0,40 20,38 40,30 60,32 80,28 100,20 120,22 140,15 160,18 180,12 200,8"/></svg>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;font-size:9px">
-                <div style="font-weight:600;margin-bottom:3px">프로바이더 쿼터</div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span>anthropic</span><span style="color:oklch(0.596 0.145 163);font-weight:600">● 활성</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-top:1px dashed oklch(0.92 0.004 286.32)"><span>zai</span><span style="color:oklch(0.577 0.245 27.325);font-weight:600">⚠ 쿼터 초과</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-top:1px dashed oklch(0.92 0.004 286.32)"><span>openai</span><span style="color:oklch(0.552 0.016 285.938)">○ 키 없음</span></div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:6px">
-              <div style="background:#fff;border:1px solid oklch(0.577 0.245 27.325/.4);border-radius:8px;padding:6px;position:relative">
-                <div style="font-size:9px;font-weight:600;display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.577 0.245 27.325)"></span>coder <span style="font-size:8px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:3px;padding:0 4px">소진</span></div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938);margin-top:2px">토큰 45k / 50k · 90%</div>
-                <div style="height:4px;background:oklch(0.967 0.003 265);border-radius:2px;margin-top:3px;overflow:hidden"><div style="height:100%;width:90%;background:oklch(0.577 0.245 27.325)"></div></div>
-                <div style="display:flex;gap:3px;margin-top:4px">
-                  <span style="font-size:8px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:2px 6px">초기화</span>
-                  <span style="font-size:8px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:4px;padding:2px 6px;font-weight:600">제거</span>
-                </div>
-              </div>
-              <div style="background:#fff;border:1px dashed oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
-                <div style="font-size:9px;font-weight:600;color:oklch(0.552 0.016 285.938)">researcher</div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938);margin-top:2px">에이전트 메타에 budget 미설정</div>
-                <div style="font-size:8px;background:oklch(0.23 0.025 265);color:#fff;border-radius:4px;padding:2px 6px;display:inline-block;margin-top:4px;font-weight:600">예산 설정</div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px;text-align:center">+ 11개<br>에이전트</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="findings">
-    <h4>발견사항 (7)</h4>
-    <ul class="flist">
-      <li><span class="badge h">HIGH</span><div><span class="ft">총 지출이 $0.0000처럼 4자리까지 표기 — 마이크로 비용과 일반 비용이 같은 정밀도로 렌더링되어 규모 감각 상실</span><span class="cite">cost-summary.tsx:29 (cost.toFixed(4)) · cost-by-model.tsx:38 · cost-by-project.tsx:40</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">월 한도 카드와 기간 탭이 한 행에 묶여 있는데 sm 구간에서는 기간 탭만 단독 행으로 떨어져 공간 낭비 + 정렬 깨짐</span><span class="cite">budget.tsx:39-52 (sm:col-span-1 lg:col-span-3 비대칭)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">ProviderQuotaCards의 ProviderRow가 정적 div — 클릭 가능 신호 0. 상세 이동·쿼터 새로고침 등 어포던스 부재</span><span class="cite">provider-quota-cards.tsx:83 (단순 div, button/as 미사용)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">에이전트 예산 카드의 "제거" 버튼이 variant=ghost + text-destructive로 outline 편집/초기화보다 오히려 약하게 표시 — 파괴적 액션 보호 원칙 위반</span><span class="cite">agent-budget-card.tsx:129-137 (ghost vs outline:118)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">provider-quota의 quota.error가 text-xs text-muted-foreground로 렌더링되어 정상 행과 색·굵기 동일 — 에러가 시각적으로 묻힘</span><span class="cite">provider-quota-cards.tsx:109-113</span></div></li>
-      <li><span class="badge l">LOW</span><div><span class="ft">예산 미설정 에이전트 카드가 "예산 미설정" 한 줄 + 버튼만 노출 — 왜 미설정인지 단서 없음</span><span class="cite">agent-budget-card.tsx:44-61</span></div></li>
-      <li><span class="badge l">LOW</span><div><span class="ft">일별 지출 차트의 X/Y축 tick 폰트가 fontSize=10 (AA 11px 미만) — 가독성 임계치 미달</span><span class="cite">cost-chart.tsx:35,39 (tick fontSize 10)</span></div></li>
-    </ul>
-  </div>
-  <div class="changes">
-    <h4>변경 방향</h4>
-    <ul>
-      <li>토큰 비용 표기는 단위 적응형으로 — $1 미만은 4자리, $1–$999는 2자리, ≥$1k는 k/M 접미 (Intl.NumberFormat).</li>
-      <li>SpendLimit + Tabs를 `grid-cols-1 lg:grid-cols-4`로 정렬하고, sm 이하에서는 탭을 한도 카드 아래로 스택 — 빈 행 제거.</li>
-      <li>ProviderRow를 `<button>` 또는 `<a>`로 감싸고, 키 없음/쿼터 초과 상태는 destructive로 색·아이콘 분리. quota.error는 text-error + AlertCircle 명시.</li>
-      <li>AgentBudgetCard의 Remove 버튼을 destructive variant의 solid 버튼으로 승격, Edit/Reset은 outline 유지 — 파괴 액션 보호.</li>
-      <li>예산 미설정 카드는 "에이전트 메타에 budget 미설정" 같은 사유 문구를 노출하고, "예산 설정"을 solid primary 버튼으로.</li>
-      <li>차트 tick 폰트 11px로 상향.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- SCREEN 11 — 토큰맥싱 -->
 <section class="screen" id="screen-11">
   <div class="screen-head">
-    <div class="num">11</div>
-    <div class="titles">
-      <h2>토큰맥싱</h2>
-      <div class="route">web/src/routes/token-maxing.tsx · /token-maxing</div>
-    </div>
-    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
-      <span class="h" style="color:var(--hi);font-weight:700">0 H</span> ·
-      <span style="color:var(--med);font-weight:700">4 M</span> ·
-      <span style="color:var(--lo);font-weight:700">2 L</span>
-    </div>
+    <div class="snum">11</div>
+    <div class="stitle"><h2>토큰 맥싱</h2><span class="route">/token-maxing · routes/token-maxing.tsx (RFC-031)</span></div>
+    <div class="rubric"><div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
   </div>
-  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
-    RFC-031 토큰맥싱 운영 패널. 라이브 상태 헤더 + 시작/중지 컨트롤 + 프로바이더 가용성/과금 분류 + 과거 세션 리포트로 구성되며, 결제 모델(metered/subscription)별 경고 흐름을 가진다.
-  </p>
-
-  <div class="rubric" aria-label="루브릭">
-    <div class="cell r3"><span class="sc">3</span>정보구조</div>
-    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
-    <div class="cell r3"><span class="sc">3</span>기능배치</div>
-    <div class="cell r4"><span class="sc">4</span>내비게이션</div>
-    <div class="cell r3"><span class="sc">3</span>일관성</div>
-    <div class="cell r3"><span class="sc">3</span>인터랙션</div>
-    <div class="cell r2"><span class="sc">2</span>접근성</div>
-    <div class="cell r3"><span class="sc">3</span>타이포</div>
-  </div>
-
   <div class="compare">
-    <div class="panel cur">
-      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
-            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:6px 2px 3px">운영</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">⏱ 크론잡</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">💲 비용</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">⚡ 토큰맥싱</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:8px 2px 3px">인프라</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🔌 MCP</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">✉ 이메일</div>
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>토큰 맥싱</div>
+              <div class="sb-grp">인프라</div><div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
           </div>
-          <div style="flex:1;padding:10px 12px;overflow:hidden">
-            <div style="font-size:14px;font-weight:600;margin-bottom:4px">토큰맥싱</div>
-            <!-- status header compact -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;position:relative">
-              <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:9px;font-weight:600">상태</div><span style="font-size:8px;background:oklch(0.967 0.003 265);color:oklch(0.552 0.016 285.938);border-radius:4px;padding:1px 5px">● 유휴</span></div>
-              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin-top:3px;font-size:8px;color:oklch(0.552 0.016 285.938)"><span>현재 프로바이더 —</span><span>현재 작업 —</span><span>토큰 0</span><span>작업 0</span></div>
-              <div style="font-size:8px;color:oklch(0.552 0.016 285.938);margin-top:3px">윈도우 —</div>
-            </div>
-            <!-- controls row -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:5px;position:relative">
-              <div style="font-size:9px;font-weight:600;margin-bottom:3px">컨트롤</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:8px"><span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px">시작 2025-…</span><span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px">종료 2025-…</span></div>
-              <div style="display:flex;gap:3px;margin-top:4px">
-                <span style="font-size:8px;background:oklch(0.23 0.025 265);color:#fff;border-radius:3px;padding:2px 6px;font-weight:600">▶ 윈도우 시작</span>
-                <span style="font-size:8px;border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px 6px">✋ 수동 시작</span>
-                <span style="font-size:8px;background:oklch(0.967 0.003 265);color:oklch(0.552 0.016 285.938);border-radius:3px;padding:2px 6px;opacity:.5">■ 중지</span>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between" style="position:relative"><span class="pin" style="top:-6px;right:-6px">1</span><span class="pin" style="top:18px;right:-6px">2</span>
+                <div><div style="font-size:18px;font-weight:700">토큰 맥싱</div><div class="sm mut">토큰 할당량 내에서 최대한 활용</div></div>
+                <div></div>
               </div>
-              <div style="font-size:8px;color:oklch(0.669 0.162 70);background:oklch(0.967 0.003 265);border-radius:3px;padding:3px 6px;margin-top:4px">⚠ 활성 프로바이더 없음</div>
-            </div>
-            <!-- providers -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:5px">
-              <div style="font-size:9px;font-weight:600;margin-bottom:3px">프로바이더</div>
-              <div id="s11-p3" style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed oklch(0.92 0.004 286.32);padding:2px 0">
-                <span style="font-size:9px">zai</span>
-                <span style="display:flex;gap:3px"><span style="font-size:8px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:3px;padding:1px 4px">● 활성</span><span style="font-size:8px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:3px;padding:1px 4px">👑 구독</span></span>
+              <div class="card">
+                <div class="card-h"><span class="pin" style="top:-4px;right:-4px">4</span><span class="card-t">상태</span><span class="badge idle">유휴</span></div>
+                <div class="card-body">
+                  <div class="g4" style="grid-template-columns:repeat(3,1fr);gap:8px">
+                    <div><div class="xs mut">제공자</div><div class="sm bold">zai</div></div>
+                    <div><div class="xs mut">세션 토큰</div><div class="sm bold">0</div></div>
+                    <div><div class="xs mut">활성 윈도우</div><div class="sm bold">수동(Manual)</div></div>
+                  </div>
+                </div>
               </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed oklch(0.92 0.004 286.32);padding:2px 0"><span style="font-size:9px">anthropic</span><span style="display:flex;gap:3px"><span style="font-size:8px;background:oklch(0.97 0.014 70);color:oklch(0.669 0.162 70);border-radius:3px;padding:1px 4px">▲ 드레이닝</span><span style="font-size:8px;background:oklch(0.97 0.014 27);color:oklch(0.577 0.245 27.325);border-radius:3px;padding:1px 4px">💳 종량제</span></span></div>
-              <div id="s11-p5" style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed oklch(0.92 0.004 286.32);padding:2px 0"><span style="font-size:9px">openai</span><span style="display:flex;gap:3px"><span style="font-size:8px;border:1px solid oklch(0.92 0.004 286.32);color:oklch(0.552 0.016 285.938);border-radius:3px;padding:1px 4px">○ 비활성</span><span style="font-size:8px;border:1px solid oklch(0.92 0.004 286.32);color:oklch(0.552 0.016 285.938);border-radius:3px;padding:1px 4px">? 미상</span></span></div>
-            </div>
-            <!-- sessions list -->
-            <div id="s11-p6" style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:5px">
-              <div style="font-size:9px;font-weight:600;margin-bottom:3px">세션</div>
-              <div style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:4px;display:flex;justify-content:space-between"><span>2025-06-27 14:00 <span style="font-size:8px;background:oklch(0.967 0.003 265);color:oklch(0.552 0.016 285.938);border-radius:3px;padding:1px 4px;margin-left:3px">윈도우 종료</span></span><span style="color:oklch(0.552 0.016 285.938);font-size:8px">12작업 · 1.2M</span></div>
-              <div style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:4px;display:flex;justify-content:space-between;margin-top:3px"><span>2025-06-26 22:00 <span style="font-size:8px;background:oklch(0.97 0.014 70);color:oklch(0.669 0.162 70);border-radius:3px;padding:1px 4px;margin-left:3px">취소됨</span></span><span style="color:oklch(0.552 0.016 285.938);font-size:8px">3작업 · 240k</span></div>
-              <div style="font-size:9px;color:oklch(0.552 0.016 285.938);text-align:center;margin-top:3px">… +n 세션</div>
+              <div class="card" style="position:relative"><span class="pin" style="top:8px;right:8px">3</span>
+                <div class="card-h"><span class="card-t">제어</span></div>
+                <div class="card-body">
+                  <div class="flex gap6"><span class="inp" style="flex:1;font-size:11px">2026-07-07 12:00</span><span style="font-size:11px;align-self:center">→</span><span class="inp" style="flex:1;font-size:11px">17:00</span></div>
+                  <div class="flex gap6" style="margin-top:8px"><span class="btn pri" style="flex:1">▶ 윈도우 시작</span><span class="btn" style="flex:1">✋ 수동 시작</span></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <span class="pin m" style="top:60px;right:14px" title="F3">3</span>
-        <span class="pin m" style="top:122px;left:148px" title="F2">2</span>
-        <span class="pin m" style="top:142px;left:148px" title="F4">4</span>
-        <span class="pin m" style="top:180px;right:14px" title="F1">1</span>
-        <span class="pin l" style="top:262px;left:170px" title="F5">5</span>
-        <span class="pin l" style="top:262px;right:60px" title="F6">6</span>
       </div>
     </div>
-
-    <!-- PROPOSED -->
-    <div class="panel prop">
-      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
-            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:6px 2px 3px">운영</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">⏱ 크론잡</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">💲 비용</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">⚡ 토큰맥싱</div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>토큰 맥싱</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
           </div>
-          <div style="flex:1;padding:10px 12px;overflow:hidden">
-            <div style="font-size:14px;font-weight:600;margin-bottom:4px">토큰맥싱</div>
-            <!-- fix1: status header now uses 4-col grid + window row spans full width consistently -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px">
-              <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:9px;font-weight:600">상태</div><span style="font-size:9px;background:oklch(0.967 0.003 265);color:oklch(0.552 0.016 285.938);border-radius:999px;padding:1px 8px;font-weight:600">● 유휴</span></div>
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:3px;font-size:9px">
-                <div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">프로바이더</div><div style="font-weight:600">—</div></div>
-                <div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">작업</div><div style="font-weight:600">—</div></div>
-                <div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">토큰</div><div style="font-weight:600">0</div></div>
-                <div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">작업 수</div><div style="font-weight:600">0</div></div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">토큰 맥싱</div><div class="sm mut">남은 할당량을 자동으로 소진해 에이전트를 최대한 구동합니다 · RFC-031</div></div>
+                <span class="chip">오늘 248k / 500k</span>
               </div>
-              <div style="margin-top:4px;border-top:1px dashed oklch(0.92 0.004 286.32);padding-top:3px"><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">⏱ 윈도우</div><div style="font-size:9px;font-weight:600">2025-06-28 14:00 → 19:00</div></div>
-            </div>
-            <!-- fix2: no-enabled warning + button row clearer -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:5px">
-              <div style="font-size:9px;font-weight:600;margin-bottom:3px">컨트롤</div>
-              <div style="font-size:9px;color:oklch(0.577 0.245 27.325);background:oklch(0.97 0.014 27/.15);border:1px solid oklch(0.577 0.245 27.325/.3);border-radius:3px;padding:4px;margin-bottom:4px"><b>⚠ 활성 프로바이더 없음</b> — [token-maxing.providers] 설정 필요</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;font-size:9px"><span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:3px 5px">시작 2025-06-28 14:00</span><span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:3px 5px">종료 2025-06-28 19:00</span></div>
-              <div style="display:flex;gap:4px;margin-top:5px"><span style="font-size:9px;background:oklch(0.23 0.025 265);color:#fff;border-radius:4px;padding:3px 8px;font-weight:600">▶ 윈도우 시작</span><span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:3px 8px">✋ 수동</span><span style="font-size:9px;background:oklch(0.967 0.003 265);color:oklch(0.552 0.016 285.938);border-radius:4px;padding:3px 8px">■ 중지</span></div>
-            </div>
-            <!-- fix3: split Active / Metered sections so subscription row is plainly visible -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:5px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><div style="font-size:9px;font-weight:600">프로바이더</div><span style="font-size:8px;color:oklch(0.552 0.016 285.938)">3개</span></div>
-              <div style="font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:oklch(0.552 0.016 285.938);margin-top:3px">▶ 실행 가능</div>
-              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed oklch(0.92 0.004 286.32);padding:3px 0"><span style="font-size:9px;font-weight:600">zai</span><span style="display:flex;gap:3px"><span style="font-size:8px;background:oklch(0.596 0.145 163);color:#fff;border-radius:4px;padding:1px 5px;font-weight:600">● 활성</span><span style="font-size:8px;background:oklch(0.596 0.145 163);color:#fff;border-radius:4px;padding:1px 5px;font-weight:600">👑 구독</span></span></div>
-              <div style="font-size:8px;color:oklch(0.552 0.016 285.938);padding-left:8px">남은 비율 12.4% · 5h 리셋</div>
-              <div style="font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:oklch(0.552 0.016 285.938);margin-top:6px">▲ 비용 경고 — 종량제</div>
-              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed oklch(0.92 0.004 286.32);padding:3px 0"><span style="font-size:9px">anthropic</span><span style="display:flex;gap:3px"><span style="font-size:8px;background:oklch(0.669 0.162 70);color:#fff;border-radius:4px;padding:1px 5px;font-weight:600">▲ 드레이닝</span><span style="font-size:8px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:4px;padding:1px 5px;font-weight:600">💳 종량제</span></span></div>
-              <div style="font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:oklch(0.552 0.016 285.938);margin-top:6px">⊘ 비활성</div>
-              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed oklch(0.92 0.004 286.32);padding:3px 0;color:oklch(0.552 0.016 285.938)"><span style="font-size:9px">openai</span><span style="font-size:8px">○ 미설정</span></div>
-            </div>
-            <!-- fix6: session row uses semantic list item + status dot + duration -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:5px">
-              <div style="font-size:9px;font-weight:600;margin-bottom:3px">세션 (보고서 열기)</div>
-              <ul style="list-style:none;padding:0;margin:0">
-                <li style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed oklch(0.92 0.004 286.32);padding:4px 0"><span><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.552 0.016 285.938);display:inline-block;margin-right:4px"></span><span style="font-size:9px">2025-06-27 14:00</span><span style="font-size:8px;background:oklch(0.967 0.003 265);color:oklch(0.552 0.016 285.938);border-radius:3px;padding:1px 5px;margin-left:4px">윈도우 종료</span></span><span style="font-size:8px;color:oklch(0.552 0.016 285.938)">12작업 · 1.2M · 4h12m</span></li>
-                <li style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed oklch(0.92 0.004 286.32);padding:4px 0"><span><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.669 0.162 70);display:inline-block;margin-right:4px"></span><span style="font-size:9px">2025-06-26 22:00</span><span style="font-size:8px;background:oklch(0.97 0.014 70);color:oklch(0.669 0.162 70);border-radius:3px;padding:1px 5px;margin-left:4px">취소됨</span></span><span style="font-size:8px;color:oklch(0.552 0.016 285.938)">3작업 · 240k · 38m</span></li>
-              </ul>
-              <div style="font-size:9px;color:oklch(0.552 0.016 285.938);text-align:center;margin-top:3px">… + 14 세션</div>
+              <div class="card">
+                <div class="card-h"><span class="card-t">상태</span><span class="badge idle">유휴</span></div>
+                <div class="card-body"><div class="g4" style="grid-template-columns:repeat(3,1fr);gap:8px"><div><div class="xs mut">제공자</div><div class="sm bold">zai</div></div><div><div class="xs mut">세션 토큰</div><div class="sm bold">0</div></div><div><div class="xs mut">활성 윈도우</div><div class="sm bold">수동</div></div></div></div>
+              </div>
+              <div class="card">
+                <div class="card-h"><span class="card-t">제어</span><span class="badge" style="background:var(--mut);color:var(--fg2)">metered 1개 · 시작 시 확인</span></div>
+                <div class="card-body"><div class="flex gap6"><span class="inp" style="flex:1;font-size:11px">2026-07-07 12:00</span><span style="font-size:11px;align-self:center">→</span><span class="inp" style="flex:1;font-size:11px">17:00</span></div><div class="flex gap6" style="margin-top:8px"><span class="btn pri" style="flex:1">▶ 윈도우 시작</span><span class="btn" style="flex:1">✋ 수동 시작</span></div></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="findings">
-    <h4>발견사항 (6)</h4>
+  <div class="findings"><h3>발견 (Findings)</h3>
     <ul class="flist">
-      <li><span class="badge m">MED</span><div><span class="ft">검증 결과 — 구독 과금 프로바이더는 정상적으로 활성 표시됨. provider-cards.tsx:42-51 `providers.map`이 billing_model 필터 없이 모든 행을 그대로 렌더링하고, normalizeAvailability가 backend의 `state` 필드를 verdict로, billing-badge가 billing_model을 독립적으로 표시하므로 zai(구독+available) / anthropic(종량+draining) / openai(unknown+ineligible) 모두 의도대로 보임. 다만 "구독=저렴/종량=비용"이라는 결정적 차이가 한 줄 섹션 헤더 없이 verdict/billing 배지만으로 전달됨</span><span class="cite">provider-cards.tsx:42-51 · billing-badge.tsx:21-38 · token-maxing.ts:62-65 (ineligible = 백엔드 의도)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">metered 경고 다이얼로그가 provider 이름만 ul로 보여줌 — BillingBadge의 💳 종량제 표시가 없어 사용자가 어떤 과금 분류 때문인지 즉시 인지 못함</span><span class="cite">controls.tsx:170-195 (confirm dialog) · billing-badge.tsx:32-38</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">status-header의 WindowField가 sm에서 col-span-2, lg에서 col-span-4 — lg 4컬럼 그리드에서 마지막 줄 4컬럼을 통째로 차지하면서 정렬이 비정상 (다른 Field 4개가 위 4컬럼 점유, WindowField는 그 아래 4컬럼 전부)</span><span class="cite">status-header.tsx:28,92 (grid-cols-4 + col-span-4 비대칭)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">활성 프로바이더 없음 경고가 warning 색 + border-warning-muted + bg-warning-muted/30 토큰을 쓰지만 카드 컨테이너와 동일 배경 — 우선순위가 낮아 보임</span><span class="cite">controls.tsx:96-101</span></div></li>
-      <li><span class="badge l">LOW</span><div><span class="ft">세션 행이 &lt;Button variant="outline"&gt; 전체를 클릭 타겟으로 사용 — 키보드 사용자/스크린리더는 매 행마다 "button" 음성 안내를 들음, 리스트 시맨틱 없음</span><span class="cite">sessions.tsx:58-92 (button-as-row)</span></div></li>
-      <li><span class="badge l">LOW</span><div><span class="ft">formatDateTime이 toLocaleString() 인자 없이 호출 — 사용자/서버 로케일에 따라 다른 형식, 보고서 비교 불가</span><span class="cite">sessions.tsx:319-323 · status-header.tsx:102-106 · provider-cards.tsx:178-182</span></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">헤더가 비어 있다 — 오른쪽 액션 자리가 공백</p><p class="fd">페이지 헤더의 오른쪽(<code>justify-between</code>의 두 번째 자식)이 아무것도 렌더하지 않는다. 페르소나·스킬 화면은 이 자리에 생성/새로고침 버튼을 둔다. 토큰 맥싱은 헤더가 텅 빈 채로 균형이 맞지 않는다.</p><p class="src">routes/token-maxing.tsx:20-25 (헤더, 오른쪽 자식 없음)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">화면 목적이 한눈에 들어오지 않는다</p><p class="fd">"토큰 맥싱"이라는 이름과 한 줄 부제만으로, 이 화면이 남은 토큰 할당량을 소진해 에이전트를 최대한 구동하는 기능이라는 것을 파악하기 어렵다. RFC-031 컨텍스트가 UI에 드러나지 않는다.</p><p class="src">routes/token-maxing.tsx:12-23 (부제만, 목적 설명 없음)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">시작 흐름이 두 가지 경로(window / 수동) + metered 확인 다이얼로그로 복잡</p><p class="fd">윈도우 시작과 수동 시작 두 변형이 있고, metered 과금 제공자가 있으면 추가 확인 다이얼로그가 끼어든다. 첫 사용자가 어떤 버튼을 눌러야 할지 결정하기 어렵다.</p><p class="src">components/token-maxing/controls.tsx:50-51,59-77 (metered guard + 두 시작 변형)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">상태 카드에 정보 밀도가 높다</p><p class="fd">상태 카드 하나에 running/idle 배지, 제공자+태스크, 세션 토큰 합계, 활성 윈도우(또는 수동)가 모두 들어간다. 한 카드에 4개 필드 영역이 밀집되어 있다.</p><p class="src">components/token-maxing/status-header.tsx:63-100 (Field/WindowField 다수)</p></div></li>
     </ul>
   </div>
-  <div class="changes">
-    <h4>변경 방향</h4>
-    <ul>
-      <li>ProviderRow를 과금 모델별 섹션 헤더(▶ 실행 가능[구독·draining] / ▲ 비용 경고[종량] / ⊘ 비활성)로 그룹핑 — billing_model과 verdict를 시각적으로 묶어 "어떤 행이 비용을 발생시키는지" 즉시 판별.</li>
-      <li>metered 경고 다이얼로그에 BillingBadge를 함께 노출하고, 과금 분류 아이콘 + "이 과금 모델은 실제 비용이 발생합니다" 명시.</li>
-      <li>status-header 그리드를 5-column 또는 stacked layout으로 재구성 — WindowField가 다른 Field와 동일한 라인 정렬을 갖도록.</li>
-      <li>활성 프로바이더 없음 경고에 액션 버튼("[token-maxing.providers] 설정 열기") 추가, 배경 saturation 상향.</li>
-      <li>세션 행을 &lt;ul&gt;/&lt;li&gt;로 바꾸고 행은 &lt;button&gt; 또는 &lt;a&gt;로 감싸되 ARIA label에 일시·상태 명시.</li>
-      <li>formatDateTime에 ko-KR/Asia/Seoul 명시 + duration 함께 표시.</li>
-    </ul>
-  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>헤더 오른쪽에 오늘 사용량 칩 또는 새로고침/도움말 버튼 추가.</li>
+    <li>부제에 한 줄 목적 설명 보강 ("남은 할당량을 자동 소진해 에이전트를 최대 구동").</li>
+    <li>시작 버튼에 tooltip/도움말로 window vs 수동 차이 안내.</li>
+  </ul></div>
 </section>
 
-<!-- SCREEN 12 — MCP -->
 <section class="screen" id="screen-12">
   <div class="screen-head">
-    <div class="num">12</div>
-    <div class="titles">
-      <h2>MCP</h2>
-      <div class="route">web/src/routes/mcp.tsx · /mcp</div>
-    </div>
-    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
-      <span class="h" style="color:var(--hi);font-weight:700">1 H</span> ·
-      <span style="color:var(--med);font-weight:700">4 M</span> ·
-      <span style="color:var(--lo);font-weight:700">1 L</span>
-    </div>
+    <div class="snum">12</div>
+    <div class="stitle"><h2>MCP 서버</h2><span class="route">/mcp · routes/mcp.tsx</span></div>
+    <div class="rubric"><div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
   </div>
-  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
-    Model Context Protocol 서버/툴 관리 화면. Servers / Tools / Test 3-탭으로 구성되며, 서버 카드에서 활성화·새로고침·편집·삭제, Tools 탭에서 검색·그룹화·스키마 열람, Test 탭에서 서버-툴 선택 후 JSON 인자로 실행한다.
-  </p>
-
-  <div class="rubric" aria-label="루브릭">
-    <div class="cell r4"><span class="sc">4</span>정보구조</div>
-    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
-    <div class="cell r3"><span class="sc">3</span>기능배치</div>
-    <div class="cell r4"><span class="sc">4</span>내비게이션</div>
-    <div class="cell r4"><span class="sc">4</span>일관성</div>
-    <div class="cell r3"><span class="sc">3</span>인터랙션</div>
-    <div class="cell r2"><span class="sc">2</span>접근성</div>
-    <div class="cell r3"><span class="sc">3</span>타이포</div>
-  </div>
-
   <div class="compare">
-    <div class="panel cur">
-      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
-            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:6px 2px 3px">인프라</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">🔌 MCP</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">✉ 이메일</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🌿 깃</div>
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">운영</div><div class="sb-it"><span class="ic" style="background:#bbb"></span>토큰 맥싱</div>
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>Git</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
           </div>
-          <div style="flex:1;padding:10px 12px;overflow:hidden">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:14px;font-weight:600">MCP Servers</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">Manage Model Context Protocol servers and tools</div></div>
-              <span id="s12-p1" style="font-size:9px;background:oklch(0.23 0.025 265);color:#fff;border-radius:5px;padding:3px 9px;font-weight:600">＋ 서버 추가</span>
-            </div>
-            <div id="s12-p2" style="display:inline-flex;gap:1px;background:oklch(0.967 0.003 265);border-radius:6px;padding:2px;font-size:10px;margin-top:6px">
-              <span style="padding:3px 9px;border-radius:4px;background:#fff;font-weight:600">🖥 Servers · 3</span>
-              <span style="padding:3px 9px;color:oklch(0.552 0.016 285.938)">🔧 Tools · 14</span>
-              <span style="padding:3px 9px;color:oklch(0.552 0.016 285.938)">▶ Test</span>
-            </div>
-            <!-- server card row -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:6px;position:relative">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="width:8px;height:8px;border-radius:50%;background:oklch(0.596 0.145 163)"></span>
-                <span style="font-size:10px;font-weight:600">filesystem</span>
-                <span style="font-size:8px;background:oklch(0.596 0.145 163);color:#fff;border-radius:3px;padding:1px 5px">● 연결됨</span>
-                <span style="margin-left:auto;display:flex;gap:2px">
-                  <span id="s12-p3" style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">↻</span>
-                  <span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">✏</span>
-                  <span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">⏻</span>
-                  <span id="s12-p4" style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.577 0.245 27.325)">🗑</span>
-                </span>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between" style="position:relative">
+                <div><div style="font-size:18px;font-weight:700">MCP 서버</div><div class="sm mut">Model Context Protocol 서버·도구 관리</div></div>
+                <span class="btn pri" style="position:relative"><span class="pin" style="top:-8px;right:-8px">2</span>＋ 서버 추가</span>
               </div>
-              <div style="font-size:8px;color:oklch(0.552 0.016 285.938);font-family:ui-monospace,monospace;margin-top:3px">npx -y @modelcontextprotocol/server-filesystem /workspace</div>
-            </div>
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:4px">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="width:8px;height:8px;border-radius:50%;background:oklch(0.577 0.245 27.325)"></span>
-                <span style="font-size:10px;font-weight:600">github</span>
-                <span style="font-size:8px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:3px;padding:1px 5px">● 연결 해제</span>
-                <span style="margin-left:auto;display:flex;gap:2px"><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">↻</span><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">✏</span><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">⏻</span><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.577 0.245 27.325)">🗑</span></span>
+              <div class="flex gap4" style="position:relative"><span class="pin" style="top:-2px;left:0">1</span><span class="pin" style="top:-2px;left:64px">4</span>
+                <div class="flex gap4" style="margin-left:14px;background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                  <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">▣ 서버</span>
+                  <span class="btn-sm" style="border:0">🔧 도구</span>
+                  <span class="btn-sm" style="border:0">⌨ 테스트</span>
+                </div>
               </div>
-              <div style="font-size:8px;color:oklch(0.552 0.016 285.938);font-family:ui-monospace,monospace;margin-top:3px">npx -y @modelcontextprotocol/server-github</div>
-            </div>
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:6px;margin-top:4px">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="width:8px;height:8px;border-radius:50%;background:oklch(0.552 0.016 285.938)"></span>
-                <span style="font-size:10px;font-weight:600">slack</span>
-                <span style="font-size:8px;border:1px solid oklch(0.92 0.004 286.32);color:oklch(0.552 0.016 285.938);border-radius:3px;padding:1px 5px">○ 비활성</span>
-                <span style="margin-left:auto;display:flex;gap:2px"><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">↻</span><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">✏</span><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.552 0.016 285.938)">⏻</span><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;font-size:10px;color:oklch(0.577 0.245 27.325)">🗑</span></span>
+              <div class="card">
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">filesystem</div><div class="ds">stdio · 8 도구</div></div><span class="badge run">연결</span></div>
+                <div class="row"><span class="pin" style="top:4px;right:4px">3</span><span class="ava"></span><div class="grow"><div class="nm">github</div><div class="ds">stdio · 12 도구</div></div><span class="badge err">오류</span></div>
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">fetch</div><div class="ds">stdio · 3 도구</div></div><span class="badge run">연결</span></div>
               </div>
             </div>
-            <div style="font-size:9px;color:oklch(0.552 0.016 285.938);text-align:center;margin-top:4px">… +n 서버</div>
           </div>
         </div>
-        <span class="pin h" style="top:30px;right:14px" title="F4">4</span>
-        <span class="pin m" style="top:60px;right:14px" title="F5">5</span>
-        <span class="pin h" style="top:96px;right:14px" title="F1">1</span>
-        <span class="pin m" style="top:96px;right:46px" title="F3">3</span>
-        <span class="pin m" style="top:144px;right:14px" title="F2">2</span>
-        <span class="pin l" style="top:30px;left:340px" title="F6">6</span>
       </div>
     </div>
-
-    <!-- PROPOSED -->
-    <div class="panel prop">
-      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
-            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:6px 2px 3px">인프라</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">🔌 MCP</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">✉ 이메일</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🌿 깃</div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
           </div>
-          <div style="flex:1;padding:10px 12px;overflow:hidden">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:14px;font-weight:600">MCP Servers</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">Manage Model Context Protocol servers and tools</div></div>
-              <!-- fix1: labelled primary action with tool count -->
-              <span style="font-size:11px;background:oklch(0.23 0.025 265);color:#fff;border-radius:6px;padding:4px 10px;font-weight:600;display:inline-flex;align-items:center;gap:4px">＋ 서버 추가 <span style="background:oklch(0.967 0.003 265);color:oklch(0.23 0.025 265);border-radius:3px;padding:0 5px;font-size:9px">14 tools</span></span>
-            </div>
-            <!-- fix2: tab labels with explicit counts -->
-            <div style="display:inline-flex;gap:1px;background:oklch(0.967 0.003 265);border-radius:6px;padding:2px;font-size:10px;margin-top:6px">
-              <span style="padding:3px 9px;border-radius:4px;background:#fff;font-weight:600">🖥 Servers · 3</span>
-              <span style="padding:3px 9px;color:oklch(0.552 0.016 285.938)">🔧 Tools · 14</span>
-              <span style="padding:3px 9px;color:oklch(0.552 0.016 285.938)">▶ Test</span>
-            </div>
-            <!-- server card: 44px touch targets, semantic icons, status semantics -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:8px;margin-top:6px">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="width:8px;height:8px;border-radius:50%;background:oklch(0.596 0.145 163)" aria-label="연결됨"></span>
-                <div style="flex:1;min-width:0">
-                  <div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;font-weight:600">filesystem</span><span style="font-size:8px;background:oklch(0.596 0.145 163);color:#fff;border-radius:3px;padding:1px 5px;font-weight:600">● 연결됨</span></div>
-                  <div style="font-size:8px;color:oklch(0.552 0.016 285.938);font-family:ui-monospace,monospace;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">npx -y @modelcontextprotocol/server-filesystem /workspace</div>
-                </div>
-                <!-- fix3+fix4: 44×28 horizontal action bar with labelled buttons, destructive separated -->
-                <div style="display:flex;gap:3px">
-                  <span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:5px 8px;display:inline-flex;align-items:center;gap:3px;color:oklch(0.23 0.025 265)">↻ 새로고침</span>
-                  <span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:5px 8px;display:inline-flex;align-items:center;gap:3px;color:oklch(0.23 0.025 265)">✏ 편집</span>
-                  <span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:5px 8px;display:inline-flex;align-items:center;gap:3px;color:oklch(0.23 0.025 265)">⏻ 비활성</span>
-                  <span style="font-size:9px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:4px;padding:5px 8px;font-weight:600">🗑 삭제</span>
-                </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">MCP 서버</div><div class="sm mut">Model Context Protocol · <b>서버 3 · 도구 23</b></div></div>
+                <span class="btn pri">＋ 서버 추가</span>
+              </div>
+              <div class="flex gap4" style="background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">▣ 서버 <span class="tag">3</span></span>
+                <span class="btn-sm" style="border:0">🔧 도구 <span class="tag">23</span></span>
+                <span class="btn-sm" style="border:0">⌨ 테스트</span>
+              </div>
+              <div class="card">
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">filesystem</div><div class="ds">stdio · 8 도구</div></div><span class="badge run">연결</span></div>
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">github <span class="tag" style="background:var(--err);color:#fff">오류</span></div><div class="ds">stdio · 12 도구 · 재연결 필요</div></div><span class="btn des xs">↻ 재연결</span></div>
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">fetch</div><div class="ds">stdio · 3 도구</div></div><span class="badge run">연결</span></div>
               </div>
             </div>
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:8px;margin-top:4px;opacity:.85">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="width:8px;height:8px;border-radius:50%;background:oklch(0.577 0.245 27.325)" aria-label="연결 해제"></span>
-                <div style="flex:1;min-width:0">
-                  <div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;font-weight:600">github</span><span style="font-size:8px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:3px;padding:1px 5px;font-weight:600">● 연결 해제</span></div>
-                  <div style="font-size:8px;color:oklch(0.552 0.016 285.938);font-family:ui-monospace,monospace;margin-top:2px">npx -y @modelcontextprotocol/server-github</div>
-                </div>
-                <!-- fix5: disconnected server — power/edit disabled; only refresh + delete enabled -->
-                <div style="display:flex;gap:3px">
-                  <span style="font-size:9px;background:oklch(0.23 0.025 265);color:#fff;border-radius:4px;padding:5px 8px;font-weight:600">↻ 재연결</span>
-                  <span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:5px 8px;color:oklch(0.552 0.016 285.938);opacity:.5">✏ 편집</span>
-                  <span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:5px 8px;color:oklch(0.552 0.016 285.938);opacity:.5">⏻ 활성화</span>
-                  <span style="font-size:9px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:4px;padding:5px 8px;font-weight:600">🗑 삭제</span>
-                </div>
-              </div>
-            </div>
-            <div style="background:#fff;border:1px dashed oklch(0.92 0.004 286.32);border-radius:8px;padding:8px;margin-top:4px;color:oklch(0.552 0.016 285.938);font-size:9px;text-align:center">＋ 새 MCP 서버 추가</div>
           </div>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="findings">
-    <h4>발견사항 (6)</h4>
+  <div class="findings"><h3>발견 (Findings)</h3>
     <ul class="flist">
-      <li><span class="badge h">HIGH</span><div><span class="ft">서버 카드의 4개 아이콘 버튼이 모두 h-8 w-8 (32×32px) — WCAG 권장 44×44px 터치 타겟 한참 미달, 모바일/터치스크린에서 오작동 위험</span><span class="cite">server-card.tsx:60-99 (Refresh/Edit/Power/Delete 모두 h-8 w-8)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">Power/Edit/Delete 버튼이 서버 enabled·initialized 상태와 무관하게 항상 활성 — 연결 해제된 서버를 Power로 토글하면 실패, Edit은 command 변경 시점에 따라 즉시 반영됨을 사용자에게 경고하지 않음</span><span class="cite">server-card.tsx:71-99 (Refresh만 line 66에서 disabled)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">Delete 버튼이 text-destructive + variant=ghost로 4개 버튼 중 가장 약한 시각 무게 — 파괴적 액션이 outline 편집·power와 동등하게 보임</span><span class="cite">server-card.tsx:90-99 (ghost + text-destructive)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">Add Server 버튼이 헤더 오른쪽에 있지만 3개 탭 중 Servers 탭에서만 의미 있음 — Tools/Test 탭에서도 같은 위치에 떠 있어 맥락이 어긋남. "＋ 서버 추가" 라벨이 "+" 만 있는 영문 기호 대비 정보 부족</span><span class="cite">mcp.tsx:28-30 · add-server-dialog.tsx:104 (영문 "Register" 디폴트)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">ToolTester의 서버 필터가 enabled만 체크 — initialized 플래그 무시. 비활성화는 아니지만 연결 실패 상태인 서버도 Test 콤보에 나타나 실행 시 4xx 에러로 실패</span><span class="cite">tool-tester.tsx:24 ((s) =&gt; s.enabled)</span></div></li>
-      <li><span class="badge l">LOW</span><div><span class="ft">edit-server-dialog의 env 입력이 raw &lt;textarea&gt; + 수제 Tailwind 클래스 — 포커스 링·에러 상태가 shadcn Textarea 컴포넌트와 시각 불일치 위험, 잘못된 KEY=VALUE 줄은 toast로만 알림 후 입력 위치 표시 없음</span><span class="cite">edit-server-dialog.tsx:160-167 (raw textarea) · 53-88 (toast-only error)</span></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">탭(서버/도구/테스트) 상태가 uncontrolled defaultValue라 URL에 없다</p><p class="fd"><code>Tabs defaultValue="servers"</code>로 탭이 제어되지 않는다. 새로고침하면 항상 서버 탭으로 리셋되고, 특정 탭으로 직접 링크하거나 공유할 수 없다.</p><p class="src">routes/mcp.tsx:33 (defaultValue="servers", 제어형 아님)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">헤더의 "서버 추가"가 도구/테스트 탭에서도 보인다</p><p class="fd">"서버 추가" 버튼은 헤더에 고정되어 모든 탭에서 보이지만, 실제로 영향을 주는 건 서버 탭뿐이다. 도구·테스트 탭에서는 문맥에 맞지 않는 액션이다.</p><p class="src">routes/mcp.tsx:28-30 (헤더 버튼) · :33-69 (탭과 무관)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">연결 오류 서버의 복구 액션이 행 수준에 즉시 보이지 않는다</p><p class="fd">오류 상태 서버(github)가 있을 때 재연결/진단 액션이 행에 즉시 노출되는지가 <code>ServerList</code> 구현에 의존한다. 오류를 한눈에 보고 바로 조치하기엔 헤더 요약이 부족하다.</p><p class="src">routes/mcp.tsx:46-52 (ServerList에 위임) · components/mcp/server-list.tsx</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">탭 카운트(서버/도구 수)가 탭 라벨에 없다</p><p class="fd">서버 탭과 도구 탭에 각각 몇 개가 있는지 카운트가 표시되지 않아, 어느 탭에 내용이 있는지 라벨만으로 파악해야 한다.</p><p class="src">routes/mcp.tsx:35-43 (TabsTrigger에 카운트 없음)</p></div></li>
     </ul>
   </div>
-  <div class="changes">
-    <h4>변경 방향</h4>
-    <ul>
-      <li>서버 카드 액션을 가로 1열 바(라벨 포함, min-h 44px)로 재구성 — 아이콘-only는 tooltip만으로 부족하므로 텍스트 라벨 추가. Destructive는 solid danger 버튼.</li>
-      <li>Power/Edit는 `!server.initialized || !server.enabled`일 때 비활성, Tooltip에 사유 표시. 연결 해제된 서버는 "재연결"이 1순위 액션.</li>
-      <li>Add Server 버튼을 Servers 탭 내부로 옮기거나 탭 비활성 시 hide. 라벨을 "＋ 서버 추가"로 영문화.</li>
-      <li>ToolTester의 서버 필터를 `(s) =&gt; s.enabled && s.initialized`로 강화.</li>
-      <li>edit-server-dialog env 입력을 shadcn Textarea로 통일, 잘못된 줄 번호 인라인 표시.</li>
-    </ul>
-  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>탭을 제어형(value/onValueChange)으로 + URL search 동기화.</li>
+    <li>"서버 추가" 버튼은 서버 탭에서만, 또는 탭별로 문맥 액션 분리.</li>
+    <li>각 탭에 카운트 배지 추가; 오류 서버는 헤더 요약에 노출 + 행에 재연결 버튼.</li>
+  </ul></div>
 </section>
 
-<!-- SCREEN 13 — 이메일 -->
 <section class="screen" id="screen-13">
   <div class="screen-head">
-    <div class="num">13</div>
-    <div class="titles">
-      <h2>이메일</h2>
-      <div class="route">web/src/routes/email.tsx · /email</div>
-    </div>
-    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
-      <span class="h" style="color:var(--hi);font-weight:700">2 H</span> ·
-      <span style="color:var(--med);font-weight:700">4 M</span> ·
-      <span style="color:var(--lo);font-weight:700">2 L</span>
-    </div>
+    <div class="snum">13</div>
+    <div class="stitle"><h2>이메일</h2><span class="route">/email · routes/email.tsx</span></div>
+    <div class="rubric"><div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
   </div>
-  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
-    Oxios 에이전트가 외부로 이메일을 보낼 수 있도록 SMTP/Resend 프로바이더를 설정하고, 발송 이력·템플릿을 관리하는 화면. Overview / Setup / History / Templates 4-탭으로 구성되며, Setup 탭은 미설정 시 폼, 설정 완료 시 read-only 요약으로 전환된다.
-  </p>
-
-  <div class="rubric" aria-label="루브릭">
-    <div class="cell r3"><span class="sc">3</span>정보구조</div>
-    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
-    <div class="cell r2"><span class="sc">2</span>기능배치</div>
-    <div class="cell r3"><span class="sc">3</span>내비게이션</div>
-    <div class="cell r3"><span class="sc">3</span>일관성</div>
-    <div class="cell r2"><span class="sc">2</span>인터랙션</div>
-    <div class="cell r2"><span class="sc">2</span>접근성</div>
-    <div class="cell r3"><span class="sc">3</span>타이포</div>
-  </div>
-
   <div class="compare">
-    <div class="panel cur">
-      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
-            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:6px 2px 3px">인프라</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🔌 MCP</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">✉ 이메일</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🌿 깃</div>
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>이메일</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>Git</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
           </div>
-          <div style="flex:1;padding:10px 12px;overflow:hidden">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:14px;font-weight:600">이메일</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">Configure and manage email sending</div></div>
-              <div style="display:flex;gap:4px;align-items:center"><span id="s13-p1" style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);color:oklch(0.596 0.145 163);border-radius:999px;padding:2px 7px;display:inline-flex;align-items:center;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.596 0.145 163)"></span>Configured</span><span style="width:20px;height:20px;display:grid;place-items:center;border-radius:4px;color:oklch(0.552 0.016 285.938)">↻</span></div>
-            </div>
-            <!-- Tabs row -->
-            <div id="s13-p2" style="display:inline-flex;gap:1px;background:oklch(0.967 0.003 265);border-radius:6px;padding:2px;font-size:10px;margin-top:6px">
-              <span style="padding:3px 9px;color:oklch(0.552 0.016 285.938)">✉ Overview</span>
-              <span style="padding:3px 9px;border-radius:4px;background:#fff;font-weight:600;color:oklch(0.23 0.025 265)">⚙ Setup</span>
-              <span style="padding:3px 9px;color:oklch(0.552 0.016 285.938)">⏱ History</span>
-              <span style="padding:3px 9px;color:oklch(0.552 0.016 285.938)">▤ Templates</span>
-            </div>
-            <!-- SetupPanel rendered despite user being configured (BUG) -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:8px;margin-top:6px;position:relative">
-              <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px"><span style="font-size:12px;color:oklch(0.577 0.245 27.325)">⚠</span><span style="font-size:11px;font-weight:600">Email Setup</span></div>
-              <div style="font-size:9px;color:oklch(0.552 0.016 285.938)">Connect an SMTP provider to enable email sending for agents.</div>
-              <div style="font-size:9px;color:oklch(0.552 0.016 285.938);margin-top:5px">Provider</div>
-              <div style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:4px;background:#fff">Resend</div>
-              <div style="font-size:9px;color:oklch(0.552 0.016 285.938);margin-top:5px">Email address</div>
-              <div style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:4px;color:oklch(0.552 0.016 285.938)">agent@mydomain.com</div>
-              <div style="font-size:9px;color:oklch(0.552 0.016 285.938);margin-top:5px">Resend API key</div>
-              <div style="position:relative"><div id="s13-p3" style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:4px 24px 4px 4px;color:oklch(0.552 0.016 285.938)">re_•••••••••••••••</div><span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);color:oklch(0.552 0.016 285.938);font-size:10px">👁</span></div>
-              <div style="display:flex;gap:4px;margin-top:7px"><span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:4px 10px;color:oklch(0.552 0.016 285.938)">취소</span><span style="font-size:9px;background:oklch(0.23 0.025 265);color:#fff;border-radius:4px;padding:4px 10px;font-weight:600">💾 저장 및 테스트</span></div>
-              <div id="s13-p4" style="font-size:9px;color:oklch(0.669 0.162 70);background:oklch(0.967 0.003 265);border:1px dashed oklch(0.669 0.162 70);border-radius:4px;padding:5px;margin-top:6px">⚠ 이미 설정됨 — Setup 탭이 read-only 요약으로 전환되어야 합니다</div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">이메일</div><div class="sm mut">이메일 발송 구성·관리</div></div>
+                <div class="flex gap6 center"><span class="chip" style="background:color-mix(in oklch,var(--suc) 16%,transparent);color:var(--suc);border-color:transparent">✓ 구성됨</span><span class="btn-sm">↻</span></div>
+              </div>
+              <div style="position:relative"><span class="pin" style="top:-2px;left:0">1</span><span class="pin" style="top:-2px;left:70px">3</span><span class="pin" style="top:-2px;left:150px">4</span>
+                <div class="flex gap4" style="margin-left:14px;background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                  <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">✉ 개요</span>
+                  <span class="btn-sm" style="border:0">⚙ 설정</span>
+                  <span class="btn-sm" style="border:0">🕘 발송 이력</span>
+                  <span class="btn-sm" style="border:0">▦ 템플릿</span>
+                </div>
+              </div>
+              <div class="g3">
+                <div class="card"><div class="card-h"><span class="card-t">상태</span></div><div class="card-body"><div class="flex gap6 center"><span class="tc-suc">✓</span><span class="sm bold">준비</span></div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">발신자</span></div><div class="card-body"><div class="sm bold">bot@oxios.app</div><div class="xs mut">resend</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">활동</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">128</div><div class="xs mut">총 발송 · 3 템플릿</div></div></div>
+              </div>
+              <div class="xs mut" style="position:relative;padding-left:14px"><span class="pin" style="top:0;left:0">2</span>configured 사용자가 "설정" 탭 열면 자동으로 "개요"로 이동</div>
             </div>
           </div>
         </div>
-        <span class="pin h" style="top:30px;right:14px" title="F1">1</span>
-        <span class="pin h" style="top:60px;left:148px" title="F2">2</span>
-        <span class="pin m" style="top:142px;right:18px" title="F3">3</span>
-        <span class="pin m" style="top:218px;right:14px" title="F4">4</span>
-        <span class="pin m" style="top:148px;left:160px" title="F5">5</span>
-        <span class="pin l" style="top:264px;right:14px" title="F6">6</span>
-        <span class="pin l" style="top:104px;right:14px" title="F7">7</span>
-        <span class="pin l" style="top:30px;left:380px" title="F8">8</span>
       </div>
     </div>
-
-    <!-- PROPOSED -->
-    <div class="panel prop">
-      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:128px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:8px 6px;flex:0 0 auto">
-            <div style="display:flex;align-items:center;gap:4px;font-weight:700;font-size:12px;color:oklch(0.23 0.025 265)">⚡ Oxios</div>
-            <div style="font-size:9px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:6px 2px 3px">인프라</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🔌 MCP</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:6px;padding:4px 6px;font-weight:600">✉ 이메일</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:4px 6px">🌿 깃</div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>이메일</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
           </div>
-          <div style="flex:1;padding:10px 12px;overflow:hidden">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:14px;font-weight:600">이메일</div><div style="font-size:9px;color:oklch(0.552 0.016 285.938)">Configure and manage email sending</div></div>
-              <!-- fix1: status pill now carries refresh + configured count -->
-              <div style="display:flex;gap:4px;align-items:center">
-                <span style="font-size:10px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:999px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.596 0.145 163)"></span>Configured · agent@mydomain.com</span>
-                <span style="width:24px;height:24px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;color:oklch(0.552 0.016 285.938)" title="새로고침">↻</span>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">이메일</div><div class="sm mut">이메일 발송 구성·관리</div></div>
+                <div class="flex gap6 center"><span class="chip" style="background:color-mix(in oklch,var(--suc) 16%,transparent);color:var(--suc);border-color:transparent">✓ 구성됨 · resend</span><span class="btn-sm">↻</span></div>
               </div>
-            </div>
-            <!-- fix2: tabs with active state on Overview (configured user lands here) -->
-            <div style="display:inline-flex;gap:1px;background:oklch(0.967 0.003 265);border-radius:6px;padding:2px;font-size:10px;margin-top:6px">
-              <span style="padding:3px 10px;border-radius:4px;background:#fff;font-weight:600;color:oklch(0.23 0.025 265)">✉ Overview</span>
-              <span style="padding:3px 10px;color:oklch(0.552 0.016 285.938)">⚙ Setup</span>
-              <span style="padding:3px 10px;color:oklch(0.552 0.016 285.938)">⏱ History · 142</span>
-              <span style="padding:3px 10px;color:oklch(0.552 0.016 285.938)">▤ Templates · 7</span>
-            </div>
-            <!-- Overview panel: 3 status cards -->
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:6px">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px"><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">상태</div><div style="display:flex;align-items:center;gap:4px;margin-top:3px"><span style="color:oklch(0.596 0.145 163)">✓</span><span style="font-size:11px;font-weight:600">준비됨</span></div></div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px"><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">발신자</div><div style="font-size:11px;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">agent@mydomain.com</div><div style="font-size:8px;color:oklch(0.552 0.016 285.938);margin-top:2px;text-transform:capitalize">resend</div></div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px"><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">활동</div><div style="font-size:14px;font-weight:700;margin-top:1px">142</div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">총 발송 · 7 템플릿</div></div>
-            </div>
-            <!-- Setup summary card (read-only path) -->
-            <div style="background:#fff;border:1px solid oklch(0.596 0.145 163/.4);border-radius:8px;padding:8px;margin-top:6px">
-              <div style="display:flex;align-items:center;gap:5px"><span style="color:oklch(0.596 0.145 163);font-size:13px">✓</span><span style="font-size:11px;font-weight:600">이메일 설정됨</span><span style="margin-left:auto;font-size:9px;color:oklch(0.552 0.016 285.938)">Resend · agent@mydomain.com</span></div>
-              <div style="display:flex;gap:4px;margin-top:6px">
-                <span style="font-size:9px;background:oklch(0.23 0.025 265);color:#fff;border-radius:4px;padding:4px 10px;font-weight:600;display:inline-flex;align-items:center;gap:3px">✉ 테스트 발송</span>
-                <span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:4px 10px;display:inline-flex;align-items:center;gap:3px">↗ Resend Dashboard</span>
-                <span style="font-size:9px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:4px 10px;display:inline-flex;align-items:center;gap:3px">⚙ 설정 변경</span>
+              <div class="flex gap4" style="background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">✉ 개요</span>
+                <span class="btn-sm" style="border:0">⚙ 재설정</span>
+                <span class="btn-sm" style="border:0">🕘 이력 <span class="tag">128</span></span>
+                <span class="btn-sm" style="border:0">▦ 템플릿 <span class="tag">3</span></span>
               </div>
-              <div style="font-size:8px;color:oklch(0.552 0.016 285.938);margin-top:5px;border-top:1px dashed oklch(0.92 0.004 286.32);padding-top:4px">재설정하려면 config.toml 수정 후 oxios 재시작</div>
-            </div>
-            <!-- Recent activity preview -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;padding:7px;margin-top:6px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span style="font-size:9px;font-weight:600">최근 발송</span><span style="font-size:9px;color:oklch(0.23 0.025 265);font-weight:600">전체 보기 →</span></div>
-              <div style="font-size:9px;display:flex;justify-content:space-between;border-top:1px dashed oklch(0.92 0.004 286.32);padding:3px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%">[PR #142] 보안 패치 리뷰 요청</span><span style="color:oklch(0.552 0.016 285.938)">2시간 전</span></div>
-              <div style="font-size:9px;display:flex;justify-content:space-between;border-top:1px dashed oklch(0.92 0.004 286.32);padding:3px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%">Welcome — agent onboarding</span><span style="color:oklch(0.552 0.016 285.938)">어제</span></div>
-              <div style="font-size:9px;color:oklch(0.552 0.016 285.938);text-align:center;margin-top:2px">… +140</div>
+              <div class="g3">
+                <div class="card"><div class="card-h"><span class="card-t">상태</span></div><div class="card-body"><div class="flex gap6 center"><span class="tc-suc">✓</span><span class="sm bold">준비</span></div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">발신자</span></div><div class="card-body"><div class="sm bold">bot@oxios.app</div><div class="xs mut">resend</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">활동</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">128</div><div class="xs mut">총 발송 · 3 템플릿</div></div></div>
+              </div>
+              <div class="xs mut">탭 전환은 사용자 의도 존중 · URL 동기화(?tab=) · 이력/템플릿에 카운트</div>
             </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="findings">
-    <h4>발견사항 (8)</h4>
+  <div class="findings"><h3>발견 (Findings)</h3>
     <ul class="flist">
-      <li><span class="badge h">HIGH</span><div><span class="ft">초기 활성 탭 결정 버그 — useState 이니셜라이저가 status 로딩 전(undef)에 평가되어 configured 사용자도 Setup 탭으로 시작. useState는 한 번만 평가되므로 이후 status 도착해도 자동 전환 없음</span><span class="cite">email.tsx:158 (useState(status?.configured ? 'overview' : 'setup'))</span></div></li>
-      <li><span class="badge h">HIGH</span><div><span class="ft">password 필드의 show/hide 토글이 &lt;button&gt;이지만 aria-label 없음 — 아이콘(Eye/EyeOff)만으로 정보 전달, 스크린리더가 토글 가능 여부를 알 수 없음</span><span class="cite">email.tsx:528-535</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">Loading/Error early-return이 헤더·탭·refresh 버튼 없이 LoadingCards count=3만 렌더 — 첫 진입 시 화면이 통째로 바뀌며 위치감 상실, 새로고침 액션도 없음</span><span class="cite">email.tsx:160-161</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">SetupPanel configured 분기(402-453)는 read-only 요약이지만 "Test 발송 + Dashboard 링크"만 제공 — 설정 변경 진입로 부재, 카드 푸터 "config.toml 수정 후 재시작" 메시지가 유일한 안내</span><span class="cite">email.tsx:402-453 (read-only 카드), 449 (재설정 안내)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">HistoryPanel의 "View" 링크가 Button variant=link + h-auto p-0 + text-xs(12px) — 터치 타겟 약 16-20px, 모바일에서 오탭 위험. 4개 행 이상이 스크롤 시 접근성 깨짐</span><span class="cite">email.tsx:732-734</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">History/Templates 쿼리가 activeTab boolean으로 enable — Setup/Overview에서 보낸 메일은 탭 전환 전까지 UI에 반영 안 됨, 10초 폴링도 비활성</span><span class="cite">email.tsx:97-111 (useEmailHistory/Templates enabled)</span></div></li>
-      <li><span class="badge l">LOW</span><div><span class="ft">TabsList 아래 불필요한 Separator — shadcn Tabs는 자체 spacing 보유, 시각 노이즈</span><span class="cite">email.tsx:212 (Separator className="my-4")</span></div></li>
-      <li><span class="badge l">LOW</span><div><span class="ft">TemplatesPanel 카드에 미리보기(line-clamp-3)·크기(KB)만 있고 본문 열람·편집 액션 없음 — "Agents can save templates" 사본만으로는 사용자 통제권 부족</span><span class="cite">email.tsx:819-829</span></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">탭(개요/설정/이력/템플릿) 상태가 URL에 동기화되지 않는다</p><p class="fd"><code>activeTab</code>이 로컬 <code>useState</code>로만 관리된다. 새로고침·공유·직접 링크로 특정 탭을 열 수 없다.</p><p class="src">routes/email.tsx:158 (useState) · :201 (Tabs value)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">configured 사용자가 설정 탭을 열면 개요로 강제 이동한다</p><p class="fd">상태가 로드되어 configured가 참이면 <code>setActiveTab</code>으로 setup→overview로 옮긴다. 사용자가 의도적으로 재설정 탭을 열려 해도 예고 없이 이동해 예측 가능성을 해친다.</p><p class="src">routes/email.tsx:164-166 (configured 시 setup→overview 강제)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">4개 탭이 configured 여부와 무관하게 모두 표시</p><p class="fd">미설정 상태에서도 발송 이력·템플릿 탭이 보인다. 설정 전에는 의미 없는 탭이 노출되어 첫 진입 인지 부하가 있다.</p><p class="src">routes/email.tsx:201-219 (항상 4개 TabsTrigger)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">이력·템플릿 탭에 건수 카운트가 없다</p><p class="fd">발송 이력·템플릿 탭 라벨에 각각 몇 건인지 카운트가 없다. 개요 카드의 총 발송 수에서만 유추할 수 있다.</p><p class="src">routes/email.tsx:211-218 (TabsTrigger에 카운트 없음)</p></div></li>
     </ul>
   </div>
-  <div class="changes">
-    <h4>변경 방향</h4>
-    <ul>
-      <li>activeTab을 status 도착 후 useEffect로 동기화 — 기본값은 'overview'로 시작, status 도착 시 configured면 그대로, 미설정이면 'setup'으로 전환.</li>
-      <li>password 토글 버튼에 aria-label="비밀번호 표시/숨기기" + aria-pressed 상태 추가. 텍스트 라벨 보조 권장.</li>
-      <li>Loading/Error는 헤더·탭 유지한 채 카드 영역만 스켈레톤/에러로 대체.</li>
-      <li>configured 분기에 "API 키 회전"·"프로바이더 변경" 명시적 진입 버튼 추가 (또는 Setup 탭 폼 자체에 진입 허용).</li>
-      <li>History "View"를 Button variant=ghost + size=sm (h-8 min-w-16)으로 상향, 행 클릭 영역 전체로 확장.</li>
-      <li>History/Templates 폴링을 10초 background refetchInterval로 항상 활성 — 탭 전환 시 staleTime 무효.</li>
-      <li>Separator 제거, 탭 콘텐츠 padding은 TabsContent에 위임.</li>
-      <li>TemplatesPanel에 "본문 보기" 모달 + "이름 복사"·"사용 에이전트" 정보 추가.</li>
-    </ul>
-  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>탭을 URL search(<code>?tab=</code>)와 동기화 — 새로고침·공유·히스토리 지원.</li>
+    <li>configured 사용자의 setup 탭 진입은 강제 이동 대신 배너로 "이미 구성됨" 안내.</li>
+    <li>미설정 시엔 setup 중심으로 탭 축소; 이력/템플릿 탭에 카운트 배지.</li>
+  </ul></div>
 </section>

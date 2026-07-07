@@ -1,856 +1,846 @@
-<!-- SCREEN 02 — AGENTS (LIST + DETAIL) -->
-<section class="screen" id="screen-02">
-  <div class="screen-head">
-    <div class="num">02</div>
-    <div class="titles">
-      <h2>에이전트</h2>
-      <div class="route">web/src/routes/agents/index.tsx · /agents</div>
-    </div>
-    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
-      <span style="color:var(--hi);font-weight:700">2 H</span> ·
-      <span style="color:var(--med);font-weight:700">2 M</span> ·
-      <span style="color:var(--lo);font-weight:700">0 L</span>
-    </div>
-  </div>
-  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
-    실행·완료·실패 에이전트를 캔버스/테이블 두 뷰로 보여주는 모니터 화면. 헤더 통계, 필터 칩, 상태 탭, 페이징, 그리고 우측 슬라이드 인 디테일 패널로 구성된다.
-  </p>
-
-  <!-- 8-dimension rubric -->
-  <div class="rubric" aria-label="루브릭">
-    <div class="cell r4"><span class="sc">4</span>정보구조</div>
-    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
-    <div class="cell r3"><span class="sc">3</span>기능배치</div>
-    <div class="cell r4"><span class="sc">4</span>내비게이션</div>
-    <div class="cell r3"><span class="sc">3</span>일관성</div>
-    <div class="cell r2"><span class="sc">2</span>인터랙션</div>
-    <div class="cell r3"><span class="sc">3</span>접근성</div>
-    <div class="cell r4"><span class="sc">4</span>타이포</div>
-  </div>
-
-  <div class="compare">
-    <!-- CURRENT (annotated) -->
-    <div class="panel cur">
-      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <!-- sidebar (compressed) -->
-          <div style="width:96px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:6px 4px;flex:0 0 auto">
-            <div style="font-weight:700;font-size:10px;color:oklch(0.23 0.025 265);margin-bottom:6px">⚡ Oxios</div>
-            <div style="font-size:8px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:4px 2px 2px">에이전트</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:5px;padding:3px 5px;font-weight:600;font-size:10px">🤖 에이전트</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:3px 5px;font-size:10px">👤 페르소나</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:3px 5px;font-size:10px">⚡ 스킬</div>
-          </div>
-          <!-- main canvas -->
-          <div style="flex:1;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:4px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:12px;font-weight:600">🤖 에이전트</div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)"><span style="color:oklch(0.596 0.145 163)">2 running</span> · $0.034 active cost · 8.2k tokens · 4 A2A</div>
-              </div>
-              <!-- view toggle (pin1 target — canvas default) -->
-              <div style="display:flex;gap:3px">
-                <div style="display:flex;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:1px;background:oklch(0.967 0.001 286.375)">
-                  <span style="background:#fff;border-radius:4px;padding:2px 6px;font-size:9px;font-weight:600;box-shadow:0 1px 1px rgba(0,0,0,.05)">▦ 캔버스</span>
-                  <span style="padding:2px 6px;font-size:9px;color:oklch(0.552 0.016 285.938)">▤ 테이블</span>
-                </div>
-                <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">⌕</span>
-                <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">↻</span>
-              </div>
-            </div>
-            <!-- canvas: nodes + edges (no legend) -->
-            <div style="flex:1;background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:8px;position:relative;overflow:hidden">
-              <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" viewBox="0 0 240 160" preserveAspectRatio="none">
-                <path d="M55 90 C 100 50, 140 110, 190 80" stroke="oklch(0.623 0.214 259.815)" stroke-width="1.2" fill="none" opacity="0.55" stroke-dasharray="3 2"/>
-                <path d="M55 90 C 100 130, 140 130, 190 80" stroke="oklch(0.669 0.162 70)" stroke-width="1" fill="none" opacity="0.4"/>
-              </svg>
-              <div style="position:absolute;left:14px;top:48px;width:78px;border:1px solid oklch(0.596 0.145 163);background:#fff;border-radius:6px;padding:5px;font-size:8px">
-                <div style="display:flex;align-items:center;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.596 0.145 163)"></span><span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">agent-α</span></div>
-                <div style="color:oklch(0.552 0.016 285.938);font-size:7px;margin-top:1px">running · 42s</div>
-              </div>
-              <div style="position:absolute;left:84px;top:14px;width:78px;border:1px solid oklch(0.92 0.004 286.32);background:#fff;border-radius:6px;padding:5px;font-size:8px">
-                <div style="display:flex;align-items:center;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.577 0.245 27.325)"></span><span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">agent-β</span></div>
-                <div style="color:oklch(0.552 0.016 285.938);font-size:7px;margin-top:1px">failed · 12s</div>
-              </div>
-              <div style="position:absolute;left:160px;top:54px;width:78px;border:1px solid oklch(0.92 0.004 286.32);background:#fff;border-radius:6px;padding:5px;font-size:8px;box-shadow:0 0 0 2px oklch(0.23 0.025 265 / .25)">
-                <div style="display:flex;align-items:center;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.552 0.016 285.938)"></span><span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">agent-γ</span></div>
-                <div style="color:oklch(0.552 0.016 285.938);font-size:7px;margin-top:1px">idle · —</div>
-              </div>
-              <div style="position:absolute;bottom:5px;right:5px;width:46px;height:32px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;background:rgba(255,255,255,.85)"></div>
-              <div style="position:absolute;bottom:5px;left:5px;display:flex;flex-direction:column;gap:1px">
-                <div style="width:14px;height:14px;background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;font-size:9px;display:grid;place-items:center">+</div>
-                <div style="width:14px;height:14px;background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;font-size:9px;display:grid;place-items:center">−</div>
-              </div>
-            </div>
-            <!-- search input (pin2 target — no loading feedback) -->
-            <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:3px 7px;font-size:9px;display:flex;align-items:center;gap:5px;color:oklch(0.552 0.016 285.938);background:#fff">
-              <span>⌕</span>
-              <span style="flex:1">agent-α…</span>
-            </div>
-          </div>
-        </div>
-        <!-- detail panel sliding from right (pin3 target — full-screen blocker on narrow) -->
-        <div style="position:absolute;top:0;right:0;width:160px;height:100%;background:#fff;border-left:1px solid oklch(0.92 0.004 286.32);box-shadow:-2px 0 8px rgba(0,0,0,.08);padding:6px 7px;display:flex;flex-direction:column;gap:4px">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div style="font-size:10px;font-weight:600">agent-γ</div>
-            <span style="font-size:10px;color:oklch(0.552 0.016 285.938)">×</span>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px">
-            <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px;text-align:center"><div style="font-size:6px;color:oklch(0.552 0.016 285.938);text-transform:uppercase">Cost</div><div style="font-size:8px;font-weight:600">$0.012</div></div>
-            <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px;text-align:center"><div style="font-size:6px;color:oklch(0.552 0.016 285.938);text-transform:uppercase">Tokens</div><div style="font-size:8px;font-weight:600">4.2k</div></div>
-            <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px;text-align:center"><div style="font-size:6px;color:oklch(0.552 0.016 285.938);text-transform:uppercase">Dur</div><div style="font-size:8px;font-weight:600">12s</div></div>
-          </div>
-          <div style="font-size:7px;color:oklch(0.552 0.016 285.938);text-transform:uppercase;letter-spacing:.04em">Trace · Logs · Messages</div>
-          <div style="font-size:7px;color:oklch(0.552 0.016 285.938);flex:1">… step 3 of 7 …</div>
-          <div style="display:flex;gap:3px;border-top:1px solid oklch(0.92 0.004 286.32);padding-top:4px">
-            <span style="flex:1;font-size:8px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:2px;text-align:center">↗ Full Detail</span>
-            <span style="font-size:8px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:4px;padding:2px 5px">☠ Kill</span>
-          </div>
-        </div>
-        <!-- PINS (4): pin1 view-toggle (canvas default), pin2 search no feedback, pin3 detail-panel blocker, pin4 missing edge legend -->
-        <span class="pin h" style="top:30px;right:118px">1</span>
-        <span class="pin m" style="top:226px;left:228px">2</span>
-        <span class="pin h" style="top:30px;right:8px">3</span>
-        <span class="pin m" style="top:88px;left:124px">4</span>
-      </div>
-    </div>
-
-    <!-- PROPOSED -->
-    <div class="panel prop">
-      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:96px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:6px 4px;flex:0 0 auto">
-            <div style="font-weight:700;font-size:10px;color:oklch(0.23 0.025 265);margin-bottom:6px">⚡ Oxios</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:5px;padding:3px 5px;font-weight:600;font-size:10px">🤖 에이전트</div>
-          </div>
-          <div style="flex:1;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:4px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:12px;font-weight:600">🤖 에이전트</div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)"><span style="color:oklch(0.596 0.145 163)">2 running</span> · $0.034 · 8.2k tokens · 4 A2A</div>
-              </div>
-              <!-- fix1: table is now the default; canvas becomes an explicit choice -->
-              <div role="tablist" aria-label="뷰 전환" style="display:flex;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:1px;background:oklch(0.967 0.001 286.375)">
-                <button type="button" role="tab" aria-selected="false" style="padding:2px 6px;font-size:9px;color:oklch(0.552 0.016 285.938);border:0;background:transparent;cursor:pointer">▦ 캔버스</button>
-                <button type="button" role="tab" aria-selected="true" style="background:#fff;border-radius:4px;padding:2px 6px;font-size:9px;font-weight:600;border:0;cursor:pointer;outline:2px solid oklch(0.45 0.04 265);outline-offset:-2px">▤ 테이블</button>
-              </div>
-              <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">↻</span>
-            </div>
-            <!-- compact table as new default (replaces the heavy canvas) -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;overflow:hidden">
-              <div style="display:grid;grid-template-columns:1.4fr .7fr .7fr .6fr;gap:0;padding:3px 6px;background:oklch(0.967 0.001 286.375);font-size:7px;color:oklch(0.552 0.016 285.938);text-transform:uppercase;letter-spacing:.04em;font-weight:600">
-                <span>이름</span><span>상태</span><span>비용</span><span>지속</span>
-              </div>
-              <div style="display:grid;grid-template-columns:1.4fr .7fr .7fr .6fr;gap:0;padding:4px 6px;font-size:9px;border-top:1px solid oklch(0.92 0.004 286.32);align-items:center">
-                <span style="display:flex;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.596 0.145 163);flex-shrink:0"></span><span style="font-weight:600">agent-α</span></span>
-                <span style="color:oklch(0.596 0.145 163);font-size:8px">running</span>
-                <span style="font-family:var(--mono);font-size:8px">$0.018</span>
-                <span style="font-family:var(--mono);font-size:8px;color:oklch(0.552 0.016 285.938)">42s</span>
-              </div>
-              <div style="display:grid;grid-template-columns:1.4fr .7fr .7fr .6fr;gap:0;padding:4px 6px;font-size:9px;border-top:1px solid oklch(0.92 0.004 286.32);align-items:center;background:oklch(0.967 0.003 265)">
-                <span style="display:flex;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.577 0.245 27.325);flex-shrink:0"></span><span style="font-weight:600">agent-β</span></span>
-                <span style="color:oklch(0.577 0.245 27.325);font-size:8px">failed</span>
-                <span style="font-family:var(--mono);font-size:8px">$0.003</span>
-                <span style="font-family:var(--mono);font-size:8px;color:oklch(0.552 0.016 285.938)">12s</span>
-              </div>
-              <div style="display:grid;grid-template-columns:1.4fr .7fr .7fr .6fr;gap:0;padding:4px 6px;font-size:9px;border-top:1px solid oklch(0.92 0.004 286.32);align-items:center">
-                <span style="display:flex;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.552 0.016 285.938);flex-shrink:0"></span><span style="font-weight:600">agent-γ</span></span>
-                <span style="color:oklch(0.552 0.016 285.938);font-size:8px">idle</span>
-                <span style="font-family:var(--mono);font-size:8px;color:oklch(0.552 0.016 285.938)">$0.012</span>
-                <span style="font-family:var(--mono);font-size:8px;color:oklch(0.552 0.016 285.938)">12s</span>
-              </div>
-              <div style="display:grid;grid-template-columns:1.4fr .7fr .7fr .6fr;gap:0;padding:4px 6px;font-size:9px;border-top:1px solid oklch(0.92 0.004 286.32);align-items:center">
-                <span style="display:flex;align-items:center;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="width:5px;height:5px;border-radius:50%;background:oklch(0.669 0.162 70);flex-shrink:0"></span><span style="font-weight:600">agent-δ</span></span>
-                <span style="color:oklch(0.669 0.162 70);font-size:8px">queued</span>
-                <span style="font-family:var(--mono);font-size:8px;color:oklch(0.552 0.016 285.938)">—</span>
-                <span style="font-family:var(--mono);font-size:8px;color:oklch(0.552 0.016 285.938)">—</span>
-              </div>
-              <div style="padding:3px 6px;border-top:1px solid oklch(0.92 0.004 286.32);font-size:7px;color:oklch(0.552 0.016 285.938);text-align:center">4 / 47 · 캔버스는 시각화 탭에서</div>
-            </div>
-            <!-- fix4: edge-color legend visible (used when canvas is opened) -->
-            <div style="display:flex;align-items:center;gap:6px;font-size:8px;color:oklch(0.552 0.016 285.938)">
-              <span style="display:inline-flex;align-items:center;gap:2px"><span style="width:8px;height:0;border-top:2px dashed oklch(0.623 0.214 259.815)"></span>요청</span>
-              <span style="display:inline-flex;align-items:center;gap:2px"><span style="width:8px;height:0;border-top:2px solid oklch(0.669 0.162 70)"></span>응답</span>
-              <span style="margin-left:auto">A2A 4건</span>
-            </div>
-            <!-- fix2: search input with visible debounce feedback -->
-            <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:3px 7px;font-size:9px;display:flex;align-items:center;gap:5px;background:#fff">
-              <span style="color:oklch(0.552 0.016 285.938)">⌕</span>
-              <span style="flex:1;color:oklch(0.552 0.016 285.938)">agent-α…</span>
-              <span style="width:9px;height:9px;border:1.5px solid oklch(0.92 0.004 286.32);border-top-color:oklch(0.23 0.025 265);border-radius:50%;animation:spin .8s linear infinite"></span>
-              <span style="font-size:7px;color:oklch(0.552 0.016 285.938)">검색 중…</span>
-            </div>
-          </div>
-        </div>
-        <!-- fix3: detail panel as bottom-sheet (mobile) with grab handle + visible breadcrumb -->
-        <div style="position:absolute;left:8px;right:8px;bottom:8px;background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:10px 10px 6px 6px;box-shadow:0 -4px 12px rgba(0,0,0,.1);padding:0;display:flex;flex-direction:column;max-height:55%">
-          <div style="display:flex;flex-direction:column;align-items:center;padding:4px 0 2px">
-            <span style="width:32px;height:3px;background:oklch(0.92 0.004 286.32);border-radius:2px"></span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 8px 4px;border-top:1px solid oklch(0.92 0.004 286.32)">
-            <div style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.552 0.016 285.938)"></span><span style="font-size:10px;font-weight:600">agent-γ</span><span style="font-size:7px;color:oklch(0.552 0.016 285.938);font-family:var(--mono)">a1b2c3d4…</span></div>
-            <span style="font-size:11px;color:oklch(0.552 0.016 285.938)">×</span>
-          </div>
-          <div style="padding:3px 8px;background:oklch(0.97 0.014 265);border-top:1px solid oklch(0.92 0.004 286.32);font-size:7px;color:oklch(0.23 0.025 265);display:flex;align-items:center;gap:3px">
-            <span>📦 프로젝트</span><span>›</span><span>🤖 에이전트</span><span>›</span><span style="font-weight:600">agent-γ</span>
-            <span style="margin-left:auto;color:oklch(0.596 0.145 163)">← 뒤로가기 활성</span>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;padding:4px 8px">
-            <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:3px;text-align:center"><div style="font-size:6px;color:oklch(0.552 0.016 285.938);text-transform:uppercase">Cost</div><div style="font-size:9px;font-weight:600">$0.012</div></div>
-            <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:3px;text-align:center"><div style="font-size:6px;color:oklch(0.552 0.016 285.938);text-transform:uppercase">Tokens</div><div style="font-size:9px;font-weight:600">4.2k</div></div>
-            <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:3px;text-align:center"><div style="font-size:6px;color:oklch(0.552 0.016 285.938);text-transform:uppercase">Dur</div><div style="font-size:9px;font-weight:600">12s</div></div>
-          </div>
-          <div style="display:flex;gap:3px;padding:0 8px 6px;border-top:1px solid oklch(0.92 0.004 286.32);padding-top:4px">
-            <span style="flex:1;font-size:8px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:3px;text-align:center">↗ Full Detail</span>
-            <span style="font-size:8px;background:oklch(0.577 0.245 27.325);color:#fff;border-radius:4px;padding:3px 7px">☠ Kill</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- findings: 4 pins == 4 findings -->
-  <div class="findings">
-    <h4>발견사항 (4)</h4>
-    <ul class="flist">
-      <li><span class="badge h">HIGH</span><div><span class="ft">기본 뷰가 무거운 캔버스 — 에이전트 0개일 때도 React Flow/Minimap/Controls가 h-[calc(100vh-12rem)] 점유</span><span class="cite">agents/index.tsx:33,46 (view: 'canvas' 기본) · monitor-canvas.tsx:166-211 (고정 높이 + Minimap/Controls 항상)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">검색 인풋이 300ms setTimeout 디바운스하지만 로딩 인디케이터 없음 — 체감 응답 불명확</span><span class="cite">agents/index.tsx:397-411 (Input + setTimeout(...,300), 시각 피드백 없음)</span></div></li>
-      <li><span class="badge h">HIGH</span><div><span class="ft">디테일 패널이 fixed inset-0 + max-w-md — 좁은 뷰포트에서 화면 전체를 덮어 뒤로가기·내비게이션 차단</span><span class="cite">detail-panel.tsx:99-115 (fixed right-0 top-0 z-50, backdrop z-40)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">A2A 엣지 색은 정의돼 있으나 범례 미노출 — 색이 무엇을 의미하는지 사용자 추측</span><span class="cite">monitor-canvas.tsx:36-45 (edgeColor) · 105-133 (stroke 적용, UI 범례 없음)</span></div></li>
-    </ul>
-  </div>
-  <div class="changes">
-    <h4>변경 방향</h4>
-    <ul>
-      <li>기본 뷰를 'list'(간단 표)로 시작, 캔버스는 빈도 낮은 시각화용. 또는 캔버스 빈 상태에서는 EmptyState로 단축.</li>
-      <li>검색 인풋 우측에 디바운스 진행 인디케이터(작은 스피너 + "검색 중…" 텍스트) 노출.</li>
-      <li>디테일 패널은 슬라이드 인 유지하되 backdrop을 mobile에서 비활성화하고, 모바일에선 풀스크린 시트 패턴(상단 그랩 핸들·닫기) 적용.</li>
-      <li>캔버스 상단에 A2A 엣지 색 범례(요청·응답)를 항상 표시.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- SCREEN 03 — PERSONAS -->
-<section class="screen" id="screen-03">
-  <div class="screen-head">
-    <div class="num">03</div>
-    <div class="titles">
-      <h2>페르소나</h2>
-      <div class="route">web/src/routes/personas.tsx · /personas</div>
-    </div>
-    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
-      <span style="color:var(--hi);font-weight:700">1 H</span> ·
-      <span style="color:var(--med);font-weight:700">3 M</span> ·
-      <span style="color:var(--lo);font-weight:700">0 L</span>
-    </div>
-  </div>
-  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
-    시스템 프롬프트·역할·설명을 묶어 에이전트에 주입할 페르소나 프리셋 관리 화면. 인라인 생성 카드 + 카드 그리드 + 수정 다이얼로그로 구성된다.
-  </p>
-
-  <!-- 8-dimension rubric -->
-  <div class="rubric" aria-label="루브릭">
-    <div class="cell r4"><span class="sc">4</span>정보구조</div>
-    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
-    <div class="cell r3"><span class="sc">3</span>기능배치</div>
-    <div class="cell r4"><span class="sc">4</span>내비게이션</div>
-    <div class="cell r3"><span class="sc">3</span>일관성</div>
-    <div class="cell r2"><span class="sc">2</span>인터랙션</div>
-    <div class="cell r3"><span class="sc">3</span>접근성</div>
-    <div class="cell r4"><span class="sc">4</span>타이포</div>
-  </div>
-
-  <div class="compare">
-    <!-- CURRENT (annotated) -->
-    <div class="panel cur">
-      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:96px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:6px 4px;flex:0 0 auto">
-            <div style="font-weight:700;font-size:10px;color:oklch(0.23 0.025 265);margin-bottom:6px">⚡ Oxios</div>
-            <div style="font-size:8px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:4px 2px 2px">에이전트</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:3px 5px;font-size:10px">🤖 에이전트</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:5px;padding:3px 5px;font-weight:600;font-size:10px">👤 페르소나</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:3px 5px;font-size:10px">⚡ 스킬</div>
-          </div>
-          <div style="flex:1;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:5px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:12px;font-weight:600">👤 페르소나</div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">시스템 프롬프트 프리셋</div></div>
-              <div style="display:flex;gap:3px">
-                <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">↻</span>
-                <span style="background:oklch(0.23 0.025 265);color:#fff;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:600">+ 생성</span>
-              </div>
-            </div>
-            <!-- INLINE create card (pin1 target — collapses grid) -->
-            <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;gap:3px">
-              <div style="font-size:9px;font-weight:600">새 페르소나</div>
-              <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px 5px;font-size:8px;color:oklch(0.552 0.016 285.938)">이름 (예: 코드 리뷰어)</div>
-              <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px 5px;font-size:8px;color:oklch(0.552 0.016 285.938)">설명 (선택)</div>
-              <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:2px 5px;font-size:8px;color:oklch(0.552 0.016 285.938);height:22px">시스템 프롬프트…</div>
-              <div style="display:flex;gap:3px">
-                <span style="background:oklch(0.23 0.025 265);color:#fff;border-radius:3px;padding:2px 6px;font-size:8px">생성</span>
-                <span style="font-size:8px;color:oklch(0.552 0.016 285.938);padding:2px 5px">취소</span>
-              </div>
-            </div>
-            <!-- grid (compressed to 2 visible rows + ellipsis) -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;flex:1;overflow:hidden">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;position:relative">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="font-size:9px;font-weight:600;display:flex;align-items:center;gap:3px"><span style="font-size:9px">👤</span> 코드 리뷰어 <span style="color:oklch(0.669 0.162 70);font-size:8px">★</span></div>
-                  <div style="display:flex;gap:1px">
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">✎</span>
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">★</span>
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.577 0.245 27.325);font-size:9px">🗑</span>
-                  </div>
-                </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);margin-top:2px;line-height:1.3">PR 검토 시 보안·성능 관점 우선…</div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="font-size:9px;font-weight:600;display:flex;align-items:center;gap:3px"><span style="font-size:9px">👤</span> 데이터 분석가</div>
-                  <div style="display:flex;gap:1px">
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">✎</span>
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">★</span>
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.577 0.245 27.325);font-size:9px">🗑</span>
-                  </div>
-                </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);margin-top:2px">SQL/Pandas 결과 요약…</div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="font-size:9px;font-weight:600;display:flex;align-items:center;gap:3px"><span style="font-size:9px">👤</span> 한국어 번역가</div>
-                  <div style="display:flex;gap:1px">
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">✎</span>
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">★</span>
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.577 0.245 27.325);font-size:9px">🗑</span>
-                  </div>
-                </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);margin-top:2px">자연스러운 한국어 번역…</div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">… +2 더보기</div>
-            </div>
-          </div>
-        </div>
-        <!-- PINS (4): pin1 inline form, pin2 dialog missing role, pin3 delete no confirm, pin4 tiny icon buttons -->
-        <span class="pin h" style="top:60px;left:120px">1</span>
-        <span class="pin m" style="top:96px;left:120px">2</span>
-        <span class="pin m" style="top:144px;right:14px">3</span>
-        <span class="pin m" style="top:144px;right:78px">4</span>
-      </div>
-    </div>
-
-    <!-- PROPOSED -->
-    <div class="panel prop">
-      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:96px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:6px 4px;flex:0 0:auto">
-            <div style="font-weight:700;font-size:10px;color:oklch(0.23 0.025 265);margin-bottom:6px">⚡ Oxios</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:5px;padding:3px 5px;font-weight:600;font-size:10px">👤 페르소나</div>
-          </div>
-          <div style="flex:1;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:5px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:12px;font-weight:600">👤 페르소나</div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">시스템 프롬프트 프리셋</div></div>
-              <div style="display:flex;gap:3px;align-items:center">
-                <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">↻</span>
-                <!-- fix1: open dialog instead of inline card -->
-                <span style="background:oklch(0.23 0.025 265);color:#fff;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:600">+ 새 페르소나</span>
-              </div>
-            </div>
-            <!-- grid: full 2-col, no inline create card stealing vertical real estate -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1;overflow:hidden">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:6px 7px;display:flex;flex-direction:column;gap:3px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="font-size:10px;font-weight:600;display:flex;align-items:center;gap:3px"><span>👤</span> 코드 리뷰어 <span style="color:oklch(0.669 0.162 70);font-size:9px">★ 활성</span></div>
-                  <!-- fix3+4: confirm on destructive; 18×18 buttons with title/aria-label -->
-                  <div style="display:flex;gap:2px">
-                    <span title="편집" aria-label="편집" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;font-size:9px">✎</span>
-                    <span title="삭제(확인)" aria-label="삭제" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;color:oklch(0.577 0.245 27.325);font-size:9px">🗑</span>
-                  </div>
-                </div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">역할: 코드 리뷰어</div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938);line-height:1.3">PR 검토 시 보안·성능 관점 우선, 한국어…</div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:6px 7px;display:flex;flex-direction:column;gap:3px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="font-size:10px;font-weight:600;display:flex;align-items:center;gap:3px"><span>👤</span> 데이터 분석가</div>
-                  <div style="display:flex;gap:2px">
-                    <span title="편집" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;font-size:9px">✎</span>
-                    <span title="활성화" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;color:oklch(0.669 0.162 70);font-size:9px">★</span>
-                    <span title="삭제(확인)" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;color:oklch(0.577 0.245 27.325);font-size:9px">🗑</span>
-                  </div>
-                </div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">역할: 데이터 분석</div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938);line-height:1.3">SQL/Pandas 결과 요약 및 시각화 제안…</div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:6px 7px;display:flex;flex-direction:column;gap:3px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="font-size:10px;font-weight:600;display:flex;align-items:center;gap:3px"><span>👤</span> 한국어 번역가</div>
-                  <div style="display:flex;gap:2px">
-                    <span title="편집" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;font-size:9px">✎</span>
-                    <span title="활성화" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;color:oklch(0.669 0.162 70);font-size:9px">★</span>
-                    <span title="삭제(확인)" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;color:oklch(0.577 0.245 27.325);font-size:9px">🗑</span>
-                  </div>
-                </div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938)">역할: 번역</div>
-                <div style="font-size:8px;color:oklch(0.552 0.016 285.938);line-height:1.3">자연스러운 한국어 번역, IT/엔지니어링…</div>
-              </div>
-              <div style="background:#fff;border:1px dashed oklch(0.92 0.004 286.32);border-radius:6px;padding:6px 7px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:oklch(0.552 0.016 285.938);font-size:9px;gap:3px">
-                <span style="font-size:14px;color:oklch(0.23 0.025 265)">+</span> 새 페르소나 만들기
-              </div>
-            </div>
-            <!-- fix2: dialog preview strip (shows where role field now lives) + fix4: required-field validation -->
-            <div style="border-top:1px dashed oklch(0.92 0.004 286.32);padding-top:4px;display:flex;align-items:center;gap:6px;font-size:8px;color:oklch(0.552 0.016 285.938)">
-              <span style="font-weight:600;color:oklch(0.23 0.025 265)">다이얼로그 검증:</span>
-              <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:1px 4px;background:#fff">이름 *</span>
-              <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:1px 4px;background:#fff">역할 *</span>
-              <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:1px 4px;background:#fff;display:flex;align-items:center;gap:3px">시스템 프롬프트 * <span style="color:oklch(0.577 0.245 27.325)">필수</span></span>
-              <span style="margin-left:auto">→ 저장 버튼 비활성</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- findings: 4 pins == 4 findings -->
-  <div class="findings">
-    <h4>발견사항 (4)</h4>
-    <ul class="flist">
-      <li><span class="badge h">HIGH</span><div><span class="ft">생성 폼이 인라인 Card로 펼쳐져 카드 그리드를 한 칸씩 밀어냄 — 빈도가 낮은 액션이 기본 화면을 잠식</span><span class="cite">personas.tsx:114-152 ({showCreate && <Card>...}) — 그리드는 154행부터</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">수정 다이얼로그(EditPersonaDialog)가 name·description·system_prompt만 편집 — 카드에 표시되는 persona.role 필드 편집 경로 없음</span><span class="cite">edit-persona-dialog.tsx:131-159 (role 입력 없음) · personas.tsx:203-208 (role 표시)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">삭제 버튼이 즉시 mutation 호출 — 확인 다이얼로그/Undo 토스트 없음. 페르소나는 에이전트 의존성</span><span class="cite">personas.tsx:193-200 (onClick={() => deleteMutation.mutate(persona.id)})</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">"생성" 버튼이 disabled={!name.trim()} — 설명·시스템 프롬프트가 비어도 페르소나 생성됨. 빈 페르소나가 그리드에 누적</span><span class="cite">personas.tsx:142 (disabled 조건이 name만 검사) · 130-135 (systemPrompt Textarea는 존재, 검증 없음)</span></div></li>
-    </ul>
-  </div>
-  <div class="changes">
-    <h4>변경 방향</h4>
-    <ul>
-      <li>생성은 + 버튼 → 모달(EditPersonaDialog 패턴과 동일)로 통일. 인라인 폼 제거로 그리드 항상 2~3열 유지.</li>
-      <li>EditPersonaDialog에 role/personality_traits 필드 추가, 카드와 다이얼로그 간 정보 동등성 확보.</li>
-      <li>삭제 전 확인 모달 또는 5초 Undo 토스트 도입. Edit/Activate/Delete 아이콘은 18×18 이상 + 텍스트 라벨(또는 tooltip 강제).</li>
-      <li>생성 버튼의 disabled 조건에 systemPrompt.trim()도 포함. 빈 페르소나는 생성 불가, 카드에는 "초안" 상태가 아닌 거부 피드백.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- SCREEN 04 — SKILLS -->
-<section class="screen" id="screen-04">
-  <div class="screen-head">
-    <div class="num">04</div>
-    <div class="titles">
-      <h2>스킬</h2>
-      <div class="route">web/src/routes/skills.tsx · /skills</div>
-    </div>
-    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
-      <span style="color:var(--hi);font-weight:700">2 H</span> ·
-      <span style="color:var(--med);font-weight:700">2 M</span> ·
-      <span style="color:var(--lo);font-weight:700">0 L</span>
-    </div>
-  </div>
-  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
-    설치된 스킬과 마켓플레이스 검색을 한 화면에서 관리. 좌측 큰 카드 목록과 우측 상세 사이드 패널로 분할되며, 요구사항 누락 시 경고를 표시한다.
-  </p>
-
-  <!-- 8-dimension rubric -->
-  <div class="rubric" aria-label="루브릭">
-    <div class="cell r3"><span class="sc">3</span>정보구조</div>
-    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
-    <div class="cell r2"><span class="sc">2</span>기능배치</div>
-    <div class="cell r3"><span class="sc">3</span>내비게이션</div>
-    <div class="cell r3"><span class="sc">3</span>일관성</div>
-    <div class="cell r3"><span class="sc">3</span>인터랙션</div>
-    <div class="cell r3"><span class="sc">3</span>접근성</div>
-    <div class="cell r3"><span class="sc">3</span>타이포</div>
-  </div>
-
-  <div class="compare">
-    <!-- CURRENT (annotated) -->
-    <div class="panel cur">
-      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:96px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:6px 4px;flex:0 0 auto">
-            <div style="font-weight:700;font-size:10px;color:oklch(0.23 0.025 265);margin-bottom:6px">⚡ Oxios</div>
-            <div style="font-size:8px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:4px 2px 2px">에이전트</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:3px 5px;font-size:10px">🤖 에이전트</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:3px 5px;font-size:10px">👤 페르소나</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:5px;padding:3px 5px;font-weight:600;font-size:10px">⚡ 스킬</div>
-          </div>
-          <div style="flex:1;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:4px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:12px;font-weight:600">⚡ 스킬</div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">설치 + 마켓플레이스</div></div>
-              <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">↻</span>
-            </div>
-            <!-- top tab switcher (pin2 target — hand-rolled, NOT TabsList) -->
-            <div style="display:inline-flex;border-radius:6px;background:oklch(0.967 0.001 286.375);padding:2px;gap:1px;width:fit-content">
-              <span style="background:#fff;border-radius:4px;padding:3px 8px;font-size:9px;font-weight:600;box-shadow:0 1px 1px rgba(0,0,0,.05)">⚡ 설치됨 <span style="color:oklch(0.552 0.016 285.938)">14</span></span>
-              <span style="padding:3px 8px;font-size:9px;color:oklch(0.552 0.016 285.938)">🛒 마켓플레이스 <span style="background:oklch(0.577 0.245 27.325);color:#fff;border-radius:999px;font-size:7px;padding:0 4px">2</span></span>
-            </div>
-            <!-- installed sub-filter -->
-            <div style="display:inline-flex;border-radius:6px;background:oklch(0.967 0.001 286.375);padding:2px;gap:1px;width:fit-content">
-              <span style="background:#fff;border-radius:4px;padding:2px 6px;font-size:8px;font-weight:600;box-shadow:0 1px 1px rgba(0,0,0,.05)">전체 14</span>
-              <span style="padding:2px 6px;font-size:8px;color:oklch(0.552 0.016 285.938)">준비 9</span>
-              <span style="padding:2px 6px;font-size:8px;color:oklch(0.669 0.162 70)">설정 필요 3</span>
-              <span style="padding:2px 6px;font-size:8px;color:oklch(0.552 0.016 285.938)">비활성 2</span>
-            </div>
-            <!-- one big card dominating the list (pin1 target) -->
-            <div style="flex:1;display:flex;flex-direction:column;gap:4px;overflow:hidden">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:6px 7px;display:flex;flex-direction:column;gap:3px;cursor:pointer">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div>
-                    <div style="font-size:10px;font-weight:600">📦 github-pr-review <span style="font-size:7px;background:oklch(0.92 0.004 286.32);border-radius:3px;padding:0 3px;margin-left:3px">v2.1.0</span></div>
-                    <div style="font-size:7px;color:oklch(0.552 0.016 285.938);margin-top:1px">PR diff 요약·리뷰 코멘트 초안 작성</div>
-                  </div>
-                  <div style="display:flex;gap:3px">
-                    <span style="font-size:7px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:3px;padding:1px 4px;border:1px solid oklch(0.596 0.145 163 / .25)">준비</span>
-                    <span style="font-size:7px;border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:1px 4px">claude_code</span>
-                  </div>
-                </div>
-                <div style="border-top:1px dashed oklch(0.92 0.004 286.32);padding-top:3px">
-                  <div style="font-size:7px;text-transform:uppercase;letter-spacing:.04em;color:oklch(0.552 0.016 285.938);font-weight:600">요구사항</div>
-                  <div style="font-size:7px;color:oklch(0.552 0.016 285.938);margin-top:1px;padding-left:4px">
-                    • bins: <span style="color:oklch(0.577 0.245 27.325)">gh</span>, jq ✓<br>
-                    • env: <span style="color:oklch(0.577 0.245 27.325)">GITHUB_TOKEN</span> ✗<br>
-                    • config: <span style="color:oklch(0.669 0.162 70)">default_branch</span>
-                  </div>
-                </div>
-                <div style="border-top:1px dashed oklch(0.92 0.004 286.32);padding-top:3px">
-                  <div style="font-size:7px;text-transform:uppercase;letter-spacing:.04em;color:oklch(0.552 0.016 285.938);font-weight:600">설치 단계</div>
-                  <div style="font-size:7px;color:oklch(0.552 0.016 285.938);margin-top:1px;padding-left:4px">
-                    <span style="font-family:var(--mono);background:oklch(0.967 0.001 286.375);padding:0 3px;border-radius:2px">npm i -g @scope/pr-review</span>
-                  </div>
-                </div>
-                <!-- pin4 target — toggle buried at bottom -->
-                <div style="display:flex;gap:3px;border-top:1px solid oklch(0.92 0.004 286.32);padding-top:3px;margin-top:1px">
-                  <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:2px 6px;font-size:8px">⏻ 비활성</span>
-                  <span style="font-size:8px;color:oklch(0.577 0.245 27.325);padding:2px 5px">🗑 삭제</span>
-                  <span style="font-size:7px;color:oklch(0.552 0.016 285.938);margin-left:auto;align-self:center">… +2 더보기</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- PINS (4): pin1 one big card, pin2 hand-rolled tabs, pin3 card not keyboard-accessible, pin4 toggle buried -->
-        <span class="pin h" style="top:78px;left:178px">1</span>
-        <span class="pin m" style="top:112px;left:178px">2</span>
-        <span class="pin h" style="top:248px;left:178px">3</span>
-        <span class="pin m" style="top:230px;right:18px">4</span>
-      </div>
-    </div>
-
-    <!-- PROPOSED -->
-    <div class="panel prop">
-      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:96px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:6px 4px;flex:0 0:auto">
-            <div style="font-weight:700;font-size:10px;color:oklch(0.23 0.025 265);margin-bottom:6px">⚡ Oxios</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:5px;padding:3px 5px;font-weight:600;font-size:10px">⚡ 스킬</div>
-          </div>
-          <div style="flex:1;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:5px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:12px;font-weight:600">⚡ 스킬</div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">설치 + 마켓플레이스</div></div>
-              <div style="display:flex;gap:3px;align-items:center">
-                <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">⌕ 검색</div>
-                <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">↻</span>
-              </div>
-            </div>
-            <!-- fix2: TabsList for top switch -->
-            <div role="tablist" style="display:inline-flex;border-bottom:1px solid oklch(0.92 0.004 286.32);gap:0">
-              <button type="button" role="tab" aria-selected="true" style="background:transparent;border:0;padding:4px 8px;font-size:9px;font-weight:600;border-bottom:2px solid oklch(0.23 0.025 265);margin-bottom:-1px">⚡ 설치됨 14</button>
-              <button type="button" role="tab" aria-selected="false" style="background:transparent;border:0;padding:4px 8px;font-size:9px;color:oklch(0.552 0.016 285.938)">🛒 마켓플레이스 <span style="background:oklch(0.577 0.245 27.325);color:#fff;border-radius:999px;font-size:7px;padding:0 4px">2 업데이트</span></button>
-            </div>
-            <div role="tablist" style="display:inline-flex;border-radius:6px;background:oklch(0.967 0.001 286.375);padding:2px;gap:1px;width:fit-content">
-              <button type="button" role="tab" aria-selected="true" style="background:#fff;border:0;border-radius:4px;padding:2px 6px;font-size:8px;font-weight:600;box-shadow:0 1px 1px rgba(0,0,0,.05);cursor:pointer">전체 14</button>
-              <button type="button" role="tab" aria-selected="false" style="border:0;background:transparent;padding:2px 6px;font-size:8px;color:oklch(0.552 0.016 285.938);cursor:pointer">준비 9</button>
-              <button type="button" role="tab" aria-selected="false" style="border:0;background:transparent;padding:2px 6px;font-size:8px;color:oklch(0.669 0.162 70);cursor:pointer">설정 필요 3</button>
-              <button type="button" role="tab" aria-selected="false" style="border:0;background:transparent;padding:2px 6px;font-size:8px;color:oklch(0.552 0.016 285.938);cursor:pointer">비활성 2</button>
-            </div>
-            <!-- compact list of 3 rows (each shows essential) + ellipsis; fix3 role=button + tabIndex; fix4 inline toggle -->
-            <div style="flex:1;display:flex;flex-direction:column;gap:3px;overflow:hidden">
-              <div role="button" tabindex="0" aria-label="github-pr-review 카드" style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 7px;display:flex;flex-direction:column;gap:2px;cursor:pointer">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
-                  <div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="font-size:11px">📦</span><span style="font-size:10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">github-pr-review</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">v2.1.0</span><span style="font-size:7px;color:oklch(0.669 0.162 70)">⚠ 설정 필요</span></div>
-                  <div style="display:flex;gap:2px;flex-shrink:0;align-items:center">
-                    <!-- fix4: inline toggle near status, not buried -->
-                    <span style="font-size:7px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:2px 5px">⏻</span>
-                    <span style="font-size:7px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:3px;padding:1px 4px">준비</span>
-                  </div>
-                </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);margin-left:16px">env: GITHUB_TOKEN 누락 · config: default_branch 미설정</div>
-              </div>
-              <div role="button" tabindex="0" style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 7px;display:flex;flex-direction:column;gap:2px;cursor:pointer">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
-                  <div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="font-size:11px">🔍</span><span style="font-size:10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">web-search</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">v1.4.2</span></div>
-                  <div style="display:flex;gap:2px;flex-shrink:0;align-items:center">
-                    <span style="font-size:7px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:2px 5px">⏻</span>
-                    <span style="font-size:7px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:3px;padding:1px 4px">준비</span>
-                  </div>
-                </div>
-              </div>
-              <div role="button" tabindex="0" style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 7px;display:flex;flex-direction:column;gap:2px;cursor:pointer">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
-                  <div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="font-size:11px">📊</span><span style="font-size:10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">sql-query-helper</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">v0.9.0</span></div>
-                  <div style="display:flex;gap:2px;flex-shrink:0;align-items:center">
-                    <span style="font-size:7px;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;padding:2px 5px">⏻</span>
-                    <span style="font-size:7px;background:oklch(0.967 0.001 286.375);color:oklch(0.552 0.016 285.938);border-radius:3px;padding:1px 4px">비활성</span>
-                  </div>
-                </div>
-              </div>
-              <div style="font-size:8px;color:oklch(0.552 0.016 285.938);text-align:center;padding:2px">… +11 더보기 · 클릭 시 상세 사이드 패널</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- findings: 4 pins == 4 findings -->
-  <div class="findings">
-    <h4>발견사항 (4)</h4>
-    <ul class="flist">
-      <li><span class="badge h">HIGH</span><div><span class="ft">스킬 카드 1장이 화면 대부분을 점유 — 요구사항·설치 단계·버전이 항상 펼쳐져 목록 1~2개만 보임</span><span class="cite">skills.tsx:711-862 (SkillCard: requirements·install·missing 모두 항상 렌더) · 452-470 grid</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">상단 탭과 하단 필터 모두 핸드롤 button 그룹(bg-muted) — 형제 화면은 TabsList 컴포넌트를 쓰는데 이 화면만 불일치</span><span class="cite">skills.tsx:231-256 (메인 탭) · 407-433 (필터) · 586-612 (소스 토글)</span></div></li>
-      <li><span class="badge h">HIGH</span><div><span class="ft">카드 전체가 onClick={onSelect}로 클릭 가능하지만 role="button"·tabIndex 없음 — 키보드 사용자는 카드에 포커스 불가</span><span class="cite">skills.tsx:712-720 (Card에 onClick만, role 미부여)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">Enable/Disable 토글이 카드 하단에 묻힘 — 자주 쓰는 액션이 시각 우선순위 최하위</span><span class="cite">skills.tsx:839-849 (border-t 아래에 토글·삭제 배치, 카드 안쪽에서 멀리)</span></div></li>
-    </ul>
-  </div>
-  <div class="changes">
-    <h4>변경 방향</h4>
-    <ul>
-      <li>카드 기본은 1줄(아이콘·이름·버전·상태 배지·간단 요약). 요구사항·설치 단계는 클릭 시 우측 사이드 패널에서 표시.</li>
-      <li>상단 탭/하단 필터/소스 토글을 모두 <code>Tabs/TabsList</code> 컴포넌트로 통일. role/aria-selected 부여.</li>
-      <li>카드 전체를 role="button" + tabIndex=0 + Enter/Space 핸들러로 키보드 접근 가능하게.</li>
-      <li>Enable/Disable 스위치를 카드 우측 상단으로 이동(드롭다운 메뉴 액션 또는 인라인 토글). 삭제는 더보기 메뉴로 이동.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- SCREEN 05 — PROJECTS -->
 <section class="screen" id="screen-05">
   <div class="screen-head">
-    <div class="num">05</div>
-    <div class="titles">
+    <div class="snum">05</div>
+    <div class="stitle">
       <h2>프로젝트</h2>
-      <div class="route">web/src/routes/projects/index.tsx · /projects</div>
+      <span class="route">/projects · routes/projects/index.tsx</span>
     </div>
-    <div style="margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-mute)">
-      <span style="color:var(--hi);font-weight:700">1 H</span> ·
-      <span style="color:var(--med);font-weight:700">3 M</span> ·
-      <span style="color:var(--lo);font-weight:700">0 L</span>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">기능배치</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
     </div>
-  </div>
-  <p style="color:var(--ink-soft);margin:6px 0 0;max-width:780px">
-    코드 경로·태그·메모리 가시성을 묶어 에이전트의 작업 컨텍스트를 정의하는 프로젝트 관리 화면. 카드 그리드 + 상세 4탭(상세/경로/메모리/활동)으로 구성된다.
-  </p>
-
-  <!-- 8-dimension rubric -->
-  <div class="rubric" aria-label="루브릭">
-    <div class="cell r4"><span class="sc">4</span>정보구조</div>
-    <div class="cell r3"><span class="sc">3</span>레이아웃</div>
-    <div class="cell r3"><span class="sc">3</span>기능배치</div>
-    <div class="cell r4"><span class="sc">4</span>내비게이션</div>
-    <div class="cell r3"><span class="sc">3</span>일관성</div>
-    <div class="cell r3"><span class="sc">3</span>인터랙션</div>
-    <div class="cell r2"><span class="sc">2</span>접근성</div>
-    <div class="cell r4"><span class="sc">4</span>타이포</div>
   </div>
 
   <div class="compare">
-    <!-- CURRENT (annotated) — index grid + small detail-page inset showing back/tab issues -->
-    <div class="panel cur">
-      <div class="plabel"><span>현재</span><span style="color:var(--ink-mute)">current</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:96px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:6px 4px;flex:0 0:auto">
-            <div style="font-weight:700;font-size:10px;color:oklch(0.23 0.025 265);margin-bottom:6px">⚡ Oxios</div>
-            <div style="font-size:8px;text-transform:uppercase;color:oklch(0.552 0.016 285.938);margin:4px 2px 2px">프로젝트</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:5px;padding:3px 5px;font-weight:600;font-size:10px">📦 프로젝트</div>
-            <div style="color:oklch(0.552 0.016 285.938);padding:3px 5px;font-size:10px">⛰ 마운트</div>
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
           </div>
-          <div style="flex:1;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:5px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:12px;font-weight:600">📦 프로젝트</div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">코드 경로·태그·메모리 묶음</div></div>
-              <div style="display:flex;gap:3px">
-                <span style="background:oklch(0.23 0.025 265);color:#fff;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:600">+ 새 프로젝트</span>
-                <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">↻</span>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>Projects</h1><p class="sub">Registered work contexts with paths and associated memories</p></div>
+                <div class="ver"><span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ New Project</span></div>
               </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:5px">
-              <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px;width:140px;color:oklch(0.552 0.016 285.938)">⌕ 이름·태그 검색</div>
-              <span style="font-size:8px;color:oklch(0.552 0.016 285.938)">5 results</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1;overflow:hidden">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;gap:2px;position:relative">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="display:flex;align-items:center;gap:3px;min-width:0"><span style="font-size:11px">🚀</span><span style="font-size:9px;font-weight:600;color:oklch(0.23 0.025 265);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">oxios</span><span style="font-size:7px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:3px;padding:0 3px">manual</span></div>
-                  <!-- pin1 target — hover-only actions -->
-                  <div style="display:flex;gap:1px;opacity:0">
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:9px">✎</span>
-                    <span style="width:14px;height:14px;display:grid;place-items:center;color:oklch(0.577 0.245 27.325);font-size:9px">🗑</span>
+              <div class="flex gap2" style="margin:6px 0">
+                <input class="inp" value="" placeholder="Search by name, description, or tag…" style="max-width:240px"/>
+              </div>
+              <div class="g3">
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">1</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> Merc UI Audit</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">Oxios web frontend audit reports and findings</p>
+                    <p class="mono xs mut">📁 /Volumes/MERCURY/PROJECTS/oxios</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="chip">ui</span><span class="chip">audit</span><span class="chip">react</span>
+                    </div>
+                    <div class="flex between xs mut"><span>2시간 전</span><span class="tc-pri">View →</span></div>
                   </div>
                 </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);line-height:1.3">Agent Operating System (Rust + TS)</div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);font-family:var(--mono)">📁 /Volumes/MERCURY/...</div>
-                <div style="display:flex;gap:2px;flex-wrap:wrap"><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">rust</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">kernel</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">async</span><span style="font-size:7px;color:oklch(0.552 0.016 285.938)">+2</span></div>
-                <!-- pin2 target — "View →" duplicate entry point -->
-                <div style="display:flex;justify-content:space-between;font-size:7px;color:oklch(0.552 0.016 285.938)"><span>2시간 전</span><span style="color:oklch(0.23 0.025 265);text-decoration:underline">View →</span></div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;gap:2px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="display:flex;align-items:center;gap:3px;min-width:0"><span style="font-size:11px">📚</span><span style="font-size:9px;font-weight:600;color:oklch(0.23 0.025 265);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">design-system</span><span style="font-size:7px;background:oklch(0.97 0.014 70);color:oklch(0.669 0.162 70);border-radius:3px;padding:0 3px">auto</span></div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">2</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--war)">✦</span> research-bot <span class="pill mut" style="background:var(--war)/.15;color:var(--war)">auto_detected</span></span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">Automated scanner daemon (no manual description)</p>
+                    <p class="mono xs mut">📁 /opt/oxios/scanner</p>
+                  </div>
                 </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);line-height:1.3">OKLCH 토큰 + 컴포넌트 카탈로그</div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);font-family:var(--mono)">📁 /Volumes/MERCURY/...</div>
-                <div style="display:flex;gap:2px;flex-wrap:wrap"><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">oklch</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">a11y</span></div>
-                <div style="display:flex;justify-content:space-between;font-size:7px;color:oklch(0.552 0.016 285.938)"><span>어제</span><span style="color:oklch(0.23 0.025 265);text-decoration:underline">View →</span></div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;gap:2px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="display:flex;align-items:center;gap:3px;min-width:0"><span style="font-size:11px">⚙️</span><span style="font-size:9px;font-weight:600;color:oklch(0.23 0.025 265);text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">infra</span></div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">3</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--info)">🛠</span> ops</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">Internal ops documentation</p>
+                    <p class="mono xs mut">📁 /var/oxios/ops</p>
+                    <div class="xs mut">…</div>
+                  </div>
                 </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);line-height:1.3">Kubernetes, Cloudflare, GitHub</div>
-              </div>
-              <div style="background:#fff;border:1px dashed oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:oklch(0.552 0.016 285.938);font-size:8px;gap:3px">
-                <span style="font-size:13px;color:oklch(0.23 0.025 265)">+</span> 새 프로젝트
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">4</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> inkwell</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">…</p>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">5</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> site-rebuild</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body"><div class="xs mut">…</div></div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        <!-- DETAIL-PAGE INSET (현재 상태: back icon-only, Activity 탭 빈 노출) -->
-        <div style="position:absolute;left:104px;right:8px;bottom:6px;background:#fff;border:1px solid oklch(0.577 0.245 27.325);border-radius:6px;padding:4px 6px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-          <div style="font-size:7px;color:oklch(0.577 0.245 27.325);font-weight:600;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">→ 프로젝트 상세 (현재 문제)</div>
-          <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid oklch(0.92 0.004 286.32)">
-            <!-- pin4 target — ghost icon-only 36×36 back button -->
-            <span title="뒤로가기" style="width:18px;height:18px;display:grid;place-items:center;color:oklch(0.552 0.016 285.938);font-size:11px;border:1px dashed oklch(0.577 0.245 27.325);border-radius:4px">←</span>
-            <span style="font-size:11px">🚀</span>
-            <span style="font-size:10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">oxios</span>
-            <span style="margin-left:auto;display:flex;gap:2px"><span style="font-size:7px;border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:1px 4px">✎ 편집</span><span style="font-size:7px;border:1px solid oklch(0.92 0.004 286.32);border-radius:3px;padding:1px 4px">🗑 삭제</span></span>
-          </div>
-          <div role="tablist" style="display:flex;gap:0;margin-top:3px;border-bottom:1px solid oklch(0.92 0.004 286.32)">
-            <button type="button" role="tab" aria-selected="true" style="background:transparent;border:0;padding:3px 6px;font-size:8px;font-weight:600;border-bottom:2px solid oklch(0.23 0.025 265);margin-bottom:-1px">상세</button>
-            <button type="button" role="tab" aria-selected="false" style="background:transparent;border:0;padding:3px 6px;font-size:8px;color:oklch(0.552 0.016 285.938)">경로</button>
-            <button type="button" role="tab" aria-selected="false" style="background:transparent;border:0;padding:3px 6px;font-size:8px;color:oklch(0.552 0.016 285.938)">메모리</button>
-            <!-- pin3 target — empty Activity tab -->
-            <button type="button" role="tab" aria-selected="false" style="background:transparent;border:0;padding:3px 6px;font-size:8px;color:oklch(0.577 0.245 27.325);font-weight:600">Activity</button>
-          </div>
-          <div style="font-size:7px;color:oklch(0.577 0.245 27.325);margin-top:2px">탭 내용: "Activity — coming in Phase 3" (빈 카드)</div>
-        </div>
-        <!-- PINS (4): pin1 hover-only edit/delete, pin2 dual entry, pin3 empty Activity tab, pin4 back button icon-only -->
-        <span class="pin h" style="top:96px;left:124px">1</span>
-        <span class="pin m" style="top:130px;right:8px">2</span>
-        <span class="pin m" style="top:245px;left:200px">3</span>
-        <span class="pin m" style="top:218px;left:120px">4</span>
       </div>
     </div>
 
     <!-- PROPOSED -->
-    <div class="panel prop">
-      <div class="plabel"><span>제안</span><span class="tag">proposed</span></div>
-      <div class="stage" style="position:relative;background:#fafafa">
-        <div style="display:flex;height:300px;font-size:11px">
-          <div style="width:96px;background:oklch(0.978 0.002 265);border-right:1px solid oklch(0.92 0.004 286.32);padding:6px 4px;flex:0 0:auto">
-            <div style="font-weight:700;font-size:10px;color:oklch(0.23 0.025 265);margin-bottom:6px">⚡ Oxios</div>
-            <div style="background:oklch(0.967 0.003 265);border-radius:5px;padding:3px 5px;font-weight:600;font-size:10px">📦 프로젝트</div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
           </div>
-          <div style="flex:1;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:5px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div><div style="font-size:12px;font-weight:600">📦 프로젝트</div><div style="font-size:8px;color:oklch(0.552 0.016 285.938)">코드 경로·태그·메모리 묶음</div></div>
-              <div style="display:flex;gap:3px;align-items:center">
-                <div style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px;display:flex;align-items:center;gap:3px"><span style="color:oklch(0.552 0.016 285.938)">⌕</span> 이름·태그 검색</div>
-                <span style="border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:2px 5px;font-size:9px">↻</span>
-                <span style="background:oklch(0.23 0.025 265);color:#fff;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:600">+ 새 프로젝트</span>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ New Project</span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>프로젝트</h1><p class="sub">작업 맥락과 경로, 메모리를 함께 관리</p></div>
+                <div class="ver">
+                  <span class="pill mut">5 프로젝트</span>
+                </div>
+              </div>
+              <div class="flex gap2" style="margin:6px 0">
+                <input class="inp" value="" placeholder="이름·설명·태그 검색…" style="max-width:280px"/>
+                <span class="chip pri">전체</span>
+                <span class="chip">manual · 3</span>
+                <span class="chip">auto_detected · 2</span>
+              </div>
+              <!-- 카드 액션이 항상 보이도록 + 라벨이 함께 노출 -->
+              <div class="g3">
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> UI 감시</span>
+                    <span class="pill mut">manual</span>
+                  </div>
+                  <div class="flex gap4">
+                    <button class="btn-sm" title="편집 · E" aria-label="프로젝트 편집">✎ 편집</button>
+                    <button class="btn-sm" title="삭제" aria-label="프로젝트 삭제" style="color:var(--err)">🗑 삭제</button>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">Oxios web frontend 감시 보고서</p>
+                    <p class="mono xs mut">📁 /Volumes/MERCURY/PROJECTS/oxios</p>
+                    <div class="flex gap4" style="margin:4px 0"><span class="chip">ui</span><span class="chip">audit</span><span class="chip">react</span></div>
+                    <div class="flex between xs"><span class="mut">2시간 전</span><span class="tc-pri">열기 →</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--war)">✦</span> research-bot</span>
+                    <span class="pill" style="background:color-mix(in oklch,var(--war) 14%,transparent);color:var(--war)">auto_detected</span>
+                  </div>
+                  <div class="flex gap4">
+                    <button class="btn-sm" title="편집" aria-label="프로젝트 편집">✎ 편집</button>
+                    <button class="btn-sm" title="삭제" aria-label="프로젝트 삭제" style="color:var(--err)">🗑 삭제</button>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">자동 스캐너 데몬 — 설명 없음</p>
+                    <p class="mono xs mut">📁 /opt/oxios/scanner</p>
+                    <div class="flex between xs"><span class="mut">어제</span><span class="tc-pri">열기 →</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--info)">🛠</span> ops</span>
+                    <span class="pill mut">manual</span>
+                  </div>
+                  <div class="flex gap4">
+                    <button class="btn-sm" title="편집" aria-label="프로젝트 편집">✎ 편집</button>
+                    <button class="btn-sm" title="삭제" aria-label="프로젝트 삭제" style="color:var(--err)">🗑 삭제</button>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">내부 운영 문서</p>
+                    <p class="mono xs mut">📁 /var/oxios/ops</p>
+                    <div class="flex between xs"><span class="mut">3일 전</span><span class="tc-pri">열기 →</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> inkwell</span><span class="pill mut">manual</span></div>
+                  <div class="card-body"><p class="sm mut">…</p></div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> site-rebuild</span><span class="pill mut">manual</span></div>
+                  <div class="card-body"><div class="xs mut">…</div></div>
+                </div>
               </div>
             </div>
-            <!-- fix1+2: cards always show ⋯ menu, full click target, single primary CTA -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1;overflow:hidden">
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;gap:2px;cursor:pointer" tabindex="0" role="link" aria-label="프로젝트 oxios 열기">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="display:flex;align-items:center;gap:3px;min-width:0"><span style="font-size:11px">🚀</span><span style="font-size:9px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">oxios</span><span style="font-size:7px;background:oklch(0.97 0.014 163);color:oklch(0.596 0.145 163);border-radius:3px;padding:0 3px">manual</span></div>
-                  <!-- fix1: ⋯ menu always visible -->
-                  <div style="display:flex;gap:1px"><span title="더보기" aria-label="더보기" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;font-size:9px">⋯</span></div>
-                </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);line-height:1.3">Agent Operating System (Rust + TS)</div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);font-family:var(--mono)">📁 /Volumes/MERCURY/...</div>
-                <div style="display:flex;gap:2px;flex-wrap:wrap"><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">rust</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">kernel</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">async</span><span style="font-size:7px;color:oklch(0.552 0.016 285.938)">+2</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;font-size:7px;color:oklch(0.552 0.016 285.938)">
-                  <span>2시간 전</span>
-                  <!-- fix2: open detail on Enter/Space, View 제거 -->
-                  <span style="color:oklch(0.23 0.025 265);font-weight:600">열기 ↗</span>
-                </div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;gap:2px;cursor:pointer" tabindex="0" role="link" aria-label="프로젝트 design-system 열기">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="display:flex;align-items:center;gap:3px;min-width:0"><span style="font-size:11px">📚</span><span style="font-size:9px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">design-system</span><span style="font-size:7px;background:oklch(0.97 0.014 70);color:oklch(0.669 0.162 70);border-radius:3px;padding:0 3px">auto</span></div>
-                  <span title="더보기" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;font-size:9px">⋯</span>
-                </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);line-height:1.3">OKLCH 토큰 + 컴포넌트 카탈로그</div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);font-family:var(--mono)">📁 /Volumes/MERCURY/...</div>
-                <div style="display:flex;gap:2px;flex-wrap:wrap"><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">oklch</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">a11y</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;font-size:7px;color:oklch(0.552 0.016 285.938)">
-                  <span>어제</span>
-                  <span style="color:oklch(0.23 0.025 265);font-weight:600">열기 ↗</span>
-                </div>
-              </div>
-              <div style="background:#fff;border:1px solid oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;gap:2px;cursor:pointer" tabindex="0" role="link" aria-label="프로젝트 infra 열기">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px">
-                  <div style="display:flex;align-items:center;gap:3px;min-width:0"><span style="font-size:11px">⚙️</span><span style="font-size:9px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">infra</span></div>
-                  <span title="더보기" style="width:18px;height:18px;display:grid;place-items:center;border:1px solid oklch(0.92 0.004 286.32);border-radius:4px;font-size:9px">⋯</span>
-                </div>
-                <div style="font-size:7px;color:oklch(0.552 0.016 285.938);line-height:1.3">Kubernetes, Cloudflare, GitHub</div>
-                <div style="display:flex;gap:2px;flex-wrap:wrap"><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">k8s</span><span style="font-size:7px;background:oklch(0.967 0.001 286.375);border-radius:3px;padding:0 3px">cloudflare</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;font-size:7px;color:oklch(0.552 0.016 285.938)">
-                  <span>3일 전</span>
-                  <span style="color:oklch(0.23 0.025 265);font-weight:600">열기 ↗</span>
-                </div>
-              </div>
-              <div style="background:#fff;border:1px dashed oklch(0.92 0.004 286.32);border-radius:6px;padding:5px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:oklch(0.552 0.016 285.938);font-size:8px;gap:3px">
-                <span style="font-size:13px;color:oklch(0.23 0.025 265)">+</span> 새 프로젝트
-              </div>
-            </div>
           </div>
-        </div>
-        <!-- DETAIL-PAGE INSET (개선: back + 텍스트, Activity 탭 비노출) -->
-        <div style="position:absolute;left:104px;right:8px;bottom:6px;background:#fff;border:1px solid oklch(0.45 0.04 265);border-radius:6px;padding:4px 6px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-          <div style="font-size:7px;color:oklch(0.45 0.04 265);font-weight:600;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">→ 프로젝트 상세 헤더·탭 (개선)</div>
-          <div style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid oklch(0.92 0.004 286.32)">
-            <!-- fix4: 44px-tall back button with text -->
-            <span style="display:inline-flex;align-items:center;gap:2px;border:1px solid oklch(0.92 0.004 286.32);border-radius:5px;padding:3px 7px;font-size:8px;font-weight:500;height:20px"><span>←</span> 뒤로</span>
-            <span style="font-size:11px">🚀</span>
-            <span style="font-size:10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">oxios</span>
-            <span style="margin-left:auto;font-size:8px;color:oklch(0.552 0.016 285.938)">편집 · 삭제</span>
-          </div>
-          <div role="tablist" style="display:flex;gap:0;margin-top:3px;border-bottom:1px solid oklch(0.92 0.004 286.32)">
-            <button type="button" role="tab" aria-selected="true" style="background:transparent;border:0;padding:3px 6px;font-size:8px;font-weight:600;border-bottom:2px solid oklch(0.23 0.025 265);margin-bottom:-1px">상세</button>
-            <button type="button" role="tab" aria-selected="false" style="background:transparent;border:0;padding:3px 6px;font-size:8px;color:oklch(0.552 0.016 285.938)">경로</button>
-            <button type="button" role="tab" aria-selected="false" style="background:transparent;border:0;padding:3px 6px;font-size:8px;color:oklch(0.552 0.016 285.938)">메모리 12</button>
-            <!-- fix3: Activity 비활성 — 탭 자체를 노출하지 않음 -->
-            <span style="font-size:7px;color:oklch(0.596 0.145 163);margin-left:auto;align-self:center;padding-right:4px">Activity는 Phase 3에서 추가</span>
-          </div>
-          <div style="font-size:7px;color:oklch(0.596 0.145 163);margin-top:2px">빈 탭을 노출하지 않거나, 메모리+세션 합성 미리보기로 대체</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- findings: 4 pins == 4 findings -->
   <div class="findings">
-    <h4>발견사항 (4)</h4>
+    <h3>발견 (Findings)</h3>
     <ul class="flist">
-      <li><span class="badge h">HIGH</span><div><span class="ft">카드 편집/삭제 액션이 hover 시에만 노출(opacity-0 group-hover:opacity-100) — 터치 디바이스·키보드 사용자에게 액션이 영구히 숨겨짐</span><span class="cite">project-card.tsx:40-57 (opacity-0 group-hover:opacity-100)</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">카드 자체는 클릭 가능하지 않고 이름 링크와 "View →" 두 진입점이 별도 — 어디를 눌러야 상세로 가는지가 모호</span><span class="cite">project-card.tsx:29-35 (이름 Link) · 97-103 (View 링크) · 카드 div는 onClick 없음</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">상세 페이지 4번째 탭 "Activity"가 "Phase 3에서 곧 제공" 안내만 노출 — 사용자에게 빈 탭으로 인식</span><span class="cite">$projectId.tsx:184-199 (ProjectActivityCard) · 254 (TabsTrigger "Activity")</span></div></li>
-      <li><span class="badge m">MED</span><div><span class="ft">상세 헤더의 뒤로가기 버튼이 variant="ghost" size="icon"(36×36) — 텍스트 라벨 없이 아이콘만. 44px 권장 미달</span><span class="cite">$projectId.tsx:220-227 (ArrowLeft Button, ghost icon)</span></div></li>
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">카드 액션 버튼이 아이콘 전용·32px 미만·반투명 기본값으로 키보드/저시력 사용자에게 노출되지 않음</p>
+        <p class="fd">편집/삭제 버튼이 <code>p-1</code>(≈24×24px) + <code>opacity-70 group-hover:opacity-100</code>로 감춰져, WCAG 2.5.5(타겟 ≥44×44px CSPC)·1.4.13(콘텐츠 간지지) 미달. 키보드 사용자는 <code>focus-within</code>에만 희미하게 보이며 SR 사용자는 <code>title="Edit"</code>만으로 의도를 파악해야 한다. 시각 사용자도 호버 전에는 “정적 카드”로 오인한다.</p>
+        <p class="src">components/project/project-card.tsx:40-59 (opacity-70, p-1, h-3.5 w-3.5 icon)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">검색 인풋 옆에 결과 카운트가 조건부로만 노출</p>
+        <p class="fd"><code>search</code>가 비어 있으면 카운트가 DOM에서 사라진다(<code>{search &amp;&amp; (...)}</code>). 검색 결과 0건·오타 상황에서도 화면이 비어 보여 “왜 결과가 없는지” 시그널이 없다. 빈 상태(<code>EmptyState</code>)로 가야만 메시지가 보인다.</p>
+        <p class="src">routes/projects/index.tsx:58-62 ({`{search && ...}`}) · :70-91 EmptyState 분기</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft"><code>source</code> 배지가 i18n 키 없이 원문 노출</p>
+        <p class="fd">카드는 <code>SOURCE_COLORS</code>로 색만 매핑하고 라벨은 <code>project.source ?? 'manual'</code>을 그대로 표시. 영문 값(manual / auto_detected)이 그대로 노출되어 UI의 다른 한국어 라벨과 어긋난다.</p>
+        <p class="src">components/project/project-card.tsx:14-17, 36-38 (string 그대로)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">헤더의 "New Project"가 시스템 기본 라벨 영어 그대로</p>
+        <p class="fd"><code>projects.title/desc/new</code>가 한국어 key 없이 <code>'Projects' / 'New Project'</code> 기본값을 그대로 가지고 있어 page-h1/sub가 영문으로 노출된다. 하위 카드/검색 placeholder도 동일하게 <code>'No projects found'</code> 등 영문 기본값.</p>
+        <p class="src">routes/projects/index.tsx:36-38, 53, 75-81 (기본값)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft"><code>paths[0]</code>만 표시해 다중 경로 프로젝트의 맥락이 사라짐</p>
+        <p class="fd">프로젝트는 <code>paths: string[]</code>이지만 카드에는 첫 경로만 <code>line-clamp-1 truncate</code>으로 노출. 프로젝트 상세(<code>/projects/$projectId</code>)로 이동하기 전에는 “몇 개의 경로/어느 마운트에 연결돼 있는지” 알 수 없다.</p>
+        <p class="src">components/project/project-card.tsx:68-72 (paths[0]) · types: Project.paths</p>
+      </div></li>
     </ul>
   </div>
+
   <div class="changes">
-    <h4>변경 방향</h4>
+    <h3>변경 제안</h3>
     <ul>
-      <li>카드 우상단에 ⋯ 메뉴를 항상 노출(hover-only 제거). 메뉴 안에 편집/삭제/복제 + 적절한 aria-label.</li>
-      <li>카드 전체를 하나의 인터랙션으로: 클릭/Enter/Space로 상세 진입. 이름 링크·View 링크 중복 제거.</li>
-      <li>Activity 탭은 구현 시점까지 노출하지 않거나, "최근 메모리 변경 + 세션 활동" 합성 미리보기라도 제공. 빈 탭은 비활성.</li>
-      <li>뒤로가기 버튼을 size="sm" + 텍스트 "뒤로" 조합으로 변경, 44×44 영역 확보.</li>
+      <li>카드 액션을 <code>h-8 w-8</code> 이상으로 키우고 라벨 동반(<code>편집 · 삭제</code>), <code>opacity-70 group-hover</code> 제거하고 항상 노출. 파괴 액션은 hover 시 confirm 모션(예: 라벨이 “삭제하시겠어요?”로 1회 변경) 부여.</li>
+      <li><code>useTranslation</code>로 <code>manual</code>/<code>auto_detected</code>/<code>paths plural</code> 추가. 기본 라벨을 한글로.</li>
+      <li>검색 인풋 옆에 카운트(0 포함)와 “결과 없음” 인라인 메시지 상시 표시. <code>EmptyState</code>의 액션은 그대로.</li>
+      <li><code>paths.length &gt; 1</code>일 때 “+N paths” 칩과 “연결된 마운트 N개” 힌트 노출.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="screen" id="screen-06">
+  <div class="screen-head">
+    <div class="snum">06</div>
+    <div class="stitle">
+      <h2>마운트</h2>
+      <span class="route">/mounts · routes/mounts/index.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">기능배치</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div style="position:relative"><span class="pin" style="top:6px;right:6px">5</span><h1>Mounts</h1><p class="sub">경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.</p></div>
+                <div class="ver">
+                  <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ Mount 만들기</span>
+                </div>
+              </div>
+              <div class="flex gap2" style="margin:6px 0">
+                <input class="inp" value="" placeholder="이름, 설명, 언어로 검색…" style="max-width:220px"/>
+              </div>
+              <div class="g3">
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">1</span>
+                  <div style="position:absolute;right:6px;top:6px;display:flex;gap:2px;opacity:.7">
+                    <button class="btn-sm" title="편집" aria-label="편집">✎</button>
+                    <button class="btn-sm" title="갱신" aria-label="갱신">↻</button>
+                    <button class="btn-sm" style="color:var(--err)" title="삭제" aria-label="삭제">🗑</button>
+                  </div>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> merc-projects</span>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/Volumes/MERCURY/PROJECTS</p>
+                    <p class="sm mut">Oxi 워크스페이스 루트, 다수의 oxios* 프로젝트가 여기에 있다.</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="pill pri">typescript</span>
+                      <span class="pill pri">rust</span>
+                      <span class="pill pri">python</span>
+                      <span class="pill mut">+2</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">2</span>
+                  <div style="position:absolute;right:6px;top:6px;display:flex;gap:2px;opacity:.7">
+                    <button class="btn-sm" title="편집" aria-label="편집">✎</button>
+                    <button class="btn-sm" title="갱신" aria-label="갱신">↻</button>
+                    <button class="btn-sm" style="color:var(--err)" title="삭제" aria-label="삭제">🗑</button>
+                  </div>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:#8b5cf6">✦</span> auto-promoted <span class="pill" style="background:#8b5cf61a;color:#7c3aed">자동 생성</span></span>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/opt/oxios/scanner</p>
+                    <p class="sm mut">에이전트가 자주 참조해 자동 승격됨</p>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">3</span>
+                  <div style="position:absolute;right:6px;top:6px;display:flex;gap:2px;opacity:.7">
+                    <button class="btn-sm" title="편집" aria-label="편집">✎</button>
+                    <button class="btn-sm" title="갱신" aria-label="갱신">↻</button>
+                    <button class="btn-sm" style="color:var(--err)" title="삭제" aria-label="삭제">🗑</button>
+                  </div>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> legacy-jobs <span class="pill" style="background:#f59e0b1a;color:#b45309">갱신 필요</span></span>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/var/oxios/legacy</p>
+                    <p class="sm mut">경로 이동으로 자동 메타 무효화</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="pill pri">bash</span>
+                      <span class="pill mut">+1</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">4</span>
+                  <div class="card-body"><p class="sm mut">…</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ Mount 만들기</span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>마운트</h1><p class="sub">경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.</p></div>
+                <div class="ver"><span class="pill mut">5 마운트</span></div>
+              </div>
+              <div class="flex gap2" style="margin:6px 0">
+                <input class="inp" value="" placeholder="이름, 설명, 언어로 검색…" style="max-width:260px"/>
+                <span class="chip pri">전체</span>
+                <span class="chip">manual · 3</span>
+                <span class="chip">자동 생성 · 1</span>
+                <span class="chip" style="background:color-mix(in oklch,var(--war) 14%,transparent);color:var(--war)">갱신 필요 · 1</span>
+              </div>
+              <div class="g3">
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> merc-projects</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="편집" aria-label="마운트 편집">✎ 편집</button>
+                      <button class="btn-sm" title="갱신 (자동 메타 재구성)" aria-label="마운트 갱신">↻ 갱신</button>
+                      <button class="btn-sm" title="삭제" aria-label="마운트 삭제" style="color:var(--err)">🗑 삭제</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/Volumes/MERCURY/PROJECTS</p>
+                    <p class="sm mut">Oxi 워크스페이스 루트 — 다수의 oxios* 프로젝트가 여기에 있다.</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="pill pri">typescript</span>
+                      <span class="pill pri">rust</span>
+                      <span class="pill pri">python</span>
+                      <span class="pill mut">+2</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:#8b5cf6">✦</span> auto-promoted <span class="pill" style="background:#8b5cf61a;color:#7c3aed">자동 생성</span></span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="편집" aria-label="마운트 편집">✎ 편집</button>
+                      <button class="btn-sm" title="갱신" aria-label="마운트 갱신">↻ 갱신</button>
+                      <button class="btn-sm" title="삭제" aria-label="마운트 삭제" style="color:var(--err)">🗑 삭제</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/opt/oxios/scanner</p>
+                    <p class="sm mut">에이전트가 자주 참조해 자동 승격됨</p>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> legacy-jobs <span class="pill" style="background:color-mix(in oklch,var(--war) 18%,transparent);color:var(--war)">⚠ 갱신 필요</span></span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="편집" aria-label="마운트 편집">✎ 편집</button>
+                      <button class="btn-sm" title="즉시 갱신" aria-label="마운트 갱신" style="background:color-mix(in oklch,var(--war) 12%,transparent);color:var(--war);border-color:color-mix(in oklch,var(--war) 25%,transparent)">↻ 즉시 갱신</button>
+                      <button class="btn-sm" title="삭제" aria-label="마운트 삭제" style="color:var(--err)">🗑 삭제</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/var/oxios/legacy</p>
+                    <p class="sm mut">경로 이동으로 자동 메타 무효화</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="pill pri">bash</span>
+                      <span class="pill mut">+1</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> inkwell</span>
+                  </div>
+                  <div class="card-body"><p class="sm mut">…</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">카드 액션이 아이콘 전용·32×32px·opacity-70 기본값으로 시각 사용자도 호버 전에 인식 불가</p>
+        <p class="fd">편집/갱신/삭제 버튼이 <code>h-8 w-8</code>(32px, WCAG ≥44px 미달) + <code>opacity-70 group-hover:opacity-100</code> 패턴으로 항상 어둡게 노출. “편집/갱신/삭제”를 가르는 신호가 아이콘 색 뿐이라, 시각 사용자는 호버하거나 <code>focus-within</code>하기 전엔 카드를 “정적 콘텐츠”로 오인한다. 동형(同形) 아이콘(✎/↻)은 색맹 사용자에게 구분 불가.</p>
+        <p class="src">routes/mounts/index.tsx:113-141 (absolute, opacity-70, h-8 w-8)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">“갱신 필요” 배지의 트리거 액션이 카드 위에 명확히 표시되지 않음</p>
+        <p class="fd"><code>enrichment_pending</code> 배지(<code>bg-amber-500/10</code>)는 상태만 알리고, 이를 해소할 1차 액션(“즉시 갱신”)이 일반 카드의 갱신 버튼과 모양이 같아 사용자가 차이를 알기 어렵다. 보색 배지가 같은 호버 시그널 안에 묻혀 사실상 “눈에 띄는” 우선순위를 잃는다.</p>
+        <p class="src">routes/mounts/index.tsx:156-160 (enrichment_pending 배지) · :123-131 (갱신 버튼)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">새로고침 <code>RefreshButton</code>이 검색 인풋 옆이지만 “갱신 필요” 마운트 일괄 재시작과 무관</p>
+        <p class="fd"><code>RefreshButton</code>은 <code>refetch()</code>만 호출(<code>index.tsx:81</code>)하고 카드의 <code>rescanMount</code>(<code>:50</code>)는 아니다. “갱신 필요 N” 칩이 있어도 일괄로 해결할 수 없어 작업이 분절된다.</p>
+        <p class="src">routes/mounts/index.tsx:81 (RefreshButton) · :35 (rescanMount) · 메모리 overview의 EnrichNow과 비대칭</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">헤더 타이틀/CTA가 영문 기본값으로 노출</p>
+        <p class="fd"><code>mounts.title/desc/create/empty/emptyDesc/rescan/rescanned</code>이 영문 폴백을 그대로 가지고 있어 한국어 로케일에서도 “Mounts / New Mount”가 그대로 보인다. 다른 페이지가 한국어인 상태에서 한 화면만 어긋난다.</p>
+        <p class="src">routes/mounts/index.tsx:62-69, 91-100 (t() 기본값)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">카드 그리드가 <code>sm:grid-cols-2 lg:grid-cols-3</code>로 3열 고정, ≥2xl에서 더 늘어나지 않음</p>
+        <p class="fd">콘텐츠 영역이 1200px을 넘어가도 카드는 3열로 고정되어 우측에 큰 여백이 생긴다. 같은 <code>.g3</code>을 쓰는 프로젝트/페르소나 화면과 함께 “콘텐츠가 끝났다”는 신호가 약하다.</p>
+        <p class="src">routes/mounts/index.tsx:105 (grid gap-3 sm:grid-cols-2 lg:grid-cols-3)</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>카드 액션을 <code>h-9</code> 이상 pill 버튼으로 항상 노출(<code>✎ 편집</code>, <code>↻ 갱신</code>, <code>🗑 삭제</code>), <code>group-hover opacity</code> 제거. 파괴 액션은 1차 confirm.</li>
+      <li><code>enrichment_pending</code> 마운트만 갱신 버튼을 <code>warn</code> 톤으로 강조 + “즉시 갱신” 카피. 필터 칩과 연동하여 “갱신 필요 · 1” 선택 시 일괄 작업 노출.</li>
+      <li><code>RefreshButton</code> 옆에 “<code>enrichment_pending</code> 마운트 일괄 재시작” 추가 액션 — 마운트 페이지의 자기완결성↑.</li>
+      <li>한글 i18n 키 보강, 그리드를 <code>lg:grid-cols-3 2xl:grid-cols-4</code>로 확장.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="screen" id="screen-07">
+  <div class="screen-head">
+    <div class="snum">07</div>
+    <div class="stitle">
+      <h2>메모리</h2>
+      <span class="route">/memory · routes/memory.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">일관성</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>메모리</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>Memory</h1><p class="sub">…</p></div>
+              </div>
+              <div class="flex gap4" style="margin:8px 0;position:relative">
+                <span class="chip pri" style="position:relative"><span class="pin" style="top:-6px;right:-6px">1</span>개요</span>
+                <span class="chip">탐색</span>
+                <span class="chip">맵</span>
+                <span class="chip">드림</span>
+                <span class="chip" style="position:relative"><span class="pin" style="top:-6px;right:-6px">2</span>검색</span>
+              </div>
+              <div class="g3">
+                <div class="card">
+                  <div class="row"><span class="kpi-ic">🧠</span>
+                    <div><div class="kpi-val">1,284</div><div class="xs mut">totalEntries</div></div></div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">4</span>
+                  <div class="row"><span class="kpi-ic">#</span>
+                    <div><div class="kpi-val">7</div><div class="xs mut">vectorIndex</div></div></div>
+                </div>
+                <div class="card">
+                  <div class="row"><span class="kpi-ic">◷</span>
+                    <div><div class="kpi-val">idle</div><div class="xs mut">dreamStatus</div></div></div>
+                </div>
+              </div>
+              <div class="g2">
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">3</span>
+                  <div class="card-h"><span class="card-t">tierDistribution</span></div>
+                  <div class="card-body">
+                    <div class="flex gap4 xs mut"><span class="w-20">hot</span><div class="grow" style="height:6px;background:var(--err);border-radius:99px;width:32%"></div><span class="mono">412</span></div>
+                    <div class="flex gap4 xs mut"><span class="w-20">warm</span><div class="grow" style="height:6px;background:var(--war);border-radius:99px;width:46%"></div><span class="mono">588</span></div>
+                    <div class="flex gap4 xs mut"><span class="w-20">cold</span><div class="grow" style="height:6px;background:var(--info);border-radius:99px;width:24%"></div><span class="mono">284</span></div>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">5</span>
+                  <div class="card-h"><span class="card-t">typeDistribution</span></div>
+                  <div class="card-body">
+                    <div class="flex gap4 xs mut"><span class="w-20">fact</span><div class="grow" style="height:6px;background:#8884d8;border-radius:99px;width:62%"></div><span class="mono">794</span></div>
+                    <div class="flex gap4 xs mut"><span class="w-20">preference</span><div class="grow" style="height:6px;background:#8884d8;border-radius:99px;width:18%"></div><span class="mono">232</span></div>
+                    <div class="flex gap4 xs mut"><span class="w-20">event</span><div class="grow" style="height:6px;background:#8884d8;border-radius:99px;width:20%"></div><span class="mono">258</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>메모리</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⌕ 메모리 내 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>메모리</h1><p class="sub">에이전트가 장기 기억으로 사용하는 항목들의 분포와 검색</p></div>
+                <div class="ver"><span class="pill pri">1,284 항목</span></div>
+              </div>
+              <div class="flex gap4" style="margin:8px 0">
+                <span class="chip pri">개요</span>
+                <span class="chip">탐색</span>
+                <span class="chip">맵</span>
+                <span class="chip">드림</span>
+                <span class="chip">검색</span>
+              </div>
+              <!-- KPI 카드: 라벨/링크/툴팁 명확화 -->
+              <div class="g3">
+                <div class="card">
+                  <div class="row"><span class="kpi-ic tc-pri">🧠</span>
+                    <div>
+                      <div class="kpi-val">1,284</div>
+                      <div class="xs mut">총 메모리 항목</div>
+                      <a class="xs tc-pri" style="text-decoration:underline">탐색으로 →</a>
+                    </div></div>
+                </div>
+                <div class="card">
+                  <div class="row"><span class="kpi-ic tc-pri">#</span>
+                    <div>
+                      <div class="kpi-val">7 / <span class="mut sm">활성</span></div>
+                      <div class="xs mut">벡터 인덱스 (유형 수)</div>
+                      <a class="xs tc-pri" style="text-decoration:underline">맵 보기 →</a>
+                    </div></div>
+                </div>
+                <div class="card">
+                  <div class="row"><span class="kpi-ic tc-war">◷</span>
+                    <div>
+                      <div class="kpi-val">idle <span class="mut sm">· 마지막 정리 2시간 전</span></div>
+                      <div class="xs mut">드림(컴팩션) 상태</div>
+                      <a class="xs tc-pri" style="text-decoration:underline">드림 탭 →</a>
+                    </div></div>
+                </div>
+              </div>
+              <!-- 분포에 x축(스케일)과 빈 상태 가이드 -->
+              <div class="g2">
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t">티어 분포</span>
+                    <span class="pill mut">최대 588</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">hot</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:70%;height:100%;background:var(--err);border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">412</span>
+                    </div>
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">warm</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:100%;height:100%;background:var(--war);border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">588</span>
+                    </div>
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">cold</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:48%;height:100%;background:var(--info);border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">284</span>
+                    </div>
+                    <p class="xs mut" style="margin-top:6px">hot = 자주 참조 · warm = 가끔 · cold = 보존. 값 0이면 행 숨김.</p>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t">유형 분포</span>
+                    <span class="pill mut">최대 794</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">fact</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:100%;height:100%;background:#8884d8;border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">794</span>
+                    </div>
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">pref</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:29%;height:100%;background:#8884d8;border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">232</span>
+                    </div>
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">event</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:32%;height:100%;background:#8884d8;border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">258</span>
+                    </div>
+                    <p class="xs mut" style="margin-top:6px">탐색 탭에서 유형 필터로 좁혀 보세요.</p>
+                  </div>
+                </div>
+              </div>
+              <!-- 단축 CTA -->
+              <div class="card">
+                <div class="row"><span class="ava"></span>
+                  <div class="grow"><div class="nm">지금 어떤 기억이 있나요?</div><div class="sm mut">상단 검색 탭에서 자연어로 찾습니다 · ⌘K</div></div>
+                  <button class="btn-sm pri">검색 탭으로</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">탭 5개(개요/탐색/맵/드림/검색)가 모두 동등한 위젯으로 보이며, 가장 자주 쓰는 “검색/탐색”과 운영 액션 “드림”이 시각 가중치가 0</p>
+        <p class="fd">메모리 페이지의 핵심 가치(찾기·정리)는 “검색/탐색/드림” 탭에 있는데, 탭은 단순 <code>TabsList</code>의 동등한 트리거(<code>tabs.tsx:5</code> 참조, <code>memory.tsx:33-42</code>)로만 노출되어 첫 화면에서 “여기서 무엇을 할 수 있는가”가 보이지 않는다. 헤더 <code>page-head</code>에 “메모리 검색” 1차 CTA가 없음.</p>
+        <p class="src">routes/memory.tsx:27-42 (헤더/탭) · components/memory/memory-overview.tsx:79-93 (탭 콘텐츠에 CTA 없음)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">시맨틱→키워드 자동 폴백이 사용자에게 안내되지 않음</p>
+        <p class="fd">내부적으로는 시맨틱 호출이 HNSW 인덱스 부재 시 키워드 검색으로 자동 폴백되며(<code>memory-search.tsx:18-21</code> 주석), 이전의 “키워드 전용” 경로는 백엔드 배선 결여로 의도적으로 제거됐다. 즉 동작(시맨틱 → 키워드 폴백)은 보존되어 있다. 문제는 UI가 그것을 알리지 않는 것이다: <code>Zap</code> 배지(<code>:36-38</code>) 하나만으로 “지금 시맨틱 모드”만 알려 줄 뿐, 사용자는 “키워드 모드를 선택할 수 있는가 / 언제 폴백이 일어났는가”를 알 수 없고 폴백이 발생해도 검색 실패처럼 느껴질 수 있다.</p>
+        <p class="src">components/memory/memory-search.tsx:14-31 (단일 호출) · :18-21 (자동 폴백 주석) · :36-38 (Zap 배지)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">분포 차트 라벨(<code>totalEntries / vectorIndex / tierDistribution</code>)이 i18n 키 그대로 노출</p>
+        <p class="fd">시각화 헤더가 영문 식별자(<code>t('memory.tierDistribution')</code>, <code>t(`memory.${name}`, name)</code>)로 출력되어 한국어 키(<code>tier</code>)가 그대로 노출. 차트 행 라벨이 미번역이면 색구분만으로 의미를 알 수 없다.</p>
+        <p class="src">components/memory/memory-overview.tsx:97, 104, 117, 124 (t() 폴백) · routes/memory.tsx:29-30</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft"><code>stats.by_type</code> 객체 키 수가 “벡터 인덱스” KPI로 잘못 매핑됨</p>
+        <p class="fd"><code>vectorIndex</code> 카드의 값은 <code>Object.keys(stats.by_type).length</code>(<code>memory-overview.tsx:72</code>)로 “유형 수”이지 벡터 인덱스 상태가 아니다. 라벨은 “벡터 인덱스”인데 표시되는 7은 메모리 유형 수 — 의미/표시 불일치(가드 없는 라벨/값).</p>
+        <p class="src">components/memory/memory-overview.tsx:68-77 (statCards[1])</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">분포 차트에 스케일(최대값)과 0-값 처리 안내가 없음</p>
+        <p class="fd">각 행이 상대 백분율로 그려지지만(<code>DistBar</code> :34, <code>max</code> 기준) 카드 헤더에 “최대 N” 표기·빈 상태 가이드가 없어 “왜 warm는 hot보다 짧아 보이지 않는가”를 즉시 설명하지 못한다.</p>
+        <p class="src">components/memory/memory-overview.tsx:23-49 (DistBar) · :65-66 (max 산출)</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>헤더 우측에 “검색 탭으로 / 드림 탭으로” 같은 1차 CTA 두 개를 pill 버튼으로 노출하고, 탭 <code>TabsList</code>를 페이지 콘텐츠 위가 아니라 헤더 줄에 인라인 배치해 “탐색/검색/드림” 가중치↑.</li>
+      <li><code>MemorySearch</code>에 “시맨틱(기본) / 키워드” 모드 토글 + HNSW 미가용 시 자동 폴백 메시지. 한국어/영어 예시 쿼리 1개씩 placeholder에 권장.</li>
+      <li>KPI 카드 라벨을 “총 메모리 항목 / 유형 수 / 드림 상태”로 명확화, 각각 “탐색/맵/드림” 탭으로 연결. <code>vectorIndex</code> 카드는 실제 벡터 인덱스 상태(<code>idle/indexing/error</code> + <code>size</code>)로 교체.</li>
+      <li>분포 카드 헤더에 “최대 N” pill, 본문에 한 줄 안내.</li>
     </ul>
   </div>
 </section>

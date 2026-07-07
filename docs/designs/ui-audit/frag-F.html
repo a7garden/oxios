@@ -1,263 +1,235 @@
-<section class="screen" id="screen-chat">
+<!-- =====================================================================
+     SCREEN 17 — CHAT (sidebar mode = chat, session-tree sidebar)
+     ===================================================================== -->
+<section class="screen" id="screen-17">
   <div class="screen-head">
-    <div class="left">
-      <div class="num">17 · Console / Chat</div>
-      <h3>Chat</h3>
-      <div class="smeta">route <code>/chat</code> · <code>web/src/routes/chat.tsx</code> · messages + interview wizard + tool approvals + @mention input</div>
+    <div class="snum">17</div>
+    <div class="stitle">
+      <h2>채팅</h2>
+      <span class="route">/chat · routes/chat.tsx</span>
     </div>
-    <div class="rubric">
-      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">정보구조</div><div class="val">4</div></div>
-      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">레이아웃</div><div class="val">4</div></div>
-      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">배치/발견</div><div class="val">2</div></div>
-      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">내비게이션</div><div class="val">4</div></div>
-      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">일관성</div><div class="val">4</div></div>
-      <div class="cell"><div class="bar"><i style="height:40%"></i></div><div class="lbl">인터랙션</div><div class="val">2</div></div>
-      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">접근성</div><div class="val">4</div></div>
-      <div class="cell"><div class="bar"><i style="height:80%"></i></div><div class="lbl">타이포</div><div class="val">4</div></div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
     </div>
   </div>
 
   <div class="compare">
-    <!-- ───── CURRENT ───── -->
-    <div class="panel">
-      <div class="panel-head"><h4><span class="tag cur">현행</span> Current — annotated</h4><span class="hint">코드 기반 재현, 문제점 ①–⑤</span></div>
-      <div class="mock-frame">
-        <div class="mock mock-wrap">
-          <span class="pin" style="--py:34px;--px:8px" title="F1">①</span>
-          <span class="pin" style="--py:34px;--px:120px" title="F2">②</span>
-          <span class="pin" style="--py:88px;--px:260px" title="F3">③</span>
-          <span class="pin" style="--py:140px;--px:200px" title="F4">④</span>
-          <span class="pin" style="--py:212px;--px:260px" title="F5">⑤</span>
-          <div class="ox">
-            <aside class="sb">
-              <div class="brand"><span class="dot"></span>Oxios</div>
-              <div class="grp">
-                <button style="all:unset;display:block;width:100%">
-                  <div style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);padding:0 6px 4px;font-weight:600">Sessions</div>
-                </button>
-                <div class="it active" style="background:var(--ox-accent);color:var(--ox-primary);font-weight:600"><span class="ic"></span>+ 새 대화</div>
-                <div style="display:flex;align-items:center;gap:6px;padding:4px 7px"><span style="width:11px;height:11px;border-radius:3px;background:var(--ox-muted);opacity:.55"></span><span style="font-size:11px;color:var(--ox-fg);font-weight:600">▶ Oxios Platform</span></div>
-                <div style="padding:1px 7px 1px 22px;font-size:10px;color:var(--ox-muted)">· RFC 문서 검토 · 2h</div>
-                <div style="padding:1px 7px 1px 22px;font-size:10px;color:var(--ox-muted)">· API 설계 · 어제</div>
-                <div style="display:flex;align-items:center;gap:6px;padding:4px 7px"><span style="width:11px;height:11px;border-radius:3px;background:var(--ox-muted);opacity:.55"></span><span style="font-size:11px;color:var(--ox-fg);font-weight:600">▶ Side Project</span></div>
-                <div style="padding:1px 7px 1px 22px;font-size:10px;color:var(--ox-muted)">· TODO 정리 · 3d</div>
-                <div style="display:flex;align-items:center;gap:6px;padding:4px 7px"><span style="width:11px;height:11px;border-radius:3px;background:var(--ox-muted);opacity:.55"></span><span style="font-size:11px;color:var(--ox-muted)">📥 분류 안 됨 (2)</span></div>
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt">Console</span><span class="mt">Knowledge</span><span class="mt on">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>내 프로젝트</div>
+              <div class="sb-it on" style="padding-left:22px"><span class="ic" style="background:#bbb"></span>2026-Q2 정리</div>
+              <div class="sb-it" style="padding-left:22px"><span class="ic" style="background:#bbb"></span>side-project/alpha</div>
+              <div class="sb-grp">세션</div>
+              <div class="sb-it"><span class="ic" style="background:var(--pri)"></span>한국어 API 조사</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>RFC-032 리뷰</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>오늘의 빠른 메모</div>
+              <div class="sb-grp">빠른 액션</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>＋ 새 세션 <span class="kbd" style="margin-left:auto">⌘⇧N</span></div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>＋ 새 프로젝트</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm">Console</span><span class="bm">Knowledge</span><span class="bm on">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⌕ Quick ask <span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <!-- PIN 8: topbar shortcut chips — ⌘J/⌘K/⌘⇧N 의미 구분 -->
+              <div style="position:relative;margin:0 4px 0;display:flex;gap:6px;align-items:center;min-height:24px">
+                <span class="pin" style="top:3px;right:3px">8</span>
+                <span class="mut xs">topbar: ⌕ Quick ask <span class="kbd">⌘J</span> · ⌕ 검색 <span class="kbd">⌘K</span></span>
               </div>
-              <div class="grp"><div class="gh">Link</div><div class="it"><span class="ic"></span>Sessions</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
-            </aside>
-            <div class="main">
-              <div class="topbar"><div class="crumb">Console / Chat</div><div class="b"><span class="pill"></span><span class="pill"></span></div></div>
-              <div class="body" style="gap:0;padding:0">
-                <!-- Reconnect banner (when disconnected) -->
-                <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:oklch(0.97 0.014 70);border-bottom:1px solid oklch(0.91 0.05 70);font-size:10px;color:var(--ox-warning)">
-                  <span style="width:6px;height:6px;border-radius:50%;background:var(--ox-warning);animation:oxpulse 1s infinite"></span>재연결 중...
+              <!-- Recon banner (no pin — pulled into finding 6 banner stacking) -->
+              <div style="position:relative;margin:6px 8px 6px;padding:5px 10px;border-radius:6px;background:color-mix(in oklch,var(--war) 12%,transparent);border:1px solid color-mix(in oklch,var(--war) 30%,transparent);font-size:11px;display:flex;gap:6px;align-items:center">
+                <span class="dot-s" style="background:var(--war);animation:pulse 1.5s infinite"></span>
+                <span>Reconnecting…</span><span style="margin-left:auto" class="tc-war">↻ Retry</span>
+              </div>
+              <!-- PIN 6: AI detection banner — banner stacking finding -->
+              <div style="position:relative;margin:0 8px 6px;padding:5px 10px;border-radius:6px;background:var(--acc);border:1px solid var(--bd);font-size:11px;display:flex;gap:8px;align-items:center">
+                <span style="opacity:.7">🪄</span><span class="grow">프로젝트 <b>2026-Q2 정리</b> 감지됨 — 현재 세션에 연결할까요?</span>
+                <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri);font-size:10px">연결</span><span class="mut">무시</span>
+                <span class="pin" style="top:3px;right:3px">6</span>
+              </div>
+              <!-- Active session card -->
+              <div class="card" style="position:relative;margin:6px 8px;padding:10px 12px">
+                <div class="row" style="border:none;padding:2px 0">
+                  <span class="ava" style="background:var(--pri)"></span>
+                  <div class="grow"><div class="nm" style="font-size:11px">2026-Q2 정리 › 한국어 API 조사</div></div>
+                  <span class="badge run" style="font-size:10px">실행</span>
                 </div>
-                <!-- Empty chat state -->
-                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:22px 12px;background:var(--ox-bg)">
-                  <p style="font-size:13px;font-weight:600;color:var(--ox-fg)">무엇을 도와드릴까요?</p>
-                  <div style="width:100%;max-width:240px">
-                    <div style="font-size:9px;color:var(--ox-muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Recent</div>
-                    <div style="display:flex;flex-direction:column;gap:3px">
-                      <div style="display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px"><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent);display:flex;align-items:center;justify-content:center"><span style="width:9px;height:9px;background:var(--ox-muted);border-radius:2px"></span></span><div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--ox-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">RFC-025 마운트 검사</div><div style="font-size:8px;color:var(--ox-muted)">2h ago</div></div></div>
-                      <div style="display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px"><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent);display:flex;align-items:center;justify-content:center"><span style="width:9px;height:9px;background:var(--ox-muted);border-radius:2px"></span></span><div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--ox-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">API 토큰 갱신</div><div style="font-size:8px;color:var(--ox-muted)">어제</div></div></div>
-                    </div>
+                <!-- User msg -->
+                <div style="margin:6px 0;padding:6px 8px;border:1px solid var(--bd);background:var(--mut);border-radius:7px;font-size:11.5px">
+                  한국어 뉴스 검색 결과 요약해줘 — 최근 1주, HackerNews
+                </div>
+                <!-- Assistant answer -->
+                <div style="margin:6px 0;padding:4px 0;font-size:11.5px">
+                  <span class="pill pri" style="font-size:10px">deepseek-v3-flash</span>
+                  <p style="margin:5px 0">HackerNews의 최근 1주 한국어 뉴스를 정리하면… <em>(3건)</em></p>
+                  <ol style="margin:4px 0 4px 16px;font-size:11px">
+                    <li><b>Show HN:</b> …</li>
+                    <li><b>한국 LLM 벤치마크:</b> …</li>
+                    <li><b>Oxios v1.12 릴리즈:</b> …</li>
+                  </ol>
+                </div>
+                <!-- Live activity bar — PIN 2 (timeline collapsed) on right side + PIN 4 (reasoning merge) on left -->
+                <div style="position:relative;margin:5px 0;padding:5px 8px;background:var(--mut);border-radius:7px;font-size:11px;display:flex;gap:6px;align-items:center">
+                  <span class="dot-s" style="background:var(--mut-fg,#777);animation:pulse 1.2s infinite"></span>
+                  <span class="mut">Thinking…</span>
+                  <!-- PIN 4: reasoning merge fragility — separate ActivityBlock implied for one reason span -->
+                  <span class="pin" style="top:-6px;left:0">4</span>
+                  <span class="mut" style="margin-left:auto">↳ ActivityTimeline (collapsed)</span>
+                  <!-- PIN 2: timeline collapsed finding -->
+                  <span class="pin" style="top:-6px;right:0">2</span>
+                </div>
+                <!-- Tool + tool result + error placeholder hint -->
+                <div style="font-size:10.5px;color:var(--fg2);margin-left:8px;margin-top:4px">↳ tool_call · search_news · 2.3s · activity timeline hidden above the bubble — only revealed by the header chevron</div>
+                <!-- Footer (timestamp + tokens) — PIN 3: token duplication finding -->
+                <div style="position:relative;font-size:10px;color:var(--fg2);margin-top:4px;border-top:1px dashed var(--bd);padding-top:3px">오후 3:42 · in 122,576 · out 1,957 tok · 3m 52s · eval ✓<span class="pin" style="top:3px;right:3px">3</span></div>
+
+                <!-- INPUT -->
+                <!-- PIN 1: @ mention area — input @mention popover trigger -->
+                <div style="position:relative;margin-top:8px;border:1px solid var(--bd);border-radius:8px;padding:8px 10px;background:var(--card)">
+                  <span class="pin" style="top:-6px;left:8px">1</span>
+                  <div style="font-size:11.5px;color:var(--fg2);min-height:18px;position:relative">메시지를 입력하세요 ( <b>@</b> 컨텍스트 첨부 )…
+                  </div>
+                  <!-- Bottom row: model pill (LEFT) + queued + send (RIGHT) — model obscured behind "..." when long. PIN 5 here. -->
+                  <div style="position:relative;display:flex;align-items:center;gap:6px;margin-top:6px">
+                    <span class="pin" style="top:-6px;right:4px">5</span>
+                    <span class="pill mut" style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;gap:4px;align-items:center">
+                      <span>⚙</span>deepseek-v3-flash <span class="mut">▾</span>
+                    </span>
+                    <span class="mut" style="font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">role: research</span>
+                    <span class="tag" style="font-size:10px">⏱ 2 queued</span>
+                    <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri);font-size:11px">▸</span>
                   </div>
                 </div>
-                <!-- Message thread -->
-                <div style="padding:10px 12px;display:flex;flex-direction:column;gap:10px;background:var(--ox-bg)">
-                  <!-- User bubble -->
-                  <div style="display:flex;justify-content:flex-end;gap:6px">
-                    <div style="max-width:75%;padding:6px 10px;background:var(--ox-primary);color:oklch(0.99 0 0);border-radius:10px;font-size:11px">@knowledge API 토큰 갱신하는 법 알려줘</div>
-                    <span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent);flex:none"></span>
-                  </div>
-                  <!-- Assistant bubble with interview + tool approval -->
-                  <div style="display:flex;gap:6px">
-                    <span style="width:18px;height:18px;border-radius:50%;background:var(--ox-primary);flex:none"></span>
-                    <div style="max-width:78%">
-                      <!-- Tool approval card -->
-                      <div style="border:1px solid var(--ox-border);border-radius:9px;background:var(--ox-card);overflow:hidden;margin-bottom:6px">
-                        <div style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-bottom:1px solid var(--ox-border);background:oklch(0.97 0.014 70);font-size:10px;font-weight:600"><span style="width:11px;height:11px;border-radius:3px;background:var(--ox-warning)"></span>도구 권한 승인 <span style="margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--ox-muted);background:var(--ox-accent);padding:1px 5px;border-radius:3px">shell_exec</span></div>
-                        <div style="padding:7px 10px;font-size:10px;color:var(--ox-muted)">이 세션에서 shell 명령 실행을 허용하시겠습니까?</div>
-                        <div style="display:flex;justify-content:flex-end;gap:5px;padding:6px 10px;border-top:1px solid var(--ox-border)">
-                          <button style="font-size:10px;padding:3px 9px;border-radius:5px;border:1px solid var(--ox-border);background:transparent;color:var(--ox-muted)">거부</button>
-                          <button style="font-size:10px;padding:3px 9px;border-radius:5px;background:var(--ox-success);color:#fff">승인 ✅</button>
-                        </div>
-                      </div>
-                      <!-- Interview wizard -->
-                      <div style="border:1px solid var(--ox-border);border-radius:9px;background:var(--ox-card);overflow:hidden">
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--ox-border);background:var(--ox-accent);font-size:10px;font-weight:600"><span>📋 인터뷰 · R2</span><span style="font-size:9px;color:var(--ox-muted)">명료도 62%</span></div>
-                        <div style="padding:8px 10px">
-                          <p style="font-size:11px;font-weight:500;margin-bottom:6px">어떤 종류의 토큰인가요?</p>
-                          <div style="display:flex;gap:5px;flex-wrap:wrap">
-                            <span style="padding:4px 9px;border:1px solid var(--ox-primary);background:var(--ox-primary);color:#fff;border-radius:6px;font-size:10px">API 키</span>
-                            <span style="padding:4px 9px;border:1px solid var(--ox-border);border-radius:6px;font-size:10px">OAuth</span>
-                            <span style="padding:4px 9px;border:1px solid var(--ox-border);border-radius:6px;font-size:10px">PAT</span>
-                          </div>
-                          <!-- ALWAYS-VISIBLE free-text textarea -->
-                          <div style="margin-top:7px;padding:5px 7px;border:1px solid var(--ox-border);border-radius:6px;font-size:10px;color:var(--ox-muted);min-height:30px">추가 설명 (선택)…</div>
-                          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
-                            <div style="display:flex;gap:4px"><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent)"></span><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-primary)"></span><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent)"></span></div>
-                            <span style="font-size:9px;color:var(--ox-muted)">1 / 3</span>
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Metadata + knowledge save -->
-                      <div style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:9px;color:var(--ox-muted)"><span style="padding:1px 5px;background:var(--ox-accent);border-radius:3px">phase:interview</span><span>2m</span><button style="all:unset;font-size:9px;color:var(--ox-muted);cursor:pointer">💾 지식에 저장</button></div>
-                    </div>
-                  </div>
-                </div>
-                <!-- Input area -->
-                <div style="border-top:1px solid var(--ox-border);padding:8px 12px 10px;background:oklch(0.985 0 0)">
-                  <div style="max-width:380px;margin:0 auto">
-                    <!-- @mention popover -->
-                    <div style="border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card);box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:4px;padding:3px">
-                      <div style="display:flex;align-items:flex-start;gap:6px;padding:5px 7px;border-radius:5px;background:var(--ox-accent)"><span style="width:11px;height:11px;background:#3b82f6;border-radius:2px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">auth-tokens.md</div><div style="font-size:9px;color:var(--ox-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">…the API token can be rotated via…</div></div><span style="font-size:8px;color:var(--ox-muted)">KB</span></div>
-                      <div style="display:flex;align-items:flex-start;gap:6px;padding:5px 7px;border-radius:5px"><span style="width:11px;height:11px;background:#a855f7;border-radius:2px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600">user-pref:theme</div><div style="font-size:9px;color:var(--ox-muted)">…last seen 3d ago…</div></div><span style="font-size:8px;color:var(--ox-muted)">Mem</span></div>
-                      <div style="display:flex;align-items:flex-start;gap:6px;padding:5px 7px;border-radius:5px"><span style="width:11px;height:11px;background:#3b82f6;border-radius:2px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600">deploy-guide.md</div><div style="font-size:9px;color:var(--ox-muted)">…step 3: rotate secrets…</div></div><span style="font-size:8px;color:var(--ox-muted)">KB</span></div>
-                    </div>
-                    <div style="display:flex;align-items:flex-end;border:1px solid var(--ox-border);border-radius:12px;background:var(--ox-card);padding:7px 9px">
-                      <textarea rows="1" placeholder="메시지를 입력하세요… (@로 컨텍스트 추가)" style="flex:1;border:0;outline:0;background:transparent;font-size:11px;resize:none;font-family:inherit;color:var(--ox-fg)"></textarea>
-                      <button style="width:30px;height:30px;border-radius:7px;background:var(--ox-primary);color:#fff;border:0;display:flex;align-items:center;justify-content:center"><span style="width:11px;height:11px;border:1.5px solid currentColor;border-radius:2px;transform:rotate(-45deg);position:relative"><span style="position:absolute;inset:2px;border:1.5px solid currentContentColor;border-radius:1px"></span></span></button>
-                    </div>
-                    <div style="text-align:center;font-size:8px;color:var(--ox-muted);margin-top:4px">Enter 전송 · ⇧Enter 줄바꿈 · ⌘⇧N 새 채팅</div>
-                  </div>
-                </div>
+                <div style="text-align:center;font-size:10px;color:var(--fg2);margin-top:3px"><span class="kbd">Enter</span> send · <span class="kbd">Shift+Enter</span> newline · <span class="kbd">⌘⇧N</span> new chat</div>
+              </div>
+
+              <!-- PIN 7: Empty-state capability grid note — grid disappears once messages exist -->
+              <div style="position:relative;margin:6px 8px 0;padding:5px 8px;border:1px dashed var(--bd);border-radius:6px;font-size:10px;color:var(--fg2);display:flex;gap:6px;align-items:center">
+                <span class="pin" style="top:3px;right:3px">7</span>
+                <span>ⓘ Capabilities Empty-state 그리드는 메시지 0건일 때만 노출. 진행 중 세션에서는 진입점이 보이지 않음.</span>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- ───── PROPOSED ───── -->
-    <div class="panel">
-      <div class="panel-head"><h4><span class="tag pro">개선</span> Proposed redesign</h4><span class="hint">동일 토큰 · 발견성·어포던스 중심</span></div>
-      <div class="mock-frame">
-        <div class="mock">
-          <div class="ox pro" style="position:relative">
-            <aside class="sb">
-              <div class="brand"><span class="dot"></span>Oxios</div>
-              <!-- Mode tabs (always visible at top of sidebar) -->
-              <div style="display:flex;gap:2px;padding:2px 6px 8px;border-bottom:1px solid var(--ox-border);margin-bottom:8px">
-                <span style="flex:1;text-align:center;padding:4px 0;border-radius:5px;font-size:9px;color:var(--ox-muted);font-weight:500">Console</span>
-                <span style="flex:1;text-align:center;padding:4px 0;border-radius:5px;font-size:9px;color:var(--ox-muted);font-weight:500">Knowledge</span>
-                <span style="flex:1;text-align:center;padding:4px 0;border-radius:5px;font-size:9px;background:var(--ox-primary);color:#fff;font-weight:600">Chat</span>
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt">Console</span><span class="mt">Knowledge</span><span class="mt on">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>내 프로젝트</div>
+              <div class="sb-it on" style="padding-left:22px"><span class="ic" style="background:#bbb"></span>2026-Q2 정리</div>
+              <div class="sb-it" style="padding-left:22px"><span class="ic" style="background:#bbb"></span>side-project/alpha</div>
+              <div class="sb-grp">세션</div>
+              <div class="sb-it"><span class="ic" style="background:var(--pri)"></span>한국어 API 조사</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>RFC-032 리뷰</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>오늘의 빠른 메모</div>
+              <div class="sb-grp">빠른 액션</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>＋ 새 세션 <span class="kbd" style="margin-left:auto">⌘⇧N</span></div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>＋ 새 프로젝트</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm">Console</span><span class="bm">Knowledge</span><span class="bm on">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 새 세션</span>
+              <span class="btn-sm">⌕ Quick ask <span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <!-- Single compact status row (reconnect + detection collapsed into one row, dismissible) -->
+              <div style="position:relative;margin:6px 8px;padding:5px 10px;border-radius:6px;background:var(--mut);border:1px solid var(--bd);font-size:11px;display:flex;gap:8px;align-items:center">
+                <span class="dot-s" style="background:var(--war)"></span>
+                <span class="mut">재연결됨 · 프로젝트 자동감지 무시됨</span>
+                <span style="margin-left:auto" class="mut">↻ ↩</span>
               </div>
-              <div class="grp">
-                <div style="font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ox-muted);padding:0 6px 4px;font-weight:600">Sessions</div>
-                <div class="it active" style="background:var(--ox-primary);color:#fff;font-weight:600"><span class="ic"></span>+ 새 대화</div>
-                <div style="display:flex;align-items:center;gap:6px;padding:4px 7px"><span style="width:11px;height:11px;border-radius:3px;background:var(--ox-muted);opacity:.55"></span><span style="font-size:11px;color:var(--ox-fg);font-weight:600">▶ Oxios Platform</span></div>
-                <div style="padding:1px 7px 1px 22px;font-size:10px;color:var(--ox-muted)">· RFC 문서 검토 · 2h</div>
-                <div style="padding:1px 7px 1px 22px;font-size:10px;color:var(--ox-muted)">· API 설계 · 어제</div>
-                <div style="display:flex;align-items:center;gap:6px;padding:4px 7px"><span style="width:11px;height:11px;border-radius:3px;background:var(--ox-muted);opacity:.55"></span><span style="font-size:11px;color:var(--ox-fg);font-weight:600">▶ Side Project</span></div>
-                <div style="padding:1px 7px 1px 22px;font-size:10px;color:var(--ox-muted)">· TODO 정리 · 3d</div>
-                <div style="display:flex;align-items:center;gap:6px;padding:4px 7px"><span style="width:11px;height:11px;border-radius:3px;background:var(--ox-muted);opacity:.55"></span><span style="font-size:11px;color:var(--ox-muted)">📥 분류 안 됨 (2)</span></div>
-              </div>
-              <div class="grp"><div class="gh">Link</div><div class="it"><span class="ic"></span>Sessions</div><div class="it"><span class="ic"></span>Projects</div><div class="it"><span class="ic"></span>Mounts</div></div>
-            </aside>
-            <div class="main">
-              <div class="topbar">
-                <div class="crumb">Console / Chat</div>
-                <div class="b">
-                  <!-- Persistent connection dot (always visible) -->
-                  <span title="Connected · 23ms" style="display:inline-flex;align-items:center;gap:4px;font-size:9px;color:var(--ox-muted);padding:3px 7px;border-radius:9px;background:var(--ox-accent)"><span style="width:6px;height:6px;border-radius:50%;background:var(--ox-success)"></span>연결됨</span>
-                  <span class="pill"></span>
+
+              <div class="card" style="position:relative;margin:6px 8px;padding:10px 12px">
+                <!-- Inline activity timeline visible (default-expanded when ≤8) — gives the "what's happening" affordance without clicking -->
+                <div style="margin:0 0 6px 0;padding:4px 8px;border:1px dashed var(--bd);border-radius:6px;font-size:11px">
+                  <span style="display:flex;gap:5px;align-items:center">
+                    <span>▾</span>
+                    <span class="mono xs tc-mut">3 activities</span>
+                    <span class="mut xs">· 2 tool calls · 122k+1.9k tok</span>
+                    <span style="margin-left:auto" class="mut xs">collapse</span>
+                  </span>
+                  <ul style="margin:4px 0 0 14px;font-size:10.5px;line-height:1.5">
+                    <li>💭 <b>Reasoning:</b> "사용자가 한국어 HackerNews 1주 검색을 원함 — 뉴스를 fetch한 뒤 요약…" (single block)</li>
+                    <li>🔧 <b>search_news</b> · hn-api · 2.3s · <span class="tc-suc">ok</span></li>
+                    <li>🔧 <b>summarize</b> · 3 items · 1.2s · <span class="tc-suc">ok</span></li>
+                  </ul>
+                </div>
+
+                <!-- Assistant answer (same shape, but now with stable model chip + explicit "stop" affordance)
+                -->
+                <div style="margin:6px 0;padding:4px 0;font-size:11.5px">
+                  <span class="pill pri" style="font-size:10px">deepseek-v3-flash</span>
+                  <p style="margin:5px 0">HackerNews의 최근 1주 한국어 뉴스를 정리하면… <em>(3건)</em></p>
+                  <ol style="margin:4px 0 4px 16px;font-size:11px">
+                    <li><b>Show HN:</b> …</li>
+                    <li><b>한국 LLM 벤치마크:</b> …</li>
+                    <li><b>Oxios v1.12 릴리즈:</b> …</li>
+                  </ol>
+                  <span class="xs mut" style="display:flex;gap:6px;margin-top:4px">
+                    in 122,576 · out 1,957 tok · 3m 52s · eval ✓
+                  </span>
+                </div>
+
+                <!-- INPUT: model picker gets a dedicated chip + role pill on a separate row (no clipping) -->
+                <div style="position:relative;margin-top:8px;border:1px solid var(--pri);border-radius:8px;padding:8px 10px;background:var(--card);box-shadow:0 0 0 2px color-mix(in oklch,var(--pri) 18%,transparent)">
+                  <div style="font-size:11.5px;color:var(--fg2);min-height:18px">메시지를 입력하세요 ( @ 컨텍스트 첨부 가능 )…</div>
+                  <!-- Top context chips row (unified) -->
+                  <div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0">
+                    <span class="tag" style="background:color-mix(in oklch,var(--pri) 12%,transparent);color:var(--pri);font-size:10px">💽 ~/work/oxios <span class="mut">×</span></span>
+                    <span class="tag" style="font-size:10px">📄 RFC-032 <span class="mut">×</span></span>
+                  </div>
+                  <!-- Bottom row: dedicated model + role chips on LEFT, send on RIGHT — no ellipsis -->
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+                    <span class="pill pri" style="font-size:10px;display:flex;gap:4px;align-items:center"><span>⚙</span>deepseek-v3-flash <span class="mut">▾</span></span>
+                    <span class="pill mut" style="font-size:10px;display:flex;gap:4px;align-items:center"><span>★</span>role: research</span>
+                    <span style="flex:1"></span>
+                    <span class="mut xs">⏱ 2 queued</span>
+                    <span class="btn-sm" style="background:var(--err);color:var(--pri2);border-color:var(--err);font-size:10px">■ Stop</span>
+                    <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri);font-size:11px">▸ Queue</span>
+                  </div>
                 </div>
               </div>
-              <div class="body" style="gap:0;padding:0">
-                <!-- Empty chat with capability grid -->
-                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 12px;background:var(--ox-bg)">
-                  <p style="font-size:13px;font-weight:600;color:var(--ox-fg)">무엇을 도와드릴까요?</p>
-                  <p style="font-size:10px;color:var(--ox-muted);margin-top:-10px">시작할 프로젝트를 선택하거나 자유롭게 질문하세요</p>
-                  <!-- Capability grid (entry points to Oxios) -->
-                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:100%;max-width:340px">
-                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card)"><span style="width:20px;height:20px;border-radius:5px;background:var(--ox-info)"></span><span style="font-size:9px;font-weight:600">📚 지식</span><span style="font-size:8px;color:var(--ox-muted)">문서 검색</span></div>
-                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card)"><span style="width:20px;height:20px;border-radius:5px;background:var(--ox-primary)"></span><span style="font-size:9px;font-weight:600">🧠 메모리</span><span style="font-size:8px;color:var(--ox-muted)">시맨틱</span></div>
-                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card)"><span style="width:20px;height:20px;border-radius:5px;background:var(--ox-warning)"></span><span style="font-size:9px;font-weight:600">🔧 도구</span><span style="font-size:8px;color:var(--ox-muted)">shell·HTTP</span></div>
-                    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card)"><span style="width:20px;height:20px;border-radius:5px;background:var(--ox-success)"></span><span style="font-size:9px;font-weight:600">📁 프로젝트</span><span style="font-size:8px;color:var(--ox-muted)">컨텍스트</span></div>
-                  </div>
-                  <div style="width:100%;max-width:340px;margin-top:4px">
-                    <div style="font-size:9px;color:var(--ox-muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Recent</div>
-                    <div style="display:flex;flex-direction:column;gap:3px">
-                      <div style="display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px"><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent)"></span><div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--ox-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">RFC-025 마운트 검사</div><div style="font-size:8px;color:var(--ox-muted)">2h ago</div></div></div>
-                      <div style="display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--ox-border);border-radius:6px"><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent)"></span><div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--ox-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">API 토큰 갱신</div><div style="font-size:8px;color:var(--ox-muted)">어제</div></div></div>
-                    </div>
-                  </div>
-                </div>
-                <!-- Thread with simplified interview + better tool approval -->
-                <div style="padding:10px 12px;display:flex;flex-direction:column;gap:10px;background:var(--ox-bg)">
-                  <div style="display:flex;justify-content:flex-end;gap:6px">
-                    <div style="max-width:75%;padding:6px 10px;background:var(--ox-primary);color:#fff;border-radius:10px;font-size:11px">@knowledge API 토큰 갱신하는 법 알려줘</div>
-                    <span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent);flex:none"></span>
-                  </div>
-                  <div style="display:flex;gap:6px">
-                    <span style="width:18px;height:18px;border-radius:50%;background:var(--ox-primary);flex:none"></span>
-                    <div style="max-width:78%">
-                      <!-- Improved tool approval: trust-session option -->
-                      <div style="border:1px solid var(--ox-border);border-radius:9px;background:var(--ox-card);overflow:hidden;margin-bottom:6px">
-                        <div style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-bottom:1px solid var(--ox-border);background:oklch(0.97 0.014 70);font-size:10px;font-weight:600"><span style="width:11px;height:11px;border-radius:3px;background:var(--ox-warning)"></span>도구 권한 요청 <span style="margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--ox-muted);background:var(--ox-accent);padding:1px 5px;border-radius:3px">shell_exec</span></div>
-                        <div style="padding:7px 10px;font-size:10px;color:var(--ox-muted)"><b style="color:var(--ox-fg)">curl -X POST /api/tokens/rotate</b><br/>민감 작업 · 이 세션에서 반복 실행 예상</div>
-                        <div style="padding:5px 10px;border-top:1px dashed var(--ox-border);background:var(--ox-accent);display:flex;align-items:center;gap:6px;font-size:9px"><input type="checkbox" style="margin:0"/><span>이 세션 동안 같은 도구 다시 묻지 않기</span></div>
-                        <div style="display:flex;justify-content:flex-end;gap:5px;padding:6px 10px;border-top:1px solid var(--ox-border)">
-                          <button style="font-size:10px;padding:3px 9px;border-radius:5px;border:1px solid var(--ox-border);background:transparent;color:var(--ox-muted)">거부</button>
-                          <button style="font-size:10px;padding:3px 9px;border-radius:5px;background:var(--ox-success);color:#fff">1회 승인</button>
-                          <button style="font-size:10px;padding:3px 9px;border-radius:5px;background:var(--ox-primary);color:#fff">세션 신뢰</button>
-                        </div>
-                      </div>
-                      <!-- Interview wizard: structured-only, free-text collapsed -->
-                      <div style="border:1px solid var(--ox-border);border-radius:9px;background:var(--ox-card);overflow:hidden">
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--ox-border);background:var(--ox-accent);font-size:10px;font-weight:600"><span>📋 인터뷰 · R2</span><span style="font-size:9px;color:var(--ox-muted)">명료도 62%</span></div>
-                        <div style="padding:8px 10px">
-                          <p style="font-size:11px;font-weight:500;margin-bottom:6px">어떤 종류의 토큰인가요? <span style="font-weight:400;color:var(--ox-muted)">(하나 선택)</span></p>
-                          <div style="display:flex;gap:5px;flex-wrap:wrap">
-                            <span style="padding:4px 9px;border:1px solid var(--ox-primary);background:var(--ox-primary);color:#fff;border-radius:6px;font-size:10px">API 키</span>
-                            <span style="padding:4px 9px;border:1px solid var(--ox-border);border-radius:6px;font-size:10px">OAuth</span>
-                            <span style="padding:4px 9px;border:1px solid var(--ox-border);border-radius:6px;font-size:10px">PAT</span>
-                          </div>
-                          <!-- Free-text moved to a "More" disclosure -->
-                          <details style="margin-top:7px"><summary style="font-size:9px;color:var(--ox-muted);cursor:pointer;list-style:none">▸ 추가 설명 (선택)</summary><div style="padding:5px 7px;border:1px solid var(--ox-border);border-radius:6px;font-size:10px;color:var(--ox-muted);min-height:24px;margin-top:4px"></div></details>
-                          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
-                            <div style="display:flex;gap:4px"><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent)"></span><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-primary)"></span><span style="width:18px;height:18px;border-radius:50%;background:var(--ox-accent)"></span></div>
-                            <span style="font-size:9px;color:var(--ox-muted)">Enter 다음 · 1–3 단축키</span>
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Knowledge save as a small but visible button -->
-                      <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
-                        <span style="padding:1px 5px;background:var(--ox-accent);border-radius:3px;font-size:9px;color:var(--ox-muted)">phase:interview</span>
-                        <span style="font-size:9px;color:var(--ox-muted)">2m</span>
-                        <button style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border:1px solid var(--ox-border);border-radius:9px;font-size:9px;color:var(--ox-fg);background:var(--ox-card);font-weight:500">💾 지식에 저장</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <!-- Input with labeled send button + context counter + scoped @mention -->
-                <div style="border-top:1px solid var(--ox-border);padding:8px 12px 10px;background:oklch(0.985 0 0)">
-                  <div style="max-width:380px;margin:0 auto">
-                    <!-- Attachment chips row -->
-                    <div style="display:flex;gap:3px;margin-bottom:5px;flex-wrap:wrap">
-                      <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:6px;background:oklch(0.95 0.02 265);font-size:9px"><span style="width:7px;height:7px;border-radius:2px;background:#3b82f6"></span>auth-tokens.md <span style="color:var(--ox-muted);cursor:pointer">×</span></span>
-                    </div>
-                    <!-- @mention popover with scope tabs -->
-                    <div style="border:1px solid var(--ox-border);border-radius:8px;background:var(--ox-card);box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:4px;overflow:hidden">
-                      <div style="display:flex;border-bottom:1px solid var(--ox-border);background:var(--ox-accent)">
-                        <span style="flex:1;text-align:center;padding:4px 0;font-size:9px;font-weight:600;color:var(--ox-primary);border-bottom:1.5px solid var(--ox-primary)">📚 지식 (3)</span>
-                        <span style="flex:1;text-align:center;padding:4px 0;font-size:9px;color:var(--ox-muted);font-weight:500">🧠 메모리 (1)</span>
-                        <span style="flex:1;text-align:center;padding:4px 0;font-size:9px;color:var(--ox-muted);font-weight:500">전체</span>
-                      </div>
-                      <div style="padding:3px">
-                        <div style="display:flex;align-items:flex-start;gap:6px;padding:5px 7px;border-radius:5px;background:var(--ox-accent)"><span style="width:11px;height:11px;background:#3b82f6;border-radius:2px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">auth-tokens.md</div><div style="font-size:9px;color:var(--ox-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">…the API token can be rotated via…</div></div></div>
-                        <div style="display:flex;align-items:flex-start;gap:6px;padding:5px 7px;border-radius:5px"><span style="width:11px;height:11px;background:#3b82f6;border-radius:2px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">deploy-guide.md</div><div style="font-size:9px;color:var(--ox-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">…step 3: rotate secrets…</div></div></div>
-                        <div style="display:flex;align-items:flex-start;gap:6px;padding:5px 7px;border-radius:5px"><span style="width:11px;height:11px;background:#3b82f6;border-radius:2px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">rotate-tokens.md</div><div style="font-size:9px;color:var(--ox-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">…use the /rotate endpoint…</div></div></div>
-                      </div>
-                    </div>
-                    <div style="display:flex;align-items:flex-end;border:1px solid var(--ox-border);border-radius:12px;background:var(--ox-card);padding:7px 9px">
-                      <textarea rows="1" placeholder="메시지를 입력하세요… (@로 컨텍스트 추가)" style="flex:1;border:0;outline:0;background:transparent;font-size:11px;resize:none;font-family:inherit;color:var(--ox-fg)"></textarea>
-                      <button style="display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 11px;border-radius:7px;background:var(--ox-primary);color:#fff;border:0;font-size:10px;font-weight:600">전송 <span style="font-size:9px;opacity:.7">⏎</span></button>
-                    </div>
-                    <div style="text-align:center;font-size:8px;color:var(--ox-muted);margin-top:4px">Enter 전송 · ⇧Enter 줄바꿈 · ⌘⇧N 새 채팅 · 1 컨텍스트</div>
-                  </div>
-                </div>
+
+              <!-- Persistent "Quick commands" entry tray so context-switching is one click -->
+              <div style="margin:4px 8px;display:flex;gap:6px;font-size:10.5px;color:var(--fg2);flex-wrap:wrap">
+                <span class="chip">＋ 새 세션</span>
+                <span class="chip">↩ 최근 세션</span>
+                <span class="chip">💡 메모 정리</span>
+                <span class="chip">📊 토큰 사용</span>
+                <span class="chip">⌘J Quick ask</span>
               </div>
             </div>
           </div>
@@ -266,27 +238,359 @@
     </div>
   </div>
 
-  <!-- FINDINGS -->
   <div class="findings">
-    <h4>발견 사항 <span style="font-size:11px;color:var(--ink-3);font-weight:400">5건 · High 2 / Med 2 / Low 1</span></h4>
+    <h3>발견 (Findings)</h3>
     <ul class="flist">
-      <li class="high"><span class="fno">①</span><div class="ft"><span class="badge high">HIGH</span> <b>Chat-mode 사이드바에 상위 모드(Console/Chat/Knowledge) 표시가 desktop에서 사라짐</b> — 사용자는 어느 모드에 있는지 알 수 없고, Console 화면과 채팅 화면이 같은 사이드바를 공유하다가 라우트 변경 시 콘솔 nav 그룹이 통째로 세션 트리로 교체됨. 모바일에서는 <code>ModeTabs</code>가 보이지만 desktop에서는 브랜드 바 아래에 모드 식별자 자체가 없음. 작업 중 모드 전환 인지 불가.<span class="ev">web/src/components/layout/sidebar.tsx:206-211 · chat-session-nav.tsx:111-260</span></div></li>
-      <li class="high"><span class="fno">②</span><div class="ft"><span class="badge high">HIGH</span> <b>빈 채팅 상태가 진입점으로 빈약 — Oxios의 4대 능력이 전혀 보이지 않음</b> — 그저 인사말 + 최근 세션 목록. 신규 사용자에게 지식·메모리·도구·프로젝트가 이 화면에서 호출 가능하다는 단서가 0개. 첫 메시지를 보내기 전에는 시스템이 무엇을 할 수 있는지 알 수 없음.<span class="ev">web/src/components/chat/empty-chat-state.tsx:26-63</span></div></li>
-      <li class="med"><span class="fno">③</span><div class="ft"><span class="badge med">MED</span> <b>인터뷰 마법사 — 모든 문항 아래에 자유 입력 textarea가 항상 노출됨</b> — yes_no / single_choice 같은 명확한 단일 선택 문항에서도 "추가 설명 (선택)"이 보임. 사용자는 "둘 다 채워야 하나?"라고 헷갈리고, 백엔드는 두 값을 결합해 제출하지만 그 결합 규칙은 어디에도 안내되지 않음. 인지 부하 + 답변 모호성.<span class="ev">web/src/components/chat/interview-wizard.tsx:334-349 (항상 렌더) · :421-459 (yes_no) · :505-537 (single_choice)</span></div></li>
-      <li class="med"><span class="fno">④</span><div class="ft"><span class="badge med">MED</span> <b>도구 권한 승인이 인라인 1회성 — 반복 호출 시 매번 차단</b> — 같은 도구(예: shell_exec)를 N번 호출하는 워크플로우에서 매 메시지마다 동일한 경고 카드가 떠 흐름이 끊김. "세션 신뢰"나 "이 도구 다시 묻지 않기" 옵션이 없어 권한 정책이 가장 거친 단위(메시지)로만 표현됨.<span class="ev">web/src/components/chat/tool-approval-card.tsx:26-63</span></div></li>
-      <li class="low"><span class="fno">⑤</span><div class="ft"><span class="badge low">LOW</span> <b>지식 저장 인디케이터 — 메시지 메타데이터 텍스트 사이에 묻혀 발견성 낮음</b> — '지식에 저장' 버튼이 <code>mt-1</code> 위치에 text-2xs 텍스트 링크로 렌더되어 긴 답변에서는 스크롤 후 인지 불가. 보조 동작이지만 RFC-016 핵심 기능.<span class="ev">web/src/components/chat/knowledge-save-indicator.tsx:76-89</span></div></li>
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">@ 컨텍스트 검색이 두 종류의 popover로 분리되어 사용자에게 보이지 않는다</p>
+        <p class="fd">chat-input은 <code>@</code> 입력 시 knowledge + memory + mount를 통합 검색하는 popover를 띄우지만, 슬래시 <code>/</code>는 knowledge-chat(다른 화면)에만 routes 메뉴를 띄운다. 같은 입력 박스에서 두 가지 "주제 트리거"가 다르게 동작하는데 UI에는 시그널이 없어, 처음 사용자는 <code>@</code> vs <code>/</code>가 컨텍스트 첨부 vs 라우팅이라는 사실을 알 수 없다.</p>
+        <p class="src">routes/chat.tsx:24-272 · components/chat/chat-input.tsx:296-313 (detect /<code>@</code>) · components/chat/chat-input.tsx:330-367 (popover render) · components/knowledge/knowledge-chat.tsx:278-282 (slash in 별도 화면)</p>
+      </div></li>
+
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">활동 타임라인이 기본 접혀 있어 투명성이 무력화된다</p>
+        <p class="fd">RFC-015의 핵심 약속은 "추론·도구 호출을 사용자에게 실시간으로" 노출하는 것이지만, <code>ActivityTimeline</code>은 <code>timelineCollapsed = activities.length &gt; 8</code> 외에는 카운터만 보이는 헤더만 노출하고 본문 카드는 클릭해야 펼쳐진다. 위 데모처럼 reasoning 1 + tool 2건 정도면 항상 한 번 클릭이 필요해, 화면 상단 활동이 "잠긴" 것처럼 느껴진다.</p>
+        <p class="src">components/chat/activity-timeline.tsx:28 (collapseAfter=8) · :32 (timelineCollapsed 초기값) · :42-95 (헤더만)</p>
+      </div></li>
+
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">live-activity-bar / activity-timeline / metadata-footer가 같은 정보를 중복 표시한다</p>
+        <p class="fd">스트리밍 중에는 <code>LiveActivityBar</code>가 "Thinking… / Running X" 한 줄을, 답변 시작 후엔 <code>ActivityTimeline</code>이 같은 도구 호출을 카드로, 푸터는 다시 "in/out tok · duration_ms · eval ✓"을 노출한다. 활동 카드 헤더는 "2 tool calls · 122k+1.9k tok"라고 집계하는데, 푸터의 in/out이 또 노출되어 동일 사실이 두 곳에 표시된다.</p>
+        <p class="src">components/chat/live-activity-bar.tsx:25-72 · components/chat/activity-timeline.tsx:55-72 (token count) · components/chat/message-bubble.tsx:184-193 (footer tokens)</p>
+      </div></li>
+
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">추론 델타 머지가 tail-only lookup이라 중간 삽입에 깨진다</p>
+        <p class="fd">과거 "빠른질문에서 reasoning이 토큰마다 한 블록씩" 버그 수정 후에도 <code>mergeOrAppendActivity</code>(<code>stores/chat.ts:279-314</code>)의 reasoning 분기(<code>:298-311</code>)는 <code>existing[existing.length - 1]</code> 단일 슬롯만 본다. 두 reasoning 델타 사이에 <em>어떠한</em> 다른 activity(<code>tool_call</code>·<code>phase</code>·<code>memory</code>·<code>usage</code>) 한 건만 끼어도, 뒤쪽 델타는 형제를 못 찾고 새 <code>reasoning</code> 블록을 append해 동일-소스 사고 스팬이 둘로 쪼개진다. 정상 트래픽(추론→도구→추론)에서도 재현되어 과거 버그와 같은 시각 증상이 다시 노출된다. 키 가드(<code>reasoningSource || content.slice(0, 16) || message.id</code>)로 <code>existing.findIndex(...)</code>를 쓰지 않으면 실질적으로 보호되지 않는다.</p>
+        <p class="src">stores/chat.ts:279-314 (mergeOrAppendActivity reasoning branch, tail-only <code>existing[existing.length - 1]</code>) · :298-311 (source guard) · :1212-1262 (handleChunk phase/tool_start/.../reasoning 끼어드는 경로) · <span style="display:block;margin-top:4px"><b>보조:</b> <code>_pendingTokens</code>·<code>_tokenRafId</code> 싱글톤(<code>stores/chat.ts:528-529</code>)이 모듈 전역 mutable. 단일 스트림에선 F9 rAF 배치가 잘 작동하지만, 새 세션(<code>newSession</code>·<code>loadSession</code>·<code>setActiveProject</code>·<code>removeMessage</code>) 시점에 <code>discardPendingTokens</code>(<code>:570-576</code>)를 모두 호출하지 않으면 늦게 도착한 rAF가 다음 세션의 메시지 배열을 오염시킬 수 있다 — 이미 4개 진입점에서 호출되지만 빠뜨리면 silent corruption.</span></p>
+      </div></li>
+
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">모델/롤 선택이 한 줄 pill에 같이 묶여 한쪽이 잘린다</p>
+        <p class="fd"><code>chat-input.tsx</code>의 하단 바는 <code>ModelPickerContainer</code>(모델+롤 + 검색)을 flex-1 한 칸에 넣고, 우측으로 queued/Send를 몰아넣는다. 결과적으로 위 데모처럼 모델명(<code>deepseek-v3-flash</code>) 뒤로 롤/검색 텍스트(<code>role: research</code>)가 <code>overflow:hidden;text-overflow:ellipsis</code>로 잘린다. 사용자는 활성 모델과 라우팅 룰 중 어느 것이 적용됐는지 시각적으로 구분할 수 없다.</p>
+        <p class="src">components/chat/chat-input.tsx:446-491 (input bottom bar) · :447-455 (ModelPicker flex-1) · components/chat/model-picker.tsx:97-424 (combined pill)</p>
+      </div></li>
+
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">프로젝트 자동감지 배너가 입력창을 위에서 덮어 세션 시작을 방해한다</p>
+        <p class="fd"><code>AiDetectionBadge</code>(헤더)와 <code>MountDetectionBadge</code>(마운트), 그리고 <code>!connected</code> 재연결 배너가 모두 입력창 위쪽 스택에 쌓여 동시에 노출될 수 있다. 데모처럼 세 가지가 한 번에 뜨면 입력 박스가 화면 하단 1/3 아래로 밀려, 사용자가 "지금 보낼 수 있나"를 인지하기 어렵다. 닫기 affordance는 있지만 세션 시작 의도와 충돌할 때 우선순위가 없다.</p>
+        <p class="src">routes/chat.tsx:154-188 (재연결·감지 스택) · components/chat/chat-input.tsx:419-421 (비활성 input box)</p>
+      </div></li>
+
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">Empty-state의 capability 그리드는 신규 사용자 온보딩에만 도움 되고 진행 세션에서는 발견되지 않는다</p>
+        <p class="fd"><code>EmptyChatState</code>는 knowledge·memory·tools·projects 4개 진입점을 그리드로 노출하지만, <code>messages.length === 0</code>인 경우에만 렌더되고 세션이 진행되면 <code>MessageBubble</code> 흐름으로 즉시 사라진다. "지금 이 모델/마운트로 무엇을 할 수 있는가"는 매 세션마다 필요한 정보인데 한 번도 노출되지 않는다.</p>
+        <p class="src">routes/chat.tsx:198 (EmptyChatState 조건) · components/chat/empty-chat-state.tsx:78-98 (capability grid) · empty-chat-state.tsx:100-128 (Recent sessions)</p>
+      </div></li>
+
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">⌘⇧N 단축키만 헤더에 노출되고 ⌘J·⌘K의 의미가 다르다</p>
+        <p class="fd">Topbar는 ⌘J "Quick ask"·⌘K "검색"·⌘⇧N "새 채팅"을 같은 형식으로 노출하지만, ⌘J는 별도 QuickAskDialog를 띄우는 모달이고 ⌘K는 CommandPalette, ⌘⇧N은 라우트 변경이다. 같은 톤의 칩 세 개가 실제로는 다른 "입력 모드"를 가리킨다.</p>
+        <p class="src">routes/chat.tsx:90-100 (⌘⇧N 핸들러) · components/chat/chat-input.tsx:431-434 (input placeholder 분기)</p>
+      </div></li>
     </ul>
   </div>
 
-  <!-- CHANGES -->
-  <div class="changes" style="margin-top:22px">
-    <h4>개선안 — 무엇이 바뀌는가</h4>
+  <div class="changes">
+    <h3>변경 제안</h3>
     <ul>
-      <li><span></span><div><b>사이드바 상단 모드 탭:</b> 데스크탑에서도 Console / Knowledge / Chat 3-tab이 항상 보이도록 sidebar 헤더 아래에 고정. 현재 경로의 모드가 활성. ① 해결.</div></li>
-      <li><span></span><div><b>빈 상태 capability grid:</b> 인사말 아래 4셀(📚지식 · 🧠메모리 · 🔧도구 · 📁프로젝트) 진입점. 각 셀이 클릭 시 해당 도메인으로 점프 + 첫 메시지 템플릿 자동 주입. ② 해결.</div></li>
-      <li><span></span><div><b>인터뷰 자유입력 접기:</b> 항상 보이던 textarea를 <code>&lt;details&gt;</code> "추가 설명 (선택)" 토글로 강등. 단답 문항은 시각적으로 단순화, 다답/주관식만 노출. ③ 해결.</div></li>
-      <li><span></span><div><b>도구 승인 3-옵션:</b> [거부] [1회 승인] [세션 신뢰]. 세션 신뢰 선택 시 같은 세션 동안 동일 도구 재승인 생략. 카드에 호출 명령 preview를 보여줘 맥락 제공. ④ 해결.</div></li>
-      <li><span></span><div><b>지식 저장 pill:</b> text-only 링크 → 테두리 있는 작은 pill 버튼으로 승격. 메타 라인과 분리되어 한 눈에 보임. ⑤ 해소.</div></li>
+      <li>트랜스페어런시 한 단계 올리기: <code>ActivityTimeline</code> 기본 <code>timelineCollapsed = false</code>, 활동이 ≤3건일 땐 헤더 스트립 없이 본문 카드만 펼친다. 헤더 카운터는 큰 활동(8+)에서만 등장.</li>
+      <li><code>mergeOrAppendActivity</code>의 reasoning 분기에 키 가드 추가: <code>reasoningSource</code>가 비어 있으면 마지막 reasoning 블록의 id 를 키로 사용, <code>id</code> 도 없으면 컨텐츠 <code>slice(0, 16)</code> 으로 fallback. 같은 id면 델타로 머지.</li>
+      <li>모델 pill을 입력박스의 우측 → 별도 한 줄 위로 옮기고, 롤은 우측 보조 pill. 양쪽 모두 truncation 없이 노출.</li>
+      <li>재연결·프로젝트 감지·마운트 감지 배너를 한 줄 "status bar"로 통합. 입력창 위쪽을 깨끗하게 유지.</li>
+      <li>Empty-state capability 그리드를 "현재 세션 컨텍스트(모델·마운트·프로젝트)" 카드 옆의 작은 패널로 항상 노출. 진행 중에는 <code>minimized</code> 상태로 표시.</li>
+      <li><code>⌘J / ⌘K / ⌘⇧N</code> topbar 버튼에 작은 모드 hint(다이얼로그 / 팔레트 / 라우트) 아이콘 추가.</li>
+      <li>@ mention 검색에서 잘린 mount name 처리를 ellipsis가 아닌 두 줄 표시로.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- =====================================================================
+     SCREEN 18 — KNOWLEDGE (sidebar mode = knowledge, dual-default: chat inbox → editor)
+     Sidebar FileTree and InfoPanel/SearchModal chrome live in components/layout/*, NOT components/knowledge/*.
+     ===================================================================== -->
+<section class="screen" id="screen-18">
+  <div class="screen-head">
+    <div class="snum">18</div>
+    <div class="stitle">
+      <h2>지식</h2>
+      <span class="route">/knowledge · routes/knowledge/index.tsx → KnowledgeLayout (knowledge-layout.tsx)</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">기능배치</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT: editor view (open: oxios-rfc-032.md). Note: default landing on /knowledge is mode='chat' inbox (stores/knowledge.ts:35),
+         but once user clicks a file the app flips to Editor mode and exposes the issues below. -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석) · 에디터 모드, 노트 1개 열림</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <!-- PIN 1: mode-default landing (.sb-mode row in console/kb/chat toggle) -->
+            <div class="sb-mode" style="position:relative">
+              <span class="mt">Console</span><span class="mt on">Knowledge</span><span class="mt">Chat</span>
+              <span class="pin" style="top:2px;right:3px">1</span>
+            </div>
+            <div class="sb-nav">
+              <div class="sb-grp">Files <span class="mut xs">(sidebar.tsx:425-435)</span></div>
+              <div class="sb-it" style="padding-left:14px"><span style="font-size:9px;margin-right:4px">▾</span><span class="ic" style="background:#bbb"></span>📁 journal</div>
+              <div class="sb-it" style="padding-left:32px"><span class="ic" style="background:#bbb"></span>2026-07-07.md</div>
+              <div class="sb-it" style="padding-left:32px"><span class="ic" style="background:#bbb"></span>2026-07-06.md</div>
+              <div class="sb-it" style="padding-left:14px"><span style="font-size:9px;margin-right:4px">▾</span><span class="ic" style="background:#bbb"></span>📁 projects</div>
+              <!-- PIN 7: active node emphasis — only the row is highlighted, parent folder / breadcrumb not surfaced -->
+              <div class="sb-it on" style="padding-left:32px;position:relative">
+                <span class="ic" style="background:var(--pri)"></span>oxios-rfc-032.md
+                <span class="pin" style="top:2px;right:2px">7</span>
+              </div>
+              <div class="sb-it" style="padding-left:14px"><span style="font-size:9px;margin-right:4px">▸</span><span class="ic" style="background:#bbb"></span>📁 archive</div>
+              <div class="sb-grp">빠른 액션</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>＋ 새 노트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>⌕ 검색 <span class="kbd" style="margin-left:auto">⌘P</span></div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>💬 빠른 메모</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>⚙ 지식 설정</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm">Console</span><span class="bm on">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <!-- PIN 5: search modal exposes only 15 recent files; PIN 6: ⌘P/⌘K meaning difference -->
+              <div style="position:relative;display:flex;gap:6px;align-items:center">
+                <span class="pin" style="top:2px;right:3px">5</span>
+                <span class="btn-sm">⌕ 파일 <span class="kbd">⌘P</span></span>
+                <span class="btn-sm">⌕ 커맨드 <span class="kbd">⌘K</span></span>
+                <span class="pin" style="top:-10px;right:80px">6</span>
+              </div>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <!-- PIN 3: editor toolbar icon-only + truncated filename -->
+              <div style="position:relative;display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid var(--bd);background:color-mix(in oklch,var(--mut) 30%,transparent);min-height:32px">
+                <span class="pin" style="top:3px;right:3px">3</span>
+                <span style="font-size:11px;opacity:.5">←</span>
+                <span style="font-size:11px;opacity:.3;margin-right:6px">→</span>
+                <span style="font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:6px">oxios-rfc-032</span>
+                <span class="btn-sm" style="font-size:10px" title="Save (⌘S)">💾</span>
+                <span class="btn-sm" style="font-size:10px" title="Split view">⫶</span>
+                <span class="btn-sm" style="font-size:10px" title="Info panel">⊞</span>
+                <span class="btn-sm" style="font-size:10px" title="Schedule note">📅</span>
+                <span class="btn-sm" style="font-size:10px" title="More">⋯</span>
+              </div>
+
+              <!-- PIN 4: SplitEditor + InfoPanel 4-way split -->
+              <!-- Editor + InfoPanel both open, no mutual exclusion -->
+              <div style="position:relative;display:flex;height:330px">
+                <span class="pin" style="top:6px;left:50%">4</span>
+                <!-- Editor body -->
+                <div style="flex:1;border-right:1px solid var(--bd);display:flex;flex-direction:column;min-width:0">
+                  <div style="padding:8px 12px;font-size:12px;flex:1;overflow:auto;line-height:1.5;background:var(--card)" class="mono">
+                    <p style="margin:0 0 8px"><span class="mut xs"># oxios-rfc-032</span></p>
+                    <p style="margin:0 0 6px;font-size:14px;font-weight:600">에러 인라인 표시와 재시도</p>
+                    <p style="margin:0 0 6px;font-size:11px">상태: <span class="pill pri" style="font-size:10px">accepted</span> · 작성자: a7garden · 2026-06-15</p>
+                    <p style="margin:0 0 6px;font-size:11px;line-height:1.6">## 문제<br/>스트리밍 모델이 30초 무응답으로 끊기면 사용자는 "왜 멈췄지?" 모른다…</p>
+                    <p style="margin:0 0 6px;font-size:11px;line-height:1.6">## 제안<br/>1. 에러 메시지를 assistant 메시지로 인라인<br/>2. <code>onRetry</code> prop을 통해 재시도 버튼 노출<br/>3. <code>errorKind</code> 분기 (quota / auth / routing)</p>
+                    <p style="margin:0 0 6px;font-size:11px;color:var(--fg2)">[[oxios-rfc-015]] · #errors · #streaming</p>
+                  </div>
+                  <div style="padding:4px 12px;border-top:1px solid var(--bd);font-size:10px;color:var(--fg2);display:flex;gap:10px">
+                    <span>1,284 단어</span><span>저장됨 · 14:02</span><span>단축키: <span class="kbd">⌘S</span></span>
+                  </div>
+                </div>
+                <!-- InfoPanel (right) — PIN 2: tab labels truncated -->
+                <div style="position:relative;width:170px;display:flex;flex-direction:column;background:color-mix(in oklch,var(--sb) 70%,transparent);border-left:1px solid var(--bd)">
+                  <!-- PIN 2: truncated tab labels -->
+                  <div style="position:relative;display:flex;border-bottom:1px solid var(--bd);background:color-mix(in oklch,var(--mut) 50%,transparent)">
+                    <span class="pin" style="top:2px;right:2px">2</span>
+                    <span class="btn-sm" style="background:var(--sba);font-size:10px;padding:4px 6px;border-radius:0;border-bottom:2px solid var(--pri)">back</span>
+                    <span class="btn-sm" style="font-size:10px;padding:4px 6px;border-radius:0">copi</span>
+                    <span class="btn-sm" style="font-size:10px;padding:4px 6px;border-radius:0">grap</span>
+                    <span class="btn-sm" style="font-size:10px;padding:4px 6px;border-radius:0">hist</span>
+                    <span class="btn-sm" style="font-size:10px;padding:4px 6px;border-radius:0">cal</span>
+                    <span style="margin-left:auto;font-size:10px;opacity:.5;padding:4px 6px">⊟</span>
+                  </div>
+                  <div style="padding:6px 8px;font-size:11px;color:var(--fg2);overflow:auto;flex:1">
+                    <p style="font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg2);margin:0 0 4px"><b>Backlinks</b></p>
+                    <ul style="list-style:none;margin:0;padding:0;line-height:1.5">
+                      <li><span style="color:var(--pri);text-decoration:underline">oxios-rfc-015</span><br/><span style="color:var(--fg2);font-size:10px">"… errorKind 분기는 RFC-032에서 다시…"</span></li>
+                      <li><span style="color:var(--pri);text-decoration:underline">2026-07-06.md</span><br/><span style="color:var(--fg2);font-size:10px">"날짜별 일지에 RFC-032 구현 메모…"</span></li>
+                      <li><span style="color:var(--pri);text-decoration:underline">errors.md</span></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Note: default landing is mode='chat' inbox; users who don't click a file never reach this editor view -->
+              <div style="margin:6px 8px 0;padding:5px 8px;border:1px dashed var(--bd);border-radius:6px;font-size:10px;color:var(--fg2);display:flex;gap:6px;align-items:center">
+                <span>ⓘ <code>stores/knowledge.ts:35</code> 기본 <code>mode:'chat'</code> → 인박스가 먼저. 이 에디터는 파일 클릭 후에만 노출.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED: fixes applied + 모드 토글 추가 + a11y 강화 -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt">Console</span><span class="mt on">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">Files</div>
+              <div class="sb-it" style="padding-left:14px"><span style="font-size:9px;margin-right:4px">▾</span><span class="ic" style="background:#bbb"></span>📁 journal</div>
+              <div class="sb-it" style="padding-left:32px"><span class="ic" style="background:#bbb"></span>2026-07-07.md</div>
+              <div class="sb-it" style="padding-left:32px"><span class="ic" style="background:#bbb"></span>2026-07-06.md</div>
+              <div class="sb-it" style="padding-left:14px;background:color-mix(in oklch,var(--pri) 14%,transparent);font-weight:600"><span style="font-size:9px;margin-right:4px">▾</span><span class="ic" style="background:var(--pri)"></span>📁 projects <span class="mut xs">(루트)</span></div>
+              <div class="sb-it" style="padding-left:32px"><span class="ic" style="background:#bbb"></span>oxios-rfc-015.md</div>
+              <div class="sb-it on" style="padding-left:32px"><span class="ic" style="background:var(--pri)"></span>📌 oxios-rfc-032.md</div>
+              <div class="sb-it" style="padding-left:14px"><span style="font-size:9px;margin-right:4px">▸</span><span class="ic" style="background:#bbb"></span>📁 archive</div>
+              <div class="sb-grp">빠른 액션</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>＋ 새 노트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>⌕ 파일 검색 <span class="kbd" style="margin-left:auto">⌘P</span></div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>📥 Inbox <span class="kbd" style="margin-left:auto">G+I</span></div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>⚙ 지식 설정</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm">Console</span><span class="bm on">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <!-- 모드 서브 토글 + 시각 차별화된 단축키 버튼 -->
+              <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri);font-size:10.5px">📝 Editor</span>
+              <span class="btn-sm" style="font-size:10.5px">📥 Inbox</span>
+              <span style="width:6px"></span>
+              <span class="btn-sm" style="font-size:10.5px;border-left:3px solid var(--info)">🗎 ⌘P 파일</span>
+              <span class="btn-sm" style="font-size:10.5px;border-left:3px solid var(--war)">⌘ ⌘K 팔레트</span>
+              <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 새 노트</span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <!-- Toolbar: 시각 라벨 + 상호 배타 시각화 -->
+              <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--bd);background:color-mix(in oklch,var(--mut) 30%,transparent);min-height:36px">
+                <span style="font-size:11px;padding:2px 6px;border:1px solid var(--bd);border-radius:4px" title="뒤로">←</span>
+                <span style="font-size:11px;padding:2px 6px;border:1px solid var(--bd);border-radius:4px" title="앞으로">→</span>
+                <span style="font-size:12px;font-weight:600;flex:1;margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📁 projects/oxios-rfc-032.md</span>
+                <span class="btn-sm" style="font-size:10.5px;padding:3px 8px" title="저장 ⌘S">💾 저장</span>
+                <span class="btn-sm" style="font-size:10.5px;padding:3px 8px" title="분할 보기 (전용)">⫶ 분할</span>
+                <span class="btn-sm" style="font-size:10.5px;padding:3px 8px;background:var(--sba);border:1px solid var(--bd)" title="정보 패널 (전용)">⊟ 정보</span>
+                <span class="btn-sm" style="font-size:10.5px;padding:3px 8px" title="캘린더">📅 일정</span>
+              </div>
+
+              <div style="display:flex;height:300px">
+                <div style="flex:1;border-right:1px solid var(--bd);display:flex;flex-direction:column;min-width:0">
+                  <div style="padding:10px 14px;font-size:12px;flex:1;overflow:auto;line-height:1.55;background:var(--card)" class="mono">
+                    <p style="margin:0 0 8px"><span class="mut xs"># oxios-rfc-032</span></p>
+                    <p style="margin:0 0 6px;font-size:14px;font-weight:600">에러 인라인 표시와 재시도</p>
+                    <p style="margin:0 0 6px;font-size:11px">상태: <span class="pill pri" style="font-size:10px">accepted</span> · 작성자: a7garden · 2026-06-15 · <span class="tc-war">변경됨 · ⌘S</span></p>
+                    <p style="margin:0 0 6px;font-size:11px;line-height:1.6">## 문제<br/>스트리밍 모델이 30초 무응답으로 끊기면 사용자는 "왜 멕췄지?" 모른다…</p>
+                    <p style="margin:0 0 6px;font-size:11px;line-height:1.6">## 제안<br/>1. 에러 메시지를 assistant 메시지로 인라인<br/>2. <code>onRetry</code> prop을 통해 재시도 버튼 노출<br/>3. <code>errorKind</code> 분기 (quota / auth / routing)</p>
+                    <p style="margin:0 0 6px;font-size:11px;color:var(--fg2)">[[oxios-rfc-015]] · #errors · #streaming</p>
+                    <p style="margin:8px 0 0;font-size:10px;color:var(--fg2);border-top:1px dashed var(--bd);padding-top:4px">📁 projects/oxios-rfc-032.md · 수정함 14:02 · 자동 저장 활성</p>
+                  </div>
+                </div>
+                <!-- InfoPanel: 풀 라벨 세로 탭, 닫기 별도, role + aria-selected (a11y 2 → 4) -->
+                <div style="width:200px;display:flex;flex-direction:column;background:color-mix(in oklch,var(--sb) 70%,transparent);border-left:1px solid var(--bd)" role="tablist" aria-label="문서 정보">
+                  <div style="padding:6px 8px;border-bottom:1px solid var(--bd);display:flex;align-items:center;background:color-mix(in oklch,var(--mut) 50%,transparent)">
+                    <span class="mut xs" style="font-weight:600">문서 정보</span>
+                    <span style="flex:1"></span>
+                    <span style="font-size:11px;opacity:.6" title="패널 닫기">⊟</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:2px;padding:6px 6px;border-bottom:1px solid var(--bd)">
+                    <span class="btn-sm" role="tab" aria-selected="true" style="justify-content:flex-start;text-align:left;font-size:10.5px;padding:6px 8px;background:var(--card);border-bottom:2px solid var(--pri);font-weight:600;border-radius:4px" title="백링크 (B)">🔗 링크 · 3</span>
+                    <span class="btn-sm" role="tab" style="justify-content:flex-start;text-align:left;font-size:10.5px;padding:6px 8px;border-radius:4px" title="코파일럿">✨ AI</span>
+                    <span class="btn-sm" role="tab" style="justify-content:flex-start;text-align:left;font-size:10.5px;padding:6px 8px;border-radius:4px" title="링크 그래프">🕸 그래프</span>
+                    <span class="btn-sm" role="tab" style="justify-content:flex-start;text-align:left;font-size:10.5px;padding:6px 8px;border-radius:4px" title="기록">🕘 기록</span>
+                    <span class="btn-sm" role="tab" style="justify-content:flex-start;text-align:left;font-size:10.5px;padding:6px 8px;border-radius:4px" title="캘린더">📅 일정</span>
+                  </div>
+                  <div role="tabpanel" style="padding:8px 10px;font-size:11px;color:var(--fg2);overflow:auto;flex:1">
+                    <p style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2);margin:0 0 4px"><b>Backlinks · 3</b></p>
+                    <ul style="list-style:none;margin:0;padding:0;line-height:1.55">
+                      <li style="padding:4px 0;border-bottom:1px dashed var(--bd)"><span style="color:var(--pri);text-decoration:underline;display:block">📄 oxios-rfc-015.md</span><span style="color:var(--fg2);font-size:10px">"… errorKind 분기는 RFC-032에서 다시…"</span></li>
+                      <li style="padding:4px 0;border-bottom:1px dashed var(--bd)"><span style="color:var(--pri);text-decoration:underline;display:block">📅 2026-07-06.md</span><span style="color:var(--fg2);font-size:10px">"날짜별 일지에 RFC-032 구현 메모…"</span></li>
+                      <li style="padding:4px 0"><span style="color:var(--pri);text-decoration:underline;display:block">🏷 errors.md</span><span style="color:var(--fg2);font-size:10px">tag index</span></li>
+                    </ul>
+                    <p style="margin-top:8px;font-size:10px;color:var(--fg2)">⌘⇧K 다음 링크 · ⌘B 백링크 패널 토글</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">/knowledge 진입 시 에디터가 아닌 빠른 메모 인박스가 기본이다 — 이 모드 디폴트가 UI에 시그널되지 않는다</p>
+        <p class="fd"><code>stores/knowledge.ts:35</code>에서 <code>mode: 'chat'</code>이 디폴트라 <code>KnowledgeLayout</code>(<code>components/knowledge/knowledge-layout.tsx:17-20</code>)은 <code>&lt;EditorPanel/&gt;</code> 아닌 <code>&lt;KnowledgeChat/&gt;</code>를 마운트한다. 사용자가 사이드바에서 <code>oxios-rfc-032.md</code> 같은 일반 노트를 눌러야 <code>openFile()</code>(<code>stores/knowledge.ts:43-53</code>)이 <code>mode:'editor'</code>로 전환한다. 토글 UI는 사이드바의 한 줄(<code>📁 journal / 📁 projects ...</code>) 아래에 잠긴 <em>💬 빠른 메모</em> 버튼으로만 존재(<code>components/layout/sidebar.tsx:265-388</code>)해, 처음 도착한 사용자는 "어디로 떨어졌지?" 인지하지 못한다.</p>
+        <p class="src">stores/knowledge.ts:35 (<code>mode:'chat'</code> default) · :43-53 (<code>openFile</code> → <code>mode:'editor'</code>) · components/knowledge/knowledge-layout.tsx:17-20 · components/knowledge/knowledge-chat.tsx:410-679 (전체 기본 화면) · components/layout/sidebar.tsx:265-388 (KnowledgeNav)</p>
+      </div></li>
+
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">정보 패널 탭 라벨이 잘려 어떤 패널인지 식별 불가</p>
+        <p class="fd"><code>InfoPanel</code>의 5개 탭(backlinks / copilot / graph / history / calendar)은 너비 320px에 5글자씩 배치되어 <code>back</code>·<code>copi</code>·<code>grap</code>·<code>hist</code>·<code>cal</code>로 잘리고, 닫기 버튼(<code>PanelRightClose</code>)이 헤더 안에 같이 들어가 한 줄로 읽힌다. 글자가 잘린 탭은 시각적으로 동일하게 보여 "기록" 탭을 클릭하려다 "캘린더"를 누르는 실수가 가능하다.</p>
+        <p class="src">components/knowledge/info-panel.tsx:48-61 (TabsList 5 triggers 한 줄 배치) · :55-59 (탭 triggers) · :38-46 (close button)</p>
+      </div></li>
+
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">에디터 툴바가 5개 아이콘-only 버튼 + 1 truncated 파일명이다</p>
+        <p class="fd"><code>EditorToolbar</code>(<code>components/knowledge/editor-toolbar.tsx:63-194</code>)는 5개 <code>Tooltip</code> 버튼(저장·분할·닫기·정보패널·캘린더)이 <code>h-8 w-8</code> 아이콘만 노출하고, 가운데 파일명은 <code>truncate mx-3</code>로 잘린다. 키보드 사용자에게는 hover해야 라벨이 보이고(<code>title</code>만 존재), 터치 디바이스에서는 영구 tooltip이 없어 액션이 무엇인지 알 수 없다. <code>goBack/goForward</code>는 <code>disabled</code> 상태에서도 회색 아이콘만 보여 회복 가능성을 알 수 없다.</p>
+        <p class="src">components/knowledge/editor-toolbar.tsx:63-194 (toolbar) · :91-105 (Save) · :108-124 (Split) · :144-160 (Info panel) · :163-179 (Calendar)</p>
+      </div></li>
+
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">분할 보기(SplitEditor)가 정보 패널과 상호 배타가 아니어서 한 화면이 [트리][에디터A][에디터B][InfoPanel] 4분할이 된다</p>
+        <p class="fd"><code>SplitEditor</code>(<code>components/knowledge/split-editor.tsx:12-25</code>)는 <code>editor-panel</code>의 우측 절반에 붙는 1×2 그리드인데, 정보 패널(<code>InfoPanel</code>, <code>w-80 border-l</code>)이 <code>app-layout.tsx:101-102</code>에서 동시에 마운트된다. <code>md</code>(768px)에서는 split 자체가 사실상 불가능하고, <code>lg</code> 이상에서 <code>4분할</code>이 되어 노트 폭이 비실용적이다. 상호 배타 시그널이 없고 한쪽을 켜면 다른 쪽이 닫힌다는 표시도 없다.</p>
+        <p class="src">components/knowledge/split-editor.tsx:12-25 · components/knowledge/editor-panel.tsx:46-48 (split conditional render) · components/layout/app-layout.tsx:101-102 (InfoPanel mount)</p>
+      </div></li>
+
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">⏵ Search modal이 "최근 15 파일"만 노출해 폴더 구조를 모르고, 키 가이드가 없다</p>
+        <p class="fd"><code>SearchModal</code>(<code>components/knowledge/search-modal.tsx</code>)의 <code>recentFiles</code>(<code>:54-57</code>)는 <code>useKnowledgeTree</code>의 처음 15개 파일(<code>MAX_RECENT_FILES=15</code>, <code>:30</code>)만 잘라 노출한다. 폴더(<code>is_dir</code>)는 move 모드(<code>isMoveMode</code>)에서만 합쳐지므로(<code>:59-77</code>) 일반 검색에서 계층 이동이 불가능하다. 모달 안에 키 가이드(<code>↑↓ Enter Esc</code>) 텍스트가 시각적으로 표시되지 않는다.</p>
+        <p class="src">components/knowledge/search-modal.tsx:30 (MAX_RECENT_FILES) · :54-77 (recentFiles 슬라이스, treeDirs 분기) · :84-98 (⌘P 글로벌 핸들러) · :119-143 (debounce 검색)</p>
+      </div></li>
+
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">⌘P / ⌘K 의 의미 차이가 아이콘 + 단축키 라벨로만 구분된다</p>
+        <p class="fd">topbar의 두 버튼은 ⌘P "파일 검색" / ⌘K "커맨드 팔레트"로 다른 두 모달을 가리키는데, 둘 다 같은 ⌕ 아이콘 + 같은 톤의 칩으로 노출된다. 키캡이 한 글자 차이라 헷갈리기 쉽다. 두 모달은 <code>components/layout/app-layout.tsx:116-121</code>에서 같은 영역에 마운트된다.</p>
+        <p class="src">components/layout/app-layout.tsx:116-121 (SearchModal &amp; MoveModal mount) · components/knowledge/search-modal.tsx:84-98 (⌘P 핸들러)</p>
+      </div></li>
+
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">현재 열린 노트의 사이드바 강조가 <code>.sb-it.on</code> 배경만이라 같은 이름 파일이 여러 폴더에 있으면 모호하다</p>
+        <p class="fd"><code>FileTree</code> 컴포넌트(<code>components/knowledge/file-tree.tsx</code>)가 활성 노트의 라벨만 굵게/배경 강조하지만, 상위 폴더는 자동으로 펼쳐지지 않고 경로 전체가 시각적으로 묶이지 않는다. <code>currentPath</code>만 prop 으로 받기 때문에 트리 깊이에 따른 breadcrumb 시그널이 부족하다.</p>
+        <p class="src">components/layout/sidebar.tsx:425-435 (FileTree mount · currentPath prop) · components/knowledge/file-tree.tsx</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>topbar에 <code>📥 Inbox / 📝 Editor</code> 모드 서브 토글을 노출해서 <code>KnowledgeLayout</code>의 <code>mode</code>(<code>stores/knowledge.ts:35</code>)를 즉시 바꿀 수 있게 한다. 키바인딩 <code>G I</code>(인박스), <code>G E</code>(에디터).</li>
+      <li>정보 패널 탭을 풀 라벨 세로 스택("🔗 링크 · 3  /  ✨ AI  /  🕸 그래프  /  🕘 기록  /  📅 일정") 으로 재구성. 닫기 버튼은 탭 strip 위 헤더의 별도 영역으로.</li>
+      <li>에디터 툴바의 아이콘-only 버튼에 시각 라벨("💾 저장 ⌘S" 처럼) 추가. <code>aria-label</code> + 텍스트, <code>title</code> 보조.</li>
+      <li><code>SplitEditor</code> 와 <code>InfoPanel</code> 를 상호 배타로: 한쪽을 켜면 다른 쪽 자동 닫힘. 좁은 viewport(<code>md</code>)에서는 split 비활성.</li>
+      <li><code>SearchModal</code> 의 <code>recentFiles</code> 를 폴더 우선(<code>treeDirs</code>) + 최근 파일 10으로 재구성. 모달 푸터에 <code>↑↓ 이동 · Enter 열기 · Esc 닫기</code> 키 가이드.</li>
+      <li>사이드바 FileTree(<code>components/layout/sidebar.tsx:425-435</code>)의 활성 노트 강조를 부모 폴더 자동 펼침 + 경로 breadcrumb 으로 확장.</li>
+      <li>topbar ⌘P 와 ⌘K 칩에 서로 다른 컬러 또는 작은 모드 아이콘을 넣어 두 모달의 시각적 차이를 강조.</li>
     </ul>
   </div>
 </section>
