@@ -1327,6 +1327,8 @@ pub(crate) async fn handle_config_put(
 
     // ExecApi — allowlist, shell mode, timeouts
     *state.kernel.exec.shared_config().write() = updated_config.exec.clone();
+    // RFC-038: PtyApi — interactive terminal config
+    *state.kernel.pty.shared_config().write() = updated_config.pty.clone();
 
     // ResourceMonitor — CPU/memory/load thresholds
     use oxios_kernel::resource_monitor::OverloadThreshold;
