@@ -34,11 +34,11 @@ function MemoryPage() {
         <TabsList>
           <TabsTrigger value="overview">{t('memory.overview')}</TabsTrigger>
           <TabsTrigger value="browse">{t('memory.browse')}</TabsTrigger>
+          <TabsTrigger value="search">{t('memory.search')}</TabsTrigger>
           <TabsTrigger value="map" data-testid="memory-tab-map">
             {t('memory.map')}
           </TabsTrigger>
           <TabsTrigger value="dream">{t('memory.dream')}</TabsTrigger>
-          <TabsTrigger value="search">{t('memory.search')}</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <MemoryOverview />
@@ -46,14 +46,14 @@ function MemoryPage() {
         <TabsContent value="browse">
           <MemoryBrowser onSelect={handleSelectMemory} />
         </TabsContent>
+        <TabsContent value="search">
+          <MemorySearch />
+        </TabsContent>
         <TabsContent value="map">
           <MemoryMap />
         </TabsContent>
         <TabsContent value="dream">
           <DreamPanel />
-        </TabsContent>
-        <TabsContent value="search">
-          <MemorySearch />
         </TabsContent>
       </Tabs>
       <MemoryDetail memory={selected} open={detailOpen} onClose={() => setDetailOpen(false)} />

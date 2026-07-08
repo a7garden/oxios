@@ -1334,7 +1334,8 @@
     "providerQuota": "제공자 할당량",
     "noProviderQuota": "사용 가능한 제공자 할당량이 없습니다",
     "noProviderQuotaDesc": "지원되는 제공자의 API 키를 설정하면 계정 잔액과 지출을 확인할 수 있습니다.",
-    "periodSpend": "이번 기간",
+    "monitoringOnly": "알림 전용",
+    "spendLimitNote": "지출 한도는 알림 전용입니다. 에이전트별 실행 한도는 아래 예산 섹션에서 관리하세요.",
     "balance": "잔액",
     "spendLimit": "지출 한도",
     "monitoringOnly": "알림 전용",
@@ -1577,7 +1578,9 @@
     "noWorkspace": "작업공간 없음",
     "description": "작업공간 파일이 여기에 표시됩니다.",
     "selectFile": "파일을 선택하세요",
-    "doubleClickEdit": "더블클릭으로 편집"
+    "doubleClickEdit": "더블클릭으로 편집",
+    "deleteConfirmTitle": "파일을 삭제하시겠습니까?",
+    "deleteConfirmDesc": "{{path}} 파일이 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
   },
   "mcp": {
     "title": "MCP 서버",

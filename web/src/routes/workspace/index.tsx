@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CreateFileDialog } from '@/components/workspace/create-file-dialog'
 import { FileBreadcrumb } from '@/components/workspace/file-breadcrumb'
 import { FileEditor } from '@/components/workspace/file-editor'
@@ -44,6 +45,7 @@ function WorkspacePage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [editedContent, setEditedContent] = useState<string | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   // Current directory context for breadcrumb + create
   const currentDir = useMemo(() => {
@@ -174,14 +176,19 @@ function WorkspacePage() {
 
   const handleDelete = useCallback(() => {
     if (!selectedFile) return
-    if (!confirm(`Delete ${selectedFile.path}?`)) return
+    setDeleteConfirmOpen(true)
+  }, [selectedFile])
+
+  const confirmDelete = () => {
+    if (!selectedFile) return
     deleteFile.mutate(selectedFile.path, {
       onSuccess: () => {
         setSelectedFile(null)
+        setDeleteConfirmOpen(false)
         refetchRoot()
       },
     })
-  }, [selectedFile, deleteFile, refetchRoot])
+  }
 
   // --- Render helpers ---
 
@@ -398,6 +405,29 @@ function WorkspacePage() {
         currentDir={currentDir}
         onSubmit={handleCreate}
       />
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('workspace.deleteConfirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('workspace.deleteConfirmDesc', { path: selectedFile?.path ?? '' })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={deleteFile.isPending}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button variant="destructive" size="sm" onClick={confirmDelete} disabled={deleteFile.isPending}>
+              {t('common.delete', '삭제')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

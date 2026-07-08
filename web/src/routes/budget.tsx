@@ -50,6 +50,7 @@ function CostPage() {
           </Tabs>
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">{t('cost.spendLimitNote')}</p>
 
       {/* Summary stat cards */}
       <CostSummaryCards period={period} />

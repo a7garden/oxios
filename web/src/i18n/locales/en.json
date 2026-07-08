@@ -1332,7 +1332,8 @@
       "all": "All Time"
     },
     "providerQuota": "Provider Quota",
-    "periodSpend": "This period",
+    "monitoringOnly": "Monitoring only",
+    "spendLimitNote": "The spend limit is alert-only. Manage per-agent enforcement limits in the Budget section below.",
     "balance": "Balance",
     "spendLimit": "Spend Limit",
     "monitoringOnly": "Monitoring only",
@@ -1581,7 +1582,9 @@
     "noWorkspace": "No workspace",
     "description": "Workspace files will appear here.",
     "selectFile": "Select a file to view",
-    "doubleClickEdit": "Double-click to edit"
+    "doubleClickEdit": "Double-click to edit",
+    "deleteConfirmTitle": "Delete this file?",
+    "deleteConfirmDesc": "{{path}} will be permanently deleted. This cannot be undone."
   },
   "mcp": {
     "title": "MCP Servers",

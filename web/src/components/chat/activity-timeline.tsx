@@ -29,7 +29,7 @@ export function ActivityTimeline({
   showHeader = true,
 }: ActivityTimelineProps) {
   const { t } = useTranslation()
-  const [timelineCollapsed, setTimelineCollapsed] = useState(activities.length > collapseAfter)
+  const [timelineCollapsed, setTimelineCollapsed] = useState(false)
   const [cardsCollapsed, setCardsCollapsed] = useState(false)
 
   if (!activities.length) return null
