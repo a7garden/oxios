@@ -131,6 +131,8 @@ impl KernelHandle {
         security: SecurityApi,
         persona: PersonaApi,
         extensions: ExtensionApi,
+        mcp: McpApi,
+        infra: InfraApi,
         projects: Option<ProjectApi>,
         exec: ExecApi,
         a2a: A2aApi,

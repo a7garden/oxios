@@ -1265,11 +1265,13 @@ impl KernelBuilder {
                 ),
                 None, // calendar (initialized later)
                 None, // email (initialized later)
+                build_marketplace_api_value(&config),
                 oxios_kernel::PtyApi::new(
                     Arc::new(parking_lot::RwLock::new(config.pty.clone())),
                     audit_trail.clone(),
                 ),
             );
+
             // RFC-015 P1: attach the streaming-sink registry so the runtime
             // callback's per-session `TextChunk` lookup finds the gateway's
             // collector sender. Wired before `Arc::new(kh)` so we can use
