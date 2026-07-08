@@ -1,4 +1,5 @@
 // Terminal route (RFC-038 §10.4).
+import type { JSX } from 'react';
 //
 // Renders the Terminal component full-bleed (AppLayout branches on
 // isTerminal to match Chat's `isChat` full-bleed behavior).

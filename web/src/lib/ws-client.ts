@@ -10,7 +10,7 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 // alive across NAT/proxy timeouts that fire anywhere from 30s–5min.
 const WS_CLIENT_PING_MS = 25_000;
 
-export type WsFrame = string | ArrayBufferLike;
+export type WsFrame = string | ArrayBuffer | Uint8Array;
 
 export type WsHooks = {
   onOpen?: () => void;
@@ -24,8 +24,6 @@ export type WsController = {
   close: () => void;
   isOpen: () => boolean;
 };
-
-type ArrayBufferLike = ArrayBuffer | { byteLength: number };
 
 function getToken(): string | null {
   try {
@@ -130,11 +128,9 @@ export function connectWs(path: string, hooks: WsHooks): WsController {
         hooks.onMessage(data);
       } else if (data instanceof Blob) {
         data.arrayBuffer().then((buf) => hooks.onMessage(buf));
-      } else if (data && typeof data === 'object' && 'byteLength' in data) {
-        // Some browsers deliver binary as Uint8Array-like. Normalize.
-        const view = data as Uint8Array;
-        const copy = new Uint8Array(view.byteLength);
-        copy.set(view);
+      } else if (data instanceof Uint8Array) {
+        const copy = new Uint8Array(data.byteLength);
+        copy.set(data);
         hooks.onMessage(copy.buffer);
       }
     };
@@ -176,8 +172,7 @@ export function connectWs(path: string, hooks: WsHooks): WsController {
     send(data: string | Uint8Array): void {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       try {
-        if (typeof data === 'string') ws.send(data);
-        else ws.send(data);
+        ws.send(data as string | ArrayBuffer);
       } catch {
         // socket torn down — onclose will fire
       }

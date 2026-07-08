@@ -3,9 +3,10 @@
 // Renders a ghostty-web Terminal on a div, wires it to the PTY WebSocket
 // hook, and exposes header status / kill / reconnect controls.
 
-import { Terminal as GhosttyTerminal, FitAddon, init as ghosttyInit, TextDecoder as GhosttyTextDecoder } from 'ghostty-web';
+import { Terminal as GhosttyTerminal, FitAddon, init as ghosttyInit } from 'ghostty-web';
 import { PowerOff, RotateCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
@@ -151,7 +152,7 @@ export function Terminal({ sessionId: initialSessionId = null, shell }: Terminal
               </span>
             </>
           ) : null}
-        </div>
+          </div>
         <div className="flex items-center gap-1">
           {status === 'detached' && ready ? (
             <Button
@@ -181,7 +182,3 @@ export function Terminal({ sessionId: initialSessionId = null, shell }: Terminal
     </div>
   );
 }
-
-// Suppress unused import warning for GhosttyTextDecoder (kept for future use
-// when we wire incremental UTF-8 decoding through binary frames).
-void GhosttyTextDecoder;

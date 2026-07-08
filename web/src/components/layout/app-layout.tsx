@@ -101,6 +101,7 @@ const isTerminal = pathname.startsWith('/terminal')
             </div>
             {/* InfoPanel only on main knowledge route, not sub-routes */}
             {!isKnowledgeSubRoute && infoPanelOpen && <InfoPanel />}
+        </div>
         ) : isChat ? (
           /* Chat: no padding, full height */
           <main className="flex-1 min-h-0 overflow-hidden">

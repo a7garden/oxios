@@ -73,6 +73,8 @@ export interface SettingsFieldDef {
    * to `<FieldRow />`).
    */
   dependsOn?: SettingsFieldDependsOn
+  /** Optional display suffix (e.g. unit like 's', 'MB'). */
+  suffix?: string
 }
 
 export interface SettingsSectionDef {
