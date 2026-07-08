@@ -1327,9 +1327,6 @@ pub(crate) async fn handle_config_put(
 
     // ExecApi — allowlist, shell mode, timeouts
     *state.kernel.exec.shared_config().write() = updated_config.exec.clone();
-    // RFC-038: PtyApi — interactive terminal config
-    *state.kernel.pty.config.write() = updated_config.pty.clone();
-
     // ResourceMonitor — CPU/memory/load thresholds
     use oxios_kernel::resource_monitor::OverloadThreshold;
     state
@@ -1385,7 +1382,6 @@ const HOT_RELOADABLE_SECTIONS: &[(&str, &str)] = &[
     ("resource_monitor", "resource_monitor"),
     ("token_maxing", "quota_tracker"),
     ("orchestrator", "infra_api"),
-    ("pty", "pty_api"),
 ];
 
 /// Subset of fields that always require a restart even inside a
@@ -1615,7 +1611,6 @@ pub(crate) async fn handle_config_patch(
 
     // Propagate hot-reloadable slices to kernel subsystems.
     *state.kernel.exec.shared_config().write() = updated.exec.clone();
-    *state.kernel.pty.config.write() = updated.pty.clone();
     use oxios_kernel::resource_monitor::OverloadThreshold;
     state
         .kernel

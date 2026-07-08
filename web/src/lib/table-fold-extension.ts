@@ -18,16 +18,9 @@
  * Round-trip safe: purely visual; the markdown source is preserved.
  */
 import { syntaxTree } from '@codemirror/language'
-import type { EditorState, Range } from '@codemirror/state'
-import {
-  Decoration,
-  type DecorationSet,
-  EditorView,
-  type EditorView as EditorViewType,
-  ViewPlugin,
-  type ViewUpdate,
-  WidgetType,
-} from '@codemirror/view'
+import { StateField } from '@codemirror/state'
+import type { EditorState, Extension, Range } from '@codemirror/state'
+import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view'
 
 function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
   if (a.length !== b.length) return false
@@ -160,43 +153,44 @@ export function buildTableDecorations(state: EditorState): DecorationSet {
   return Decoration.set(builder)
 }
 
-export const tableFoldExtension = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
-    constructor(view: EditorViewType) {
-      this.decorations = buildTableDecorations(view.state)
-    }
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
-        this.decorations = buildTableDecorations(update.view.state)
-      }
-    }
-  },
-  {
-    decorations: (v) => v.decorations,
-    provide: () =>
-      EditorView.baseTheme({
-        '.ox-md-table-wrap': {
-          display: 'block',
-          margin: '0.6em 0',
-          overflowX: 'auto',
-        },
-        '.ox-md-table': {
-          borderCollapse: 'collapse',
-          width: '100%',
-          fontSize: '0.9em',
-        },
-        '.ox-md-table th, .ox-md-table td': {
-          border: '1px solid var(--border)',
-          padding: '0.35em 0.6em',
-        },
-        '.ox-md-table thead th': {
-          background: 'var(--muted)',
-          fontWeight: '600',
-        },
-        '.ox-md-table tbody tr:nth-child(even)': {
-          background: 'color-mix(in srgb, var(--muted) 40%, transparent)',
-        },
-      }),
-  },
-)
+// StateField — not a ViewPlugin — because the table widget replaces a
+// range that spans line breaks, and CodeMirror 6 only permits
+// line-break-spanning replace decorations from state-derived sources.
+// Public API is unchanged: `tableFoldExtension` is an `Extension`
+// (theme + field) that drops straight into the editor's extensions[].
+export const tableFoldExtension: Extension = [
+  EditorView.baseTheme({
+    '.ox-md-table-wrap': {
+      display: 'block',
+      margin: '0.6em 0',
+      overflowX: 'auto',
+    },
+    '.ox-md-table': {
+      borderCollapse: 'collapse',
+      width: '100%',
+      fontSize: '0.9em',
+    },
+    '.ox-md-table th, .ox-md-table td': {
+      border: '1px solid var(--border)',
+      padding: '0.35em 0.6em',
+    },
+    '.ox-md-table thead th': {
+      background: 'var(--muted)',
+      fontWeight: '600',
+    },
+    '.ox-md-table tbody tr:nth-child(even)': {
+      background: 'color-mix(in srgb, var(--muted) 40%, transparent)',
+    },
+  }),
+  StateField.define<DecorationSet>({
+    create(state) {
+      return buildTableDecorations(state)
+    },
+    update(deco, tr) {
+      return tr.docChanged || tr.selection != null
+        ? buildTableDecorations(tr.state)
+        : deco.map(tr.changes)
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  }),
+]

@@ -507,15 +507,6 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "name": name,
             "source": source,
         }),
-        KernelEvent::PhaseStarted { phase, summary, .. } => serde_json::json!({
-            "type": "phase_started",
-            "phase": phase,
-            "summary": summary,
-        }),
-        KernelEvent::PhaseCompleted { phase, .. } => serde_json::json!({
-            "type": "phase_completed",
-            "phase": phase,
-        }),
     };
     // Merge payload into base
     if let serde_json::Value::Object(mut map) = base {

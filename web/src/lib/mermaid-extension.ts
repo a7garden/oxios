@@ -6,21 +6,22 @@
  * string is `mermaid` and replaces the code content with a widget
  * that lazy-loads mermaid and renders an inline SVG.
  *
- * Why a ViewPlugin (and not a StateField)?
- *  - We only need to recompute when the doc changes, viewport scrolls,
- *    or the user types in a code block. A ViewPlugin lets us read the
- *    current `EditorView` and build a `DecorationSet` for the visible
- *    ranges only.
- *  - The widget is added to the set as a replace, so the underlying
- *    markdown source remains unchanged (round-trip safe).
+ * Why a StateField (not a ViewPlugin)?
+ *  - The widget replaces the entire ```mermaid … ``` block, which spans
+ *    line breaks. CodeMirror 6 forbids replace decorations that cross
+ *    line breaks from coming via a ViewPlugin — only state-derived
+ *    decorations may, so this is a StateField.
+ *  - The widget is a replace, so the underlying markdown source remains
+ *    unchanged (round-trip safe). CM6 only calls `toDOM()` for widgets
+ *    in the visible viewport, keeping the lazy mermaid render off-screen.
  */
+import { StateEffect, StateField } from '@codemirror/state'
+import type { EditorState, Range } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
-  type EditorView,
-  MatchDecorator,
+  EditorView,
   ViewPlugin,
-  type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
 
@@ -92,38 +93,52 @@ class MermaidWidget extends WidgetType {
   }
 }
 
-// ─── Decorator: match ```mermaid ... ``` blocks via regex ──────────
+// ─── Decoration builder: scan the whole doc for ```mermaid blocks ──
 //
-// We use a regex match decorator for resilience — even if the lezer AST
-// changes shape between versions, this still matches the raw code.
+// We deliberately scan the full document rather than use a viewport-
+// scoped MatchDecorator: the replace decoration must live in a
+// StateField (it spans line breaks), and StateFields cannot read the
+// view's viewport. CM6 still only instantiates widget DOM for ranges
+// in the visible viewport, so the lazy mermaid render stays off-screen.
+//
 // The pattern matches a fenced code block whose opening fence is
-// exactly "```mermaid" (case-insensitive), non-greedy until the
-// closing fence.
-const fencedMermaid = new MatchDecorator({
-  regexp: /^```mermaid\s*\n([\s\S]*?)^```\s*$/gm,
-  decoration: (match) => {
-    const code = match[1] ?? ''
-    return Decoration.replace({ widget: new MermaidWidget(code) })
-  },
-})
+// "```mermaid", non-greedy until the closing fence.
+const MERMAID_RE = /^```mermaid\s*\n([\s\S]*?)^```\s*$/gm
 
-// ─── ViewPlugin: tie it all together ────────────────────────────────
-export const mermaidExtension = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
-    constructor(view: EditorView) {
-      this.decorations = fencedMermaid.createDeco(view)
-    }
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) {
-        this.decorations = fencedMermaid.createDeco(update.view)
-      }
-    }
+export function buildMermaidDecorations(state: EditorState): DecorationSet {
+  const builder: Range<Decoration>[] = []
+  const text = state.doc.toString()
+  MERMAID_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = MERMAID_RE.exec(text)) !== null) {
+    builder.push(
+      Decoration.replace({ widget: new MermaidWidget(m[1] ?? '') }).range(
+        m.index,
+        m.index + m[0].length,
+      ),
+    )
+  }
+  builder.sort((a, b) => a.from - b.from)
+  return Decoration.set(builder)
+}
+
+// Force-rebuild the decorations. The dark-mode observer dispatches this
+// effect so widgets are recreated (and re-rendered with the new theme).
+const forceMermaidRedraw = StateEffect.define<void>()
+
+// ─── StateField: line-break-spanning replaces must be state-derived ──
+export const mermaidExtension = StateField.define<DecorationSet>({
+  create(state) {
+    return buildMermaidDecorations(state)
   },
-  {
-    decorations: (v) => v.decorations,
+  update(deco, tr) {
+    if (tr.docChanged || tr.effects.some((e) => e.is(forceMermaidRedraw))) {
+      return buildMermaidDecorations(tr.state)
+    }
+    return deco.map(tr.changes)
   },
-)
+  provide: (f) => EditorView.decorations.from(f),
+})
 
 // ─── Dark-mode reactivity ───────────────────────────────────────────
 //
@@ -137,7 +152,7 @@ export const mermaidDarkObserver = ViewPlugin.fromClass(
     constructor(public view: EditorView) {
       this.observer = new MutationObserver(() => {
         // Force re-decoration so the widget re-creates with the new theme.
-        view.dispatch({})
+        view.dispatch({ effects: forceMermaidRedraw.of() })
       })
       this.observer.observe(document.documentElement, {
         attributes: true,

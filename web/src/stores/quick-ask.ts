@@ -20,6 +20,7 @@ import {
 // See docs/designs/2026-07-05-one-shot-quick-ask-design.md.
 //
 // Shares the pure chunk parsers / WS URL builder with chat.ts (no duplication).
+// Token batching uses the same RAF pattern as chat.ts so the UX is identical.
 // ---------------------------------------------------------------------------
 
 export interface CapturedExchange {
@@ -41,14 +42,65 @@ interface QuickAskState {
   lastExchange: CapturedExchange | null
   /** Active tool-approval request id, if the one-shot triggers one. */
   activeToolApproval: { id: string; toolName: string; reason: string } | null
+  /** User messages queued while an assistant turn is streaming. Drained
+   *  (in order) when the turn completes via `done`/`error`; cleared on
+   *  cancel / close / reset. Mirrors chat.ts _pendingQueue. */
+  _pendingQueue: string[]
   _ws: WebSocket | null
 
   openQuickAsk: () => void
   closeQuickAsk: () => void
   setQuickAskModel: (model: string | null) => void
   send: (content: string) => void
+  /** Cancel the in-flight stream and discard the queue. */
+  cancel: () => void
   resolveToolApproval: (id: string, approved: boolean) => Promise<void>
   reset: () => void
+  _drainPendingQueue: () => void
+}
+
+// ---------------------------------------------------------------------------
+// Token batching — same RAF pattern as chat.ts.
+//
+// Each incoming token chunk previously rebuilt the entire messages array
+// (O(n) per token → O(n×t) for a response of t tokens across n messages),
+// triggering a Zustand subscriber re-render on every token. We instead
+// accumulate token content in a module-scoped buffer and flush it at most once
+// per animation frame. Any non-token chunk flushes synchronously first so
+// streamed text is never lost when a tool/done/error event arrives mid-stream.
+// ---------------------------------------------------------------------------
+let _pendingTokens = ''
+let _tokenRafId: number | null = null
+
+function flushPendingTokens(): void {
+  if (_tokenRafId !== null) {
+    cancelAnimationFrame(_tokenRafId)
+    _tokenRafId = null
+  }
+  if (!_pendingTokens) return
+  const content = _pendingTokens
+  _pendingTokens = ''
+  useQuickAskStore.setState((s) => ({
+    messages: appendTokenToMessages(s.messages, content, {
+      placeholderModel: s.pendingModel ?? s.quickAskModel,
+    }),
+  }))
+}
+
+function scheduleTokenFlush(): void {
+  if (_tokenRafId !== null) return
+  _tokenRafId = requestAnimationFrame(() => {
+    _tokenRafId = null
+    flushPendingTokens()
+  })
+}
+
+function discardPendingTokens(): void {
+  if (_tokenRafId !== null) {
+    cancelAnimationFrame(_tokenRafId)
+    _tokenRafId = null
+  }
+  _pendingTokens = ''
 }
 
 export const useQuickAskStore = create<QuickAskState>((set, get) => ({
@@ -59,6 +111,7 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
   quickAskModel: null,
   lastExchange: null,
   activeToolApproval: null,
+  _pendingQueue: [],
   _ws: null,
 
   openQuickAsk: () => {
@@ -71,16 +124,26 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
   },
 
   closeQuickAsk: () => {
+    discardPendingTokens()
     const ws = get()._ws
     if (ws && ws.readyState === WebSocket.OPEN) ws.close()
-    set({ open: false, _ws: null, isStreaming: false })
+    set({ open: false, _ws: null, isStreaming: false, _pendingQueue: [] })
   },
 
   setQuickAskModel: (model) => set({ quickAskModel: model }),
 
   send: (content) => {
     const { quickAskModel, isStreaming, _ws, messages } = get()
-    if (!content.trim() || isStreaming) return
+    if (!content.trim()) return
+
+    // Queue if currently streaming (same pattern as chat.ts _pendingQueue).
+    // The caller has already cleared the textarea; we just stash the content.
+    // It is dispatched (and added to the message list) when the done/error
+    // handler drains the queue — so there are no ghost messages to clean up.
+    if (isStreaming) {
+      set((s) => ({ _pendingQueue: [...s._pendingQueue, content] }))
+      return
+    }
 
     const now = new Date().toISOString()
     const userMsg: ChatMessage = {
@@ -137,15 +200,25 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
           if (get()._ws !== ws) return
           set({ _ws: null })
           if (get().isStreaming) {
+            flushPendingTokens()
             appendError(set, '연결이 끊겼습니다. 다시 시도해 주세요.')
+            get()._drainPendingQueue()
           }
         }
       } catch (err) {
         appendError(set, err instanceof Error ? err.message : '연결할 수 없습니다.')
+        get()._drainPendingQueue()
       }
     }
 
     void connectAndSend()
+  },
+
+  cancel: () => {
+    discardPendingTokens()
+    const ws = get()._ws
+    if (ws && ws.readyState === WebSocket.OPEN) ws.close()
+    set({ isStreaming: false, _ws: null, _pendingQueue: [] })
   },
 
   resolveToolApproval: async (id, approved) => {
@@ -165,6 +238,7 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
   },
 
   reset: () => {
+    discardPendingTokens()
     const ws = get()._ws
     if (ws && ws.readyState === WebSocket.OPEN) ws.close()
     set({
@@ -173,8 +247,20 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
       pendingModel: null,
       lastExchange: null,
       activeToolApproval: null,
+      _pendingQueue: [],
       _ws: null,
     })
+  },
+
+  _drainPendingQueue: () => {
+    const { _pendingQueue } = get()
+    if (_pendingQueue.length === 0) return
+    // Shift the head before dispatching: send's normal path runs here because
+    // isStreaming was just cleared by the done/error handler.
+    const next = _pendingQueue[0]
+    if (next === undefined) return
+    set({ _pendingQueue: _pendingQueue.slice(1) })
+    get().send(next)
   },
 }))
 
@@ -184,10 +270,9 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
 // Message transforms (token append, activity merge, model patch, placeholder
 // creation) route through shared pure primitives imported from chat.ts
 // (appendTokenToMessages / appendActivityToMessages / patchAssistantModel) so
-// this store and the chat store cannot drift apart. What stays quick-ask-
-// specific: no token-batch RAF (one-shot is short; per-token set is cheap
-// enough), promote-capture on done, and the divergent done/interview/error/
-// tool_approval side effects.
+// this store and the chat store cannot drift apart. Token batching uses the
+// same RAF pattern as chat.ts. What stays quick-ask-specific: promote-capture
+// on done, and the divergent done/interview/error/tool_approval side effects.
 // ---------------------------------------------------------------------------
 
 type SetFn = (
@@ -218,6 +303,13 @@ function appendError(set: SetFn, message: string): void {
 }
 
 function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
+  // Flush any buffered token content before a non-token chunk so streamed text
+  // is committed to the message before a tool/done/error event reads or
+  // replaces the last assistant message. (Same guard as chat.ts.)
+  if (chunk.type !== 'token') {
+    flushPendingTokens()
+  }
+
   switch (chunk.type) {
     case 'model': {
       // Patch the live assistant message, or stash as pendingModel for the
@@ -233,19 +325,16 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
       break
     }
     case 'token':
-      set((s) => ({
-        messages: appendTokenToMessages(s.messages, chunk.content ?? '', {
-          placeholderModel: s.pendingModel ?? s.quickAskModel ?? undefined,
-        }),
-      }))
+      if (!chunk.content) break
+      _pendingTokens += chunk.content
+      scheduleTokenFlush()
       break
     case 'reasoning':
     case 'tool_start':
     case 'tool_progress':
     case 'tool_end':
     case 'memory':
-    case 'usage':
-    case 'phase': {
+    case 'usage': {
       const activity = chunkToActivity(chunk)
       if (activity) {
         set((s) => ({
@@ -277,6 +366,7 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
       break
     case 'error':
       appendError(set, chunk.error ?? '오류가 발생했습니다.')
+      get()._drainPendingQueue()
       break
     case 'done': {
       const state = get()
@@ -299,6 +389,9 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
       set({ isStreaming: false })
       const ws = get()._ws
       if (ws && ws.readyState === WebSocket.OPEN) ws.close()
+      // Queue drain: if the user queued follow-ups while this turn streamed,
+      // dispatch the next one now that the turn is idle.
+      get()._drainPendingQueue()
       break
     }
     default:

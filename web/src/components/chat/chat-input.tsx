@@ -55,6 +55,10 @@ interface ChatInputProps {
   onAttachMount?: (id: string) => void
   /** RFC-025: unbind a Mount from the active session. */
   onRemoveMount?: (id: string) => void
+  /** Custom placeholder text (defaults to chat placeholder). */
+  placeholder?: string
+  /** Whether to show the ⌘⇧N "new chat" hint (default true). */
+  showNewChatHint?: boolean
 }
 // ── Component ─────────────────────────────────────────────────
 
@@ -82,6 +86,8 @@ export function ChatInput({
   activeMounts = [],
   onAttachMount = () => {},
   onRemoveMount = () => {},
+  placeholder,
+  showNewChatHint = true,
 }: ChatInputProps) {
   const { t } = useTranslation()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -434,9 +440,10 @@ export function ChatInput({
           onCompositionStart={() => setIsComposing(true)}
           onCompositionEnd={() => setIsComposing(false)}
           placeholder={
-            connected
+            placeholder ??
+            (connected
               ? t('chat.inputPlaceholder', 'Message Oxios… (@ to add context)')
-              : t('chat.waitingForConnection', 'Waiting for connection...')
+              : t('chat.waitingForConnection', 'Waiting for connection...'))
           }
           disabled={disabled || !connected}
           rows={1}
@@ -502,7 +509,7 @@ export function ChatInput({
       <div className="mt-1.5 flex items-center justify-center gap-3 text-2xs text-muted-foreground/70 hidden sm:flex">
         <Hint kbd="Enter" label={t('chat.send', 'send')} />
         <Hint kbd="Shift+Enter" label={t('chat.newline', 'new line')} />
-        <Hint kbd="⌘⇧N" label={t('chat.newConversation', 'new chat')} />
+        {showNewChatHint && <Hint kbd="⌘⇧N" label={t('chat.newConversation', 'new chat')} />}
       </div>
     </div>
   )

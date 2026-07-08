@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 
 interface KnowledgeState {
   // View mode
-  mode: 'editor' | 'chat'
+  mode: 'home' | 'editor' | 'chat'
 
   // Current file
   currentFilePath: string | null
@@ -22,6 +22,7 @@ interface KnowledgeState {
   // Actions
   openFile: (path: string) => void
   openChat: () => void
+  openHome: () => void
   goBack: () => string | null | undefined
   goForward: () => string | null | undefined
   toggleInfoPanel: () => void
@@ -32,7 +33,7 @@ interface KnowledgeState {
 export const useKnowledgeStore = create<KnowledgeState>()(
   persist(
     (set, get) => ({
-      mode: 'chat',
+      mode: 'home',
       currentFilePath: null,
       history: [],
       historyIndex: -1,
@@ -54,6 +55,9 @@ export const useKnowledgeStore = create<KnowledgeState>()(
 
       openChat: () => {
         set({ mode: 'chat' })
+      },
+      openHome: () => {
+        set({ mode: 'home' })
       },
 
       goBack: () => {

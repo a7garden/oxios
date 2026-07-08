@@ -28,7 +28,9 @@ interface ActivityCardProps {
 export function ActivityCard({ activity, className }: ActivityCardProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
-  const { icon, label, badge } = getActivityMeta(activity, t)
+  const meta = getActivityMeta(activity, t)
+  if (!meta) return null
+  const { icon, label, badge } = meta
   const durationStr = formatDuration(activity.durationMs)
 
   return (
@@ -148,8 +150,6 @@ function ActivityDetail({ activity, t }: { activity: ChatActivity; t: Translator
           })}
         </p>
       )
-    case 'phase':
-      return null
     default:
       return null
   }
@@ -162,7 +162,7 @@ function getActivityMeta(
   icon: React.ReactNode
   label: string
   badge: React.ReactNode
-} {
+} | null {
   switch (activity.type) {
     case 'tool_call':
       return {
@@ -201,18 +201,8 @@ function getActivityMeta(
         }),
         badge: null,
       }
-    case 'phase':
-      return {
-        icon: <Sparkles className="h-3 w-3" />,
-        label: t('chat.transparency.phaseLabel', {
-          phase: activity.phase ?? 'unknown',
-        }),
-        badge: (
-          <span className="text-2xs px-1.5 py-0.5 rounded bg-info/10 text-info font-medium">
-            {activity.status ?? 'started'}
-          </span>
-        ),
-      }
+    default:
+      return null
   }
 }
 

@@ -1,6 +1,7 @@
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { EditorPanel } from './editor-panel'
 import { KnowledgeChat } from './knowledge-chat'
+import { KnowledgeHome } from './knowledge-home'
 
 /**
  * KnowledgeLayout renders inline within the AppLayout outlet.
@@ -17,5 +18,5 @@ import { KnowledgeChat } from './knowledge-chat'
 export function KnowledgeLayout() {
   const { mode } = useKnowledgeStore()
 
-  return mode === 'chat' ? <KnowledgeChat /> : <EditorPanel />
+  return mode === 'chat' ? <KnowledgeChat /> : mode === 'home' ? <KnowledgeHome /> : <EditorPanel />
 }

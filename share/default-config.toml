@@ -98,21 +98,6 @@ default_timeout_secs = 120
 # Maximum command timeout in seconds.
 max_timeout_secs = 600
 
-# RFC-038: Interactive terminal (PTY-bridged WebSocket).
-# Disabled by default; flip to true after reviewing the threat model.
-[pty]
-enabled = false
-# Shell invoked when the client doesn't specify one. macOS default;
-# overridden by $SHELL env at runtime if set.
-default_shell = "/bin/zsh"
-# Hard cap on concurrent PTY sessions per principal.
-max_sessions = 3
-# Idle timeout in seconds. Resets on every input frame from the client.
-idle_timeout_secs = 1800
-# Hard lifetime in seconds.
-max_lifetime_secs = 28800
-# Allowlist of permitted shell binaries. Empty = only default_shell allowed.
-allowed_shells = []
 [orchestrator]
 # Maximum Ouroboros evolution iterations before giving up.
 max_evolution_iterations = 3

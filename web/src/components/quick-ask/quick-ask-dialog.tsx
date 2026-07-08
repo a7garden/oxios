@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
+import { ChatInput } from '@/components/chat/chat-input'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -16,7 +17,6 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useEngineConfig } from '@/hooks/use-engine'
 import { api } from '@/lib/api-client'
-import { cn } from '@/lib/utils'
 import { useChatStore } from '@/stores/chat'
 import { useQuickAskStore } from '@/stores/quick-ask'
 
@@ -24,8 +24,9 @@ import { useQuickAskStore } from '@/stores/quick-ask'
  * QuickAskDialog — global one-shot question overlay.
  *
  * Renders in AppLayout so it overlays every route. Sends `ephemeral: true`
- * over its own short-lived WS; nothing is persisted. Streams tokens, tool
- * calls, and reasoning with the same transparency as /chat.
+ * over its own short-lived WS; nothing is persisted. Uses the same ChatInput
+ * as the regular chat page so the UX (model picker, queue, stop, streaming)
+ * is identical — the only difference is that no session is saved.
  */
 export function QuickAskDialog() {
   const { t } = useTranslation()
@@ -35,8 +36,10 @@ export function QuickAskDialog() {
   const messages = useQuickAskStore((s) => s.messages)
   const isStreaming = useQuickAskStore((s) => s.isStreaming)
   const send = useQuickAskStore((s) => s.send)
+  const cancel = useQuickAskStore((s) => s.cancel)
   const quickAskModel = useQuickAskStore((s) => s.quickAskModel)
   const setQuickAskModel = useQuickAskStore((s) => s.setQuickAskModel)
+  const queuedCount = useQuickAskStore((s) => s._pendingQueue.length)
   const lastExchange = useQuickAskStore((s) => s.lastExchange)
   const activeToolApproval = useQuickAskStore((s) => s.activeToolApproval)
   const resolveToolApproval = useQuickAskStore((s) => s.resolveToolApproval)
@@ -53,7 +56,6 @@ export function QuickAskDialog() {
   const [input, setInput] = useState('')
   const [copied, setCopied] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-scroll on new content.
   useEffect(() => {
@@ -67,22 +69,6 @@ export function QuickAskDialog() {
       setCopied(false)
     }
   }, [open])
-
-  const handleSubmit = () => {
-    const text = input.trim()
-    if (!text || isStreaming) return
-    send(text)
-    setInput('')
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // IME guard: don't send while composing (e.g. confirming a Hangul candidate).
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit()
-    }
-  }
 
   const handleCopy = async () => {
     const reply = lastExchange?.reply
@@ -139,20 +125,12 @@ export function QuickAskDialog() {
     >
       <DialogContent
         showCloseButton={false}
-        onOpenAutoFocus={(e) => {
-          e.preventDefault()
-          inputRef.current?.focus()
-        }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
         className="flex h-[80vh] max-w-2xl flex-col gap-0 p-0 sm:rounded-xl"
       >
         <DialogHeader className="flex-row items-center justify-between border-b px-5 py-3">
           <div className="flex items-center gap-2">
             <DialogTitle className="text-sm font-medium">{t('quickAsk.title')}</DialogTitle>
-            {quickAskModel && (
-              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                {quickAskModel}
-              </span>
-            )}
           </div>
           <DialogDescription className="sr-only">{t('quickAsk.placeholder')}</DialogDescription>
           <Button
@@ -187,63 +165,48 @@ export function QuickAskDialog() {
           </div>
         </ScrollArea>
 
-        {/* Input */}
-        <div className="border-t p-3">
-          <div className="flex items-end gap-2">
-            <textarea
-              value={input}
-              ref={inputRef}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t('quickAsk.placeholder')}
-              rows={1}
-              disabled={isStreaming}
-              className={cn(
-                'flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-sm',
-                'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1',
-                'focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-                'max-h-32',
-              )}
-            />
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={!input.trim() || isStreaming}
-              className="shrink-0"
-            >
-              {isStreaming ? t('quickAsk.thinking') : t('quickAsk.send')}
-            </Button>
-          </div>
-          <div className="mt-2 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {`↵ ${t('quickAsk.hintSend')} · ⇧↵ ${t('quickAsk.hintNewline')}`}
-              </span>
-              {hasResult && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="h-7 gap-1.5 px-2 text-xs"
-                  >
-                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    {t('quickAsk.copy')}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handlePromote}
-                    className="h-7 gap-1.5 px-2 text-xs"
-                  >
-                    <MessageSquarePlus className="h-3 w-3" />
-                    {t('quickAsk.promote')}
-                  </Button>
-                </>
-              )}
+        {/* Result actions (copy / promote) — shown only when a turn completed. */}
+        {hasResult && (
+          <div className="flex items-center justify-between border-t px-5 py-1.5">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopy}
+                className="h-7 gap-1.5 px-2 text-xs"
+              >
+                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                {t('quickAsk.copy')}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handlePromote}
+                className="h-7 gap-1.5 px-2 text-xs"
+              >
+                <MessageSquarePlus className="h-3 w-3" />
+                {t('quickAsk.promote')}
+              </Button>
             </div>
             <span className="text-[10px] text-muted-foreground">{t('quickAsk.notSaved')}</span>
           </div>
+        )}
+
+        {/* Input — same ChatInput as the chat page for UX parity. */}
+        <div className="border-t bg-background/95 backdrop-blur-sm shrink-0">
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={(content) => send(content)}
+            onCancel={cancel}
+            isStreaming={isStreaming}
+            connected={true}
+            queuedCount={queuedCount}
+            activeModelId={quickAskModel}
+            setActiveModelId={setQuickAskModel}
+            placeholder={t('quickAsk.placeholder')}
+            showNewChatHint={false}
+          />
         </div>
       </DialogContent>
     </Dialog>

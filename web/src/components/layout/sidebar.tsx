@@ -12,13 +12,13 @@ import {
   FolderPlus,
   GitBranch,
   LayoutDashboard,
+  LayoutGrid,
   Mail,
   MessageSquare,
   Network,
   PanelLeft,
   PanelLeftClose,
   Settings,
-  Terminal,
   Theater,
   Timer,
   Trash2,
@@ -140,7 +140,6 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
         href: '/token-maxing',
         icon: <Flame className="h-4 w-4" />,
       },
-      { labelKey: 'common.terminal', href: '/terminal', icon: <Terminal className="h-4 w-4" /> },
     ],
   },
   {
@@ -205,19 +204,13 @@ export function Sidebar() {
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
       </div>
-      {/* Mobile only: mode tabs inside sidebar overlay (kept as-is) */}
-      {mobileOpen && (
-        <div className="lg:hidden px-2 py-1.5">
-          <ModeTabs variant="sidebar" />
-        </div>
-      )}
 
-      {/* Desktop sidebar: compact mode tabs under brand so users always
-          know which top-level surface (Console / Knowledge / Chat) they're
-          on. Without this the chat mode hides the indicator and the
-          Knowledge session tree replaces the console nav with no signal. */}
+      {/* Desktop mode switcher — single source of truth for Console /
+          Knowledge / Chat on desktop. Collapses to an icon rail (VS Code
+          Activity Bar) when the sidebar is collapsed. Mobile mode switching
+          lives in the BottomNav bar. */}
       <div className="hidden lg:block px-2 pb-2">
-        <ModeTabs variant="sidebar" />
+        <ModeTabs collapsed={collapsed} />
       </div>
 
       <Separator />
@@ -270,7 +263,7 @@ function KnowledgeNav() {
   const { collapsed } = useSidebarStore()
   const router = useRouterState()
   const currentPath = router.location.pathname
-  const { mode, currentFilePath, openFile, openChat } = useKnowledgeStore()
+  const { mode, currentFilePath, openFile, openChat, openHome } = useKnowledgeStore()
   const { data: entries, isLoading, refetch } = useKnowledgeTree()
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
@@ -310,6 +303,18 @@ function KnowledgeNav() {
     return (
       <>
         <div className="flex flex-col items-center gap-1 py-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => openHome()}
+                className={cn(itemCollapsedBase, mode === 'home' && itemActive)}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t('knowledge.homeTitle')}</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -393,8 +398,16 @@ function KnowledgeNav() {
 
   return (
     <>
-      {/* Views — Quick Notes, Journal, Graph */}
+      {/* Views — Home, Quick Notes, Journal, Graph */}
       <div className={sectionGap}>
+        <button
+          type="button"
+          onClick={() => openHome()}
+          className={cn(itemBase, mode === 'home' ? itemActive : itemInactive)}
+        >
+          <LayoutGrid className="h-4 w-4" />
+          <span>{t('knowledge.homeTitle')}</span>
+        </button>
         <button
           type="button"
           onClick={() => openChat()}

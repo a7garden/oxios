@@ -114,10 +114,6 @@ pub async fn require_auth(
     if path == "/api/chat/stream" {
         return Ok(next.run(request).await);
     }
-    // RFC-038: same exemption for the terminal WS endpoint.
-    if path == "/api/terminal/stream" {
-        return Ok(next.run(request).await);
-    }
 
     // Allow only actual static asset paths (prefix-based, not suffix)
     let static_prefixes = ["/assets/", "/favicon", "/knowledge/"];

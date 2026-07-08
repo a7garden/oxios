@@ -15,7 +15,6 @@ pub mod memory_api;
 pub mod mount_api;
 pub mod persona_api;
 pub mod project_api;
-pub mod pty_api;
 pub mod security_api;
 pub mod state_api;
 pub mod token_maxing_api;
@@ -42,7 +41,7 @@ pub use memory_api::MemoryApi;
 pub use mount_api::{MountApi, MountInfo};
 pub use persona_api::PersonaApi;
 pub use project_api::{ProjectApi, ProjectInfo};
-pub use pty_api::{PtyApi, SharedPtyConfig};
+
 pub use security_api::SecurityApi;
 pub use state_api::StateApi;
 pub use token_maxing_api::TokenMaxingApi;
@@ -88,8 +87,6 @@ pub struct KernelHandle {
     pub mounts: Option<MountApi>,
     /// Execution: config + access management.
     pub exec: ExecApi,
-    /// RFC-038: Interactive terminal (PTY-bridged WebSocket).
-    pub pty: PtyApi,
     /// Agent-to-agent communication.
     pub a2a: A2aApi,
     /// Engine: LLM providers, models, config.
@@ -142,7 +139,6 @@ impl KernelHandle {
         marketplace_api: MarketplaceApi,
         calendar: Option<CalendarApi>,
         email: Option<EmailApi>,
-        pty: PtyApi,
     ) -> Self {
         Self {
             state,
@@ -155,7 +151,6 @@ impl KernelHandle {
             projects,
             mounts: None,
             exec,
-            pty,
             a2a,
             engine,
             knowledge,

@@ -761,9 +761,6 @@ mod tests {
             ),
             None, // calendar (not configured in test)
             None, // email (not configured in test)
-            crate::kernel_handle::PtyApi::new(Arc::new(parking_lot::RwLock::new(
-                crate::config::PtyConfig::default(),
-            ))),
         ));
 
         let engine = crate::OxiosEngine::new("mock/model");

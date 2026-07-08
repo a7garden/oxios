@@ -9,10 +9,12 @@ import { QuickAskDialog } from '@/components/quick-ask/quick-ask-dialog'
 import { useApprovalWatcher, useGlobalEvents } from '@/hooks/use-global-events'
 import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
 import { useQuickAskShortcut } from '@/hooks/use-quick-ask-shortcut'
+import { useTabShortcuts } from '@/hooks/use-tab-shortcuts'
 import { cn } from '@/lib/utils'
 import { useEventStore } from '@/stores/events'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useSidebarStore } from '@/stores/sidebar'
+import { BottomNav } from './bottom-nav'
 import { Header } from './header'
 import { NotificationCenter } from './notification-center'
 import { Sidebar } from './sidebar'
@@ -32,14 +34,13 @@ export function AppLayout() {
   const isKnowledge = pathname.startsWith('/knowledge')
   const isKnowledgeSubRoute = isKnowledge && pathname !== '/knowledge' && pathname !== '/knowledge/'
   const isChat = pathname === '/chat'
-  const isTerminal = pathname.startsWith('/terminal')
-
   const { infoPanelOpen } = useKnowledgeStore()
 
   useKnowledgeShortcuts()
   useGlobalEvents()
   useApprovalWatcher()
   useQuickAskShortcut()
+  useTabShortcuts()
 
   // Bootstrap singleton SSE connection on first mount
   const connectEvents = useEventStore((s) => s.connect)
@@ -107,16 +108,14 @@ export function AppLayout() {
           <main className="flex-1 min-h-0 overflow-hidden">
             <Outlet />
           </main>
-        ) : isTerminal ? (
-          /* RFC-038: Terminal full-bleed like Chat */
-          <main className="flex-1 min-h-0 overflow-hidden">
-            <Outlet />
-          </main>
         ) : (
           <main className="flex-1 overflow-y-auto p-3 lg:p-4 min-h-0">
             <Outlet />
           </main>
         )}
+
+        {/* Mobile mode switcher — Console/Knowledge/Chat, thumb-reachable */}
+        <BottomNav />
       </div>
 
       {isKnowledge && (

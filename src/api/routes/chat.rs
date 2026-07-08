@@ -1445,22 +1445,6 @@ fn kernel_event_to_ws_chunk(
             "content": content,
             "source": source,
         })),
-        KernelEvent::PhaseStarted { phase, summary, .. } => {
-            let mut obj = serde_json::json!({
-                "type": "phase",
-                "phase": phase,
-                "status": "started",
-            });
-            if let Some(s) = summary {
-                obj["summary"] = serde_json::json!(s);
-            }
-            Some(obj)
-        }
-        KernelEvent::PhaseCompleted { phase, .. } => Some(serde_json::json!({
-            "type": "phase",
-            "phase": phase,
-            "status": "completed",
-        })),
         KernelEvent::ApprovalRequested {
             id,
             tool_name,
@@ -1756,9 +1740,9 @@ mod rfc015_tests {
         assert_eq!(chunk.unwrap()["type"], "usage");
     }
 
-    /// Lifecycle events (AgentStarted, PhaseCompleted, …) should not be
-    /// forwarded as RFC-015 chunks — the global /api/events SSE handles
-    /// them. Returning None keeps the WS stream clean.
+    /// Lifecycle events (AgentStarted, …) should not be forwarded as
+    /// RFC-015 chunks — the global /api/events SSE handles them.
+    /// Returning None keeps the WS stream clean.
     #[test]
     fn lifecycle_events_are_skipped() {
         let event = KernelEvent::AgentStarted {

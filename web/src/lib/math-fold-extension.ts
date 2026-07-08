@@ -17,17 +17,11 @@
  * preserved.
  */
 import { syntaxTree } from '@codemirror/language'
+import { StateField } from '@codemirror/state'
 import type { EditorState, Range } from '@codemirror/state'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import {
-  Decoration,
-  type DecorationSet,
-  type EditorView as EditorViewType,
-  ViewPlugin,
-  type ViewUpdate,
-  WidgetType,
-} from '@codemirror/view'
+import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view'
 
 // Display `$$…$$` (group 1) takes precedence; inline `$…$` (group 2) requires
 // a non-space char at each end to dodge currency like "$5 and $10".
@@ -106,19 +100,17 @@ export function buildMathDecorations(state: EditorState): DecorationSet {
   return Decoration.set(builder)
 }
 
-export const mathFoldExtension = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
-    constructor(view: EditorViewType) {
-      this.decorations = buildMathDecorations(view.state)
-    }
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
-        this.decorations = buildMathDecorations(update.view.state)
-      }
-    }
+// StateField — not a ViewPlugin — because display `$$…$$` blocks can
+// span line breaks, and CodeMirror 6 only permits line-break-spanning
+// replace decorations from state-derived sources.
+export const mathFoldExtension = StateField.define<DecorationSet>({
+  create(state) {
+    return buildMathDecorations(state)
   },
-  {
-    decorations: (v) => v.decorations,
+  update(deco, tr) {
+    return tr.docChanged || tr.selection != null
+      ? buildMathDecorations(tr.state)
+      : deco.map(tr.changes)
   },
-)
+  provide: (f) => EditorView.decorations.from(f),
+})

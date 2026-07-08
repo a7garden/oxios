@@ -158,61 +158,6 @@ const execSection: SettingsSectionDef = {
     },
   ],
 }
-
-const ptySection: SettingsSectionDef = {
-  key: 'pty',
-  labelKey: 'settings.terminal',
-  descriptionKey: 'settings.terminalDescription',
-  iconKey: 'exec',
-  groupId: 'security',
-  fields: [
-    {
-      key: 'enabled',
-      labelKey: 'settings.ptyEnabled',
-      descriptionKey: 'settings.ptyEnabledDescription',
-      type: 'toggle',
-    },
-    {
-      key: 'default_shell',
-      labelKey: 'settings.ptyDefaultShell',
-      descriptionKey: 'settings.ptyDefaultShellDescription',
-      type: 'text',
-    },
-    {
-      key: 'max_sessions',
-      labelKey: 'settings.ptyMaxSessions',
-      descriptionKey: 'settings.ptyMaxSessionsDescription',
-      type: 'number',
-      min: 1,
-      max: 32,
-    },
-    {
-      key: 'idle_timeout_secs',
-      labelKey: 'settings.ptyIdleTimeout',
-      descriptionKey: 'settings.ptyIdleTimeoutDescription',
-      type: 'range',
-      min: 60,
-      max: 86400,
-      suffix: 's',
-    },
-    {
-      key: 'max_lifetime_secs',
-      labelKey: 'settings.ptyMaxLifetime',
-      descriptionKey: 'settings.ptyMaxLifetimeDescription',
-      type: 'range',
-      min: 300,
-      max: 86400,
-      suffix: 's',
-    },
-    {
-      key: 'allowed_shells',
-      labelKey: 'settings.ptyAllowedShells',
-      descriptionKey: 'settings.ptyAllowedShellsDescription',
-      type: 'tags',
-    },
-  ],
-}
-
 // ---------------------------------------------------------------------------
 // 2. security — Security / RBAC
 // ---------------------------------------------------------------------------
@@ -733,7 +678,6 @@ const budgetSection: SettingsSectionDef = {
 
 export const NEW_SECTIONS: SettingsSectionDef[] = [
   execSection,
-  ptySection,
   securitySection,
   memorySection,
   telegramSection,

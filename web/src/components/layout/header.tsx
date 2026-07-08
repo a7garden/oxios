@@ -5,7 +5,6 @@ import { useCommandPaletteStore } from '@/stores/command-palette'
 import { useQuickAskStore } from '@/stores/quick-ask'
 import { useSidebarStore } from '@/stores/sidebar'
 import { MenuClock } from './menu-clock'
-import { ModeTabs } from './mode-tabs'
 
 export function Header() {
   const { t } = useTranslation()
@@ -14,53 +13,54 @@ export function Header() {
   const openQuickAsk = useQuickAskStore((s) => s.openQuickAsk)
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 pt-[env(safe-area-inset-top)]">
+    <header className="flex h-14 items-center gap-2 border-b bg-background px-3 pt-[env(safe-area-inset-top)] lg:gap-3 lg:px-4">
       {/* Mobile hamburger */}
       <button
         type="button"
-        className="lg:hidden rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="shrink-0 rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring lg:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label={t('common.openNav', 'Open navigation menu')}
       >
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Mode tabs — desktop only */}
-      <div className="hidden lg:block">
-        <ModeTabs variant="header" />
-      </div>
+      {/*
+        Command palette trigger — promoted to a primary, left-aligned search
+        affordance (Notion / Linear / Raycast pattern). ⌘K is the app's most
+        powerful feature; this gives it visible prominence instead of burying it
+        as a tiny right-aligned button. Fills the void left by removing the
+        header mode tabs. Fills available width on mobile, fixed width desktop.
+      */}
+      <button
+        type="button"
+        onClick={() => openPalette()}
+        className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 text-muted-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring lg:w-64 lg:flex-none"
+        aria-label={t('commandPalette.openAria')}
+        title={`${t('commandPalette.openAria')} (⌘K)`}
+      >
+        <Search className="h-4 w-4 shrink-0" />
+        <span className="flex-1 truncate text-left text-sm">{t('commandPalette.placeholder')}</span>
+        <kbd className="hidden h-5 shrink-0 items-center rounded border border-border bg-background px-1.5 font-mono text-[10px] sm:inline-flex">
+          ⌘K
+        </kbd>
+      </button>
 
-      <div className="flex-1" />
+      {/* Desktop spacer — pushes quick actions + clock to the right edge */}
+      <div className="hidden flex-1 lg:block" />
 
-      {/* Global command palette trigger (⌘K) — discoverability for the power-user feature */}
       {/* QuickAsk (⌘J) — one-shot throwaway question, no session persisted */}
       <Button
         type="button"
         variant="outline"
         size="sm"
         onClick={() => openQuickAsk()}
-        className="h-8 gap-1 px-2.5 text-muted-foreground"
+        className="h-8 shrink-0 gap-1 px-2.5 text-muted-foreground"
         aria-label={t('quickAsk.openAria')}
         title={`${t('quickAsk.openAria')} (⌘J)`}
       >
         <Zap className="h-3.5 w-3.5" />
-        <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border bg-muted/50 px-1.5 font-mono text-[10px]">
+        <kbd className="hidden h-5 items-center rounded border border-border bg-muted/50 px-1.5 font-mono text-[10px] sm:inline-flex">
           ⌘J
-        </kbd>
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => openPalette()}
-        className="h-8 gap-2 px-2.5 text-muted-foreground"
-        aria-label={t('commandPalette.openAria')}
-        title={`${t('commandPalette.openAria')} (⌘K)`}
-      >
-        <Search className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline text-xs">{t('commandPalette.placeholder')}</span>
-        <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border bg-muted/50 px-1.5 font-mono text-[10px]">
-          ⌘K
         </kbd>
       </Button>
 

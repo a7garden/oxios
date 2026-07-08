@@ -187,15 +187,6 @@ export function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
   const ts = new Date().toISOString()
   const baseId = (id?: string) => `${id ?? crypto.randomUUID()}`
   switch (chunk.type) {
-    case 'phase':
-      return {
-        id: baseId(chunk.phase),
-        type: 'phase',
-        timestamp: ts,
-        phase: chunk.phase,
-        status: chunk.status,
-        summary: chunk.summary,
-      }
     case 'tool_start':
       return {
         id: baseId(chunk.tool_call_id),
@@ -1288,7 +1279,6 @@ export const useChatStore = create<ChatStore>()(
           }
 
           // ── RFC-015 chat transparency chunks ──
-          case 'phase':
           case 'tool_start':
           case 'tool_progress':
           case 'tool_end':

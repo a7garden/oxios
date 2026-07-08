@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::agent_lifecycle::AgentLifecycleManager;
-use crate::event_bus::{EventBus, KernelEvent};
+use crate::event_bus::EventBus;
 use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
 use crate::mount::{MountId, MountManager};
@@ -445,20 +445,6 @@ impl Orchestrator {
         msg: &str,
         ctx: &oxios_ouroboros::MsgCtx,
     ) -> Result<HandleResponse> {
-        let publish_phase = |phase: &'static str| {
-            let _ = self.event_bus.publish(KernelEvent::PhaseStarted {
-                session_id: ctx.session_id.clone(),
-                phase: phase.to_string(),
-                summary: None,
-            });
-        };
-        let complete_phase = |phase: &'static str| {
-            let _ = self.event_bus.publish(KernelEvent::PhaseCompleted {
-                session_id: ctx.session_id.clone(),
-                phase: phase.to_string(),
-            });
-        };
-
         // 1. Build the Directive verbatim from the message (no crystallize).
         let mut directive = oxios_ouroboros::Directive::from_message(msg);
 
@@ -466,20 +452,16 @@ impl Orchestrator {
         let env = self.resolve_exec_env(ctx, msg);
 
         // 3. Execute — every message streams through the agent loop.
-        publish_phase("execute");
         let mut result = self.execute_directive(&directive, &env).await?;
-        complete_phase("execute");
 
         // 4. Optional external review — only when the directive carries
         //    acceptance criteria (RFC-033 §3.5). Interactive chat uses
         //    Directive::from_message (no criteria), so this is skipped and
         //    the agent's internal VERIFY step stands in for review.
         let (verdict, evaluation_passed) = if directive.needs_review() {
-            publish_phase("review");
             let (r, v) = self
                 .verify_or_retry(engine, &mut directive, &env, result, msg, ctx)
                 .await?;
-            complete_phase("review");
             result = r;
             let passed = v.all_passed();
             (Some(v), Some(passed))
