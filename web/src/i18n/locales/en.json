@@ -762,6 +762,8 @@
     "chatPlaceholder": "Drop what just crossed your mind...",
     "routeHint": "destination",
     "inbox": "Inbox",
+    "inboxMode": "Quick capture inbox",
+    "inboxModeHint": "Open a file to switch to the editor",
     "pressEnterToSend": "Press Enter to send",
     "journalHint": "jj to route to journal",
     "noFilesYet": "No files yet",

@@ -409,6 +409,12 @@ export function KnowledgeChat() {
 
   return (
     <div className="flex flex-col flex-1 h-full">
+      {/* Mode signal — this is the capture inbox; opening a file switches to the editor */}
+      <div className="flex items-center gap-2 px-4 pt-3 text-xs text-muted-foreground">
+        <Inbox className="h-3.5 w-3.5" />
+        <span className="font-medium">{t('knowledge.inboxMode')}</span>
+        <span className="opacity-70">· {t('knowledge.inboxModeHint')}</span>
+      </div>
       {/* Command bar (top) */}
       <div ref={barRef} className="relative shrink-0 border-b px-4 py-3">
         <div

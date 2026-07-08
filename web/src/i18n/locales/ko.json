@@ -762,6 +762,8 @@
     "chatPlaceholder": "방금 떠오른 걸 여기에…",
     "routeHint": "목적지",
     "inbox": "인박스",
+    "inboxMode": "빠른 메모 인박스",
+    "inboxModeHint": "파일을 열면 에디터로 전환됩니다",
     "pressEnterToSend": "Enter를 눌러 전송",
     "journalHint": "jj로 일지로 이동",
     "noFilesYet": "파일 없음",
