@@ -34,7 +34,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
             {project.name}
           </Link>
           <span className={`shrink-0 text-2xs px-1.5 py-0.5 rounded ${sourceColor}`}>
-            {project.source ?? 'manual'}
+            {t(project.source === 'auto_detected' ? 'projects.sourceAutoDetected' : 'projects.sourceManual')}
           </span>
         </div>
         <div className="shrink-0 flex items-center gap-0.5">

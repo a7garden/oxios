@@ -154,9 +154,14 @@ function MountsPage() {
                   </span>
                 )}
                 {mount.enrichment_pending && (
-                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600">
-                    {t('mounts.needsRefresh', '갱신 필요')}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRescan(mount)}
+                    className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 hover:bg-amber-500/20 transition-colors"
+                    title={t('mounts.rescan', '갱신')}
+                  >
+                    {t('mounts.needsRefresh', '갱신 필요')} ↻
+                  </button>
                 )}
               </div>
 

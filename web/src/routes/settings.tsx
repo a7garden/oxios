@@ -501,6 +501,16 @@ function SettingsPage() {
   const safeActiveSection = getSectionMeta(activeSection)
     ? activeSection
     : (SECTION_META[0]?.id ?? 'engine')
+  // Sync active section from the URL on browser back/forward so section
+  // navigation participates in history (handleNavigate uses pushState).
+  useEffect(() => {
+    const onPopState = () => {
+      const s = new URL(window.location.href).searchParams.get('section')
+      setActiveSection(s && getSectionMeta(s) ? s : (SECTION_META[0]?.id ?? 'engine'))
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   // Populate form from server config (initial sync + when navigating sections).
   useEffect(() => {
@@ -740,7 +750,7 @@ function SettingsPage() {
     // Keep URL in sync so deep-links work.
     const url = new URL(window.location.href)
     url.searchParams.set('section', id)
-    window.history.replaceState({}, '', url.toString())
+    window.history.pushState({}, '', url.toString())
   }
 
   // Build shell data from SECTION_META + SETTINGS_GROUPS.
@@ -757,7 +767,7 @@ function SettingsPage() {
   const activeMeta = getSectionMeta(safeActiveSection)
 
   return (
-    <div>
+    <div className={hasUnsaved ? 'pb-24' : undefined}>
       {/* Header */}
       <SettingsHeader
         title={t(tKeys.title)}

@@ -27,7 +27,7 @@ function CostPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('cost.title')}</h1>
+          <h1 className="text-2xl font-bold">{t('cost.pageTitle')}</h1>
           <p className="text-sm text-muted-foreground">{t('cost.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -51,6 +51,7 @@ function CostPage() {
         </div>
       </div>
       <p className="text-xs text-muted-foreground">{t('cost.spendLimitNote')}</p>
+      <p className="text-xs text-muted-foreground">{t('cost.periodScopeNote')}</p>
 
       {/* Summary stat cards */}
       <CostSummaryCards period={period} />

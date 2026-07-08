@@ -75,11 +75,14 @@ export const useKnowledgeStore = create<KnowledgeState>()(
       },
 
       toggleInfoPanel: () => {
-        set({ infoPanelOpen: !get().infoPanelOpen })
+        const infoPanelOpen = !get().infoPanelOpen
+        // Opening the info panel closes the split editor so the layout
+        // never exceeds three panes (tree + editor + one side panel).
+        set(infoPanelOpen ? { infoPanelOpen: true, splitEditorOpen: false } : { infoPanelOpen: false })
       },
 
       openSplit: (path) => {
-        set({ splitEditorOpen: true, splitFilePath: path })
+        set({ splitEditorOpen: true, splitFilePath: path, infoPanelOpen: false })
       },
 
       closeSplit: () => {

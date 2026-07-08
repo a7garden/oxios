@@ -221,6 +221,9 @@ function EmailPage() {
           <TabsTrigger value="templates">
             <LayoutTemplate className="h-4 w-4 mr-2" />
             {t('email.templatesTab', 'Templates')}
+            {status?.template_count ? (
+              <span className="ml-1 text-xs text-muted-foreground">{status.template_count}</span>
+            ) : null}
           </TabsTrigger>
         </TabsList>
 

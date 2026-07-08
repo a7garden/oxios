@@ -318,6 +318,7 @@ function SkillsPage() {
         >
           <Zap className="h-3.5 w-3.5" /> {t('skills.installed')}{' '}
           <span className="text-xs text-muted-foreground">{counts.all}</span>
+          <UpdateBadge count={updateCount} />
         </button>
         <button
           type="button"

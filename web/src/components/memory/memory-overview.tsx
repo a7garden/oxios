@@ -68,7 +68,7 @@ export function MemoryOverview() {
   const statCards = [
     { label: t('memory.totalEntries'), value: stats.total, icon: Brain },
     {
-      label: t('memory.vectorIndex'),
+      label: t('memory.typeCount'),
       value: stats.by_type ? Object.keys(stats.by_type).length : 0,
       icon: Hash,
     },
@@ -94,7 +94,10 @@ export function MemoryOverview() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>{t('memory.tierDistribution')}</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              {t('memory.tierDistribution')}
+              <span className="text-xs font-normal text-muted-foreground">max {tierMax}</span>
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {tierEntries.length > 0 ? (
@@ -114,7 +117,10 @@ export function MemoryOverview() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>{t('memory.typeDistribution')}</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              {t('memory.typeDistribution')}
+              <span className="text-xs font-normal text-muted-foreground">max {typeMax}</span>
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {typeEntries.length > 0 ? (

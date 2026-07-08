@@ -33,9 +33,11 @@ function McpPage() {
             {t('mcp.subtitle', 'Manage Model Context Protocol servers and tools')}
           </p>
         </div>
-        <Button onClick={() => setAddDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> {t('mcp.addServer', 'Add Server')}
-        </Button>
+        {tab === 'servers' && (
+          <Button onClick={() => setAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> {t('mcp.addServer', 'Add Server')}
+          </Button>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v === 'servers' ? undefined : v }), replace: true })}>

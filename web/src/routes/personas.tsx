@@ -58,6 +58,7 @@ function PersonasPage() {
             description: string
             enabled: boolean
             personality_traits: string[]
+            system_prompt?: string
           }[]
         >('/api/personas')
       // Backend returns raw array
@@ -112,6 +113,7 @@ function PersonasPage() {
         <div>
           <h1 className="text-2xl font-bold">{t('personas.title')}</h1>
           <p className="text-muted-foreground">{t('personas.subtitle')}</p>
+          <p className="text-xs text-muted-foreground">{t('personas.singleActiveHint')}</p>
         </div>
         <div className="flex gap-2">
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
@@ -154,11 +156,12 @@ function PersonasPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="persona-description">{t('common.description')}</Label>
-              <Input
+              <Textarea
                 id="persona-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t('common.description')}
+                rows={2}
               />
             </div>
             <div className="space-y-1">
@@ -250,6 +253,11 @@ function PersonasPage() {
                   <p className="text-xs text-muted-foreground">
                     {t('personas.role')}: {persona.role}
                   </p>
+                  {persona.system_prompt && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                      {persona.system_prompt}
+                    </p>
+                  )}
                 </CardContent>
               )}
             </Card>

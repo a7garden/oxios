@@ -22,6 +22,7 @@ function TokenMaxingPage() {
           <h1 className="text-2xl font-bold">{t('tokenMaxing.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('tokenMaxing.subtitle')}</p>
         </div>
+        <span className="text-xs text-muted-foreground">RFC-031</span>
       </div>
 
       <TokenMaxingStatusHeader />

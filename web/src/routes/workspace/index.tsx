@@ -303,7 +303,7 @@ function WorkspacePage() {
               className="w-full text-xs"
               onClick={() => setShowUpload(!showUpload)}
             >
-              {showUpload ? 'Hide upload' : 'Upload file'}
+              {showUpload ? t('workspace.hideUpload') : t('workspace.uploadFile')}
             </Button>
           </div>
         </div>
@@ -323,6 +323,7 @@ function WorkspacePage() {
                         size="sm"
                         className="h-7 px-2"
                         onClick={() => setSelectedFile((s) => s && { ...s, mode: 'view' })}
+                        aria-label={t('common.view')}
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
@@ -331,6 +332,7 @@ function WorkspacePage() {
                         size="sm"
                         className="h-7 px-2"
                         onClick={() => setSelectedFile((s) => s && { ...s, mode: 'edit' })}
+                        aria-label={t('common.edit')}
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -341,6 +343,7 @@ function WorkspacePage() {
                     size="sm"
                     className="h-7 px-2 text-destructive hover:text-destructive"
                     onClick={handleDelete}
+                    aria-label={t('common.delete')}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

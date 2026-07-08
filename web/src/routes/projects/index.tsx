@@ -57,7 +57,7 @@ function ProjectsPage() {
         />
         {search && (
           <span className="text-xs text-muted-foreground">
-            {data?.total ?? 0} result{data?.total !== 1 ? 's' : ''}
+            {t('projects.resultsCount', { count: data?.total ?? 0 })}
           </span>
         )}
       </div>

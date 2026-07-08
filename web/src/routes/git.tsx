@@ -91,7 +91,7 @@ function GitPage() {
         <div className="flex gap-2">
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => verifyMutation.mutate()}
             disabled={verifyMutation.isPending}

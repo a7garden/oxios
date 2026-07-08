@@ -132,10 +132,11 @@ function CronJobsPage() {
               placeholder={t('cronJobs.jobNamePlaceholder')}
             />
             <CronScheduleEditor value={schedule} onChange={setSchedule} />
+            <span className="text-xs text-muted-foreground">{t('cronJobs.goalLabel')}</span>
             <Input
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              placeholder={t('cronJobs.goalPlaceholder', 'Goal or prompt for the agent')}
+              placeholder={t('cronJobs.goalPlaceholder')}
             />
             <div className="flex gap-2">
               <Button
@@ -169,7 +170,7 @@ function CronJobsPage() {
       ) : (
         <div className="space-y-3">
           {jobs.map((job) => (
-            <Card key={job.id}>
+            <Card key={job.id} className={cn('transition-opacity', !job.enabled && 'opacity-60')}>
               <CardContent className="flex items-center justify-between p-4">
                 <div>
                   <div className="font-medium flex items-center gap-2">
