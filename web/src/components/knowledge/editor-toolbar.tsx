@@ -69,6 +69,7 @@ export function EditorToolbar() {
         onClick={() => goBack()}
         disabled={!canGoBack}
         title={t('knowledge.goBack')}
+        aria-label={t('knowledge.goBack')}
       >
         <ArrowLeft className="h-4 w-4" />
       </Button>
@@ -79,11 +80,14 @@ export function EditorToolbar() {
         onClick={() => goForward()}
         disabled={!canGoForward}
         title={t('knowledge.goForward')}
+        aria-label={t('knowledge.goForward')}
       >
         <ArrowRight className="h-4 w-4" />
       </Button>
 
-      <span className="text-sm font-medium truncate mx-3">{fileName || 'Knowledge'}</span>
+      <span className="text-sm font-medium truncate mx-3" title={currentFilePath ?? undefined}>
+        {fileName || 'Knowledge'}
+      </span>
 
       <div className="flex-1" />
 

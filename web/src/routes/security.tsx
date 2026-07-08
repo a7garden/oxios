@@ -4,6 +4,7 @@ import { FileWarning, Filter, KeyRound, Search, Shield } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
+import { ApprovalsQueue } from '@/components/dashboard/approvals-queue'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
@@ -101,12 +102,18 @@ function SecurityPage() {
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
+      <ApprovalsQueue />
 
       {/* Permissions */}
       {permissionsError ? (
         <ErrorState onRetry={() => refetchPermissions()} />
       ) : permissions ? (
         <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <Shield className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">{t('security.permissions')}</h2>
+            <Badge variant="outline" className="text-2xs">{t('security.readOnly')}</Badge>
+          </div>
           {permissions.policies
             .slice()
             .sort((a, b) => b.resources.length - a.resources.length)

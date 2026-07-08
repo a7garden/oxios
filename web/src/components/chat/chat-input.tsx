@@ -327,10 +327,11 @@ export function ChatInput({
   return (
     <div className="w-full max-w-3xl mx-auto px-4 pb-4 pt-2 relative">
       {/* ── @mention Popover ── */}
-      {mentionQuery !== null && mentionResults.length > 0 && (
+      {mentionQuery !== null && (
         <div className="absolute bottom-full left-4 right-4 mb-1 z-50 max-h-64 overflow-y-auto rounded-xl border bg-popover shadow-lg">
           <div className="p-1.5">
-            {mentionResults.map((result, i) => (
+            {mentionResults.length > 0 ? (
+              mentionResults.map((result, i) => (
               <button
                 key={`${result.type}-${result.id}`}
                 type="button"
@@ -361,7 +362,12 @@ export function ChatInput({
                       : 'Memory'}
                 </span>
               </button>
-            ))}
+            ))
+            ) : (
+              <p className="px-2.5 py-3 text-xs text-muted-foreground text-center">
+                {mentionQuery === '' ? t('chat.mentionHint') : t('chat.noMentionResults')}
+              </p>
+            )}
           </div>
         </div>
       )}

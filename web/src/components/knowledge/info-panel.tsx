@@ -51,9 +51,9 @@ export function InfoPanel() {
         onValueChange={(v) => setTab(v as Tab)}
         className="shrink-0 px-2 pt-2 border-b"
       >
-        <TabsList className="w-full">
+        <TabsList variant="line" className="w-full overflow-x-auto">
           {(['backlinks', 'copilot', 'graph', 'history', 'calendar'] as Tab[]).map((tabValue) => (
-            <TabsTrigger key={tabValue} value={tabValue} className="capitalize">
+            <TabsTrigger key={tabValue} value={tabValue} className="capitalize flex-none text-xs px-2.5">
               {tabValue}
             </TabsTrigger>
           ))}

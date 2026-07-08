@@ -6,6 +6,8 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Legend,
+  ReferenceLine,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   XAxis,
@@ -15,6 +17,11 @@ import {
 function getChartColor(token: string): string {
   if (typeof window === 'undefined') return '#888'
   return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || '#888'
+}
+
+/** Severity color for a 0–100 utilization metric: neutral under 75%, warning 75–90%, error 90%+. */
+function sevColor(pct: number): string {
+  return getChartColor(pct >= 90 ? '--error' : pct >= 75 ? '--warning' : '--info')
 }
 
 import { ErrorState } from '@/components/shared/error-state'
@@ -77,7 +84,7 @@ function ResourcesPage() {
                   className="h-full rounded-full transition-all"
                   style={{
                     width: `${latest.cpu_percent}%`,
-                    backgroundColor: getChartColor('--chart-1'),
+                    backgroundColor: sevColor(latest.cpu_percent),
                   }}
                 />
               </div>
@@ -96,7 +103,7 @@ function ResourcesPage() {
                   className="h-full rounded-full transition-all"
                   style={{
                     width: `${latest.memory_percent}%`,
-                    backgroundColor: getChartColor('--chart-2'),
+                    backgroundColor: sevColor(latest.memory_percent),
                   }}
                 />
               </div>
@@ -113,7 +120,7 @@ function ResourcesPage() {
                   className="h-full rounded-full transition-all"
                   style={{
                     width: `${latest.disk_percent}%`,
-                    backgroundColor: getChartColor('--chart-3'),
+                    backgroundColor: sevColor(latest.disk_percent),
                   }}
                 />
               </div>
@@ -144,6 +151,19 @@ function ResourcesPage() {
                     fontSize: '12px',
                     color: 'var(--foreground)',
                   }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <ReferenceLine
+                  y={75}
+                  stroke={getChartColor('--warning')}
+                  strokeDasharray="4 4"
+                  label={{ value: '75%', position: 'right', fontSize: 10, fill: getChartColor('--warning') }}
+                />
+                <ReferenceLine
+                  y={90}
+                  stroke={getChartColor('--error')}
+                  strokeDasharray="4 4"
+                  label={{ value: '90%', position: 'right', fontSize: 10, fill: getChartColor('--error') }}
                 />
                 <Area
                   type="monotone"

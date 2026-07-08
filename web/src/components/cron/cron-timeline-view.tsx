@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   chartColor,
@@ -30,7 +31,17 @@ interface HoveredMarker {
  * backend is always shown as a highlighted primary marker; additional
  * projected fire times visualize the schedule pattern.
  */
-export function CronTimelineView({ jobs }: { jobs: CronJob[] }) {
+export function CronTimelineView({
+  jobs,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  jobs: CronJob[]
+  onEdit?: (job: CronJob) => void
+  onToggle?: (job: CronJob) => void
+  onDelete?: (job: CronJob) => void
+}) {
   const { t } = useTranslation()
   const [range, setRange] = useState<TimeRange>('24h')
   const [hovered, setHovered] = useState<HoveredMarker | null>(null)
@@ -145,6 +156,40 @@ export function CronTimelineView({ jobs }: { jobs: CronJob[] }) {
                       </span>
                     )}
                   </div>
+                  {(onEdit || onToggle || onDelete) && (
+                    <div className="mt-1 flex gap-0.5">
+                      {onEdit && (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(job)}
+                          aria-label={t('common.edit', '편집')}
+                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      )}
+                      {onToggle && (
+                        <button
+                          type="button"
+                          onClick={() => onToggle(job)}
+                          aria-label={job.enabled ? t('cronJobs.disableJob') : t('cronJobs.enableJob')}
+                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {job.enabled ? <PowerOff className="h-3 w-3" /> : <Power className="h-3 w-3" />}
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          type="button"
+                          onClick={() => onDelete(job)}
+                          aria-label={t('cronJobs.deleteJob')}
+                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Track */}
@@ -200,6 +245,26 @@ export function CronTimelineView({ jobs }: { jobs: CronJob[] }) {
                             })
                           }
                           onMouseLeave={() => setHovered(null)}
+                          tabIndex={ft.isPrimary ? 0 : undefined}
+                          role={ft.isPrimary ? 'img' : undefined}
+                          aria-hidden={ft.isPrimary ? undefined : true}
+                          aria-label={
+                            ft.isPrimary
+                              ? `${job.name}: ${t('cronJobs.timeline.nextRun')} ${ft.date.toLocaleString()}`
+                              : undefined
+                          }
+                          onFocus={
+                            ft.isPrimary
+                              ? (e) =>
+                                  setHovered({
+                                    rect: e.currentTarget.getBoundingClientRect(),
+                                    date: ft.date,
+                                    jobName: job.name,
+                                    isPrimary: true,
+                                  })
+                              : undefined
+                          }
+                          onBlur={ft.isPrimary ? () => setHovered(null) : undefined}
                         />
                       )
                     })}

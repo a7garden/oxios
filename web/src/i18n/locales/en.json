@@ -858,6 +858,8 @@
     "startConversationHint": "Send a message to start a conversation.",
     "thinking": "Thinking...",
     "inputPlaceholder": "Type a message...",
+    "mentionHint": "Search knowledge, memory, mounts with @ — type to filter",
+    "noMentionResults": "No matching items",
     "waitingForConnection": "Waiting for connection...",
     "loadingSpaces": "Loading spaces...",
     "today": "Today",
@@ -1111,6 +1113,7 @@
     "noAuditEntries": "No audit events",
     "noAuditEntriesDescription": "Security audit events will appear here.",
     "permission": "permission",
+    "readOnly": "Read-only",
     "showingEntries": "Showing {{start}}–{{end}} of {{total}}"
   },
   "resources": {

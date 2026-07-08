@@ -160,7 +160,12 @@ function CronJobsPage() {
           description={t('cronJobs.description')}
         />
       ) : viewMode === 'timeline' ? (
-        <CronTimelineView jobs={jobs} />
+        <CronTimelineView
+          jobs={jobs}
+          onEdit={setEditingJob}
+          onToggle={(job) => toggleMutation.mutate({ id: job.id, enabled: !job.enabled })}
+          onDelete={(job) => deleteMutation.mutate(job.id)}
+        />
       ) : (
         <div className="space-y-3">
           {jobs.map((job) => (
