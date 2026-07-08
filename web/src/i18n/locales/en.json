@@ -72,6 +72,7 @@
     "workspace": "Workspace",
     "calendar": "Calendar",
     "cronJobs": "Cron Jobs",
+    "terminal": "Terminal",
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
     "toggleTheme": "Toggle theme",
@@ -2036,5 +2037,17 @@
         "recurring": "Recurring"
       }
     }
+  },
+  "terminal": {
+    "title": "Terminal",
+    "connecting": "Connecting…",
+    "attached": "Connected",
+    "detached": "Detached (reconnect?)",
+    "exited": "Process exited",
+    "error": "Error",
+    "disabled": "Terminal is disabled in settings",
+    "permissionDenied": "Not authorized to open a terminal",
+    "killButton": "Kill",
+    "reconnectButton": "Reconnect"
   }
 }

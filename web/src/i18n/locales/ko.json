@@ -72,6 +72,7 @@
     "workspace": "작업공간",
     "calendar": "캘린더",
     "cronJobs": "Cron 작업",
+    "terminal": "터미널",
     "expandSidebar": "사이드바 펼치기",
     "collapseSidebar": "사이드바 접기",
     "toggleTheme": "테마 전환",
@@ -2030,5 +2031,17 @@
         "recurring": "반복"
       }
     }
+  },
+  "terminal": {
+    "title": "터미널",
+    "connecting": "연결 중…",
+    "attached": "연결됨",
+    "detached": "연결 끊김 (재연결?)",
+    "exited": "프로세스 종료",
+    "error": "오류",
+    "disabled": "설정에서 터미널이 비활성화됨",
+    "permissionDenied": "터미널을 열 권한이 없습니다",
+    "killButton": "강제 종료",
+    "reconnectButton": "재연결"
   }
 }

@@ -20,6 +20,7 @@ import {
   Settings,
   Theater,
   Timer,
+  Terminal,
   Trash2,
   Wallet,
   Zap,
@@ -139,6 +140,7 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
         href: '/token-maxing',
         icon: <Flame className="h-4 w-4" />,
       },
+      { labelKey: 'common.terminal', href: '/terminal', icon: <Terminal className="h-4 w-4" /> },
     ],
   },
   {

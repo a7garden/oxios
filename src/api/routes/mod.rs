@@ -28,6 +28,7 @@ mod resource_routes;
 mod secrets_routes;
 mod system;
 mod token_maxing_routes;
+mod terminal;
 mod tools;
 mod workspace;
 
@@ -138,6 +139,9 @@ pub(crate) use token_maxing_routes::{
     handle_token_maxing_providers, handle_token_maxing_session, handle_token_maxing_sessions,
     handle_token_maxing_start, handle_token_maxing_status, handle_token_maxing_stop,
 };
+pub(crate) use terminal::{
+    handle_pty_sessions, handle_pty_start, handle_terminal_stream, handle_terminal_ticket,
+};
 pub(crate) use tools::handle_tools_registry;
 pub(crate) use workspace::{
     MemoryMapCache, handle_dream_reports, handle_dream_status, handle_memory_create,
@@ -242,6 +246,11 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             post(handle_ask_user_respond),
         )
         // RFC-016: Knowledge persistence API
+        // Terminal (RFC-038)
+        .route("/api/terminal/ticket", post(handle_terminal_ticket))
+        .route("/api/terminal/stream", get(handle_terminal_stream))
+        .route("/api/terminal/sessions", get(handle_pty_sessions))
+        .route("/api/terminal/pty/start", post(handle_pty_start))
         .route(
             "/api/chat/{session_id}/knowledge-saves",
             get(handle_knowledge_saves),

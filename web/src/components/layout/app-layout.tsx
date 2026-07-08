@@ -32,6 +32,7 @@ export function AppLayout() {
   const isKnowledge = pathname.startsWith('/knowledge')
   const isKnowledgeSubRoute = isKnowledge && pathname !== '/knowledge' && pathname !== '/knowledge/'
   const isChat = pathname === '/chat'
+const isTerminal = pathname.startsWith('/terminal')
 
   const { infoPanelOpen } = useKnowledgeStore()
 
@@ -100,9 +101,13 @@ export function AppLayout() {
             </div>
             {/* InfoPanel only on main knowledge route, not sub-routes */}
             {!isKnowledgeSubRoute && infoPanelOpen && <InfoPanel />}
-          </div>
         ) : isChat ? (
           /* Chat: no padding, full height */
+          <main className="flex-1 min-h-0 overflow-hidden">
+            <Outlet />
+          </main>
+        ) : isTerminal ? (
+          /* RFC-038: Terminal full-bleed like Chat */
           <main className="flex-1 min-h-0 overflow-hidden">
             <Outlet />
           </main>
