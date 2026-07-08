@@ -220,9 +220,9 @@ impl Kernel {
                     self.build_marketplace_api(),
                     self.build_calendar_api(),
                     self.build_email_api(),
-                    oxios_kernel::PtyApi::new(
-                        Arc::new(parking_lot::RwLock::new(self.config.pty.clone())),
-                    ),
+                    oxios_kernel::PtyApi::new(Arc::new(parking_lot::RwLock::new(
+                        self.config.pty.clone(),
+                    ))),
                 );
                 // RFC-025: attach MountApi to the handle the HTTP API and CLI
                 // actually use. The orchestrator gets its own Arc directly; this
@@ -1190,9 +1190,8 @@ impl KernelBuilder {
             Arc::clone(&routing_stats),
             Arc::clone(&engine_handle),
         ));
-        let mut persona_api_unwrapped = oxios_kernel::PersonaApi::new(Arc::new(
-            persona_manager.clone(),
-        ));
+        let mut persona_api_unwrapped =
+            oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone()));
         // RFC-039: auto re-seed the intent engine when the active persona
         // changes via HTTP. The binary crate bridges kernel ↔ ouroboros.
         let ie = intent_engine.clone();
@@ -1275,12 +1274,10 @@ impl KernelBuilder {
                     )
                     .expect("KnowledgeLens init failed"),
                 ),
+                build_marketplace_api_value(&config),
                 None, // calendar (initialized later)
                 None, // email (initialized later)
-                build_marketplace_api_value(&config),
-                oxios_kernel::PtyApi::new(
-                    Arc::new(parking_lot::RwLock::new(config.pty.clone())),
-                ),
+                oxios_kernel::PtyApi::new(Arc::new(parking_lot::RwLock::new(config.pty.clone()))),
             );
 
             // RFC-015 P1: attach the streaming-sink registry so the runtime

@@ -523,6 +523,9 @@ mod tests {
                 "anthropic/claude-sonnet-4-20250514",
             )))),
             event_bus: EventBus::new(16),
+            state_store: Arc::new(
+                crate::state_store::StateStore::new(tempfile::tempdir().unwrap().keep()).unwrap(),
+            ),
         };
         let schema = tool.parameters_schema();
         let actions = schema["properties"]["action"]["enum"]

@@ -52,10 +52,7 @@ pub async fn load_from_state_store(store: &StateStore) -> Result<Option<PersonaS
 }
 
 /// Save the snapshot to `StateStore`. Atomic via `StateStore::durable_write`.
-pub async fn save_to_state_store(
-    store: &StateStore,
-    snapshot: &PersonaSnapshot,
-) -> Result<()> {
+pub async fn save_to_state_store(store: &StateStore, snapshot: &PersonaSnapshot) -> Result<()> {
     store
         .save_json("personas", "index", snapshot)
         .await

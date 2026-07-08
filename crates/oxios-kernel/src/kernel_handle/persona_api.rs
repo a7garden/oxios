@@ -90,7 +90,10 @@ impl PersonaApi {
     ) -> anyhow::Result<Option<String>> {
         self.persona_manager.set_active(id, None).await?;
         self.persist(state_api).await?;
-        let prompt = self.persona_manager.get_active_persona().map(|p| p.system_prompt);
+        let prompt = self
+            .persona_manager
+            .get_active_persona()
+            .map(|p| p.system_prompt);
         // RFC-039: auto re-seed intent engine if callback is set.
         if let Some(ref cb) = self.reseed_callback {
             cb(prompt.clone());
@@ -102,10 +105,7 @@ impl PersonaApi {
     /// Call this after every mutation (`create`/`update`/`delete`) so the
     /// in-memory state matches the on-disk state. Otherwise the next
     /// restart will lose the change.
-    pub async fn persist(
-        &self,
-        state_api: &crate::kernel_handle::StateApi,
-    ) -> anyhow::Result<()> {
+    pub async fn persist(&self, state_api: &crate::kernel_handle::StateApi) -> anyhow::Result<()> {
         let snapshot = crate::persona::persistence::PersonaSnapshot {
             schema_version: 1,
             active_persona_id: self.persona_manager.active_persona_id(),

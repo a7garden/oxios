@@ -1510,7 +1510,6 @@ impl PtyConfig {
     }
 }
 
-
 /// Orchestrator configuration (Ouroboros protocol execution).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrchestratorConfig {

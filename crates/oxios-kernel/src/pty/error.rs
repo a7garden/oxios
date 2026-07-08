@@ -51,7 +51,10 @@ mod tests {
             "session cap reached for principal: max 3"
         );
         assert_eq!(
-            PtyError::ShellNotAllowed { shell: "fish".into() }.to_string(),
+            PtyError::ShellNotAllowed {
+                shell: "fish".into()
+            }
+            .to_string(),
             "shell not allowed: \"fish\""
         );
     }

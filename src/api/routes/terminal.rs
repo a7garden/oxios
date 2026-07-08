@@ -7,11 +7,11 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use futures_util::{SinkExt, StreamExt as FuturesStreamExt};
 use serde::{Deserialize, Serialize};
 
@@ -179,7 +179,6 @@ fn ctrl_to_message(ctrl: &TerminalControl) -> Message {
 /// Per-WS-connection: spawn session (or attach), then bridge PTY ↔ WS bytes.
 async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
     let (mut ws_tx, mut ws_rx) = socket.split();
-    let mut session_id: Option<String> = None;
     let principal: String = "default".to_string();
 
     // First frame must be Open.
@@ -192,8 +191,8 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
             Message::Text(t) => t.to_string(),
             _ => return Err("first frame must be text Open".to_string()),
         };
-        let open: TerminalControl = serde_json::from_str(&text)
-            .map_err(|e| format!("invalid open frame: {e}"))?;
+        let open: TerminalControl =
+            serde_json::from_str(&text).map_err(|e| format!("invalid open frame: {e}"))?;
         match open {
             TerminalControl::Open {
                 session_id: sid,
@@ -239,7 +238,7 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
             return;
         }
     };
-    session_id = Some(sid.clone());
+    let session_id = Some(sid.clone());
 
     // Send Opened.
     let info = state
@@ -287,7 +286,7 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
             }
         }
     });
-    let mut send_task = {
+    let send_task = {
         let mut ws_tx = ws_tx;
         tokio::spawn(async move {
             while let Some(bytes) = pty_rx.recv().await {

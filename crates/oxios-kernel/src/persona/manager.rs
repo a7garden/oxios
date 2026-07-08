@@ -122,27 +122,17 @@ impl PersonaManager {
     pub fn apply_config(&self, cfg: &crate::config::PersonaConfig) {
         // 우선순위 1: 기존 active_persona_id 가 enabled 면 유지
         // (load_from_state_store 가 이미 StateStore 의 active_persona_id 를 박았음).
-        if let Some(id) = self.active_persona_id() {
-            if self
-                .store
-                .get(&id)
-                .map(|p| p.enabled)
-                .unwrap_or(false)
-            {
-                return;
-            }
+        if let Some(id) = self.active_persona_id()
+            && self.store.get(&id).map(|p| p.enabled).unwrap_or(false)
+        {
+            return;
         }
         // 우선순위 2: config.default_persona_id
-        if let Some(id) = cfg.default_persona_id.as_ref() {
-            if self
-                .store
-                .get(id)
-                .map(|p| p.enabled)
-                .unwrap_or(false)
-            {
-                *self.active_persona_id.write() = Some(id.clone());
-                return;
-            }
+        if let Some(id) = cfg.default_persona_id.as_ref()
+            && self.store.get(id).map(|p| p.enabled).unwrap_or(false)
+        {
+            *self.active_persona_id.write() = Some(id.clone());
+            return;
         }
         // 우선순위 3: 첫 번째 enabled
         if let Some(p) = self.store.list_enabled().into_iter().next() {
@@ -164,20 +154,17 @@ impl PersonaManager {
         for p in &snap.personas {
             self.store.register(p.clone());
         }
-        if let Some(active) = snap.active_persona_id {
-            if snap.personas.iter().any(|p| p.id == active && p.enabled) {
-                *self.active_persona_id.write() = Some(active);
-            }
+        if let Some(active) = snap.active_persona_id
+            && snap.personas.iter().any(|p| p.id == active && p.enabled)
+        {
+            *self.active_persona_id.write() = Some(active);
         }
         Ok(())
     }
 
     /// StateStore 에 페르소나 + active_persona_id 를 저장.
     /// 메모리 상태는 유지, IO 실패는 Result 로 전파.
-    pub async fn persist(
-        &self,
-        store: &crate::state_store::StateStore,
-    ) -> Result<()> {
+    pub async fn persist(&self, store: &crate::state_store::StateStore) -> Result<()> {
         let snapshot = crate::persona::persistence::PersonaSnapshot {
             schema_version: 1,
             active_persona_id: self.active_persona_id(),
@@ -240,7 +227,7 @@ impl Clone for PersonaManager {
 mod tests {
     use super::*;
     use crate::config::PersonaConfig;
-    use crate::persona::persistence::PersonaSnapshot;
+    // PersonaSnapshot is used indirectly via persistence module
     use crate::state_store::StateStore;
 
     fn make_store() -> StateStore {

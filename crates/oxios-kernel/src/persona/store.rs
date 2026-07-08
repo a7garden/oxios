@@ -39,10 +39,12 @@ impl PersonaStore {
         personas.get(id).cloned()
     }
 
-    /// Returns all enabled personas.
+    /// Returns all enabled personas, sorted by ID for deterministic ordering.
     pub fn list_enabled(&self) -> Vec<Persona> {
         let personas = self.personas.read();
-        personas.values().filter(|p| p.enabled).cloned().collect()
+        let mut result: Vec<Persona> = personas.values().filter(|p| p.enabled).cloned().collect();
+        result.sort_by(|a, b| a.id.cmp(&b.id));
+        result
     }
 
     /// Returns all personas (enabled and disabled).

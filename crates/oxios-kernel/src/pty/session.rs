@@ -4,7 +4,7 @@
 //! outlives the WebSocket — when the WS closes, the session becomes
 //! `Detached` and may be re-attached (until `max_lifetime_secs` elapses).
 use parking_lot::Mutex;
-use portable_pty::{native_pty_system, MasterPty, PtySize as PortablePtySize};
+use portable_pty::{MasterPty, PtySize as PortablePtySize, native_pty_system};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Instant;

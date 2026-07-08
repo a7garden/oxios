@@ -1391,7 +1391,7 @@ const HOT_RELOADABLE_SECTIONS: &[(&str, &str)] = &[
 /// Subset of fields that always require a restart even inside a
 /// hot-reloadable section (e.g. `memory.embedding.provider` swaps a
 /// model that was loaded at boot).
-const ALWAYS_RESTART_FIELDS: &[&str] = &[
+const RESTART_REQUIRED_FIELDS: &[&str] = &[
     "memory.embedding.dimension",
     "memory.sqlite.path",
     "memory.sqlite.embedding_dim",

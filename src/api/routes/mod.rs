@@ -27,8 +27,8 @@ mod project_routes;
 mod resource_routes;
 mod secrets_routes;
 mod system;
-mod token_maxing_routes;
 mod terminal;
+mod token_maxing_routes;
 mod tools;
 mod workspace;
 
@@ -135,12 +135,12 @@ pub(crate) use system::{
     handle_log, handle_readiness, handle_status, handle_update_changelog, handle_update_check,
     handle_update_run,
 };
+pub(crate) use terminal::{
+    handle_pty_sessions, handle_pty_start, handle_terminal_stream, handle_terminal_ticket,
+};
 pub(crate) use token_maxing_routes::{
     handle_token_maxing_providers, handle_token_maxing_session, handle_token_maxing_sessions,
     handle_token_maxing_start, handle_token_maxing_status, handle_token_maxing_stop,
-};
-pub(crate) use terminal::{
-    handle_pty_sessions, handle_pty_start, handle_terminal_stream, handle_terminal_ticket,
 };
 pub(crate) use tools::handle_tools_registry;
 pub(crate) use workspace::{

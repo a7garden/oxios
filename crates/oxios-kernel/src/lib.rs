@@ -66,9 +66,9 @@ pub mod onboarding;
 pub mod persona;
 
 // ─── Tools & Skills ───────────────────────────────────────────────
+pub mod pty;
 pub mod skill;
 pub mod token_maxing;
-pub mod pty;
 pub mod tools;
 #[cfg(feature = "wasm-sandbox")]
 pub mod wasm_sandbox;
@@ -278,9 +278,9 @@ pub use kernel_handle::{
     A2aApi, AgentApi, CalendarApi, CopilotResponse, EmailApi, EngineApi, EngineConfigResponse,
     ExecApi, ExtensionApi, FallbackEvent, InfraApi, InputModality as EngineInputModality,
     KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, ModelInfo, MountApi,
-    MountInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderCategory, ProviderInfo,
-    PtyApi, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate,
-    SecurityApi, SharedExecConfig, SharedPtyConfig, StateApi, ValidateKeyResult,
+    MountInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderCategory, ProviderInfo, PtyApi,
+    RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, SecurityApi,
+    SharedExecConfig, SharedPtyConfig, StateApi, ValidateKeyResult,
 };
 pub use session_context::SessionContext;
 

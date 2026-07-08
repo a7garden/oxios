@@ -71,12 +71,16 @@ impl PtyManager {
             let map = self.by_principal.lock();
             let count = map.get(principal).map(|s| s.len()).unwrap_or(0);
             if count >= cfg.max_sessions as usize {
-                return Err(PtyError::SessionCapReached { max: cfg.max_sessions });
+                return Err(PtyError::SessionCapReached {
+                    max: cfg.max_sessions,
+                });
             }
         }
         let id = Self::new_id();
         let session = PtySession::spawn(id.clone(), principal.to_string(), resolved, size, &cfg)?;
-        self.sessions.write().insert(id.clone(), Arc::clone(&session));
+        self.sessions
+            .write()
+            .insert(id.clone(), Arc::clone(&session));
         self.by_principal
             .lock()
             .entry(principal.to_string())
@@ -105,11 +109,8 @@ impl PtyManager {
         if session.principal != principal {
             return Err(PtyError::NotOwner(session_id.to_string()));
         }
-        match &*session.state.lock() {
-            PtySessionState::Closed { .. } => {
-                return Err(PtyError::Closed(session_id.to_string()));
-            }
-            _ => {}
+        if let PtySessionState::Closed { .. } = &*session.state.lock() {
+            return Err(PtyError::Closed(session_id.to_string()));
         }
         Ok(session)
     }
@@ -147,8 +148,7 @@ impl PtyManager {
         let master = guard
             .as_ref()
             .ok_or_else(|| PtyError::Closed(session_id.to_string()))?;
-        let _ =
-        master.resize(portable_pty::PtySize {
+        let _ = master.resize(portable_pty::PtySize {
             rows,
             cols,
             pixel_width: 0,

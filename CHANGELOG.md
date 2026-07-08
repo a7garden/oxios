@@ -6,9 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-07-08
+
 ### Added
 - **RFC-039: Persona system completion** — Full persona persistence via `StateStore::durable_write` under `~/.oxios/state/personas/index.json`, `PersonaManager::load_from_state_store` / `persist`, `PersonaConfig.default_persona_id` now honored at boot (previously ignored), and `PersonaApi::set_active_with_persist` for idempotent `PUT /api/personas/active {id}`. HTTP create/update/delete routes and the `PersonaTool` agent-tool path auto-persist after every mutation. Active persona system prompt re-seeds the intent engine on runtime switch.
 - **effective_role model resolution** — The active persona's `role` participates in model resolution (`agent_runtime.rs:496`) so `engine.role_routing[persona_role]` fires, closing a gap where only the WS client's per-message role hint was consulted (RFC-039 §3.5).
+- **RFC-038: PTY/terminal subsystem** — `PtyConfig` + `PtyManager` + `PtyApi` + KernelHandle wiring, terminal routes + ghostty-web UI, settings UI + hot reload.
+- **Audit remediation (backlog)** — Remaining findings across backend, refactoring, design, and LOW-priority items.
+
+### Fixed
+- **RFC-038** — Drop `AuditSink` dep, use tracing audit; fix terminal.rs Message types; `AuditEvent::ToolAccess` + `take_writer` API.
+- **UI/UX audit, 1st pass (21 High)** — Close-dialog dup, KPI threshold colors, tab URL sync, card accessibility, action/label alignment.
+- **UI/UX audit, 2nd pass** — Chart legends, security approvals queue, cron timeline, knowledge inbox mode signal.
+- **UI/UX audit, 3rd pass** — Memory tab, activity timeline, delete confirmation, budget guidance labels.
+- **UI/UX audit, 4th pass (MED/LOW)** — 75 items across all screens.
+- **Regression fix** — Restore `cost.periodSpend` key, remove `monitoringOnly` duplication.
+
+### Changed
+- **Dependencies** — Add `portable-pty 0.8` dep.
+- **Refactor** — Chat activity merge into single helper; `live-activity` cleanup.
+- **Docs** — UI/UX audit report: 19 screens, 96 findings (21H/47M/28L).
+- **Style** — `git_layer::delete_tag` clippy fix (cmp_owned).
 
 ### Removed
 - **`PersonaConfig.max_concurrent_personas`** — Removed unused dead field (only one persona active at a time; `PersonaManager` has a single slot). Existing `config.toml` values are silently ignored via `#[serde(default)]`.
