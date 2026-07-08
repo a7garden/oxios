@@ -1332,7 +1332,7 @@
       "all": "All Time"
     },
     "providerQuota": "Provider Quota",
-    "monitoringOnly": "Monitoring only",
+    "periodSpend": "This period",
     "spendLimitNote": "The spend limit is alert-only. Manage per-agent enforcement limits in the Budget section below.",
     "balance": "Balance",
     "spendLimit": "Spend Limit",
