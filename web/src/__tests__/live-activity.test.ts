@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deriveCurrentActivity, type LiveActivityDescriptor } from '@/lib/live-activity'
+import { describeLiveActivity, deriveCurrentActivity, type LiveActivityDescriptor, type Translator } from '@/lib/live-activity'
 import type { ChatActivity } from '@/types'
 
 const NOW = new Date().toISOString()
@@ -125,5 +125,156 @@ describe('deriveCurrentActivity (RFC-015 §4.3)', () => {
     expect(deriveCurrentActivity(activities)).toEqual<LiveActivityDescriptor>({
       kind: 'thinking',
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Mock translator — returns the i18n key (with simple {{opt}} interpolation)
+// so tests verify key selection + detail extraction without a full locale.
+// ---------------------------------------------------------------------------
+const mockT: Translator = (key, opts) => {
+  if (!opts) return key
+  return Object.entries(opts).reduce(
+    (s, [k, v]) => s.replaceAll(`{{${k}}}`, String(v)),
+    key,
+  )
+}
+
+describe('deriveCurrentActivity — enriched fields', () => {
+  it('carries progress text from a running tool_call', () => {
+    const activities: ChatActivity[] = [
+      toolCall({ isRunning: true, toolName: 'browser', progress: 'Navigating to https://example.com' }),
+    ]
+    const d = deriveCurrentActivity(activities)
+    expect(d.kind).toBe('tool_running')
+    expect(d.progress).toBe('Navigating to https://example.com')
+  })
+
+  it('carries context from a running tool_call', () => {
+    const activities: ChatActivity[] = [
+      toolCall({
+        isRunning: true,
+        toolName: 'browser',
+        context: { kind: 'web_search', query: 'rust async', engine: 'google' },
+      }),
+    ]
+    const d = deriveCurrentActivity(activities)
+    expect(d.context?.kind).toBe('web_search')
+  })
+
+  it('carries toolArgs from a running tool_call', () => {
+    const activities: ChatActivity[] = [
+      toolCall({ isRunning: true, toolName: 'read', toolArgs: { path: 'src/main.rs' } }),
+    ]
+    const d = deriveCurrentActivity(activities)
+    expect(d.toolArgs).toEqual({ path: 'src/main.rs' })
+  })
+})
+
+describe('describeLiveActivity', () => {
+  it('returns thinking label for thinking kind', () => {
+    const { label, detail } = describeLiveActivity({ kind: 'thinking' }, mockT)
+    expect(label).toBe('chat.liveActivity.thinking')
+    expect(detail).toBeUndefined()
+  })
+
+  it('returns reasoning label for reasoning kind', () => {
+    const { label, detail } = describeLiveActivity({ kind: 'reasoning' }, mockT)
+    expect(label).toBe('chat.liveActivity.reasoning')
+    expect(detail).toBeUndefined()
+  })
+
+  it('derives label + detail from web_search context', () => {
+    const { label, detail } = describeLiveActivity(
+      {
+        kind: 'tool_running',
+        toolName: 'browser',
+        context: { kind: 'web_search', query: 'rust async runtime', engine: 'google' },
+      },
+      mockT,
+    )
+    expect(label).toBe('chat.liveActivity.webSearch')
+    expect(detail).toBe('rust async runtime')
+  })
+
+  it('derives label + shortened URL from page_visit context', () => {
+    const { label, detail } = describeLiveActivity(
+      {
+        kind: 'tool_running',
+        toolName: 'browser',
+        context: { kind: 'page_visit', url: 'https://example.com/some/long/path' },
+      },
+      mockT,
+    )
+    expect(label).toBe('chat.liveActivity.pageVisit')
+    expect(detail).toBe('example.com/some/long/path')
+  })
+
+  it('uses step text as label for script_step context', () => {
+    const { label, detail } = describeLiveActivity(
+      {
+        kind: 'tool_running',
+        toolName: 'browser',
+        context: { kind: 'script_step', current: 2, total: 5, step: 'Clicking search button' },
+      },
+      mockT,
+    )
+    expect(label).toBe('Clicking search button')
+    expect(detail).toBe('2/5')
+  })
+
+  it('falls back to progress text as detail when no context', () => {
+    const { label, detail } = describeLiveActivity(
+      {
+        kind: 'tool_running',
+        toolName: 'exec',
+        progress: 'Building project...',
+      },
+      mockT,
+    )
+    expect(label).toBe('chat.liveActivity.exec')
+    expect(detail).toBe('Building project...')
+  })
+
+  it('extracts file path from toolArgs as detail', () => {
+    const { label, detail } = describeLiveActivity(
+      {
+        kind: 'tool_running',
+        toolName: 'read',
+        toolArgs: { path: '/home/user/projects/src/main.rs' },
+      },
+      mockT,
+    )
+    expect(label).toBe('chat.liveActivity.read')
+    expect(detail).toBe('…/src/main.rs')
+  })
+
+  it('extracts command from toolArgs as detail', () => {
+    const { label, detail } = describeLiveActivity(
+      {
+        kind: 'tool_running',
+        toolName: 'exec',
+        toolArgs: { command: 'cargo build --release' },
+      },
+      mockT,
+    )
+    expect(label).toBe('chat.liveActivity.exec')
+    expect(detail).toBe('cargo build --release')
+  })
+
+  it('uses toolRunning fallback for unknown tool names', () => {
+    const { label } = describeLiveActivity(
+      { kind: 'tool_running', toolName: 'custom_mcp_tool' },
+      mockT,
+    )
+    expect(label).toBe('chat.liveActivity.toolRunning')
+  })
+
+  it('uses toolDefault when toolName is absent', () => {
+    const { label } = describeLiveActivity(
+      { kind: 'tool_running', toolName: undefined },
+      mockT,
+    )
+    expect(label).toBe('chat.liveActivity.toolDefault')
   })
 })

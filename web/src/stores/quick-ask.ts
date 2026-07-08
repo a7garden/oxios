@@ -1,6 +1,14 @@
 import { create } from 'zustand'
 import type { ChatActivity, ChatMessage, StreamChunk } from '@/types'
-import { buildWsUrl, chunkToActivity, getToken, parseChunk } from './chat'
+import {
+  appendActivityToMessages,
+  appendTokenToMessages,
+  buildWsUrl,
+  chunkToActivity,
+  getToken,
+  parseChunk,
+  patchAssistantModel,
+} from './chat'
 
 // ---------------------------------------------------------------------------
 // QuickAsk — one-shot, non-persisted question/answer store.
@@ -172,8 +180,14 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
 
 // ---------------------------------------------------------------------------
 // Chunk handling — operates on the store via set/get closures.
-// Distinct from chat.ts: single assistant placeholder, no token-batch RAF
-// (one-shot is short; per-token set is cheap enough), promote-capture on done.
+//
+// Message transforms (token append, activity merge, model patch, placeholder
+// creation) route through shared pure primitives imported from chat.ts
+// (appendTokenToMessages / appendActivityToMessages / patchAssistantModel) so
+// this store and the chat store cannot drift apart. What stays quick-ask-
+// specific: no token-batch RAF (one-shot is short; per-token set is cheap
+// enough), promote-capture on done, and the divergent done/interview/error/
+// tool_approval side effects.
 // ---------------------------------------------------------------------------
 
 type SetFn = (
@@ -195,13 +209,6 @@ function updateAssistant(set: SetFn, fn: (m: ChatMessage) => ChatMessage): void 
   })
 }
 
-function appendActivity(set: SetFn, activity: ChatActivity): void {
-  updateAssistant(set, (m) => ({
-    ...m,
-    activities: [...(m.activities ?? []), activity],
-  }))
-}
-
 function appendError(set: SetFn, message: string): void {
   set({ isStreaming: false })
   updateAssistant(set, (m) => ({
@@ -212,11 +219,25 @@ function appendError(set: SetFn, message: string): void {
 
 function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
   switch (chunk.type) {
-    case 'model':
-      set({ pendingModel: chunk.model || null })
+    case 'model': {
+      // Patch the live assistant message, or stash as pendingModel for the
+      // placeholder created on first token/activity (shared logic w/ chat.ts).
+      const modelId = chunk.model
+      if (!modelId) break
+      set((s) => {
+        const r = patchAssistantModel(s.messages, modelId)
+        return r.pendingModel !== undefined
+          ? { pendingModel: r.pendingModel }
+          : { messages: r.messages }
+      })
       break
+    }
     case 'token':
-      updateAssistant(set, (m) => ({ ...m, content: m.content + (chunk.content ?? '') }))
+      set((s) => ({
+        messages: appendTokenToMessages(s.messages, chunk.content ?? '', {
+          placeholderModel: s.pendingModel ?? s.quickAskModel ?? undefined,
+        }),
+      }))
       break
     case 'reasoning':
     case 'tool_start':
@@ -226,16 +247,28 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
     case 'usage':
     case 'phase': {
       const activity = chunkToActivity(chunk)
-      if (activity) appendActivity(set, activity)
+      if (activity) {
+        set((s) => ({
+          messages: appendActivityToMessages(s.messages, activity, {
+            placeholderModel: s.pendingModel ?? s.quickAskModel ?? undefined,
+          }),
+        }))
+      }
       break
     }
     case 'tool_approval':
+      // Backend sends `id` (chat.rs:1479), NOT tool_call_id — that field is
+      // reserved for RFC-015 tool-activity chunks (types/index.ts). Reading
+      // tool_call_id here always yielded undefined → random-UUID fallback →
+      // resolveToolApproval 404. Mirrors chat's tool_approval handler; also
+      // pauses streaming while approval is pending.
       set({
         activeToolApproval: {
-          id: chunk.tool_call_id || crypto.randomUUID(),
+          id: chunk.id || crypto.randomUUID(),
           toolName: chunk.tool_name || 'tool',
           reason: chunk.reason ?? '',
         },
+        isStreaming: false,
       })
       break
     case 'interview':
@@ -258,7 +291,7 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
             prompt,
             reply,
             activities,
-            model: state.pendingModel ?? state.quickAskModel ?? undefined,
+            model: assistant.model ?? state.pendingModel ?? state.quickAskModel ?? undefined,
             sessionId: chunk.session_id,
           },
         })

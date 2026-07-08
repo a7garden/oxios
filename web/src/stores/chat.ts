@@ -261,6 +261,166 @@ export function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
   }
 }
 
+/**
+ * Merge `activity` into `existing` activities, returning a new array.
+ *
+ * Single source of truth for activity de-duplication/merging, shared by the
+ * chat store and the one-shot QuickAsk store (quick-ask.ts) so the two
+ * streaming paths cannot drift apart:
+ *
+ * - `tool_call` with a `toolCallId`: `tool_start`/`tool_progress`/`tool_end`
+ *   all map to one `tool_call` activity per call — fold later fragments
+ *   (progress/end) into the first by `toolCallId`.
+ * - `reasoning` with a `reasoningSource`: reasoning streams as per-token
+ *   deltas — concatenate onto the last activity when it shares the source,
+ *   so one reasoning span renders as one "thinking" block (not one per token).
+ * - otherwise: append a new activity.
+ */
+export function mergeOrAppendActivity(
+  existing: ChatActivity[],
+  activity: ChatActivity,
+): ChatActivity[] {
+  if (activity.type === 'tool_call' && activity.toolCallId) {
+    const idx = existing.findIndex(
+      (a) => a.type === 'tool_call' && a.toolCallId === activity.toolCallId,
+    )
+    if (idx >= 0) {
+      const prior = existing[idx]!
+      const next = [...existing]
+      next[idx] = {
+        ...prior,
+        ...activity,
+        toolName: prior.toolName ?? activity.toolName,
+      }
+      return next
+    }
+  }
+  if (activity.type === 'reasoning') {
+    const lastAct = existing[existing.length - 1]
+    if (
+      lastAct &&
+      lastAct.type === 'reasoning' &&
+      lastAct.reasoningSource === activity.reasoningSource
+    ) {
+      const next = [...existing]
+      next[next.length - 1] = {
+        ...lastAct,
+        content: (lastAct.content ?? '') + (activity.content ?? ''),
+      }
+      return next
+    }
+  }
+  return [...existing, activity]
+}
+
+// ---------------------------------------------------------------------------
+// Shared message-transform primitives
+// ---------------------------------------------------------------------------
+// Pure helpers that mutate a message list by transforming the last assistant
+// message (creating a placeholder if absent). chat.ts (RAF token flush,
+// activity/done cases) and quick-ask.ts (token/activity cases) all route
+// through these so the "find-or-create assistant + copy array + replace"
+// ceremony — the actual duplication that previously let the reasoning-merge
+// bug drift in — is defined exactly once. Per-store handleChunk keeps its own
+// divergent side-effect cases (done/error/interview/tool_approval).
+// ---------------------------------------------------------------------------
+
+/** Context for assistant-placeholder creation. */
+export interface AssistantCtx {
+  /** Model stamped onto a newly-created assistant placeholder. */
+  placeholderModel?: string | null
+}
+
+/**
+ * Ensure the last message is an assistant message, appending an empty
+ * placeholder if not. Returns the (possibly unchanged) list and the index of
+ * the last assistant message. Pure.
+ */
+export function ensureLastAssistant(
+  messages: ChatMessage[],
+  ctx: AssistantCtx,
+): { messages: ChatMessage[]; index: number } {
+  const last = messages[messages.length - 1]
+  if (last?.role === 'assistant') {
+    return { messages, index: messages.length - 1 }
+  }
+  const placeholder: ChatMessage = {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    content: '',
+    timestamp: new Date().toISOString(),
+    model: ctx.placeholderModel ?? undefined,
+  }
+  return { messages: [...messages, placeholder], index: messages.length }
+}
+
+/**
+ * Append token text to the last assistant message, creating a placeholder if
+ * none exists. Pure. Used by chat's RAF token-flush and quick-ask's immediate
+ * token append — the transformation is identical; only the batching strategy
+ * differs (kept per-store).
+ */
+export function appendTokenToMessages(
+  messages: ChatMessage[],
+  content: string,
+  ctx: AssistantCtx,
+): ChatMessage[] {
+  if (!content) return messages
+  const { messages: ensured, index } = ensureLastAssistant(messages, ctx)
+  const target = ensured[index]!
+  const next = ensured.slice()
+  next[index] = { ...target, content: target.content + content }
+  return next
+}
+
+/**
+ * Append/merge an activity onto the last assistant message (creating a
+ * placeholder if absent) and accumulate token counts. Pure. Delegates
+ * dedup/merge to mergeOrAppendActivity. Used by both chat and quick-ask so the
+ * activity timeline stays consistent across stores.
+ */
+export function appendActivityToMessages(
+  messages: ChatMessage[],
+  activity: ChatActivity,
+  ctx: AssistantCtx,
+): ChatMessage[] {
+  const { messages: ensured, index } = ensureLastAssistant(messages, ctx)
+  const target = ensured[index]!
+  const next = ensured.slice()
+  next[index] = {
+    ...target,
+    activities: mergeOrAppendActivity(target.activities ?? [], activity),
+    totalInputTokens: (target.totalInputTokens ?? 0) + (activity.inputTokens ?? 0),
+    totalOutputTokens: (target.totalOutputTokens ?? 0) + (activity.outputTokens ?? 0),
+  }
+  return next
+}
+
+/**
+ * Patch the model of the last assistant message; if no assistant message
+ * exists yet, return a `pendingModel` signal so the store can stash it for the
+ * next placeholder (consumed via AssistantCtx.placeholderModel). Pure. Lets
+ * quick-ask patch the live message too, matching chat's behaviour.
+ */
+export function patchAssistantModel(
+  messages: ChatMessage[],
+  modelId: string,
+): { messages: ChatMessage[]; pendingModel?: string } {
+  let idx = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === 'assistant') {
+      idx = i
+      break
+    }
+  }
+  if (idx >= 0) {
+    const next = messages.slice()
+    next[idx] = { ...next[idx]!, model: modelId }
+    return { messages: next }
+  }
+  return { messages, pendingModel: modelId }
+}
+
 function trajectoryToActivity(step: {
   tool_name: string
   tool_args: unknown
@@ -484,27 +644,11 @@ function flushPendingTokens(): void {
   if (!_pendingTokens) return
   const content = _pendingTokens
   _pendingTokens = ''
-  useChatStore.setState((s) => {
-    const msgs = s.messages
-    const last = msgs[msgs.length - 1]
-    if (last?.role === 'assistant') {
-      // Only the last element changes — copy once and replace in place.
-      const next = msgs.slice()
-      next[next.length - 1] = { ...last, content: last.content + content }
-      return { messages: next }
-    }
-    return {
-      messages: [
-        ...msgs,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant' as const,
-          content,
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    }
-  })
+  useChatStore.setState((s) => ({
+    messages: appendTokenToMessages(s.messages, content, {
+      placeholderModel: s.pendingModel ?? s.activeModelId,
+    }),
+  }))
 }
 
 function scheduleTokenFlush(): void {
@@ -1120,31 +1264,18 @@ export const useChatStore = create<ChatStore>()(
           flushPendingTokens()
         }
         switch (chunk.type) {
-          // RFC-015 model mark — arrives before the first token, so buffer it
-          // in `pendingModel` when no assistant message exists yet; the first
-          // placeholder consumes it. Patch the live message if it already exists.
+          // RFC-015 model mark — arrives before the first token. Patch the live
+          // assistant message, or stash as pendingModel for the next placeholder
+          // (consumed via AssistantCtx.placeholderModel).
           case 'model': {
             const modelId = chunk.model
             if (!modelId) break
-            const msgs = get().messages
-            let idx = -1
-            for (let i = msgs.length - 1; i >= 0; i--) {
-              if (msgs[i]?.role === 'assistant') {
-                idx = i
-                break
-              }
-            }
-            if (idx >= 0) {
-              set((s) => {
-                const updated = [...s.messages]
-                const target = updated[idx]
-                if (!target) return {}
-                updated[idx] = { ...target, model: modelId }
-                return { messages: updated }
-              })
-            } else {
-              set({ pendingModel: modelId })
-            }
+            set((s) => {
+              const r = patchAssistantModel(s.messages, modelId)
+              return r.pendingModel !== undefined
+                ? { pendingModel: r.pendingModel }
+                : { messages: r.messages }
+            })
             break
           }
           case 'token': {
@@ -1166,91 +1297,11 @@ export const useChatStore = create<ChatStore>()(
           case 'usage': {
             const activity = chunkToActivity(chunk)
             if (!activity) break
-            set((s) => {
-              const updated = [...s.messages]
-              const last = updated[updated.length - 1]
-
-              // If the last message is not an assistant message (e.g. the user
-              // just submitted an interview response and tool events arrive
-              // before the first token chunk), create a placeholder assistant
-              // message so the activity timeline has somewhere to attach to.
-              // The token chunk will later fill in the content.
-              if (last?.role !== 'assistant') {
-                const placeholder: ChatMessage = {
-                  id: crypto.randomUUID(),
-                  role: 'assistant',
-                  content: '',
-                  timestamp: new Date().toISOString(),
-                  model: get().pendingModel ?? get().activeModelId ?? undefined,
-                  activities: [activity],
-                }
-                return { messages: [...updated, placeholder] }
-              }
-
-              const existing = last.activities ?? []
-
-              if (activity.type === 'tool_call' && activity.toolCallId) {
-                const idx = existing.findIndex(
-                  (a) => a.type === 'tool_call' && a.toolCallId === activity.toolCallId,
-                )
-                if (idx >= 0) {
-                  const prior = existing[idx]!
-                  const merged: ChatActivity = {
-                    ...prior,
-                    ...activity,
-                    toolName: prior.toolName ?? activity.toolName,
-                  }
-                  const newActivities = [...existing]
-                  newActivities[idx] = merged
-                  return {
-                    messages: [
-                      ...updated.slice(0, -1),
-                      {
-                        ...last,
-                        activities: newActivities,
-                        totalInputTokens:
-                          (last.totalInputTokens ?? 0) + (activity.inputTokens ?? 0),
-                        totalOutputTokens:
-                          (last.totalOutputTokens ?? 0) + (activity.outputTokens ?? 0),
-                      },
-                    ],
-                  }
-                }
-              }
-              // Reasoning fragments stream as deltas (per token/word). Merge
-              // consecutive same-source fragments into a single activity so the
-              // timeline shows one "thinking" block per reasoning span, not one
-              // card per token — matching the "one reasoning record per turn"
-              // persisted contract (reasoningToActivity, §7 persistence).
-              if (activity.type === 'reasoning') {
-                const lastAct = existing[existing.length - 1]
-                if (
-                  lastAct &&
-                  lastAct.type === 'reasoning' &&
-                  lastAct.reasoningSource === activity.reasoningSource
-                ) {
-                  const newActivities = [...existing]
-                  newActivities[newActivities.length - 1] = {
-                    ...lastAct,
-                    content: (lastAct.content ?? '') + (activity.content ?? ''),
-                  }
-                  return {
-                    messages: [...updated.slice(0, -1), { ...last, activities: newActivities }],
-                  }
-                }
-              }
-              return {
-                messages: [
-                  ...updated.slice(0, -1),
-                  {
-                    ...last,
-                    activities: [...existing, activity],
-                    totalInputTokens: (last.totalInputTokens ?? 0) + (activity.inputTokens ?? 0),
-                    totalOutputTokens: (last.totalOutputTokens ?? 0) + (activity.outputTokens ?? 0),
-                  },
-                ],
-              }
-            })
+            set((s) => ({
+              messages: appendActivityToMessages(s.messages, activity, {
+                placeholderModel: s.pendingModel ?? s.activeModelId,
+              }),
+            }))
             break
           }
 

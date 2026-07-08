@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { useAuthStore } from '@/stores/auth'
-import { useChatStore } from '@/stores/chat'
+import {
+  appendActivityToMessages,
+  appendTokenToMessages,
+  chunkToActivity,
+  ensureLastAssistant,
+  mergeOrAppendActivity,
+  patchAssistantModel,
+  useChatStore,
+} from '@/stores/chat'
+import type { ChatMessage } from '@/types'
 import { useSidebarStore } from '@/stores/sidebar'
 
 describe('useAuthStore', () => {
@@ -420,6 +429,162 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     useChatStore.getState().removeMessage('a1')
     expect(useChatStore.getState().isStreaming).toBe(false)
     expect(useChatStore.getState().messages).toHaveLength(0)
+  })
+})
+
+// mergeOrAppendActivity is the single pure helper both the chat store and the
+// one-shot QuickAsk store route activity append/merge through. Testing it
+// directly guards the Cmd+J path (which has no store-level tests) and prevents
+// the two stores from drifting apart again.
+describe('mergeOrAppendActivity (shared by chat + quick-ask stores)', () => {
+  const act = (chunk: Parameters<typeof chunkToActivity>[0]) => chunkToActivity(chunk)!
+
+  it('folds tool_start/progress/end into one tool_call by toolCallId', () => {
+    const start = act({ type: 'tool_start', tool_name: 'bash', tool_call_id: 'c1', tool_args: {} })
+    const progress = act({
+      type: 'tool_progress',
+      tool_name: 'bash',
+      tool_call_id: 'c1',
+      progress: 'halfway',
+    })
+    const end = act({
+      type: 'tool_end',
+      tool_name: 'bash',
+      tool_call_id: 'c1',
+      output_summary: 'ok',
+      duration_ms: 9,
+      is_error: false,
+    })
+
+    let activities = mergeOrAppendActivity([], start)
+    activities = mergeOrAppendActivity(activities, progress)
+    activities = mergeOrAppendActivity(activities, end)
+
+    expect(activities.filter((a) => a.type === 'tool_call')).toHaveLength(1)
+    expect(activities[0]).toMatchObject({
+      type: 'tool_call',
+      toolCallId: 'c1',
+      progress: 'halfway',
+      outputSummary: 'ok',
+      durationMs: 9,
+      isRunning: false,
+    })
+  })
+
+  it('keeps distinct toolCallIds as separate activities', () => {
+    const a = act({ type: 'tool_start', tool_name: 'read', tool_call_id: 'c1', tool_args: {} })
+    const b = act({ type: 'tool_start', tool_name: 'write', tool_call_id: 'c2', tool_args: {} })
+    expect(mergeOrAppendActivity([a], b)).toHaveLength(2)
+  })
+
+  it('concatenates consecutive same-source reasoning deltas', () => {
+    const d1 = act({ type: 'reasoning', content: 'Thi', source: 'thinking' })
+    const d2 = act({ type: 'reasoning', content: 's is', source: 'thinking' })
+    const d3 = act({ type: 'reasoning', content: ' fine', source: 'thinking' })
+    const activities = mergeOrAppendActivity(mergeOrAppendActivity([d1], d2), d3)
+    expect(activities).toHaveLength(1)
+    expect(activities[0]).toMatchObject({
+      type: 'reasoning',
+      content: 'This is fine',
+      reasoningSource: 'thinking',
+    })
+  })
+
+  it('starts a new reasoning activity when the source changes', () => {
+    const a = act({ type: 'reasoning', content: 'thinking…', source: 'thinking' })
+    const b = act({ type: 'reasoning', content: 'compacting…', source: 'compaction' })
+    const activities = mergeOrAppendActivity([a], b)
+    expect(activities).toHaveLength(2)
+    expect(activities[1]).toMatchObject({ content: 'compacting…', reasoningSource: 'compaction' })
+  })
+
+  it('appends a tool_call after a reasoning span (no cross-type merge)', () => {
+    const r = act({ type: 'reasoning', content: 'hmm', source: 'thinking' })
+    const t = act({ type: 'tool_start', tool_name: 'bash', tool_call_id: 'c1', tool_args: {} })
+    expect(mergeOrAppendActivity([r], t)).toHaveLength(2)
+  })
+
+  it('does not mutate the input array', () => {
+    const a = act({ type: 'reasoning', content: 'x', source: 'thinking' })
+    const b = act({ type: 'reasoning', content: 'y', source: 'thinking' })
+    const input = [a]
+    const out = mergeOrAppendActivity(input, b)
+    expect(input).toHaveLength(1)
+    expect(input[0]).toBe(a)
+    expect(out).not.toBe(input)
+  })
+})
+
+// The message-transform primitives route every chunk through a single shared
+// path in chat.ts; both the chat store and the quick-ask store call them, so
+// these tests guard the Cmd+J (one-shot) path too (which has no store tests).
+describe('message-transform primitives (shared by chat + quick-ask stores)', () => {
+  const ctx = { placeholderModel: 'gpt-x' }
+  const assistant = (over: Partial<ChatMessage> = {}): ChatMessage => ({
+    id: 'a1',
+    role: 'assistant',
+    content: '',
+    timestamp: 't',
+    ...over,
+  })
+  const userMsg = (): ChatMessage => ({ id: 'u1', role: 'user', content: 'hi', timestamp: 't' })
+
+  it('ensureLastAssistant returns the same array when last is already assistant', () => {
+    const input = [assistant()]
+    const { messages, index } = ensureLastAssistant(input, ctx)
+    expect(messages).toBe(input)
+    expect(index).toBe(0)
+  })
+
+  it('ensureLastAssistant appends a ctx-modelled placeholder when last is not assistant', () => {
+    const { messages, index } = ensureLastAssistant([userMsg()], ctx)
+    expect(messages).toHaveLength(2)
+    expect(messages[1]).toMatchObject({ role: 'assistant', content: '', model: 'gpt-x' })
+    expect(index).toBe(1)
+  })
+
+  it('appendTokenToMessages appends to the last assistant content', () => {
+    const out = appendTokenToMessages([assistant({ content: 'foo' })], 'bar', ctx)
+    expect(out[0]!.content).toBe('foobar')
+  })
+
+  it('appendTokenToMessages creates a placeholder when no assistant exists', () => {
+    const out = appendTokenToMessages([userMsg()], 'hi', ctx)
+    expect(out).toHaveLength(2)
+    expect(out[1]).toMatchObject({ role: 'assistant', content: 'hi', model: 'gpt-x' })
+  })
+
+  it('appendTokenToMessages is a no-op returning the same array on empty content', () => {
+    const input = [assistant({ content: 'foo' })]
+    expect(appendTokenToMessages(input, '', ctx)).toBe(input)
+  })
+
+  it('appendActivityToMessages merges the activity and accumulates token counts', () => {
+    const usage = chunkToActivity({ type: 'usage', input_tokens: 10, output_tokens: 5 })!
+    const out = appendActivityToMessages([assistant({ content: 'x' })], usage, ctx)
+    expect(out[0]!.activities).toHaveLength(1)
+    expect(out[0]!.totalInputTokens).toBe(10)
+    expect(out[0]!.totalOutputTokens).toBe(5)
+  })
+
+  it('appendActivityToMessages creates a placeholder when no assistant exists', () => {
+    const phase = chunkToActivity({ type: 'phase', phase: 'assess', status: 'started', summary: '' })!
+    const out = appendActivityToMessages([userMsg()], phase, ctx)
+    expect(out).toHaveLength(2)
+    expect(out[1]!.activities).toHaveLength(1)
+  })
+
+  it('patchAssistantModel patches the last assistant model', () => {
+    const out = patchAssistantModel([assistant({ model: 'old' })], 'new')
+    expect(out.messages[0]!.model).toBe('new')
+    expect(out.pendingModel).toBeUndefined()
+  })
+
+  it('patchAssistantModel returns pendingModel when no assistant exists', () => {
+    const input = [userMsg()]
+    const out = patchAssistantModel(input, 'm')
+    expect(out.messages).toBe(input)
+    expect(out.pendingModel).toBe('m')
   })
 })
 
