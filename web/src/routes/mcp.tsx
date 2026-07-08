@@ -40,7 +40,15 @@ function McpPage() {
         )}
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v === 'servers' ? undefined : v }), replace: true })}>
+      <Tabs
+        value={tab}
+        onValueChange={(v) =>
+          navigate({
+            search: (prev) => ({ ...prev, tab: v === 'servers' ? undefined : v }),
+            replace: true,
+          })
+        }
+      >
         <TabsList>
           <TabsTrigger value="servers" className="flex items-center gap-1.5">
             <Server className="h-4 w-4" /> {t('mcp.servers', 'Servers')}

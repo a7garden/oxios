@@ -7,8 +7,8 @@ import {
   AreaChart,
   CartesianGrid,
   Legend,
-  ReferenceLine,
   Tooltip as RechartsTooltip,
+  ReferenceLine,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -157,13 +157,23 @@ function ResourcesPage() {
                   y={75}
                   stroke={getChartColor('--warning')}
                   strokeDasharray="4 4"
-                  label={{ value: '75%', position: 'right', fontSize: 10, fill: getChartColor('--warning') }}
+                  label={{
+                    value: '75%',
+                    position: 'right',
+                    fontSize: 10,
+                    fill: getChartColor('--warning'),
+                  }}
                 />
                 <ReferenceLine
                   y={90}
                   stroke={getChartColor('--error')}
                   strokeDasharray="4 4"
-                  label={{ value: '90%', position: 'right', fontSize: 10, fill: getChartColor('--error') }}
+                  label={{
+                    value: '90%',
+                    position: 'right',
+                    fontSize: 10,
+                    fill: getChartColor('--error'),
+                  }}
                 />
                 <Area
                   type="monotone"

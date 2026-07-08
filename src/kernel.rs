@@ -882,8 +882,14 @@ impl KernelBuilder {
         let access_manager = Arc::new(parking_lot::Mutex::new(access_manager));
 
         let persona_manager = PersonaManager::new();
+        // RFC-039: 디스크에서 페르소나 로드 → config 적용 → 활성 결정 → intent 시드.
+        // 손상은 silent fallback 하지 않고 tracing log 에 남김.
+        if let Err(e) = persona_manager.load_from_state_store(&state_store).await {
+            tracing::warn!(error = %e, "persona load from state store failed; using in-memory defaults");
+        }
+        persona_manager.apply_config(&config.persona);
         if let Some(p) = persona_manager.first_enabled() {
-            intent_engine.set_persona_prompt(Some(p.system_prompt));
+            intent_engine.set_persona_prompt(Some(p.system_prompt.clone()));
             tracing::info!(persona = %p.name, "Active persona set on engines");
         }
 

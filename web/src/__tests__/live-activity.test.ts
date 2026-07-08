@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { describeLiveActivity, deriveCurrentActivity, type LiveActivityDescriptor, type Translator } from '@/lib/live-activity'
+import {
+  deriveCurrentActivity,
+  describeLiveActivity,
+  type LiveActivityDescriptor,
+  type Translator,
+} from '@/lib/live-activity'
 import type { ChatActivity } from '@/types'
 
 const NOW = new Date().toISOString()
@@ -134,16 +139,17 @@ describe('deriveCurrentActivity (RFC-015 §4.3)', () => {
 // ---------------------------------------------------------------------------
 const mockT: Translator = (key, opts) => {
   if (!opts) return key
-  return Object.entries(opts).reduce(
-    (s, [k, v]) => s.replaceAll(`{{${k}}}`, String(v)),
-    key,
-  )
+  return Object.entries(opts).reduce((s, [k, v]) => s.replaceAll(`{{${k}}}`, String(v)), key)
 }
 
 describe('deriveCurrentActivity — enriched fields', () => {
   it('carries progress text from a running tool_call', () => {
     const activities: ChatActivity[] = [
-      toolCall({ isRunning: true, toolName: 'browser', progress: 'Navigating to https://example.com' }),
+      toolCall({
+        isRunning: true,
+        toolName: 'browser',
+        progress: 'Navigating to https://example.com',
+      }),
     ]
     const d = deriveCurrentActivity(activities)
     expect(d.kind).toBe('tool_running')
@@ -271,10 +277,7 @@ describe('describeLiveActivity', () => {
   })
 
   it('uses toolDefault when toolName is absent', () => {
-    const { label } = describeLiveActivity(
-      { kind: 'tool_running', toolName: undefined },
-      mockT,
-    )
+    const { label } = describeLiveActivity({ kind: 'tool_running', toolName: undefined }, mockT)
     expect(label).toBe('chat.liveActivity.toolDefault')
   })
 })

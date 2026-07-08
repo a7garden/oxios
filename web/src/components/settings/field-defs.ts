@@ -211,7 +211,7 @@ const ptySection: SettingsSectionDef = {
       type: 'tags',
     },
   ],
-};
+}
 
 // ---------------------------------------------------------------------------
 // 2. security — Security / RBAC

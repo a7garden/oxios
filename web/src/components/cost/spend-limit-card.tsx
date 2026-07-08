@@ -39,7 +39,9 @@ export function SpendLimitCard() {
           <CardTitle className="flex items-center gap-2 text-sm font-medium">
             <Target className="h-4 w-4" />
             {t('cost.spendLimit')}
-            <span className="text-2xs font-normal text-muted-foreground">{t('cost.monitoringOnly')}</span>
+            <span className="text-2xs font-normal text-muted-foreground">
+              {t('cost.monitoringOnly')}
+            </span>
           </CardTitle>
           {limit != null ? (
             <Badge variant={isOver ? 'destructive' : isNear ? 'default' : 'secondary'}>

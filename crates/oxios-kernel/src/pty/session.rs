@@ -163,7 +163,7 @@ impl PtySession {
         tokio::spawn(async move {
             let exit = tokio::task::spawn_blocking(move || child.wait()).await;
             let (code, signal) = match exit {
-                Ok(Ok(status)) => (status.exit_code(), None),
+                Ok(Ok(status)) => (Some(status.exit_code() as i32), None),
                 Ok(Err(e)) => {
                     tracing::warn!(error = %e, session = %session_for_wait.id, "pty child wait error");
                     (None, None)

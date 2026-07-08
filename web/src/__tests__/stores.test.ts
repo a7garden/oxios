@@ -9,8 +9,8 @@ import {
   patchAssistantModel,
   useChatStore,
 } from '@/stores/chat'
-import type { ChatMessage } from '@/types'
 import { useSidebarStore } from '@/stores/sidebar'
+import type { ChatMessage } from '@/types'
 
 describe('useAuthStore', () => {
   beforeEach(() => {
@@ -568,7 +568,12 @@ describe('message-transform primitives (shared by chat + quick-ask stores)', () 
   })
 
   it('appendActivityToMessages creates a placeholder when no assistant exists', () => {
-    const phase = chunkToActivity({ type: 'phase', phase: 'assess', status: 'started', summary: '' })!
+    const phase = chunkToActivity({
+      type: 'phase',
+      phase: 'assess',
+      status: 'started',
+      summary: '',
+    })!
     const out = appendActivityToMessages([userMsg()], phase, ctx)
     expect(out).toHaveLength(2)
     expect(out[1]!.activities).toHaveLength(1)

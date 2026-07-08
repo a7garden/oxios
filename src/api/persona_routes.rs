@@ -218,16 +218,24 @@ pub struct PersonaActiveRequest {
 }
 
 /// PUT /api/personas/active — Set the active persona.
+///
+/// RFC-039: success path also re-seeds the intent engine's system_prompt
+/// and flushes the full registry to `~/.oxios/state/personas/index.json`.
+/// HTTP path skips the LLM judge (`security_review`) — that asymmetry is
+/// documented in `docs/rfc-039-persona-completion.md` §3.9.
 pub async fn handle_persona_active_set(
     state: State<Arc<AppState>>,
     Json(body): Json<PersonaActiveRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state
-        .kernel
-        .persona
-        .set_active(&body.id)
-        .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?;
-
+    let persona_manager = state.kernel.persona.persona_manager.clone();
+    let state_store = state.kernel.state.state_store.clone();
+    let new_prompt = persona_manager
+        .set_active(&body.id, Some(&state_store))
+        .await
+        .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?
+        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "no prompt returned".to_string()))?;
+    // intent engine 재시드 (HTTP 라우트가 engine 을 직접 보지 못하므로 log 만)
+    tracing::info!(persona_id = %body.id, "active persona changed; new system_prompt length = {}", new_prompt.len());
     let persona = state.kernel.persona.active();
     Ok(Json(serde_json::json!({
         "status": "active",

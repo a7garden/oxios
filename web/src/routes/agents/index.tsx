@@ -329,9 +329,7 @@ function AgentsListPage() {
                   {monitor.stats.running} {t('agents.running')}
                 </span>
               )}
-              {monitor.stats.totalCost > 0 && (
-                <span>${monitor.stats.totalCost.toFixed(4)}</span>
-              )}
+              {monitor.stats.totalCost > 0 && <span>${monitor.stats.totalCost.toFixed(4)}</span>}
               {monitor.stats.totalTokens > 0 && (
                 <span>{monitor.stats.totalTokens.toLocaleString()} tokens</span>
               )}

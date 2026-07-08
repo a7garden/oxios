@@ -105,9 +105,7 @@ function toolVerb(toolName: string | undefined, t: Translator): string {
 }
 
 /** Extract a short detail string from tool arguments (file path, command, …). */
-function extractArgDetail(
-  toolArgs?: Record<string, unknown>,
-): string | undefined {
+function extractArgDetail(toolArgs?: Record<string, unknown>): string | undefined {
   if (!toolArgs) return undefined
   // File tools: path / file_path
   const path = strArg(toolArgs, 'path') ?? strArg(toolArgs, 'file_path')
@@ -160,10 +158,7 @@ function shortenUrl(url: string): string {
  * "Searching the web · rust async runtime" rather than a generic
  * "Running browser".
  */
-export function describeLiveActivity(
-  d: LiveActivityDescriptor,
-  t: Translator,
-): LiveActivityLabel {
+export function describeLiveActivity(d: LiveActivityDescriptor, t: Translator): LiveActivityLabel {
   if (d.kind === 'reasoning') {
     return { label: t('chat.liveActivity.reasoning') }
   }

@@ -1,6 +1,6 @@
 import { Loader2, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { describeLiveActivity, deriveCurrentActivity } from '@/lib/live-activity'
+import { deriveCurrentActivity, describeLiveActivity } from '@/lib/live-activity'
 import { cn } from '@/lib/utils'
 import { useChatStore } from '@/stores/chat'
 
@@ -63,9 +63,7 @@ export function LiveActivityBar() {
             {detail && (
               <>
                 <span className="text-muted-foreground/40 shrink-0">·</span>
-                <span className="text-muted-foreground/70 truncate max-w-[40ch]">
-                  {detail}
-                </span>
+                <span className="text-muted-foreground/70 truncate max-w-[40ch]">{detail}</span>
               </>
             )}
           </div>

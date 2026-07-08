@@ -53,7 +53,11 @@ export function InfoPanel() {
       >
         <TabsList variant="line" className="w-full overflow-x-auto">
           {(['backlinks', 'copilot', 'graph', 'history', 'calendar'] as Tab[]).map((tabValue) => (
-            <TabsTrigger key={tabValue} value={tabValue} className="capitalize flex-none text-xs px-2.5">
+            <TabsTrigger
+              key={tabValue}
+              value={tabValue}
+              className="capitalize flex-none text-xs px-2.5"
+            >
               {tabValue}
             </TabsTrigger>
           ))}

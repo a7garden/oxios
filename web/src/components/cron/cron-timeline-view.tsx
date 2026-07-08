@@ -1,6 +1,6 @@
+import { Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   chartColor,
@@ -172,10 +172,16 @@ export function CronTimelineView({
                         <button
                           type="button"
                           onClick={() => onToggle(job)}
-                          aria-label={job.enabled ? t('cronJobs.disableJob') : t('cronJobs.enableJob')}
+                          aria-label={
+                            job.enabled ? t('cronJobs.disableJob') : t('cronJobs.enableJob')
+                          }
                           className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          {job.enabled ? <PowerOff className="h-3 w-3" /> : <Power className="h-3 w-3" />}
+                          {job.enabled ? (
+                            <PowerOff className="h-3 w-3" />
+                          ) : (
+                            <Power className="h-3 w-3" />
+                          )}
                         </button>
                       )}
                       {onDelete && (

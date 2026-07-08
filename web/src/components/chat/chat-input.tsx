@@ -332,37 +332,37 @@ export function ChatInput({
           <div className="p-1.5">
             {mentionResults.length > 0 ? (
               mentionResults.map((result, i) => (
-              <button
-                key={`${result.type}-${result.id}`}
-                type="button"
-                onClick={() => insertMention(result)}
-                className={cn(
-                  'flex items-start gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-colors',
-                  i === mentionIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
-                )}
-              >
-                {result.type === 'mount' ? (
-                  <HardDrive className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />
-                ) : result.type === 'knowledge' ? (
-                  <FileText className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
-                ) : (
-                  <Brain className="h-4 w-4 mt-0.5 shrink-0 text-purple-500" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{result.label}</p>
-                  {result.snippet && (
-                    <p className="text-xs text-muted-foreground truncate">{result.snippet}</p>
+                <button
+                  key={`${result.type}-${result.id}`}
+                  type="button"
+                  onClick={() => insertMention(result)}
+                  className={cn(
+                    'flex items-start gap-2.5 w-full rounded-lg px-2.5 py-2 text-left transition-colors',
+                    i === mentionIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
                   )}
-                </div>
-                <span className="text-2xs text-muted-foreground/60 shrink-0 mt-0.5">
-                  {result.type === 'mount'
-                    ? 'Mount'
-                    : result.type === 'knowledge'
-                      ? 'KB'
-                      : 'Memory'}
-                </span>
-              </button>
-            ))
+                >
+                  {result.type === 'mount' ? (
+                    <HardDrive className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />
+                  ) : result.type === 'knowledge' ? (
+                    <FileText className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+                  ) : (
+                    <Brain className="h-4 w-4 mt-0.5 shrink-0 text-purple-500" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{result.label}</p>
+                    {result.snippet && (
+                      <p className="text-xs text-muted-foreground truncate">{result.snippet}</p>
+                    )}
+                  </div>
+                  <span className="text-2xs text-muted-foreground/60 shrink-0 mt-0.5">
+                    {result.type === 'mount'
+                      ? 'Mount'
+                      : result.type === 'knowledge'
+                        ? 'KB'
+                        : 'Memory'}
+                  </span>
+                </button>
+              ))
             ) : (
               <p className="px-2.5 py-3 text-xs text-muted-foreground text-center">
                 {mentionQuery === '' ? t('chat.mentionHint') : t('chat.noMentionResults')}

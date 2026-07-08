@@ -19,7 +19,14 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { CreateFileDialog } from '@/components/workspace/create-file-dialog'
 import { FileBreadcrumb } from '@/components/workspace/file-breadcrumb'
 import { FileEditor } from '@/components/workspace/file-editor'
@@ -238,7 +245,7 @@ function WorkspacePage() {
           ) : (
             <>
               <span className="w-4" />
-            <File className={`h-4 w-4 ${fileTint(entry.name)} shrink-0`} />
+              <File className={`h-4 w-4 ${fileTint(entry.name)} shrink-0`} />
             </>
           )}
           <span className="truncate">{entry.name}</span>
@@ -434,7 +441,12 @@ function WorkspacePage() {
             >
               {t('common.cancel')}
             </Button>
-            <Button variant="destructive" size="sm" onClick={confirmDelete} disabled={deleteFile.isPending}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={confirmDelete}
+              disabled={deleteFile.isPending}
+            >
               {t('common.delete', '삭제')}
             </Button>
           </DialogFooter>

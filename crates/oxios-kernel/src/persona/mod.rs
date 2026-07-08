@@ -5,8 +5,8 @@
 //! This foundation supports future multi-agent chat scenarios.
 
 pub mod manager;
+pub mod persistence;
 pub mod store;
-
 pub use manager::PersonaManager;
 pub use store::PersonaStore;
 

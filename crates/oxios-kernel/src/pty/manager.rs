@@ -1,12 +1,12 @@
 //! PtyManager — session registry, GC tick, attach/detach (RFC-038 §5.3, §6.3, §8.3).
+use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
-use portable_pty::MasterPty;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::access_manager::{AuditEvent, AuditSink};
 use crate::config::PtyConfig;
-use oxi_sdk::observability::AuditSink;
 
 use super::error::PtyError;
 use super::session::{PtySession, PtySessionId, PtySessionInfo, PtySessionState, PtySize};
@@ -86,10 +86,14 @@ impl PtyManager {
             .entry(principal.to_string())
             .or_default()
             .insert(id.clone());
-        self.audit.record(oxi_sdk::observability::AuditAction::Custom(format!(
-            "pty.open id={id} shell={} principal={principal}",
-            session.shell
-        )));
+        self.audit.record(AuditEvent::ToolAccess {
+            timestamp: Utc::now(),
+            agent: principal.to_string(),
+            tool: format!("pty.open:{}", session.shell),
+            allowed: true,
+            layer: Some("pty".into()),
+            reason: Some(id.clone()),
+        });
         Ok(session)
     }
 
@@ -129,8 +133,8 @@ impl PtyManager {
             .as_mut()
             .ok_or_else(|| PtyError::Closed(session_id.to_string()))?;
         master
-            .try_clone_writer()
-            .ok_or_else(|| PtyError::Io("master writer unavailable".into()))?
+            .take_writer()
+            .map_err(|e| PtyError::Io(e.to_string()))?
             .write_all(bytes)
             .map_err(|e| PtyError::Io(e.to_string()))?;
         session.touch_input();
@@ -175,7 +179,7 @@ impl PtyManager {
             .ok_or_else(|| PtyError::Closed(session_id.to_string()))?;
         master
             .try_clone_reader()
-            .ok_or_else(|| PtyError::Io("master reader unavailable".into()))
+            .map_err(|e| PtyError::Io(e.to_string()))
     }
 
     /// List sessions for a principal.
@@ -248,9 +252,14 @@ impl PtyManager {
         if let Some(set) = self.by_principal.lock().get_mut(&session.principal) {
             set.remove(session_id);
         }
-        self.audit.record(oxi_sdk::observability::AuditAction::Custom(format!(
-            "pty.close id={session_id}"
-        )));
+        self.audit.record(AuditEvent::ToolAccess {
+            timestamp: Utc::now(),
+            agent: session.principal.clone(),
+            tool: "pty.close".into(),
+            allowed: true,
+            layer: Some("pty".into()),
+            reason: Some(session_id.to_string()),
+        });
         Ok(())
     }
 
@@ -324,11 +333,11 @@ fn hex_encode(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oxi_sdk::observability::{AuditAction, AuditSink};
+    use crate::access_manager::AuditEvent;
 
     struct NoopAudit;
     impl AuditSink for NoopAudit {
-        fn record(&self, _: AuditAction) {}
+        fn record(&self, _event: AuditEvent) {}
     }
 
     #[test]

@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 
 use crate::config::PtyConfig;
 use crate::pty::{PtyManager, PtySessionInfo, PtySize};
-use oxi_sdk::observability::AuditSink;
+use crate::access_manager::AuditSink;
 
 /// Shared, hot-reloadable PTY config.
 pub type SharedPtyConfig = Arc<RwLock<PtyConfig>>;
