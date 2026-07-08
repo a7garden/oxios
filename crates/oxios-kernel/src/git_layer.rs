@@ -563,6 +563,31 @@ impl GitLayer {
         Ok(tags)
     }
 
+    /// Delete a tag by name. Fails if the tag does not exist.
+    pub fn delete_tag(&self, name: &str) -> Result<()> {
+        if !self.enabled {
+            return Ok(());
+        }
+        let repo = self.repo.lock();
+        // Locate the tag reference first, then delete it after the search
+        // iterator is dropped so we don't hold a borrow across the edit.
+        let target = repo
+            .references()?
+            .all()?
+            .filter_map(|r| r.ok())
+            .find(|r| {
+                r.name()
+                    .category()
+                    .is_some_and(|c| matches!(c, gix::refs::Category::Tag))
+                    && r.name().shorten().to_string() == name
+            })
+            .ok_or_else(|| anyhow::anyhow!("tag not found: {name}"))?;
+        target
+            .delete()
+            .map_err(|e| anyhow::anyhow!("delete tag: {e:#}"))?;
+        Ok(())
+    }
+
     // ── Log / resolve ─────────────────────────────────────────────────────
 
     /// Return commit log entries, most recent first.

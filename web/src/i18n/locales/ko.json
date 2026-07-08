@@ -1480,7 +1480,10 @@
     "noChanges": "변경 사항 없음",
     "restoreConfirmTitle": "이 커밋으로 복원하시겠습니까?",
     "restoreConfirmDesc": "{{hash}}(으)로 작업 디렉터리를 복원합니다. 커밋되지 않은 변경 사항은 손실될 수 있습니다.",
-    "useHashForRestore": "이 해시를 복원 입력에 사용"
+    "useHashForRestore": "이 해시를 복원 입력에 사용",
+    "deleteTag": "태그 삭제",
+    "tagDeleted": "태그가 삭제되었습니다",
+    "tagDeleteFailed": "태그 삭제에 실패했습니다"
   },
   "memory": {
     "title": "메모리",
@@ -1955,6 +1958,8 @@
       "windowEnd": "종료",
       "startWindow": "윈도우 시작",
       "startManual": "수동 실행",
+      "windowHint": "지정한 시간 윈도우 동안 할당량을 소진합니다",
+      "manualHint": "즉시 수동으로 시작합니다 (윈도우 없음)",
       "stop": "중지",
       "noEnabledProviders": "활성화된 구독형 프로바이더가 없습니다",
       "startFailed": "시작 실패: {{error}}",

@@ -3,7 +3,7 @@
 use crate::api::error::AppError;
 use crate::api::server::AppState;
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use serde::Deserialize;
 use serde_json;
 use std::sync::Arc;
@@ -67,4 +67,17 @@ pub(crate) async fn handle_git_restore(
         "restored": body.path,
         "from": body.hash
     })))
+}
+
+/// DELETE /api/git/tags/{name} — Delete a tag.
+pub(crate) async fn handle_git_tag_delete(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    state
+        .kernel
+        .infra
+        .git_delete_tag(&name)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "deleted": name })))
 }

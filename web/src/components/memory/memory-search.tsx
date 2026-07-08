@@ -11,6 +11,7 @@ export function MemorySearch() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SemanticSearchResult[]>([])
+  const [engine, setEngine] = useState<string | null>(null)
   const semanticSearch = useMemorySemanticSearch()
 
   const handleSearch = async () => {
@@ -25,6 +26,7 @@ export function MemorySearch() {
         limit: 20,
       })
       setResults(res?.entries ?? [])
+      setEngine(res?.engine ?? null)
     } catch {
       setResults([])
     }
@@ -35,6 +37,9 @@ export function MemorySearch() {
       <div className="flex items-center justify-between gap-2">
         <Badge variant="secondary" className="gap-1">
           <Zap className="h-3 w-3" /> {t('memory.semanticSearch')}
+          {engine && (
+            <span className="text-xs font-normal text-muted-foreground/70">· {engine}</span>
+          )}
         </Badge>
         {semanticSearch.isError && (
           <p className="text-xs text-destructive">

@@ -55,6 +55,7 @@ export function Header() {
         onClick={() => openPalette()}
         className="h-8 gap-2 px-2.5 text-muted-foreground"
         aria-label={t('commandPalette.openAria')}
+        title={`${t('commandPalette.openAria')} (⌘K)`}
       >
         <Search className="h-3.5 w-3.5" />
         <span className="hidden sm:inline text-xs">{t('commandPalette.placeholder')}</span>

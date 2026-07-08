@@ -11,6 +11,7 @@ import {
   Plus,
   RefreshCw,
   Trash2,
+  Upload,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -34,6 +35,16 @@ export const Route = createFileRoute('/workspace/')({ component: WorkspacePage }
 type SelectedFile = {
   path: string
   mode: 'view' | 'edit'
+}
+
+/** Tailwind text tint for a file node by extension category — at-a-glance type ID. */
+function fileTint(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return 'text-pink-500'
+  if (['rs', 'ts', 'tsx', 'js', 'jsx', 'py', 'go', 'java', 'c', 'cpp', 'rb'].includes(ext))
+    return 'text-blue-500'
+  if (['md', 'txt', 'json', 'toml', 'yaml', 'yml'].includes(ext)) return 'text-amber-500'
+  return 'text-muted-foreground'
 }
 
 function WorkspacePage() {
@@ -227,7 +238,7 @@ function WorkspacePage() {
           ) : (
             <>
               <span className="w-4" />
-              <File className="h-4 w-4 text-muted-foreground shrink-0" />
+            <File className={`h-4 w-4 ${fileTint(entry.name)} shrink-0`} />
             </>
           )}
           <span className="truncate">{entry.name}</span>
@@ -263,6 +274,14 @@ function WorkspacePage() {
           <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
             <Plus className="h-4 w-4 mr-1" /> {t('common.create')}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowUpload(!showUpload)}
+            aria-label={t('workspace.uploadFile')}
+          >
+            <Upload className="h-4 w-4 mr-1" /> {t('workspace.uploadFile')}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => refetchRoot()} disabled={rootFetching}>
             <RefreshCw className={`h-4 w-4 ${rootFetching ? 'animate-spin' : ''}`} />
           </Button>
@@ -296,16 +315,6 @@ function WorkspacePage() {
               <UploadDropZone currentDir={currentDir} onUploaded={() => refetchRoot()} />
             </div>
           )}
-          <div className="px-2 pb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-xs"
-              onClick={() => setShowUpload(!showUpload)}
-            >
-              {showUpload ? t('workspace.hideUpload') : t('workspace.uploadFile')}
-            </Button>
-          </div>
         </div>
 
         {/* Right panel: File viewer/editor */}

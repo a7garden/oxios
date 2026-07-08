@@ -90,7 +90,7 @@ pub(crate) use events::{
     handle_sessions_prune,
 };
 pub(crate) use git_routes::{
-    handle_git_log, handle_git_restore, handle_git_tags, handle_git_verify,
+    handle_git_log, handle_git_restore, handle_git_tag_delete, handle_git_tags, handle_git_verify,
 };
 pub(crate) use infra::{
     handle_audit_log, handle_mcp_server_delete, handle_mcp_server_refresh,
@@ -482,6 +482,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/git/tags", get(handle_git_tags))
         .route("/api/git/verify", post(handle_git_verify))
         .route("/api/git/restore", post(handle_git_restore))
+        .route("/api/git/tags/{name}", delete(handle_git_tag_delete))
         // Projects
         .route("/api/projects", get(handle_projects_list))
         .route("/api/projects", post(handle_project_create))

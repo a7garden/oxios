@@ -227,6 +227,14 @@ function AgentsListPage() {
     refetchInterval: statusTab === 'running' ? 3000 : 10000,
   })
 
+  // Lightweight counts-only query (always enabled) so the canvas view can
+  // surface the all/completed/failed breakdown without loading the full table.
+  const countsQuery = useQuery({
+    queryKey: ['agents', 'counts'],
+    queryFn: () => api.get<AgentListResponse>('/api/agents?per_page=1'),
+    refetchInterval: 10000,
+  })
+
   function setParam(key: string, value: string | number | undefined) {
     navigate({
       search: (prev) => ({
@@ -315,17 +323,45 @@ function AgentsListPage() {
           {view === 'table' ? (
             <StatsBar response={tableQuery.data} />
           ) : (
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               {monitor.stats.running > 0 && (
-                <span className="text-success">{monitor.stats.running} running</span>
+                <span className="text-success">
+                  {monitor.stats.running} {t('agents.running')}
+                </span>
               )}
               {monitor.stats.totalCost > 0 && (
-                <span>${monitor.stats.totalCost.toFixed(4)} active cost</span>
+                <span>${monitor.stats.totalCost.toFixed(4)}</span>
               )}
               {monitor.stats.totalTokens > 0 && (
                 <span>{monitor.stats.totalTokens.toLocaleString()} tokens</span>
               )}
-              {monitor.edges.length > 0 && <span>{monitor.edges.length} A2A connections</span>}
+              {monitor.edges.length > 0 && <span>{monitor.edges.length} A2A</span>}
+              {countsQuery.data && (
+                <span className="text-xs">
+                  {t('agents.all')} {countsQuery.data.total}
+                  {countsQuery.data.stats.count_completed ? (
+                    <>
+                      {' · '}
+                      {t('agents.completed')} {countsQuery.data.stats.count_completed}
+                    </>
+                  ) : null}
+                  {countsQuery.data.stats.count_failed ? (
+                    <>
+                      {' · '}
+                      <span className="text-destructive">
+                        {t('agents.failed')} {countsQuery.data.stats.count_failed}
+                      </span>
+                    </>
+                  ) : null}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setView('table')}
+                className="text-xs text-primary underline-offset-2 hover:underline"
+              >
+                {t('agentMonitor.table')} →
+              </button>
             </div>
           )}
         </div>

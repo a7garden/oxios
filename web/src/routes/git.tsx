@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { GitBranch, RotateCcw, ShieldCheck, Tag } from 'lucide-react'
+import { GitBranch, RotateCcw, ShieldCheck, Tag, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -54,6 +54,17 @@ function GitPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['git-tags'] })
       setTagName('')
+    },
+  })
+
+  const deleteTagMutation = useMutation({
+    mutationFn: (tag: string) => api.delete(`/api/git/tags/${encodeURIComponent(tag)}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['git-tags'] })
+      toast.success(t('git.tagDeleted'))
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : t('git.tagDeleteFailed'))
     },
   })
 
@@ -126,9 +137,18 @@ function GitPage() {
           </div>
           {tagList.length > 0 ? (
             <div className="flex gap-2 flex-wrap">
-              {tagList.map((t) => (
-                <Badge key={t} variant="outline">
-                  {t}
+              {tagList.map((tagName) => (
+                <Badge key={tagName} variant="outline" className="gap-1 pr-1">
+                  {tagName}
+                  <button
+                    type="button"
+                    onClick={() => deleteTagMutation.mutate(tagName)}
+                    disabled={deleteTagMutation.isPending}
+                    aria-label={t('git.deleteTag')}
+                    className="ml-0.5 rounded-sm p-0.5 hover:bg-muted"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               ))}
             </div>

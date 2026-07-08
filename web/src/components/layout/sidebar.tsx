@@ -154,6 +154,7 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
       { labelKey: 'common.security', href: '/security', icon: <Bell className="h-4 w-4" /> },
+      { labelKey: 'common.settings', href: '/settings', icon: <Settings className="h-4 w-4" /> },
     ],
   },
 ]

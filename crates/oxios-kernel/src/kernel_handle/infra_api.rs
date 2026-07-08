@@ -80,6 +80,11 @@ impl InfraApi {
         self.git_layer.list_tags()
     }
 
+    /// Delete a tag by name.
+    pub fn git_delete_tag(&self, name: &str) -> anyhow::Result<()> {
+        self.git_layer.delete_tag(name)
+    }
+
     /// Add a cron job.
     pub async fn add_cron(&self, job: CronJob) -> anyhow::Result<uuid::Uuid> {
         self.cron_scheduler.add_job(job).await

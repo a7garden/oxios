@@ -1484,7 +1484,10 @@
     "noChanges": "No changes",
     "restoreConfirmTitle": "Restore to this commit?",
     "restoreConfirmDesc": "Restores the working directory to {{hash}}. Uncommitted changes may be lost.",
-    "useHashForRestore": "Use this hash for restore"
+    "useHashForRestore": "Use this hash for restore",
+    "deleteTag": "Delete tag",
+    "tagDeleted": "Tag deleted",
+    "tagDeleteFailed": "Failed to delete tag"
   },
   "memory": {
     "title": "Memory",
@@ -1961,6 +1964,8 @@
       "windowEnd": "End",
       "startWindow": "Start Window",
       "startManual": "Run Manually",
+      "windowHint": "Burns quota during the chosen time window",
+      "manualHint": "Starts immediately, manually (no window)",
       "stop": "Stop",
       "noEnabledProviders": "No enabled subscription providers",
       "startFailed": "Start failed: {{error}}",

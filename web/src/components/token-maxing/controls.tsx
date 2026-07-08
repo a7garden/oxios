@@ -129,6 +129,7 @@ export function TokenMaxingControls() {
           <Button
             onClick={handleStartWindow}
             disabled={running || !enabled || startMutation.isPending || !start || !end}
+            title={t('tokenMaxing.controls.windowHint')}
           >
             <Play className="h-4 w-4" />
             {t('tokenMaxing.controls.startWindow')}
@@ -137,6 +138,7 @@ export function TokenMaxingControls() {
             variant="secondary"
             onClick={handleStartManual}
             disabled={running || !enabled || startMutation.isPending}
+            title={t('tokenMaxing.controls.manualHint')}
           >
             <Hand className="h-4 w-4" />
             {t('tokenMaxing.controls.startManual')}

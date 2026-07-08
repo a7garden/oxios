@@ -66,6 +66,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
       {project.paths && project.paths.length > 0 && (
         <p className="text-2xs text-muted-foreground font-mono truncate mb-2">
           <FolderOpen className="h-3 w-3 shrink-0" /> {project.paths[0]}
+          {project.paths.length > 1 ? ` +${project.paths.length - 1}` : ''}
         </p>
       )}
 
