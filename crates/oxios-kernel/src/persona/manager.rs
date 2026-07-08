@@ -157,15 +157,15 @@ impl PersonaManager {
         &self,
         store: &crate::state_store::StateStore,
     ) -> Result<()> {
-        let loaded = crate::persona::persistence::load_from_state_store(store).await?;
-        // store 비우기 (defaults 잔존 방지) — store 가 비어있을 때만 채움
-        // (load_from_state_store 가 schema_version 검증 후 personas Vec 제공)
-        if let Some(active) = loaded.active_persona_id {
-            if loaded
-                .personas
-                .iter()
-                .any(|p| p.id == active && p.enabled)
-            {
+        let snap = crate::persona::persistence::load_from_state_store(store)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("persona: no snapshot present"))?;
+        // store 가 이미 기본 페르소나를 들고 있어도 디스크가 우선.
+        for p in &snap.personas {
+            self.store.register(p.clone());
+        }
+        if let Some(active) = snap.active_persona_id {
+            if snap.personas.iter().any(|p| p.id == active && p.enabled) {
                 *self.active_persona_id.write() = Some(active);
             }
         }

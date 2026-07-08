@@ -227,15 +227,18 @@ pub async fn handle_persona_active_set(
     state: State<Arc<AppState>>,
     Json(body): Json<PersonaActiveRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let persona_manager = state.kernel.persona.persona_manager.clone();
-    let state_store = state.kernel.state.state_store.clone();
-    let new_prompt = persona_manager
-        .set_active(&body.id, Some(&state_store))
+    let new_prompt = state
+        .kernel
+        .persona
+        .set_active_with_persist(&body.id, &state.kernel.state)
         .await
         .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?
         .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "no prompt returned".to_string()))?;
-    // intent engine 재시드 (HTTP 라우트가 engine 을 직접 보지 못하므로 log 만)
-    tracing::info!(persona_id = %body.id, "active persona changed; new system_prompt length = {}", new_prompt.len());
+    tracing::info!(
+        persona_id = %body.id,
+        prompt_len = new_prompt.len(),
+        "active persona changed; new system_prompt available for re-seed"
+    );
     let persona = state.kernel.persona.active();
     Ok(Json(serde_json::json!({
         "status": "active",

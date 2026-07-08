@@ -138,7 +138,7 @@ impl PtySession {
             cmd.env(k, v);
         }
 
-        let child = pair
+        let mut child = pair
             .slave
             .spawn_command(cmd)
             .map_err(|e| PtyError::Spawn(e.to_string()))?;
