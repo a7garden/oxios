@@ -1,5 +1,4 @@
 //! PtyManager — session registry, GC tick, attach/detach (RFC-038 §5.3, §6.3, §8.3).
-use chrono::Utc;
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

@@ -13,12 +13,24 @@ use std::sync::Arc;
 /// Persona management system calls.
 pub struct PersonaApi {
     pub(crate) persona_manager: Arc<PersonaManager>,
+    /// RFC-039: optional callback invoked after a successful activate/persist
+    /// to re-seed the intent engine's system_prompt.
+    reseed_callback: Option<Arc<dyn Fn(Option<String>) + Send + Sync>>,
 }
 
 impl PersonaApi {
     /// Create a new PersonaApi.
     pub fn new(persona_manager: Arc<PersonaManager>) -> Self {
-        Self { persona_manager }
+        Self {
+            persona_manager,
+            reseed_callback: None,
+        }
+    }
+
+    /// Set the callback that re-seeds the intent engine's system_prompt.
+    /// Called automatically by `set_active_with_persist`.
+    pub fn set_reseed_callback(&mut self, cb: Option<Arc<dyn Fn(Option<String>) + Send + Sync>>) {
+        self.reseed_callback = cb;
     }
 
     /// Underlying `Arc<PersonaManager>` for boot-time wiring.
@@ -78,7 +90,12 @@ impl PersonaApi {
     ) -> anyhow::Result<Option<String>> {
         self.persona_manager.set_active(id, None).await?;
         self.persist(state_api).await?;
-        Ok(self.persona_manager.get_active_persona().map(|p| p.system_prompt))
+        let prompt = self.persona_manager.get_active_persona().map(|p| p.system_prompt);
+        // RFC-039: auto re-seed intent engine if callback is set.
+        if let Some(ref cb) = self.reseed_callback {
+            cb(prompt.clone());
+        }
+        Ok(prompt)
     }
 
     /// RFC-039: persist the full persona registry to `StateStore`.

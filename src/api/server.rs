@@ -43,10 +43,6 @@ pub struct AppState {
     /// RFC-024 SP4: subsystem readiness gate. The readiness middleware
     /// returns 503 (with `Retry-After`) when the gate is not yet open.
     pub readiness: std::sync::Arc<oxios_kernel::ReadinessGate>,
-    /// RFC-039: callback to re-seed IntentEngine's system_prompt when the
-    /// active persona changes via HTTP. The binary crate bridges kernel ↔
-    /// ouroboros (kernel can't depend on ouroboros).
-    pub persona_prompt_reseed: Option<Arc<dyn Fn(Option<String>) + Send + Sync>>,
 }
 
 impl std::fmt::Debug for AppState {

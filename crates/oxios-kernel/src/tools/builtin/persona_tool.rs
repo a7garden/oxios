@@ -358,6 +358,14 @@ impl AgentTool for PersonaTool {
                         if let Err(e) = self.persona_manager.persist(&self.state_store).await {
                             tracing::warn!(error = %e, "persona update: persist failed");
                         }
+                        let _ = self.event_bus.publish(KernelEvent::PersonaUpdated {
+                            id: id.to_string(),
+                            name: updated_name.clone(),
+                            source: "agent".to_string(),
+                        });
+                        Ok(AgentToolResult::success(format!(
+                            "Updated persona '{updated_name}'. The user has been notified."
+                        )))
                     }
                     Err(e) => Ok(AgentToolResult::error(format!(
                         "Failed to update persona: {e}"

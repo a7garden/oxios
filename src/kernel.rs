@@ -1190,9 +1190,16 @@ impl KernelBuilder {
             Arc::clone(&routing_stats),
             Arc::clone(&engine_handle),
         ));
-        let persona_api = Arc::new(oxios_kernel::PersonaApi::new(Arc::new(
+        let mut persona_api_unwrapped = oxios_kernel::PersonaApi::new(Arc::new(
             persona_manager.clone(),
-        )));
+        ));
+        // RFC-039: auto re-seed the intent engine when the active persona
+        // changes via HTTP. The binary crate bridges kernel ↔ ouroboros.
+        let ie = intent_engine.clone();
+        persona_api_unwrapped.set_reseed_callback(Some(Arc::new(move |prompt| {
+            ie.set_persona_prompt(prompt);
+        })));
+        let persona_api = Arc::new(persona_api_unwrapped);
 
         // Shared KnowledgeBase — single source of truth (RFC-003)
         let knowledge_base = Arc::new(
