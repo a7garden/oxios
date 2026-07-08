@@ -61,3 +61,106 @@ pub async fn save_to_state_store(
         .await
         .context("persona: failed to save index.json")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::persona::Persona;
+
+    fn make_persona(id: &str, name: &str, role: &str, enabled: bool) -> Persona {
+        Persona {
+            id: id.to_string(),
+            name: name.to_string(),
+            role: role.to_string(),
+            description: format!("Test persona {name}"),
+            system_prompt: format!("You are {name}."),
+            enabled,
+            model: None,
+            personality_traits: vec!["curious".to_string()],
+        }
+    }
+
+    fn make_store() -> StateStore {
+        let dir = tempfile::tempdir().unwrap();
+        StateStore::new(dir.keep()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_round_trip() {
+        let store = make_store();
+        let snap = PersonaSnapshot {
+            schema_version: 1,
+            active_persona_id: Some("dev".to_string()),
+            personas: vec![
+                make_persona("dev", "Dev", "developer", true),
+                make_persona("qa", "Review", "qa", true),
+            ],
+        };
+        save_to_state_store(&store, &snap).await.unwrap();
+        let loaded = load_from_state_store(&store).await.unwrap().unwrap();
+        assert_eq!(loaded.schema_version, 1);
+        assert_eq!(loaded.active_persona_id, Some("dev".to_string()));
+        assert_eq!(loaded.personas.len(), 2);
+        assert_eq!(loaded.personas[0].id, "dev");
+        assert_eq!(loaded.personas[1].role, "qa");
+    }
+
+    #[tokio::test]
+    async fn test_no_file_returns_none() {
+        let store = make_store();
+        let loaded = load_from_state_store(&store).await.unwrap();
+        assert!(loaded.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_schema_version_mismatch_errors() {
+        let store = make_store();
+        let snap = PersonaSnapshot {
+            schema_version: 99,
+            active_persona_id: None,
+            personas: vec![],
+        };
+        save_to_state_store(&store, &snap).await.unwrap();
+        let result = load_from_state_store(&store).await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("schema_version"));
+    }
+
+    #[tokio::test]
+    async fn test_empty_personas_round_trip() {
+        let store = make_store();
+        let snap = PersonaSnapshot {
+            schema_version: 1,
+            active_persona_id: None,
+            personas: vec![],
+        };
+        save_to_state_store(&store, &snap).await.unwrap();
+        let loaded = load_from_state_store(&store).await.unwrap().unwrap();
+        assert!(loaded.personas.is_empty());
+        assert!(loaded.active_persona_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_overwrite_on_save() {
+        let store = make_store();
+        let snap1 = PersonaSnapshot {
+            schema_version: 1,
+            active_persona_id: Some("dev".to_string()),
+            personas: vec![make_persona("dev", "Dev", "developer", true)],
+        };
+        save_to_state_store(&store, &snap1).await.unwrap();
+        let snap2 = PersonaSnapshot {
+            schema_version: 1,
+            active_persona_id: Some("qa".to_string()),
+            personas: vec![
+                make_persona("dev", "Dev", "developer", true),
+                make_persona("qa", "Review", "qa", true),
+            ],
+        };
+        save_to_state_store(&store, &snap2).await.unwrap();
+        let loaded = load_from_state_store(&store).await.unwrap().unwrap();
+        assert_eq!(loaded.active_persona_id, Some("qa".to_string()));
+        assert_eq!(loaded.personas.len(), 2);
+    }
+}

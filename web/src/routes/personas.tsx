@@ -85,7 +85,8 @@ function PersonasPage() {
   })
 
   const activateMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/api/personas/${id}/activate`),
+    // RFC-039: PUT /api/personas/active {id} (was POST /:id/activate — 404)
+    mutationFn: (id: string) => api.put('/api/personas/active', { id }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['personas'] }),
   })
 

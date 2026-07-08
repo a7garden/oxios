@@ -5,7 +5,6 @@ use parking_lot::RwLock;
 
 use crate::config::PtyConfig;
 use crate::pty::{PtyManager, PtySessionInfo, PtySize};
-use crate::access_manager::AuditSink;
 
 /// Shared, hot-reloadable PTY config.
 pub type SharedPtyConfig = Arc<RwLock<PtyConfig>>;
@@ -14,17 +13,12 @@ pub type SharedPtyConfig = Arc<RwLock<PtyConfig>>;
 pub struct PtyApi {
     pub manager: Arc<PtyManager>,
     pub config: SharedPtyConfig,
-    audit: Arc<dyn AuditSink>,
 }
 
 impl PtyApi {
-    pub fn new(config: SharedPtyConfig, audit: Arc<dyn AuditSink>) -> Self {
-        let manager = Arc::new(PtyManager::new(Arc::clone(&config), Arc::clone(&audit)));
-        Self {
-            manager,
-            config,
-            audit,
-        }
+    pub fn new(config: SharedPtyConfig) -> Self {
+        let manager = Arc::new(PtyManager::new(Arc::clone(&config)));
+        Self { manager, config }
     }
 
     /// Snapshot of the current PTY config.

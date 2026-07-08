@@ -222,7 +222,6 @@ impl Kernel {
                     self.build_email_api(),
                     oxios_kernel::PtyApi::new(
                         Arc::new(parking_lot::RwLock::new(self.config.pty.clone())),
-                        self.audit_trail.clone(),
                     ),
                 );
                 // RFC-025: attach MountApi to the handle the HTTP API and CLI
@@ -1274,7 +1273,6 @@ impl KernelBuilder {
                 build_marketplace_api_value(&config),
                 oxios_kernel::PtyApi::new(
                     Arc::new(parking_lot::RwLock::new(config.pty.clone())),
-                    audit_trail.clone(),
                 ),
             );
 

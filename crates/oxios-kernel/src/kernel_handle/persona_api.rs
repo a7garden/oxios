@@ -1,14 +1,13 @@
 //! Persona API — multi-persona management.
 //!
 //! `PersonaApi` is the public surface over `PersonaManager`. RFC-039 adds
-//! `set_active_with_persist`, which also flushes the full registry to the
-//! shared `StateStore`, and `manager()` for callers that need the underlying
-//! `Arc<PersonaManager>` (e.g. boot-time `load_from_state_store` /
-//! `apply_config`).
+//! `set_active_with_persist` + `persist`, which also flushes the full
+//! registry via the shared `StateApi`, and `manager()` for callers that
+//! need the underlying `Arc<PersonaManager>` (e.g. boot-time
+//! `load_from_state_store` / `apply_config`).
 
 use crate::persona::Persona;
 use crate::persona::PersonaManager;
-use crate::state_store::StateStore;
 use std::sync::Arc;
 
 /// Persona management system calls.
@@ -37,18 +36,18 @@ impl PersonaApi {
         self.persona_manager.store().get(id)
     }
 
-    /// Create a new persona (in-memory only; persistence requires an explicit
-    /// `set_active_with_persist` or `manager.persist`).
+    /// Create a new persona (in-memory only; persistence requires an
+    /// explicit `persist` call after this — see `handle_persona_create`).
     pub fn create(&self, persona: Persona) {
         self.persona_manager.store().register(persona);
     }
 
-    /// Update a persona.
+    /// Update a persona (in-memory only; call `persist` after).
     pub fn update(&self, id: &str, persona: Persona) -> anyhow::Result<()> {
         self.persona_manager.store().update(id, persona)
     }
 
-    /// Delete a persona.
+    /// Delete a persona (in-memory only; call `persist` after).
     pub fn delete(&self, id: &str) -> anyhow::Result<()> {
         self.persona_manager.store().delete(id)
     }
@@ -69,15 +68,38 @@ impl PersonaApi {
         self.persona_manager.set_active_persona(id)
     }
 
-    /// RFC-039: set active persona + persist the full registry to `StateStore`.
-    /// Returns the new `system_prompt` so the caller can re-seed the intent
-    /// engine (kernel ↔ ouroboros 의존성 방향 회피).
+    /// RFC-039: set active persona + persist the full registry via `StateApi`.
+    /// Returns the new system_prompt so the caller can re-seed the intent
+    /// engine (kernel <-> ouroboros dependency direction avoidance).
     pub async fn set_active_with_persist(
         &self,
         id: &str,
-        store: &crate::state_store::StateStore,
+        state_api: &crate::kernel_handle::StateApi,
     ) -> anyhow::Result<Option<String>> {
-        self.persona_manager.set_active(id, Some(store)).await
+        self.persona_manager.set_active(id, None).await?;
+        self.persist(state_api).await?;
+        Ok(self.persona_manager.get_active_persona().map(|p| p.system_prompt))
+    }
+
+    /// RFC-039: persist the full persona registry to `StateStore`.
+    /// Call this after every mutation (`create`/`update`/`delete`) so the
+    /// in-memory state matches the on-disk state. Otherwise the next
+    /// restart will lose the change.
+    pub async fn persist(
+        &self,
+        state_api: &crate::kernel_handle::StateApi,
+    ) -> anyhow::Result<()> {
+        let snapshot = crate::persona::persistence::PersonaSnapshot {
+            schema_version: 1,
+            active_persona_id: self.persona_manager.active_persona_id(),
+            personas: self.persona_manager.store().list_all(),
+        };
+        state_api.save("personas", "index", &snapshot).await
+    }
+
+    /// Get persona count.
+    pub fn count(&self) -> usize {
+        self.persona_manager.store().len()
     }
 
     /// List enabled personas.

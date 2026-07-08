@@ -15,8 +15,7 @@ use axum::Json;
 use futures_util::{SinkExt, StreamExt as FuturesStreamExt};
 use serde::{Deserialize, Serialize};
 
-use oxios_kernel::pty::PtySize;
-use oxios_kernel::PtyError;
+use oxios_kernel::pty::{PtyError, PtySize};
 
 use crate::api::error::AppError;
 use crate::api::server::AppState;
@@ -71,9 +70,7 @@ pub(crate) async fn handle_pty_start(
     state: State<Arc<AppState>>,
     Json(body): Json<SpawnRequest>,
 ) -> Result<Json<SpawnResponse>, AppError> {
-    let principal = body
-        .principal
-        .unwrap_or_else(|| "default".to_string());
+    let principal = body.principal.unwrap_or_else(|| "default".to_string());
     let size = PtySize {
         cols: body.cols,
         rows: body.rows,
@@ -85,7 +82,6 @@ pub(crate) async fn handle_pty_start(
         .pty
         .open(&principal, body.shell.clone(), size)
         .map_err(map_pty_err)?;
-    // Get the resolved shell from the session list.
     let info = state
         .kernel
         .pty
@@ -112,7 +108,6 @@ pub struct SessionsResponse {
 pub(crate) async fn handle_pty_sessions(
     state: State<Arc<AppState>>,
 ) -> Result<Json<SessionsResponse>, AppError> {
-    // In single-user local-first deployment, list all sessions.
     let mut all = Vec::new();
     let principals = vec!["default".to_string()];
     for p in principals {
@@ -161,20 +156,31 @@ enum TerminalControl {
         cols: u16,
         rows: u16,
     },
-    Resize { cols: u16, rows: u16 },
-    Close { reason: Option<String> },
+    Resize {
+        cols: u16,
+        rows: u16,
+    },
+    Close {
+        reason: Option<String>,
+    },
     Exit {
         code: Option<i32>,
         signal: Option<i32>,
     },
-    Error { message: String },
+    Error {
+        message: String,
+    },
+}
+
+fn ctrl_to_message(ctrl: &TerminalControl) -> Message {
+    Message::Text(serde_json::to_string(ctrl).unwrap().into())
 }
 
 /// Per-WS-connection: spawn session (or attach), then bridge PTY ↔ WS bytes.
 async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
     let (mut ws_tx, mut ws_rx) = socket.split();
     let mut session_id: Option<String> = None;
-    let mut principal: String = "default".to_string();
+    let principal: String = "default".to_string();
 
     // First frame must be Open.
     let open_outcome = async {
@@ -183,7 +189,7 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
         };
         let msg = msg.map_err(|e| format!("ws recv: {e}"))?;
         let text = match msg {
-            Message::Text(t) => t,
+            Message::Text(t) => t.to_string(),
             _ => return Err("first frame must be text Open".to_string()),
         };
         let open: TerminalControl = serde_json::from_str(&text)
@@ -202,7 +208,6 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
                     pixel_height: 0,
                 };
                 if let Some(sid) = sid {
-                    // Re-attach.
                     state
                         .kernel
                         .pty
@@ -229,9 +234,7 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
         Ok(v) => v,
         Err(e) => {
             let _ = ws_tx
-                .send(Message::Text(
-                    serde_json::to_string(&TerminalControl::Error { message: e }).unwrap(),
-                ))
+                .send(ctrl_to_message(&TerminalControl::Error { message: e }))
                 .await;
             return;
         }
@@ -251,11 +254,7 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
         cols: info.as_ref().map(|i| i.cols).unwrap_or(80),
         rows: info.as_ref().map(|i| i.rows).unwrap_or(24),
     };
-    if ws_tx
-        .send(Message::Text(serde_json::to_string(&opened).unwrap()))
-        .await
-        .is_err()
-    {
+    if ws_tx.send(ctrl_to_message(&opened)).await.is_err() {
         return;
     }
 
@@ -264,12 +263,9 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
         Ok(r) => r,
         Err(e) => {
             let _ = ws_tx
-                .send(Message::Text(
-                    serde_json::to_string(&TerminalControl::Error {
-                        message: format!("reader: {e}"),
-                    })
-                    .unwrap(),
-                ))
+                .send(ctrl_to_message(&TerminalControl::Error {
+                    message: format!("reader: {e}"),
+                }))
                 .await;
             return;
         }
@@ -295,18 +291,15 @@ async fn handle_terminal_websocket(socket: WebSocket, state: Arc<AppState>) {
         let mut ws_tx = ws_tx;
         tokio::spawn(async move {
             while let Some(bytes) = pty_rx.recv().await {
-                if ws_tx.send(Message::Binary(bytes)).await.is_err() {
+                if ws_tx.send(Message::Binary(bytes.into())).await.is_err() {
                     break;
                 }
             }
             let _ = ws_tx
-                .send(Message::Text(
-                    serde_json::to_string(&TerminalControl::Exit {
-                        code: None,
-                        signal: None,
-                    })
-                    .unwrap(),
-                ))
+                .send(ctrl_to_message(&TerminalControl::Exit {
+                    code: None,
+                    signal: None,
+                }))
                 .await;
         })
     };

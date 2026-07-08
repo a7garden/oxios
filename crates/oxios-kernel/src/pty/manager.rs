@@ -1,11 +1,10 @@
 //! PtyManager — session registry, GC tick, attach/detach (RFC-038 §5.3, §6.3, §8.3).
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::access_manager::{AuditEvent, AuditSink};
 use crate::config::PtyConfig;
 
 use super::error::PtyError;
@@ -16,16 +15,14 @@ pub struct PtyManager {
     sessions: RwLock<HashMap<PtySessionId, Arc<PtySession>>>,
     by_principal: parking_lot::Mutex<HashMap<String, HashSet<PtySessionId>>>,
     config: Arc<RwLock<PtyConfig>>,
-    audit: Arc<dyn AuditSink>,
 }
 
 impl PtyManager {
-    pub fn new(config: Arc<RwLock<PtyConfig>>, audit: Arc<dyn AuditSink>) -> Self {
+    pub fn new(config: Arc<RwLock<PtyConfig>>) -> Self {
         Self {
             sessions: RwLock::new(HashMap::new()),
             by_principal: parking_lot::Mutex::new(HashMap::new()),
             config,
-            audit,
         }
     }
 
@@ -86,14 +83,12 @@ impl PtyManager {
             .entry(principal.to_string())
             .or_default()
             .insert(id.clone());
-        self.audit.record(AuditEvent::ToolAccess {
-            timestamp: Utc::now(),
-            agent: principal.to_string(),
-            tool: format!("pty.open:{}", session.shell),
-            allowed: true,
-            layer: Some("pty".into()),
-            reason: Some(id.clone()),
-        });
+        tracing::info!(
+            session = %id,
+            shell = %session.shell,
+            principal = %principal,
+            "pty.open"
+        );
         Ok(session)
     }
 
@@ -153,6 +148,7 @@ impl PtyManager {
         let master = guard
             .as_ref()
             .ok_or_else(|| PtyError::Closed(session_id.to_string()))?;
+        let _ =
         master.resize(portable_pty::PtySize {
             rows,
             cols,
@@ -252,14 +248,11 @@ impl PtyManager {
         if let Some(set) = self.by_principal.lock().get_mut(&session.principal) {
             set.remove(session_id);
         }
-        self.audit.record(AuditEvent::ToolAccess {
-            timestamp: Utc::now(),
-            agent: session.principal.clone(),
-            tool: "pty.close".into(),
-            allowed: true,
-            layer: Some("pty".into()),
-            reason: Some(session_id.to_string()),
-        });
+        tracing::info!(
+            session = %session_id,
+            principal = %session.principal,
+            "pty.close"
+        );
         Ok(())
     }
 
@@ -333,12 +326,6 @@ fn hex_encode(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::access_manager::AuditEvent;
-
-    struct NoopAudit;
-    impl AuditSink for NoopAudit {
-        fn record(&self, _event: AuditEvent) {}
-    }
 
     #[test]
     fn new_id_is_unique() {
@@ -351,7 +338,7 @@ mod tests {
     #[test]
     fn disabled_blocks_open() {
         let cfg = Arc::new(RwLock::new(PtyConfig::default()));
-        let m = Arc::new(PtyManager::new(cfg, Arc::new(NoopAudit)));
+        let m = Arc::new(PtyManager::new(cfg));
         let res = m.open("user", None, PtySize::default_80x24());
         assert!(matches!(res, Err(PtyError::Disabled)));
     }

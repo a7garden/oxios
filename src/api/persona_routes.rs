@@ -1,4 +1,11 @@
 //! Persona API routes: CRUD and active persona management.
+//!
+//! RFC-039: every mutation (`create`/`update`/`delete`/`set_active`) calls
+//! `PersonaApi::persist` after the in-memory change so the on-disk state at
+//! `~/.oxios/state/personas/index.json` matches the in-memory registry.
+//! HTTP path intentionally skips the LLM judge (`security_review`) that
+//! `PersonaTool` uses — that asymmetry is documented in
+//! `docs/rfc-039-persona-completion.md` §3.9.
 use axum::{
     Json,
     extract::{Path, State},
@@ -68,11 +75,9 @@ pub struct PersonaCreateRequest {
     name: String,
     role: String,
     description: String,
-    #[serde(default)]
     system_prompt: String,
     #[serde(default = "default_true")]
     enabled: bool,
-    #[serde(default)]
     model: Option<String>,
     #[serde(default)]
     personality_traits: Vec<String>,
@@ -98,12 +103,21 @@ pub async fn handle_persona_create(
         model: body.model,
         personality_traits: body.personality_traits,
     };
-    state.kernel.persona.create(persona.clone());
-    tracing::info!(persona = %persona.name, "Persona created via API");
+    let created_id = persona.id.clone();
+    let created_name = persona.name.clone();
+    state.kernel.persona.create(persona);
+    // RFC-039: persist so the new persona survives restart.
+    state
+        .kernel
+        .persona
+        .persist(&state.kernel.state)
+        .await
+        .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    tracing::info!(persona = %created_name, "Persona created via API + persisted");
     Ok(Json(serde_json::json!({
         "status": "created",
-        "id": persona.id,
-        "name": persona.name,
+        "id": created_id,
+        "name": created_name,
     })))
 }
 
@@ -148,9 +162,16 @@ pub async fn handle_persona_update(
     state
         .kernel
         .persona
-        .update(&id, updated.clone())
+        .update(&id, updated)
         .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?;
-    tracing::info!(persona_id = %id, "Persona updated via API");
+    // RFC-039: persist so the edit survives restart.
+    state
+        .kernel
+        .persona
+        .persist(&state.kernel.state)
+        .await
+        .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    tracing::info!(persona_id = %id, "Persona updated via API + persisted");
     Ok(Json(serde_json::json!({
         "status": "updated",
         "id": id,
@@ -185,8 +206,15 @@ pub async fn handle_persona_delete(
             let _ = state.kernel.persona.set_active(&next.id);
         }
     }
+    // RFC-039: persist so the delete survives restart.
+    state
+        .kernel
+        .persona
+        .persist(&state.kernel.state)
+        .await
+        .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    tracing::info!(persona_id = %id, "Persona deleted via API");
+    tracing::info!(persona_id = %id, "Persona deleted via API + persisted");
     Ok(Json(serde_json::json!({
         "status": "deleted",
         "id": id,
@@ -218,11 +246,6 @@ pub struct PersonaActiveRequest {
 }
 
 /// PUT /api/personas/active — Set the active persona.
-///
-/// RFC-039: success path also re-seeds the intent engine's system_prompt
-/// and flushes the full registry to `~/.oxios/state/personas/index.json`.
-/// HTTP path skips the LLM judge (`security_review`) — that asymmetry is
-/// documented in `docs/rfc-039-persona-completion.md` §3.9.
 pub async fn handle_persona_active_set(
     state: State<Arc<AppState>>,
     Json(body): Json<PersonaActiveRequest>,
@@ -233,7 +256,12 @@ pub async fn handle_persona_active_set(
         .set_active_with_persist(&body.id, &state.kernel.state)
         .await
         .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "no prompt returned".to_string()))?;
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "no prompt returned".to_string(),
+            )
+        })?;
     tracing::info!(
         persona_id = %body.id,
         prompt_len = new_prompt.len(),

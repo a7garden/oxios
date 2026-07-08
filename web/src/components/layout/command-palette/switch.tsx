@@ -50,7 +50,8 @@ export function useSwitchProvider(): CommandProvider {
     staleTime: 60_000,
   })
   const activateMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/api/personas/${id}/activate`),
+    // RFC-039: PUT /api/personas/active {id} (was POST /:id/activate — 404)
+    mutationFn: (id: string) => api.put('/api/personas/active', { id }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['personas'] })
       toast.success(t('commandPalette.switchedPersona'))

@@ -51,18 +51,22 @@ pub struct PersonaTool {
     engine_handle: Arc<EngineHandle>,
     /// Bus used to notify the user of agent-authored writes.
     event_bus: EventBus,
+    /// RFC-039: StateStore for persisting after create/update.
+    state_store: Arc<crate::state_store::StateStore>,
 }
 
 impl PersonaTool {
     /// Create a new `PersonaTool` from a `KernelHandle`.
     ///
     /// Captures the persona manager, the engine handle (for the security
-    /// review LLM call), and the event bus (to notify the user of writes).
+    /// review LLM call), the event bus (to notify the user of writes),
+    /// and the StateStore (RFC-039: persist after create/update).
     pub fn from_kernel(kernel: &KernelHandle) -> Self {
         Self {
             persona_manager: kernel.persona.persona_manager.clone(),
             engine_handle: kernel.engine.engine_handle().clone(),
             event_bus: kernel.infra.event_bus_clone(),
+            state_store: kernel.state.state_store.clone(),
         }
     }
 }
@@ -275,7 +279,10 @@ impl AgentTool for PersonaTool {
                 let created_name = persona.name.clone();
                 let enabled = persona.enabled;
                 api.create(persona);
-
+                // RFC-039: persist so the new persona survives restart.
+                if let Err(e) = self.persona_manager.persist(&self.state_store).await {
+                    tracing::warn!(error = %e, "persona create: persist failed");
+                }
                 let _ = self.event_bus.publish(KernelEvent::PersonaCreated {
                     id,
                     name: created_name.clone(),
@@ -347,14 +354,10 @@ impl AgentTool for PersonaTool {
                 let updated_name = updated.name.clone();
                 match api.update(id, updated) {
                     Ok(()) => {
-                        let _ = self.event_bus.publish(KernelEvent::PersonaUpdated {
-                            id: id.to_string(),
-                            name: updated_name.clone(),
-                            source: "agent".to_string(),
-                        });
-                        Ok(AgentToolResult::success(format!(
-                            "Updated persona '{updated_name}'. The user has been notified."
-                        )))
+                        // RFC-039: persist so the edit survives restart.
+                        if let Err(e) = self.persona_manager.persist(&self.state_store).await {
+                            tracing::warn!(error = %e, "persona update: persist failed");
+                        }
                     }
                     Err(e) => Ok(AgentToolResult::error(format!(
                         "Failed to update persona: {e}"

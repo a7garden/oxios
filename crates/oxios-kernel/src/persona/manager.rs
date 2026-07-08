@@ -235,3 +235,140 @@ impl Clone for PersonaManager {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::PersonaConfig;
+    use crate::persona::persistence::PersonaSnapshot;
+    use crate::state_store::StateStore;
+
+    fn make_store() -> StateStore {
+        let dir = tempfile::tempdir().unwrap();
+        StateStore::new(dir.keep()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_load_from_state_store_round_trip() {
+        let store = make_store();
+        let pm = PersonaManager::new();
+        // Create a custom persona, persist, then load into a fresh manager.
+        let custom = Persona {
+            id: "custom-1".to_string(),
+            name: "Custom".to_string(),
+            role: "custom".to_string(),
+            description: "Custom test persona".to_string(),
+            system_prompt: "You are Custom.".to_string(),
+            enabled: true,
+            model: None,
+            personality_traits: vec![],
+        };
+        pm.store().register(custom);
+        pm.set_active_persona("custom-1").unwrap();
+        pm.persist(&store).await.unwrap();
+
+        // Fresh manager — load from disk.
+        let pm2 = PersonaManager::new();
+        pm2.load_from_state_store(&store).await.unwrap();
+        assert!(pm2.store().get("custom-1").is_some());
+        assert_eq!(pm2.active_persona_id(), Some("custom-1".to_string()));
+        // Defaults should also still be present (new() created them).
+        assert!(pm2.store().get("dev").is_some());
+    }
+
+    #[tokio::test]
+    async fn test_load_no_file_is_ok() {
+        let store = make_store();
+        let pm = PersonaManager::new();
+        let result = pm.load_from_state_store(&store).await;
+        // No file → Err (we require a snapshot). But defaults from new() remain.
+        assert!(result.is_err());
+        assert!(pm.store().get("dev").is_some());
+    }
+
+    #[tokio::test]
+    async fn test_apply_config_default_persona_id() {
+        let pm = PersonaManager::new();
+        // Clear active so apply_config must pick from config.
+        *pm.active_persona_id.write() = None;
+        let cfg = PersonaConfig {
+            default_persona_id: Some("review".to_string()),
+        };
+        pm.apply_config(&cfg);
+        assert_eq!(pm.active_persona_id(), Some("review".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_apply_config_falls_back_to_first_enabled() {
+        let pm = PersonaManager::new();
+        *pm.active_persona_id.write() = None;
+        let cfg = PersonaConfig {
+            default_persona_id: None,
+        };
+        pm.apply_config(&cfg);
+        // First enabled persona is "dev" (order: dev, review, research).
+        assert_eq!(pm.active_persona_id(), Some("dev".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_apply_config_skips_disabled_default() {
+        let pm = PersonaManager::new();
+        *pm.active_persona_id.write() = None;
+        // "review" is enabled by default; disable it.
+        pm.store().set_enabled("review", false).unwrap();
+        let cfg = PersonaConfig {
+            default_persona_id: Some("review".to_string()),
+        };
+        pm.apply_config(&cfg);
+        // review is disabled → fall back to first enabled = dev.
+        assert_eq!(pm.active_persona_id(), Some("dev".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_apply_config_keeps_existing_active() {
+        let pm = PersonaManager::new();
+        pm.set_active_persona("research").unwrap();
+        let cfg = PersonaConfig {
+            default_persona_id: Some("dev".to_string()),
+        };
+        pm.apply_config(&cfg);
+        // Existing active (research, enabled) wins over config default.
+        assert_eq!(pm.active_persona_id(), Some("research".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_set_active_rejects_disabled() {
+        let pm = PersonaManager::new();
+        pm.store().set_enabled("review", false).unwrap();
+        let result = pm.set_active("review", None).await;
+        assert!(result.is_err());
+        assert_eq!(pm.active_persona_id(), Some("dev".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_set_active_rejects_unknown_id() {
+        let pm = PersonaManager::new();
+        let result = pm.set_active("nonexistent", None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_set_active_returns_system_prompt() {
+        let pm = PersonaManager::new();
+        let prompt = pm.set_active("review", None).await.unwrap();
+        assert!(prompt.is_some());
+        assert!(prompt.unwrap().contains("Review"));
+    }
+
+    #[tokio::test]
+    async fn test_persist_round_trip_preserves_active() {
+        let store = make_store();
+        let pm = PersonaManager::new();
+        pm.set_active_persona("research").unwrap();
+        pm.persist(&store).await.unwrap();
+
+        let pm2 = PersonaManager::new();
+        pm2.load_from_state_store(&store).await.unwrap();
+        assert_eq!(pm2.active_persona_id(), Some("research".to_string()));
+    }
+}
