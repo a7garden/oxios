@@ -926,6 +926,10 @@ pub struct OxiosConfig {
     /// Exec configuration (host command execution bridge).
     #[serde(default)]
     pub exec: ExecConfig,
+    /// RFC-038: Interactive terminal (PTY-bridged WebSocket) configuration.
+    #[serde(default)]
+    pub pty: PtyConfig,
+
     /// Resource monitor configuration.
     #[serde(default)]
     pub resource_monitor: ResourceMonitorConfig,
@@ -1374,6 +1378,139 @@ impl Default for ExecConfig {
     }
 }
 
+// ─── Interactive Terminal (RFC-038) ───────────────────────────────
+
+/// Initial PTY size when the client doesn't send one.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+pub struct PtySize {
+    /// Columns.
+    #[serde(default = "default_pty_cols")]
+    pub cols: u16,
+    /// Rows.
+    #[serde(default = "default_pty_rows")]
+    pub rows: u16,
+    /// Pixel width (optional, 0 = unspecified).
+    #[serde(default)]
+    pub pixel_width: u16,
+    /// Pixel height (optional, 0 = unspecified).
+    #[serde(default)]
+    pub pixel_height: u16,
+}
+
+fn default_pty_cols() -> u16 {
+    80
+}
+fn default_pty_rows() -> u16 {
+    24
+}
+
+impl Default for PtySize {
+    fn default() -> Self {
+        Self {
+            cols: default_pty_cols(),
+            rows: default_pty_rows(),
+            pixel_width: 0,
+            pixel_height: 0,
+        }
+    }
+}
+
+/// Interactive terminal (PTY-bridged WebSocket) configuration. RFC-038.
+///
+/// A live PTY is *not* a one-shot exec call. `AccessGate` cannot inspect
+/// keystrokes once the shell is running — it gates session *opening* and
+/// shell binary selection only. Everything inside the shell is the
+/// operator's responsibility (see RFC-038 §3.1).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PtyConfig {
+    /// Master switch. Default `false` (RFC-038 §17 rollout).
+    #[serde(default)]
+    pub enabled: bool,
+    /// Default shell invoked when the client omits `shell` in the open frame.
+    /// Resolution order at runtime: `$SHELL` env, then `default_shell`,
+    /// then `/bin/zsh`, then `/bin/bash`.
+    #[serde(default = "default_pty_shell")]
+    pub default_shell: String,
+    /// Hard cap on concurrent PTY sessions per principal.
+    #[serde(default = "default_pty_max_sessions")]
+    pub max_sessions: u32,
+    /// Idle timeout in seconds. Resets on every input frame from the client.
+    #[serde(default = "default_pty_idle_secs")]
+    pub idle_timeout_secs: u64,
+    /// Hard lifetime in seconds. After this, the session is killed
+    /// regardless of activity.
+    #[serde(default = "default_pty_max_lifetime_secs")]
+    pub max_lifetime_secs: u64,
+    /// Optional allowlist of shells. Empty = only `default_shell` allowed.
+    /// Enforced via AccessGate (RFC-038 §7.2).
+    #[serde(default)]
+    pub allowed_shells: Vec<String>,
+    /// Optional working directory override. Empty = inherit daemon cwd.
+    #[serde(default)]
+    pub working_directory: Option<std::path::PathBuf>,
+    /// Initial PTY size when the client doesn't send one.
+    #[serde(default)]
+    pub initial_size: PtySize,
+    /// Environment variables added on top of the inherited env.
+    /// `TERM=xterm-256color` is always set unconditionally.
+    #[serde(default)]
+    pub extra_env: std::collections::BTreeMap<String, String>,
+    /// Env var name prefixes stripped from the inherited env before exec
+    /// (RFC-038 §7.5). Defaults to daemon-secret prefixes.
+    #[serde(default = "default_pty_env_strip_prefixes")]
+    pub env_strip_prefixes: Vec<String>,
+}
+
+fn default_pty_shell() -> String {
+    "/bin/zsh".to_string()
+}
+fn default_pty_max_sessions() -> u32 {
+    3
+}
+fn default_pty_idle_secs() -> u64 {
+    1800
+}
+fn default_pty_max_lifetime_secs() -> u64 {
+    28800
+}
+fn default_pty_env_strip_prefixes() -> Vec<String> {
+    vec![
+        "OXIOS_AUTH_".into(),
+        "OXIOS_TOKEN_".into(),
+        "OXIOS_API_KEY_".into(),
+        "OXIOS_HOME".into(),
+    ]
+}
+
+impl Default for PtyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            default_shell: default_pty_shell(),
+            max_sessions: default_pty_max_sessions(),
+            idle_timeout_secs: default_pty_idle_secs(),
+            max_lifetime_secs: default_pty_max_lifetime_secs(),
+            allowed_shells: Vec::new(),
+            working_directory: None,
+            initial_size: PtySize::default(),
+            extra_env: std::collections::BTreeMap::new(),
+            env_strip_prefixes: default_pty_env_strip_prefixes(),
+        }
+    }
+}
+
+impl PtyConfig {
+    /// Check whether a shell binary path is permitted.
+    /// Empty allowlist = only `default_shell` allowed.
+    pub fn is_shell_allowed(&self, name: &str) -> bool {
+        if self.allowed_shells.is_empty() {
+            return name == self.default_shell;
+        }
+        self.allowed_shells.iter().any(|s| s == name)
+    }
+}
+
+
 /// Orchestrator configuration (Ouroboros protocol execution).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrchestratorConfig {
@@ -1592,27 +1729,14 @@ impl Default for SecurityConfig {
 }
 
 /// Persona system configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+///
+/// Only one persona is active at a time (single slot in `PersonaManager`).
+/// See `docs/rfc-039-persona-completion.md` for the rationale.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct PersonaConfig {
     /// Default persona ID to activate on startup.
     #[serde(default)]
     pub default_persona_id: Option<String>,
-    /// Maximum concurrent personas.
-    #[serde(default = "default_max_concurrent_personas")]
-    pub max_concurrent_personas: usize,
-}
-
-fn default_max_concurrent_personas() -> usize {
-    5
-}
-
-impl Default for PersonaConfig {
-    fn default() -> Self {
-        Self {
-            default_persona_id: Some("dev".to_string()),
-            max_concurrent_personas: default_max_concurrent_personas(),
-        }
-    }
 }
 
 /// MCP server configuration loaded from config.toml.

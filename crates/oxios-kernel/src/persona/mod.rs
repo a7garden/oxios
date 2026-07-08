@@ -13,7 +13,7 @@ pub use store::PersonaStore;
 use serde::{Deserialize, Serialize};
 
 /// A persona is an AI character with its own voice and specialization.
-/// Multiple personas can be active simultaneously (future multi-agent chat support).
+/// Exactly one persona is active at a time (single slot). RFC-039.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Persona {
     /// Unique identifier.

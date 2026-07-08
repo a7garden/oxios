@@ -481,20 +481,23 @@ impl AgentRuntime {
             Err(e) => tracing::warn!(error = %e, "Failed to recall knowledge context"),
         }
 
-        // RFC-032 + RFC-029 P2: resolve the model. Precedence:
-        //   1.  — set by RecoveryCoordinator during fallback
+        // RFC-032 + RFC-029 P2 + RFC-039: resolve the model. Precedence:
+        //   1. `model_override` — set by RecoveryCoordinator during fallback
         //      retries. MUST win over role routing: if a role-mapped model
         //      is the one that just failed, letting role override recovery
         //      would loop the failure.
-        //   2.  — when the WS client supplied a role
-        //      hint, consult  for a role → model
-        //      mapping. Read from  directly (not via the
-        //      EngineApi facade) so the resolution stays on the hot path.
-        //   3.  — the configured default.
+        //   2. `effective_role` — when the WS client supplied a per-message
+        //      role hint (`env.role`), use it; otherwise fall back to the
+        //      active persona's `role`. Read from config directly (not via
+        //      the EngineApi facade) so the resolution stays on the hot
+        //      path. RFC-039 makes the persona role participate here so
+        //      `engine.role_routing[persona_role]` actually fires.
+        //   3. — the configured default.
+        let effective_role = role.or(persona_role.as_deref());
         let engine = self.engine_handle.get();
         let model_id = model_override
             .map(|s| s.to_string())
-            .or_else(|| role.and_then(|r| self.kernel_handle.engine.model_for_role(r)))
+            .or_else(|| effective_role.and_then(|r| self.kernel_handle.engine.model_for_role(r)))
             .unwrap_or_else(|| engine.default_model_id().to_string());
         // Validates fail-fast: a bad model ID is rejected here at execute entry.
         engine.resolve_model(&model_id)?;

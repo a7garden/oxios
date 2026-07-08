@@ -7,6 +7,7 @@ pub mod email_api;
 pub mod engine_api;
 pub mod exec_api;
 pub mod extension_api;
+pub mod pty_api;
 pub mod infra_api;
 pub mod knowledge_lens;
 pub mod marketplace_api;
@@ -30,6 +31,7 @@ pub use engine_api::{
 };
 pub use exec_api::ExecApi;
 pub use exec_api::SharedExecConfig;
+pub use pty_api::{PtyApi, SharedPtyConfig};
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
 pub use knowledge_lens::{
@@ -86,6 +88,8 @@ pub struct KernelHandle {
     pub mounts: Option<MountApi>,
     /// Execution: config + access management.
     pub exec: ExecApi,
+    /// RFC-038: Interactive terminal (PTY-bridged WebSocket).
+    pub pty: PtyApi,
     /// Agent-to-agent communication.
     pub a2a: A2aApi,
     /// Engine: LLM providers, models, config.
@@ -116,7 +120,7 @@ pub struct KernelHandle {
 }
 
 impl KernelHandle {
-    /// Create a new KernelHandle from 13 domain Facades.
+    /// Create a new KernelHandle from 14 domain Facades.
     ///
     /// Each Facade is assembled independently in `kernel.rs` and passed here.
     /// This enables testing individual Facades without the full kernel.
@@ -127,8 +131,6 @@ impl KernelHandle {
         security: SecurityApi,
         persona: PersonaApi,
         extensions: ExtensionApi,
-        mcp: McpApi,
-        infra: InfraApi,
         projects: Option<ProjectApi>,
         exec: ExecApi,
         a2a: A2aApi,
@@ -138,6 +140,7 @@ impl KernelHandle {
         marketplace_api: MarketplaceApi,
         calendar: Option<CalendarApi>,
         email: Option<EmailApi>,
+        pty: PtyApi,
     ) -> Self {
         Self {
             state,
@@ -150,6 +153,7 @@ impl KernelHandle {
             projects,
             mounts: None,
             exec,
+            pty,
             a2a,
             engine,
             knowledge,

@@ -1,7 +1,10 @@
 //! In-memory store for persona registry.
 //!
-//! PersonaStore manages CRUD operations for personas in memory.
-//! Persists personas to the state store on save.
+//! PersonaStore manages CRUD operations for personas in memory only.
+//! Persistence is delegated to `PersonaManager::load_from_state_store` /
+//! `PersonaManager::persist`, which serialize the full registry under
+//! `~/.oxios/state/personas/index.json` via `StateStore::save_json`
+//! (RFC-039).
 
 use anyhow::{Result, anyhow};
 use parking_lot::RwLock;
