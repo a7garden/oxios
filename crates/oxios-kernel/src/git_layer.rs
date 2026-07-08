@@ -579,7 +579,7 @@ impl GitLayer {
                 r.name()
                     .category()
                     .is_some_and(|c| matches!(c, gix::refs::Category::Tag))
-                    && r.name().shorten().to_string() == name
+                    && r.name().shorten() == name
             })
             .ok_or_else(|| anyhow::anyhow!("tag not found: {name}"))?;
         target
