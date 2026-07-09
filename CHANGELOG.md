@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-07-09
+
+### Removed
+- **RFC-038: Interactive PTY/terminal subsystem** — Complete removal of the terminal feature shipped in 1.20.0. Deleted `oxios-kernel/src/pty/` (manager, session, error, config, mod), `kernel_handle/pty_api.rs`, `src/api/routes/terminal.rs` (ticket, stream, sessions, pty/start), `KernelHandle::PtyApi` field + 17th constructor arg, `PtyConfig`/`PtySize` from `OxiosConfig`, `portable-pty` dependency, `/api/terminal/stream` auth exemption, `web/src/components/terminal/`, `web/src/routes/terminal.tsx`, `web/src/lib/ws-client.ts` (terminal-only transport), `isTerminal` branch in app-layout, `/terminal` sidebar nav, `ghostty-web` dep, `ptySection` settings UI, terminal/pty i18n keys, `[pty]` blocks from default + user configs, and `docs/rfc-038-interactive-terminal.md`. The user-facing `/terminal` route, the PTY-aware settings panel, and the kernel-side PTY manager are gone with no replacement in this release.
+
+### Known Issues
+- **Pre-existing frontend CI failures (carried over from main, NOT introduced by 1.21.0)** — `web/` has three failing gates on the `frontend` CI job at this tag:
+  - `bun run typecheck` — `src/hooks/use-tab-shortcuts.ts:32` TS2532 (`Object is possibly 'undefined'`).
+  - `bun run test` — `src/__tests__/stores.test.ts` test "appendActivityToMessages creates a placeholder when no assistant exists" fails because `chunkToActivity` lacks a `case 'phase'` branch (real bug: server-emitted phase chunks silently drop to `null`). To be fixed in a follow-up release.
+  - `bun run lint` — 7 biome `assist/source/organizeImports` errors across `knowledge-home.tsx`, `quick-ask-dialog.tsx`, `math-fold-extension.ts`, `mermaid-extension.ts`, `table-fold-extension.ts`.
+  These were red on main before RFC-038 merged; this release does not introduce them but does not fix them either. The CI `frontend` job will fail at this tag; cut a v1.21.1 patch with the fixes.
+
 ## [1.20.0] - 2026-07-08
 
 ### Added
