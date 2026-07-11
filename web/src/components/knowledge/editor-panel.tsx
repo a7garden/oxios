@@ -1,7 +1,9 @@
 import { FileText } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useKnowledgeFile, useWriteFile } from '@/hooks/use-knowledge'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { EditorStatusBar, type EditorStats } from './editor-status-bar'
 import { EditorToolbar } from './editor-toolbar'
 import { MarkdownEditor } from './markdown-editor'
 import { SplitEditor } from './split-editor'
@@ -11,6 +13,7 @@ export function EditorPanel() {
   const { currentFilePath, splitEditorOpen, splitFilePath } = useKnowledgeStore()
   const { data: content, isLoading } = useKnowledgeFile(currentFilePath)
   const writeFile = useWriteFile()
+  const [stats, setStats] = useState<EditorStats | null>(null)
 
   return (
     <div className="flex flex-col md:flex-row flex-1 min-w-0">
@@ -28,7 +31,10 @@ export function EditorPanel() {
                 key={currentFilePath}
                 filePath={currentFilePath}
                 initialContent={content ?? ''}
-                onSave={(content) => writeFile.mutate({ path: currentFilePath, content })}
+                onSave={async (content) => {
+                  await writeFile.mutateAsync({ path: currentFilePath, content })
+                }}
+                onStatsChange={setStats}
               />
             </div>
           ) : (
@@ -41,6 +47,7 @@ export function EditorPanel() {
             </div>
           )}
         </div>
+        {currentFilePath && <EditorStatusBar stats={stats} />}
       </div>
 
       {/* Split editor */}

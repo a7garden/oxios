@@ -18,8 +18,8 @@
  * Round-trip safe: purely visual; the markdown source is preserved.
  */
 import { syntaxTree } from '@codemirror/language'
-import { StateField } from '@codemirror/state'
 import type { EditorState, Extension, Range } from '@codemirror/state'
+import { StateField } from '@codemirror/state'
 import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view'
 
 function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {

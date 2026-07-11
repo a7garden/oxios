@@ -554,6 +554,17 @@ pub(crate) async fn handle_knowledge_file_delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Compute a deterministic content hash for optimistic concurrency (S-2).
+/// Uses FNV-1a — fast, no external dependency, sufficient for change detection.
+fn content_etag(content: &str) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in content.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("\"{hash:x}\"")
+}
+
 /// Unified handler for /api/knowledge/file/{*path} sub-paths.
 ///
 /// axum 0.8: `{*path}` MUST be the last segment of any route, so we can't
@@ -566,6 +577,7 @@ pub(crate) async fn handle_knowledge_file_or_sub(
     state: State<Arc<AppState>>,
     axum::extract::Path(path): axum::extract::Path<String>,
     method: axum::http::Method,
+    headers: axum::http::HeaderMap,
     body: String,
 ) -> Result<axum::response::Response<axum::body::Body>, AppError> {
     // Strip trailing slash if present
@@ -620,20 +632,34 @@ pub(crate) async fn handle_knowledge_file_or_sub(
                 .map_err(|e| AppError::Internal(e.to_string()))?
                 .ok_or_else(|| AppError::NotFound("file not found".into()))?;
             let mime = guess_knowledge_mime(path);
+            let etag = content_etag(&content);
             Ok(axum::response::Response::builder()
                 .status(StatusCode::OK)
                 .header(axum::http::header::CONTENT_TYPE, mime)
+                .header(axum::http::header::ETAG, &etag)
                 .body(axum::body::Body::from(content))
                 .unwrap())
         }
         "PUT" => {
-            // Validate file size (max 5MB for knowledge files)
             const MAX_KNOWLEDGE_FILE_SIZE: usize = 5 * 1024 * 1024;
             if body.len() > MAX_KNOWLEDGE_FILE_SIZE {
                 return Err(AppError::PayloadTooLarge {
                     size: body.len(),
                     limit: MAX_KNOWLEDGE_FILE_SIZE,
                 });
+            }
+            // S-2: Optimistic concurrency — if the client sends If-Match,
+            // verify it matches the current content hash. A mismatch means
+            // another channel (CLI, Telegram, agent) modified the file.
+            if let Some(if_match) = headers.get(axum::http::header::IF_MATCH) {
+                if let Ok(Some(current_content)) = state.kernel.knowledge.note_read(path) {
+                    let current_etag = content_etag(&current_content);
+                    if if_match.to_str().unwrap_or("") != current_etag {
+                        return Err(AppError::Conflict(
+                            "File was modified by another client. Please reload.".into(),
+                        ));
+                    }
+                }
             }
             state
                 .kernel
@@ -678,12 +704,11 @@ async fn handle_knowledge_file_history_impl(
     let git_rel = format!("{prefix}/{file_path}");
 
     let log = git
-        .log(100)
+        .log_for_file(&git_rel, 50)
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let entries: Vec<KnowledgeHistoryEntry> = log
         .into_iter()
-        .filter(|e| e.message.contains(&git_rel) || e.message.contains(file_path))
         .map(|e| KnowledgeHistoryEntry {
             hash: e.hash,
             short_hash: e.short_hash,
@@ -741,6 +766,40 @@ async fn handle_knowledge_file_restore_impl(
         .status(StatusCode::OK)
         .body(axum::body::Body::empty())
         .unwrap())
+}
+/// GET /api/knowledge/file-diff?path={path}&hash={hash} — unified diff for a
+/// file between a specific commit and HEAD. Used by the history panel
+/// to show a diff preview when the user clicks a version (I-6).
+#[derive(Debug, Deserialize)]
+pub struct KnowledgeFileDiffQuery {
+    pub path: String,
+    pub hash: String,
+}
+
+pub(crate) async fn handle_knowledge_file_diff(
+    state: State<Arc<AppState>>,
+    Query(params): Query<KnowledgeFileDiffQuery>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let git = state.kernel.infra.git();
+    let kb_root = state.kernel.knowledge.root();
+    let prefix = kb_root
+        .strip_prefix(git.root())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "knowledge".to_string());
+    let git_rel = format!("{prefix}/{}", params.path);
+
+    // Reuse diff_commits to get all file changes between the specified
+    // commit and HEAD, then filter for this file.
+    let diff = git
+        .diff_commits(&params.hash, "HEAD")
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let file_diff = diff.files.into_iter().find(|f| f.path == git_rel);
+    let has_changes = file_diff.is_some();
+
+    Ok(Json(serde_json::json!({
+        "diff": file_diff.and_then(|f| f.patch).unwrap_or_default(),
+        "has_changes": has_changes,
+    })))
 }
 
 /// POST /api/knowledge/search — Search knowledge files.
@@ -1287,23 +1346,20 @@ pub(crate) async fn handle_knowledge_file_restore(
         .unwrap_or_else(|_| "knowledge".to_string());
     let git_rel = format!("{prefix}/{path}");
 
-    // 1. Restore file content from git commit to disk
-    git.restore_file(&git_rel, &body.hash)
+    // I-4: Read blob content from git WITHOUT writing to disk, then write
+    // through note_restore (which acquires the VirtualFs write lock).
+    // The old path called git.restore_file → std::fs::write directly,
+    // bypassing the VirtualFs lock and racing with concurrent note_write.
+    let data = git
+        .file_at_commit(&git_rel, &body.hash)
         .map_err(|e| AppError::Internal(e.to_string()))?;
-
-    // 2. Re-read the restored content and update backlinks without triggering git callback
-    if let Some(content) = state
+    let content = String::from_utf8(data)
+        .map_err(|e| AppError::Internal(format!("restored content is not valid UTF-8: {e}")))?;
+    state
         .kernel
         .knowledge
-        .note_read(&path)
-        .map_err(|e| AppError::Internal(e.to_string()))?
-    {
-        state
-            .kernel
-            .knowledge
-            .note_restore(&path, &content)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
-    }
+        .note_restore(&path, &content)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     tracing::info!(path = %path, hash = %body.hash, "Knowledge file restored from git");
     Ok(StatusCode::OK)

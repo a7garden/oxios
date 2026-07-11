@@ -394,6 +394,15 @@ impl GitLayer {
         let content = std::fs::read(&abs)?;
         let blob_id = repo.write_blob(&content)?;
         let head_tree = Self::head_tree_oid(&repo)?;
+        // I-3: Skip commit if the file content is byte-identical to the
+        // existing HEAD tree entry. Avoids empty-diff commits from no-op
+        // writes (agent re-saves, debounce no-ops, dream curation, etc.).
+        if let Ok(existing) = Self::find_blob_in_tree(&repo, head_tree, rel_path)
+            && existing == blob_id
+        {
+            tracing::debug!(path = rel_path, "Skipping identical-content commit");
+            return self.noop_commit(&ctx, message);
+        }
         let mut editor = repo.edit_tree(head_tree)?;
         editor.upsert(rel_path, EntryKind::Blob, blob_id)?;
         let tree_id = editor.write()?;
@@ -672,6 +681,76 @@ impl GitLayer {
         Ok(())
     }
 
+    /// Read a file's content at a specific commit without writing to disk.
+    ///
+    /// Unlike [`restore_file`], this does NOT touch the filesystem — it
+    /// returns the blob data directly. Callers that need to write the
+    /// content should pass it through `KnowledgeBase::note_restore`,
+    /// which acquires the VirtualFs write lock. This avoids a race where
+    /// `restore_file`'s direct `std::fs::write` bypasses the lock and
+    /// clobbers a concurrent `note_write` (I-4).
+    pub fn file_at_commit(&self, rel_path: &str, hash: &str) -> Result<Vec<u8>> {
+        // Validate path (defense-in-depth, same as restore_file).
+        self.ensure_within_root(rel_path)?;
+        let commit_id = self.resolve_partial_hash(hash)?;
+        let repo = self.repo.lock();
+        let commit_tree_id = Self::commit_tree_id(&repo, commit_id)?;
+        let blob_id = Self::find_blob_in_tree(&repo, commit_tree_id, rel_path)?;
+        let blob = repo.find_blob(blob_id)?;
+        Ok(blob.data.to_vec())
+    }
+
+    /// Return commit log entries for a specific file, most recent first.
+    ///
+    /// Walks the commit graph and includes only commits where the file's
+    /// blob OID actually changed (tree diff, not message string matching).
+    /// Replaces the old approach of filtering `log(N)` by commit message
+    /// substring, which was inaccurate and limited to N entries.
+    pub fn log_for_file(&self, rel_path: &str, max_count: usize) -> Result<Vec<LogEntry>> {
+        if !self.enabled {
+            return Ok(Vec::new());
+        }
+        let repo = self.repo.lock();
+        let head_id = repo.head_id()?.detach();
+        let mut entries = Vec::new();
+        let mut current_id: Option<ObjectId> = Some(head_id);
+        let mut prev_blob: Option<ObjectId> = None;
+
+        while let Some(id) = current_id {
+            if entries.len() >= max_count {
+                break;
+            }
+            let commit = repo.find_commit(id)?;
+            let decoded = commit.decode()?;
+            let tree_id = decoded.tree();
+            let current_blob = Self::find_blob_in_tree(&repo, tree_id, rel_path).ok();
+            if current_blob != prev_blob {
+                let msg_ref = decoded.message();
+                let msg = if let Some(body) = msg_ref.body {
+                    format!("{}\n\n{}", msg_ref.title, body)
+                } else {
+                    msg_ref.title.to_string()
+                };
+                let timestamp = decoded.time().map(|t| t.to_string()).unwrap_or_default();
+                let author = decoded
+                    .author()
+                    .map(|a| a.name.to_string())
+                    .unwrap_or_default();
+                let hex = id.to_hex().to_string();
+                entries.push(LogEntry {
+                    hash: hex.clone(),
+                    short_hash: hex[..7].into(),
+                    message: msg,
+                    timestamp,
+                    author,
+                });
+            }
+            prev_blob = current_blob;
+            current_id = decoded.parents().next();
+        }
+        Ok(entries)
+    }
+
     // ── Diff API (Phase 3) ────────────────────────────────────────────────
 
     /// Compute the diff between two commits.
@@ -742,18 +821,7 @@ impl GitLayer {
         })
     }
 
-    /// Retrieve file content as it was at a specific commit.
-    pub fn file_at_commit(&self, rel_path: &str, hash: &str) -> Result<Vec<u8>> {
-        // Defense-in-depth: the path is only used as a tree key here, but
-        // rejecting traversal early keeps the contract uniform with restore_file.
-        self.ensure_within_root(rel_path)?;
-        let repo = self.repo.lock();
-        let commit_id = self.resolve_hash_inner(&repo, hash)?;
-        let tree_id = Self::commit_tree_id(&repo, commit_id)?;
-        let blob_id = Self::find_blob_in_tree(&repo, tree_id, rel_path)?;
-        let blob = repo.find_blob(blob_id)?;
-        Ok(blob.data.to_vec())
-    }
+    // file_at_commit is defined above (line 692) — this duplicate removed.
 
     // ── Diff helpers ──────────────────────────────────────────────────────
 

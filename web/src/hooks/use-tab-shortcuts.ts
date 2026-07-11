@@ -28,8 +28,10 @@ export function useTabShortcuts(): void {
       if (!e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return
       const idx = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code)
       if (idx === -1 || idx >= SIDEBAR_MODES.length) return
+      const mode = SIDEBAR_MODES[idx]
+      if (!mode) return
       e.preventDefault()
-      router.history.push(SIDEBAR_MODES[idx].href)
+      router.history.push(mode.href)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)

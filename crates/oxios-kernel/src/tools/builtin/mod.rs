@@ -44,7 +44,7 @@ pub use security_tool::SecurityTool;
 pub use skill_forge_tool::SkillForgeTool;
 
 use crate::KernelHandle;
-use crate::tools::AskUserTool;
+use crate::tools::{AskUserTool, MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 use crate::types::AgentId;
 use oxi_sdk::ToolRegistry;
 
@@ -58,12 +58,13 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     // ExecTool (stores Arc<KernelHandle>)
     registry.register(crate::tools::ExecTool::from_kernel(kernel));
 
-    // Memory tools — oxi-agent's `memory_*` tools, backed by AgentConfig.memory
-    // (the OxiosMemoryBackend bridge over oxios-memory, RFC-034 Part B).
-    registry.register(oxi_agent::MemoryRecallTool);
-    registry.register(oxi_agent::MemoryRetainTool);
-    registry.register(oxi_agent::MemoryEditTool);
-    registry.register(oxi_agent::MemoryReflectTool);
+    // Memory tools — MemoryManager-backed, registered unconditionally.
+    // Oxios is a personal agent OS: every agent gets memory read + write.
+    // The CSpace-gated path in registration.rs is removed (redundant).
+    // See docs/designs/2026-07-11-memory-system-overhaul-design.md Phase 1.
+    registry.register(MemoryWriteTool::from_kernel(kernel));
+    registry.register(MemoryReadTool::from_kernel(kernel));
+    registry.register(MemorySearchTool::from_kernel(kernel));
 
     // Subagent tool — oxi-agent's native `subagent` tool (RFC-035 gap 3).
     // Wired via AgentConfig.subagent_runner (set in agent_runtime.rs).

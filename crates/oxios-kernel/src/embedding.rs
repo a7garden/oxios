@@ -6,6 +6,7 @@
 pub use oxios_memory::memory::embedding::{
     EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider,
 };
+pub mod api;
 
 #[cfg(feature = "embedding-gguf")]
 pub mod gguf;

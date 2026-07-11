@@ -45,20 +45,25 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Weak};
 
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::Sender;
+
+/// Bounded capacity for streaming delta channels. Each delta is a small text
+/// chunk (~100-500 bytes); 256 caps the buffer at ~128 KB, preventing OOM
+/// from slow clients while absorbing normal burst latency.
+pub const STREAMING_CHANNEL_CAPACITY: usize = 256;
 
 use crate::agent_runtime::StreamDelta;
 
 /// Strong sender side, wrapped in `Arc` so the runtime callback can clone
 /// cheaply on every lookup. Re-exported here so callers don't have to know
 /// the runtime's internal type.
-pub type StreamingSinkSender = Arc<UnboundedSender<StreamDelta>>;
+pub type StreamingSinkSender = Arc<Sender<StreamDelta>>;
 
 /// Per-session lookup table. Shared via `Arc` between the kernel handle,
 /// the agent runtime, and the gateway dispatch layer.
 #[derive(Default)]
 pub struct StreamingSinkRegistry {
-    inner: Mutex<HashMap<String, Weak<UnboundedSender<StreamDelta>>>>,
+    inner: Mutex<HashMap<String, Weak<Sender<StreamDelta>>>>,
 }
 
 impl StreamingSinkRegistry {
@@ -74,7 +79,10 @@ impl StreamingSinkRegistry {
         let weak = Arc::downgrade(sender);
         self.inner
             .lock()
-            .expect("StreamingSinkRegistry mutex poisoned")
+            .unwrap_or_else(|e| {
+                tracing::error!("streaming sink mutex poisoned — recovering");
+                e.into_inner()
+            })
             .insert(session_id.to_string(), weak);
     }
 
@@ -83,10 +91,10 @@ impl StreamingSinkRegistry {
     /// completed and dropped its `Arc`). Misses are silent — the runtime
     /// simply skips emitting the delta.
     pub fn lookup(&self, session_id: &str) -> Option<StreamingSinkSender> {
-        let guard = self
-            .inner
-            .lock()
-            .expect("StreamingSinkRegistry mutex poisoned");
+        let guard = self.inner.lock().unwrap_or_else(|e| {
+            tracing::error!("streaming sink mutex poisoned — recovering");
+            e.into_inner()
+        });
         guard
             .get(session_id)
             .and_then(|w| w.upgrade())
@@ -99,7 +107,10 @@ impl StreamingSinkRegistry {
     pub fn unregister(&self, session_id: &str) {
         self.inner
             .lock()
-            .expect("StreamingSinkRegistry mutex poisoned")
+            .unwrap_or_else(|e| {
+                tracing::error!("streaming sink mutex poisoned — recovering");
+                e.into_inner()
+            })
             .remove(session_id);
     }
 
@@ -108,7 +119,10 @@ impl StreamingSinkRegistry {
     pub fn len(&self) -> usize {
         self.inner
             .lock()
-            .expect("StreamingSinkRegistry mutex poisoned")
+            .unwrap_or_else(|e| {
+                tracing::error!("streaming sink mutex poisoned — recovering");
+                e.into_inner()
+            })
             .len()
     }
     /// Returns true if there are no active streaming sessions.
@@ -132,7 +146,7 @@ mod tests {
     #[test]
     fn lookup_returns_strong_when_alive() {
         let r = StreamingSinkRegistry::new();
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<StreamDelta>();
+        let (tx, _rx) = tokio::sync::mpsc::channel::<StreamDelta>(8);
         let sender: StreamingSinkTx = Arc::new(tx);
         r.register("s1", &sender);
         let looked = r.lookup("s1").expect("should find live sink");
@@ -142,7 +156,7 @@ mod tests {
     #[test]
     fn lookup_misses_after_drop() {
         let r = StreamingSinkRegistry::new();
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<StreamDelta>();
+        let (tx, _rx) = tokio::sync::mpsc::channel::<StreamDelta>(8);
         let sender: StreamingSinkTx = Arc::new(tx);
         r.register("s1", &sender);
         drop(sender);
@@ -152,7 +166,7 @@ mod tests {
     #[test]
     fn unregister_clears_entry() {
         let r = StreamingSinkRegistry::new();
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<StreamDelta>();
+        let (tx, _rx) = tokio::sync::mpsc::channel::<StreamDelta>(8);
         let sender: StreamingSinkTx = Arc::new(tx);
         r.register("s1", &sender);
         r.unregister("s1");

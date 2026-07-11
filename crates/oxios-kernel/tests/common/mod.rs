@@ -106,3 +106,11 @@ pub fn passing_verdict() -> Verdict {
         gaps: vec![],
     }
 }
+
+/// Create a fresh temporary directory for tests that need a real filesystem
+/// scratch space. Auto-deleted on drop. Replaces 12+ copies of
+/// `tempfile::tempdir().unwrap()` scattered across integration_tests.rs,
+/// resilience_test.rs, and e2e_test.rs.
+pub fn setup_tempdir() -> tempfile::TempDir {
+    tempfile::tempdir().expect("test tempdir creation should never fail")
+}

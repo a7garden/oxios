@@ -1,6 +1,6 @@
 [package]
 name = "oxios-ouroboros"
-version = "1.21.0"
+version = "1.22.0"
 edition = "2024"
 description = "Ouroboros spec-first protocol for Oxios"
 license = "MIT"
@@ -27,3 +27,4 @@ parking_lot = { workspace = true }
 
 [dev-dependencies]
 oxi-sdk = { workspace = true }
+proptest = { workspace = true }

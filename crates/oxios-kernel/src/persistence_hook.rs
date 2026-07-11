@@ -148,23 +148,35 @@ impl PersistenceHook {
             });
         }
 
-        // Layer 2: LLM Reflection
+        // Layer 2: LLM Reflection, with heuristic fallback when empty.
         let knowledge_already_handled = !plan.knowledge.is_empty();
         let reflection_plan = self
             .reflect(directive, trajectory, output, knowledge_already_handled)
             .await;
         match reflection_plan {
-            Ok(rp) => {
-                plan.memory.extend(rp.memory);
+            Ok(reflected) => {
+                plan.memory.extend(reflected.memory);
                 if !already_saved_knowledge {
-                    plan.knowledge.extend(rp.knowledge);
+                    plan.knowledge.extend(reflected.knowledge);
+                }
+                // LLM produced nothing for memory — fall back to user-input scan.
+                if plan.memory.is_empty() {
+                    let heuristic = Self::heuristic_fallback(directive, output);
+                    if !heuristic.is_empty() {
+                        tracing::info!(
+                            count = heuristic.len(),
+                            "PersistenceHook heuristic filled empty reflection"
+                        );
+                        plan.memory.extend(heuristic);
+                    }
                 }
             }
             Err(e) => {
-                tracing::warn!(error = %e, "PersistenceHook reflection failed");
+                tracing::warn!(error = %e, "PersistenceHook reflection failed; trying heuristic fallback");
+                let heuristic = Self::heuristic_fallback(directive, output);
+                plan.memory.extend(heuristic);
             }
         }
-
         Ok(plan)
     }
 
@@ -327,17 +339,10 @@ impl PersistenceHook {
             output.to_string()
         };
 
-        let knowledge_section = if knowledge_already_handled {
-            String::new()
+        let knowledge_hint = if knowledge_already_handled {
+            "Knowledge has already been saved by the agent — do NOT include a knowledge array."
         } else {
-            "- Knowledge: documents, research, reference material the user would want later. Visible via Web UI.\n"
-                .to_string()
-        };
-
-        let knowledge_field = if knowledge_already_handled {
-            String::new()
-        } else {
-            ",\"knowledge\":[{\"path\":\"cat/file.md\",\"content\":\"...\"}]".to_string()
+            "You may also save knowledge (documents, reference material) if the output contains substantive content worth keeping."
         };
 
         let prompt = format!(
@@ -348,11 +353,13 @@ impl PersistenceHook {
              Result: {}\n\n\
              Two stores:\n\
              - Memory: facts about the user, preference corrections, project context. Not visible to the user. Agent's own learning.\n\
-             {knowledge_section}\
+             - Knowledge: documents, research, reference material the user would want later. Visible via Web UI.\n\
+             {knowledge_hint}\n\
+             Look especially hard at the user's REQUEST — user preferences and facts live there, not in the agent's output.\n\
              \n\
              When saving to knowledge, strip conversational wrapping: greetings, sign-offs, questions to the user, hedging. Extract only substantive content.\n\
              JSON only:\n\
-             {{\"memory\":[{{\"content\":\"...\",\"type\":\"fact|episode\",\"importance\":0.0-1.0}}]{knowledge_field}}}",
+             {{\"memory\":[{{\"content\":\"...\",\"type\":\"fact|episode\",\"importance\":0.0-1.0}}],\"knowledge\":[{{\"path\":\"cat/file.md\",\"content\":\"...\"}}]}}",
             directive.goal,
             directive.original_request,
             trajectory_summary.join("\n"),
@@ -361,18 +368,31 @@ impl PersistenceHook {
 
         // Build a lightweight agent via EngineHandle → Oxi → AgentBuilder
         let engine = self.engine_handle.get();
+        let model_id = engine.default_model_id().to_string();
         let agent_config = oxi_sdk::AgentConfig {
             description: Some("Persistence reflection".into()),
-            model_id: engine.default_model_id().to_string(),
+            model_id: model_id.clone(),
             system_prompt: Some("You output JSON only. No explanation.".to_string()),
             max_tokens: Some(512),
             temperature: Some(0.3),
             ..Default::default()
         };
 
-        let agent = engine.oxi().agent(agent_config).build()?;
+        tracing::info!(
+            model = %model_id,
+            prompt_len = prompt.len(),
+            request_len = directive.original_request.len(),
+            output_len = output.len(),
+            "PersistenceHook reflection starting"
+        );
 
+        let agent = engine.oxi().agent(agent_config).build()?;
         let (response, _events) = agent.run(prompt).await?;
+
+        tracing::info!(
+            response_len = response.content.len(),
+            "PersistenceHook reflection response received"
+        );
 
         // Parse JSON from response
         let json_str = response.content.trim();
@@ -384,8 +404,69 @@ impl PersistenceHook {
         let json_str = json_str.strip_suffix("```").unwrap_or(json_str);
 
         let plan: PersistencePlan = serde_json::from_str(json_str.trim())?;
+        tracing::info!(
+            memory_count = plan.memory.len(),
+            knowledge_count = plan.knowledge.len(),
+            "PersistenceHook reflection plan parsed"
+        );
         Ok(plan)
     }
+
+    /// Heuristic fallback: when the LLM reflection fails or returns an empty
+    /// memory plan, scan the user's request (not the agent output) for
+    /// preference/fact patterns. The user's stated facts live in the request,
+    /// not in the agent's response.
+    fn heuristic_fallback(directive: &Directive, output: &str) -> Vec<MemoryWrite> {
+        let mut found = Vec::new();
+        let request = &directive.original_request;
+        if request.is_empty() {
+            return found;
+        }
+        // Preference indicators (Korean + English).
+        let preference_patterns = [
+            "I prefer",
+            "I like",
+            "I always",
+            "I never",
+            "remember that",
+            "기억해",
+            "항상 ",
+            "절대 ",
+            "내가 ",
+            "나는 ",
+            "저는 ",
+            "선호",
+        ];
+        for pat in &preference_patterns {
+            if request.contains(pat) || output.contains(pat) {
+                let content = if request.contains(pat) {
+                    truncate(request, 200)
+                } else {
+                    truncate(output, 200)
+                };
+                found.push(MemoryWrite {
+                    content,
+                    memory_type: "fact".to_string(),
+                    importance: 0.6,
+                    tags: vec!["persistence-hook-heuristic".to_string()],
+                });
+                break; // one heuristic hit per execution is enough
+            }
+        }
+        found
+    }
+}
+
+/// Truncate a string for error messages without panicking on UTF-8 boundaries.
+fn truncate(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}…", &s[..end])
 }
 
 /// Check if content looks like a structured markdown document.

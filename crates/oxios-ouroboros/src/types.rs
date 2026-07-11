@@ -25,7 +25,7 @@ pub struct ToolCallRecord {
 }
 
 /// Result of executing a directive.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ExecutionResult {
     /// The output produced by execution.
     pub output: String,
@@ -34,7 +34,7 @@ pub struct ExecutionResult {
     /// Whether execution completed successfully.
     pub success: bool,
     /// Tool calls recorded during execution.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<ToolCallRecord>,
     /// Total input tokens consumed during execution.
     #[serde(default)]
@@ -101,4 +101,106 @@ pub struct InterviewQuestionOutput {
 
 fn default_question_kind() -> String {
     "free_text".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // ToolCallRecord — JSON shape and skip-if-empty behavior
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tool_call_record_serialization_omits_empty_optional_fields() {
+        let r = ToolCallRecord {
+            tool: "bash".into(),
+            input: "ls".into(),
+            output: "file.txt".into(),
+            duration_ms: 42,
+            is_error: false,
+            tool_call_id: String::new(), // empty → skip
+            timestamp: None,             // None → skip
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(!json.contains("tool_call_id"));
+        assert!(!json.contains("timestamp"));
+        assert!(json.contains("\"tool\":\"bash\""));
+        assert!(json.contains("\"duration_ms\":42"));
+    }
+
+    #[test]
+    fn tool_call_record_round_trips_with_all_fields() {
+        let r = ToolCallRecord {
+            tool: "read".into(),
+            input: "src/lib.rs".into(),
+            output: "fn main(){}".into(),
+            duration_ms: 7,
+            is_error: false,
+            tool_call_id: "call-abc".into(),
+            timestamp: Some(chrono::Utc::now()),
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let back: ToolCallRecord = serde_json::from_value(json).unwrap();
+        assert_eq!(back.tool, "read");
+        assert_eq!(back.tool_call_id, "call-abc");
+        assert!(back.timestamp.is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // ExecutionResult — default fields and skip-if-empty
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn execution_result_serialization_omits_default_optional_fields() {
+        // No tool calls, no failure, no restore_state, no reasoning, no model_id
+        // → all should be skipped. token counts stay (they're not Option).
+        let r = ExecutionResult {
+            output: "ok".into(),
+            steps_completed: 3,
+            success: true,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(!json.contains("tool_calls"));
+        assert!(!json.contains("failure_class"));
+        assert!(!json.contains("restore_state"));
+        assert!(!json.contains("reasoning_text"));
+        assert!(!json.contains("model_id"));
+        assert!(json.contains("\"output\":\"ok\""));
+        assert!(json.contains("\"steps_completed\":3"));
+        assert!(json.contains("\"success\":true"));
+    }
+
+    // -----------------------------------------------------------------------
+    // InterviewQuestionOutput — default question kind
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn interview_question_kind_defaults_to_free_text_when_omitted() {
+        let json = r#"{"id":"q1","text":"name?","options":[]}"#;
+        let q: InterviewQuestionOutput = serde_json::from_str(json).unwrap();
+        assert_eq!(q.kind, "free_text");
+    }
+
+    #[test]
+    fn interview_question_preserves_explicit_kind() {
+        let json = r#"{"id":"q1","text":"pick","kind":"single_select","options":[]}"#;
+        let q: InterviewQuestionOutput = serde_json::from_str(json).unwrap();
+        assert_eq!(q.kind, "single_select");
+    }
+
+    #[test]
+    fn interview_option_output_serialization_roundtrips() {
+        let opt = InterviewOptionOutput {
+            value: "yes".into(),
+            label: "Yes, do it".into(),
+            description: "proceed with the change".into(),
+        };
+        let json = serde_json::to_value(&opt).unwrap();
+        let back: InterviewOptionOutput = serde_json::from_value(json).unwrap();
+        assert_eq!(back.value, "yes");
+        assert_eq!(back.label, "Yes, do it");
+        assert_eq!(back.description, "proceed with the change");
+    }
 }

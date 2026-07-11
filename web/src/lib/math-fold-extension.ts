@@ -17,8 +17,8 @@
  * preserved.
  */
 import { syntaxTree } from '@codemirror/language'
-import { StateField } from '@codemirror/state'
 import type { EditorState, Range } from '@codemirror/state'
+import { StateField } from '@codemirror/state'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view'

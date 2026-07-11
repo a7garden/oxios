@@ -93,6 +93,8 @@ pub async fn run_update(
     println!("  Fetching release info from GitHub...");
     let client = reqwest::Client::builder()
         .user_agent("oxios/0.3")
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .context("failed to create HTTP client")?;
 
@@ -184,11 +186,16 @@ pub async fn run_update(
         }
         println!();
 
-        print!("  Continue with update? ");
+        print!("  Continue with update? [Y/n] ");
         std::io::stdout().flush().ok();
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).ok();
-        if !input.trim().eq_ignore_ascii_case("y") {
+        let answer = input.trim();
+        // Empty (Enter) or y/yes → proceed; anything else cancels.
+        let confirmed = answer.is_empty()
+            || answer.eq_ignore_ascii_case("y")
+            || answer.eq_ignore_ascii_case("yes");
+        if !confirmed {
             println!("  Update cancelled.");
             return Ok(UpdateOutcome::unchanged());
         }
@@ -343,6 +350,8 @@ pub async fn run_changelog(version: Option<&str>) -> Result<()> {
 
     let client = reqwest::Client::builder()
         .user_agent("oxios/0.3")
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .context("failed to create HTTP client")?;
 

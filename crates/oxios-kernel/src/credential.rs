@@ -73,6 +73,20 @@ impl CredentialStore {
             return Some((key, CredentialSource::EnvVar));
         }
 
+        // 6. Suffix fallback: subscription credentials may be stored under
+        //    "<provider>-coding-plan" (e.g. "zai-coding-plan"). Only auth
+        //    stores are consulted — env vars use the canonical name.
+        {
+            let alt = format!("{provider}-coding-plan");
+            if let Ok(Some(token)) = oxi_sdk::load_token(&alt)
+                && !token.access_token.is_empty()
+            {
+                return Some((token.access_token, CredentialSource::OxiAuthStore));
+            }
+            if let Some(key) = load_from_shared_store(&alt) {
+                return Some((key, CredentialSource::OxiAuthStore));
+            }
+        }
         None
     }
 

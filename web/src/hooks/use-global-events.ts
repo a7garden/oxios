@@ -67,6 +67,17 @@ export function useGlobalEvents() {
         const lastFailed = seen.current.get(failedKey) ?? 0
         if (now - lastFailed < 30_000) continue
       }
+      // RFC-016: knowledge persistence events — invalidate the save records
+      // query so the KnowledgeSaveIndicator on the relevant message refetches
+      // and shows the new save inline. No toast — the indicator is the feedback.
+      if (event.type === 'knowledge_persisted' || event.type === 'knowledge_removed') {
+        const sid = event.session_id
+        if (sid) {
+          queryClient.invalidateQueries({ queryKey: ['chat', 'knowledge-saves', sid] })
+        }
+        queryClient.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
+        continue
+      }
 
       const title = eventTitle(event)
       if (!title) continue
@@ -87,7 +98,7 @@ export function useGlobalEvents() {
         if (soundSeverity) playNotificationSound(soundSeverity)
       }
     }
-  }, [events, add])
+  }, [events, add, queryClient])
 }
 
 /**

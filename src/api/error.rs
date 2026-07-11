@@ -29,6 +29,8 @@ pub enum AppError {
     },
     /// Gateway did not respond within the configured deadline (RFC-024 C1).
     GatewayTimeout(String),
+    /// Precondition failed — ETag mismatch on optimistic concurrency check (S-2).
+    Conflict(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -45,6 +47,7 @@ impl std::fmt::Display for AppError {
                 "Payload too large: {size} bytes exceeds limit of {limit} bytes"
             ),
             AppError::GatewayTimeout(m) => write!(f, "Gateway Timeout: {m}"),
+            AppError::Conflict(m) => write!(f, "Conflict: {m}"),
         }
     }
 }
@@ -65,6 +68,7 @@ impl IntoResponse for AppError {
                 format!("{size} bytes exceeds limit of {limit} bytes"),
             ),
             AppError::GatewayTimeout(m) => (StatusCode::GATEWAY_TIMEOUT, m.clone()),
+            AppError::Conflict(m) => (StatusCode::CONFLICT, m.clone()),
         };
         let body = json!({ "error": message });
         (status, axum::Json(body)).into_response()
@@ -75,6 +79,25 @@ impl IntoResponse for AppError {
 
 impl From<anyhow::Error> for AppError {
     fn from(err: anyhow::Error) -> Self {
+        // Walk the error chain to find a typed KernelError and preserve its
+        // intended HTTP status. Without this, agent/session/program not-found
+        // errors that propagate through anyhow surface as 500 instead of 404.
+        for source in err.chain() {
+            if let Some(ke) = source.downcast_ref::<oxios_kernel::error::KernelError>() {
+                match ke.http_status() {
+                    oxios_kernel::error::HttpStatus::NotFound => {
+                        return AppError::NotFound(err.to_string());
+                    }
+                    oxios_kernel::error::HttpStatus::BadRequest => {
+                        return AppError::BadRequest(err.to_string());
+                    }
+                    oxios_kernel::error::HttpStatus::Forbidden => {
+                        return AppError::Forbidden(err.to_string());
+                    }
+                    _ => {}
+                }
+            }
+        }
         AppError::Internal(err.to_string())
     }
 }
@@ -102,5 +125,31 @@ mod tests {
             AppError::Internal(msg) => assert_eq!(msg, "something failed"),
             _ => panic!("Expected Internal variant"),
         }
+    }
+
+    #[test]
+    fn test_kernel_not_found_preserved() {
+        // A KernelError::SessionNotFound that propagates through anyhow should
+        // map to AppError::NotFound (404), not Internal (500).
+        let kernel_err = oxios_kernel::error::KernelError::SessionNotFound { id: "s1".into() };
+        let anyhow_err: anyhow::Error = kernel_err.into();
+        let app_err: AppError = anyhow_err.into();
+        assert!(
+            matches!(app_err, AppError::NotFound(_)),
+            "SessionNotFound should map to NotFound, not Internal"
+        );
+    }
+
+    #[test]
+    fn test_kernel_not_found_through_context() {
+        // KernelError wrapped in anyhow context should still be detected via
+        // the error chain walk.
+        let kernel_err = oxios_kernel::error::KernelError::SessionNotFound { id: "s2".into() };
+        let anyhow_err = anyhow::Error::new(kernel_err).context("while fetching session");
+        let app_err: AppError = anyhow_err.into();
+        assert!(
+            matches!(app_err, AppError::NotFound(_)),
+            "context-wrapped SessionNotFound should still map to NotFound"
+        );
     }
 }

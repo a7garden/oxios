@@ -24,15 +24,18 @@ import {
 } from '@codemirror/autocomplete'
 import { history, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { bracketMatching, defaultHighlightStyle, HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
-import { EditorSelection } from '@codemirror/state'
+import { EditorSelection, type Extension, Prec } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { keymap } from '@codemirror/view'
 import { Strikethrough, Table, TaskList } from '@lezer/markdown'
+import { tags as lmTags } from '@lezer/highlight'
 import CodeMirror, { EditorView, type ReactCodeMirrorRef } from '@uiw/react-codemirror'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { type EditorStats, countWords } from './editor-status-bar'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
 import { emojiFoldExtension } from '@/lib/emoji-fold-extension'
@@ -45,13 +48,15 @@ import { tableFoldExtension } from '@/lib/table-fold-extension'
 import { tokenHideExtension } from '@/lib/token-hide-extension'
 import { cn } from '@/lib/utils'
 import { wikilinkExtension } from '@/lib/wikilink-extension'
+import { useEditorPrefs } from '@/stores/editor-prefs'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
 interface MarkdownEditorProps {
   filePath: string
   initialContent: string
-  onSave: (content: string) => void
+  onSave: (content: string) => Promise<void>
   className?: string
+  onStatsChange?: (stats: EditorStats) => void
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -220,10 +225,20 @@ const baseTheme = EditorView.theme({
   '.cm-content': {
     padding: '12px 8px',
   },
-  '.cm-gutters': {
-    display: 'none',
-  },
 })
+
+// Force the editor canvas transparent so it inherits the app's
+// --background token in both themes. Wrapped in Prec.highest to win
+// over oneDark (#282c34 bluish canvas) and @uiw's built-in theme,
+// regardless of extension order. Syntax-highlight colours are untouched.
+const transparentCanvas = Prec.highest(
+  EditorView.theme({
+    '&': { backgroundColor: 'transparent' },
+    '.cm-scroller': { backgroundColor: 'transparent' },
+    '.cm-content': { backgroundColor: 'transparent' },
+    '.cm-gutters': { backgroundColor: 'transparent' },
+  }),
+)
 
 const darkTheme = EditorView.theme(
   {
@@ -240,14 +255,22 @@ export function MarkdownEditor({
   initialContent,
   onSave,
   className,
+  onStatsChange,
 }: MarkdownEditorProps) {
   const ref = useRef<ReactCodeMirrorRef | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // B-2: Dirty-state ref — checked by the content-replace effect to
+  // prevent our own save echo (setQueryData in onSuccess → new
+  // initialContent → effect) from clobbering unsaved edits made
+  // during the PUT round-trip.
+  const dirtyRef = useRef(false)
+  dirtyRef.current = isDirty
   const isSettingContent = useRef(false)
   const openFile = useKnowledgeStore((s) => s.openFile)
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
+  const prefs = useEditorPrefs()
   // Image fold needs the current note's directory to resolve relative image
   // URLs against the backend asset route. A ref lets the (stable) extension
   // read the latest path on each rebuild without being recreated.
@@ -278,6 +301,8 @@ export function MarkdownEditor({
 
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
+  const onStatsChangeRef = useRef(onStatsChange)
+  onStatsChangeRef.current = onStatsChange
 
   const autocompleteEntries = useCallback(() => {
     if (!treeEntries) return []
@@ -289,14 +314,154 @@ export function MarkdownEditor({
     [autocompleteEntries],
   )
 
+  // Stats tracker — fires on doc/selection changes, reports to parent.
+  // Created once (stable identity); reads the latest callback via ref.
+  const statsTracker = useMemo(
+    () =>
+      EditorView.updateListener.of((update) => {
+        if (!update.docChanged && !update.selectionSet) return
+        const { state } = update.view
+        const text = state.doc.toString()
+        const sel = state.selection.main
+        const line = state.doc.lineAt(sel.head)
+        onStatsChangeRef.current?.({
+          words: countWords(text),
+          chars: text.length,
+          lines: state.doc.lines,
+          cursorLine: line.number,
+          cursorCol: sel.head - line.from + 1,
+        })
+      }),
+    [],
+  )
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Conditional extensions — built from editor prefs. Each live-rendering /
+  // fold extension can be toggled independently. The relative ordering is
+  // preserved from the pre-prefs hard-coded array: syntax-highlighting and
+  // transparentCanvas stay last so inline styling wins over oneDark.
+  // ─────────────────────────────────────────────────────────────────────────
+  const extensions = useMemo<Extension[]>(() => {
+    const exts: Extension[] = [
+      history(),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      customKeymap,
+      headingEnforcer,
+      linkClickHandler,
+      autocompletion({
+        override: [completionSource],
+        activateOnTyping: true,
+        closeOnBlur: true,
+      }),
+      markdown({
+        base: markdownLanguage,
+        codeLanguages: languages,
+        extensions: [Strikethrough, Table, TaskList],
+      }),
+      baseTheme,
+      statsTracker,
+    ]
+    if (prefs.bracketMatching) exts.push(bracketMatching())
+    if (prefs.mermaidFold) {
+      exts.push(mermaidExtension)
+      exts.push(mermaidDarkObserver)
+    }
+    if (prefs.tokenHiding) exts.push(tokenHideExtension)
+    if (prefs.livePreview) exts.push(livePreviewExtension)
+    exts.push(wikilinkExtension)
+    if (prefs.emojiFold) exts.push(emojiFoldExtension)
+    if (prefs.mathFold) exts.push(mathFoldExtension)
+    if (prefs.imageFold) exts.push(imageFoldExt)
+    if (prefs.tableFold) exts.push(tableFoldExtension)
+    if (isDark) {
+      exts.push(oneDark)
+      exts.push(darkTheme)
+    }
+    // Inline live-preview styling — must stay last to win over oneDark.
+    exts.push(syntaxHighlighting(livePreviewHighlight))
+
+    // ── User-defined markdown colors (override oneDark / defaults) ──
+    // Heading colors via HighlightStyle — oneDark styles `tags.heading`
+    // (the parent), so `tags.heading1`-`heading6` (children) override it.
+    const headingEntries: { tag: typeof lmTags.heading1; color: string }[] = []
+    const headingTagMap = {
+      h1: lmTags.heading1,
+      h2: lmTags.heading2,
+      h3: lmTags.heading3,
+      h4: lmTags.heading4,
+      h5: lmTags.heading5,
+      h6: lmTags.heading6,
+    } as const
+    for (const lvl of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const) {
+      const c = prefs.headingColors[lvl]
+      if (c) headingEntries.push({ tag: headingTagMap[lvl], color: c })
+    }
+    if (headingEntries.length > 0) {
+      exts.push(syntaxHighlighting(HighlightStyle.define(headingEntries)))
+    }
+    // Markdown syntax markers (`#`, `*`, `` ` ``, `>`)
+    if (prefs.markerColor) {
+      exts.push(
+        syntaxHighlighting(
+          HighlightStyle.define([
+            { tag: lmTags.processingInstruction, color: prefs.markerColor },
+          ]),
+        ),
+      )
+    }
+    // Links and URLs
+    if (prefs.linkColor) {
+      exts.push(
+        syntaxHighlighting(
+          HighlightStyle.define([
+            { tag: lmTags.link, color: prefs.linkColor },
+            { tag: lmTags.url, color: prefs.linkColor },
+          ]),
+        ),
+      )
+    }
+
+    exts.push(transparentCanvas)
+    return exts
+  }, [
+    completionSource,
+    imageFoldExt,
+    isDark,
+    prefs.bracketMatching,
+    prefs.mermaidFold,
+    prefs.tokenHiding,
+    prefs.livePreview,
+    prefs.emojiFold,
+    prefs.mathFold,
+    prefs.imageFold,
+    prefs.tableFold,
+    statsTracker,
+    prefs.headingColors,
+    prefs.markerColor,
+    prefs.linkColor,
+  ])
+
   // Manual save handler (toolbar / ⌘S)
   useEffect(() => {
-    const handler = () => {
+    const handler = async () => {
       const view = viewRef.current
       if (!view) return
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      onSaveRef.current(view.state.doc.toString())
-      setIsDirty(false)
+      clearTimeout(saveTimerRef.current)
+      const value = view.state.doc.toString()
+      try {
+        await onSaveRef.current(value)
+        // B-3: Only clear dirty if the editor content hasn't drifted
+        // since the save was initiated. If the user typed during the
+        // PUT round-trip, dirty stays true so the dirty guard (B-2)
+        // blocks the save echo from clobbering their new edits.
+        if (viewRef.current?.state.doc.toString() === value) {
+          setIsDirty(false)
+        }
+      } catch {
+        // I-1: Save failed — keep dirty so the unsaved indicator
+        // stays visible and the user knows their edits are at risk.
+        toast.error(t('knowledge.saveFailed', 'Save failed'))
+      }
     }
     document.addEventListener('knowledge:save', handler)
     return () => {
@@ -321,18 +486,26 @@ export function MarkdownEditor({
   }, [openFile])
 
   // Save on blur
-  const handleBlur = useCallback(() => {
+  const handleBlur = useCallback(async () => {
     const view = viewRef.current
     if (!view || !isDirty) return
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    onSaveRef.current(view.state.doc.toString())
-    setIsDirty(false)
+    clearTimeout(saveTimerRef.current)
+    const value = view.state.doc.toString()
+    try {
+      await onSaveRef.current(value)
+      if (viewRef.current?.state.doc.toString() === value) {
+        setIsDirty(false)
+      }
+    } catch {
+      toast.error(t('knowledge.saveFailed', 'Save failed'))
+    }
   }, [isDirty])
 
   // Update content when initialContent changes (file loaded from API)
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
+    if (dirtyRef.current) return
     const current = view.state.doc.toString()
     if (current === initialContent) return
     // Suspend the heading enforcer and onChange-driven autosave while
@@ -365,8 +538,35 @@ export function MarkdownEditor({
     }
   }, [initialContent])
 
+  // Report initial stats on mount and when content is loaded — the
+  // updateListener only fires on *changes*, not on the initial state.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const text = view.state.doc.toString()
+    const sel = view.state.selection.main
+    const line = view.state.doc.lineAt(sel.head)
+    onStatsChangeRef.current?.({
+      words: countWords(text),
+      chars: text.length,
+      lines: view.state.doc.lines,
+      cursorLine: line.number,
+      cursorCol: sel.head - line.from + 1,
+    })
+  }, [initialContent])
+
   return (
-    <div className={cn('h-full relative', className)} onBlur={handleBlur}>
+    <div
+      className={cn('h-full relative', className)}
+      onBlur={handleBlur}
+      style={
+        {
+          '--editor-font-size': `${prefs.fontSize}px`,
+          '--editor-line-height': String(prefs.lineHeight),
+          '--editor-font-mono': prefs.fontFamily,
+        } as CSSProperties
+      }
+    >
       {isDirty && (
         <span className="absolute top-2 right-3 text-xs text-muted-foreground z-10">
           {t('knowledge.unsavedChanges')}
@@ -379,59 +579,33 @@ export function MarkdownEditor({
         }}
         value={initialContent}
         basicSetup={{
-          lineNumbers: false,
-          highlightActiveLine: true,
-          highlightActiveLineGutter: false,
-          foldGutter: true,
+          lineNumbers: prefs.lineNumbers,
+          highlightActiveLine: prefs.activeLineHighlight,
+          highlightActiveLineGutter: prefs.activeLineHighlight,
+          foldGutter: prefs.foldGutter,
           foldKeymap: true,
           autocompletion: false, // we provide our own
           syntaxHighlighting: true,
-          bracketMatching: true,
+          bracketMatching: false, // controlled via the extensions array below
           closeBrackets: false,
           defaultKeymap: true,
           history: true,
         }}
-        extensions={[
-          history(),
-          bracketMatching(),
-          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-          customKeymap,
-          headingEnforcer,
-          linkClickHandler,
-          autocompletion({
-            override: [completionSource],
-            activateOnTyping: true,
-            closeOnBlur: true,
-          }),
-          markdown({
-            base: markdownLanguage,
-            codeLanguages: languages,
-            extensions: [Strikethrough, Table, TaskList],
-          }),
-          baseTheme,
-          mermaidExtension,
-          mermaidDarkObserver,
-          tokenHideExtension,
-          livePreviewExtension,
-          wikilinkExtension,
-          emojiFoldExtension,
-          mathFoldExtension,
-          imageFoldExt,
-          tableFoldExtension,
-          ...(isDark ? [oneDark, darkTheme] : []),
-          // Live-preview inline styling (bold 800, strikethrough, inline
-          // code). Registered last so it wins over defaultHighlightStyle
-          // AND oneDark without clobbering their colours.
-          syntaxHighlighting(livePreviewHighlight),
-        ]}
+        extensions={extensions}
         theme={isDark ? 'dark' : 'light'}
         onChange={(value) => {
           if (isSettingContent.current) return
           setIsDirty(true)
-          if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-          saveTimerRef.current = setTimeout(() => {
-            onSaveRef.current(value)
-            setIsDirty(false)
+          clearTimeout(saveTimerRef.current)
+          saveTimerRef.current = setTimeout(async () => {
+            try {
+              await onSaveRef.current(value)
+              if (viewRef.current?.state.doc.toString() === value) {
+                setIsDirty(false)
+              }
+            } catch {
+              toast.error(t('knowledge.saveFailed', 'Save failed'))
+            }
           }, 1000)
         }}
         height="100%"

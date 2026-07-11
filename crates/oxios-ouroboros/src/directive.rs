@@ -170,3 +170,199 @@ pub struct MsgCtx {
 
 /// Timestamp of directive creation (used for session metadata, not stored on the directive itself).
 pub type DirectiveTimestamp = DateTime<Utc>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // Directive::from_message — Trivial task construction
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn from_message_uses_message_as_both_goal_and_original_request() {
+        let d = Directive::from_message("read the README");
+        assert_eq!(d.goal, "read the README");
+        assert_eq!(d.original_request, "read the README");
+    }
+
+    #[test]
+    fn from_message_preserves_exact_punctuation_and_whitespace() {
+        // The directive is the verbatim user message — language fidelity
+        // matters, so no trimming, lowercasing, or normalization.
+        let raw = "  Fix bug #42 (urgent)  ";
+        let d = Directive::from_message(raw);
+        assert_eq!(d.original_request, raw);
+        assert_eq!(d.goal, raw);
+    }
+
+    #[test]
+    fn from_message_produces_empty_criteria_and_constraints() {
+        let d = Directive::from_message("hello");
+        assert!(d.constraints.is_empty());
+        assert!(d.acceptance_criteria.is_empty());
+        assert!(d.output_schema.is_none());
+    }
+
+    #[test]
+    fn from_message_accepts_string_and_str_via_into() {
+        // The signature takes `impl Into<String>` so both &str and String work.
+        let from_str = Directive::from_message("from &str");
+        let from_string = Directive::from_message(String::from("from String"));
+        assert_eq!(from_str.goal, "from &str");
+        assert_eq!(from_string.goal, "from String");
+    }
+
+    // -----------------------------------------------------------------------
+    // Directive::needs_review — review-eligibility contract
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn needs_review_false_for_from_message_directive() {
+        // from_message is the Trivial path — no criteria, no schema → no review.
+        let d = Directive::from_message("hi");
+        assert!(!d.needs_review());
+    }
+
+    #[test]
+    fn needs_review_true_when_acceptance_criteria_present() {
+        let mut d = Directive::from_message("do thing");
+        d.acceptance_criteria.push("must exit 0".to_string());
+        assert!(d.needs_review());
+    }
+
+    #[test]
+    fn needs_review_true_when_output_schema_present() {
+        let mut d = Directive::from_message("do thing");
+        d.output_schema = Some(serde_json::json!({"type": "object"}));
+        assert!(d.needs_review());
+    }
+
+    #[test]
+    fn needs_review_true_with_either_criteria_or_schema() {
+        // Either signal triggers review; we don't AND them.
+        let d_crit = Directive {
+            goal: "x".into(),
+            original_request: "x".into(),
+            constraints: vec![],
+            acceptance_criteria: vec!["c".into()],
+            output_schema: None,
+        };
+        let d_schema = Directive {
+            goal: "x".into(),
+            original_request: "x".into(),
+            constraints: vec![],
+            acceptance_criteria: vec![],
+            output_schema: Some(serde_json::json!({})),
+        };
+        assert!(d_crit.needs_review());
+        assert!(d_schema.needs_review());
+    }
+
+    // -----------------------------------------------------------------------
+    // Verdict::all_passed — pass-flag accessor
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn verdict_all_passed_matches_passed_field() {
+        assert!(
+            Verdict {
+                passed: true,
+                score: 1.0,
+                notes: vec![],
+                gaps: vec![]
+            }
+            .all_passed()
+        );
+        assert!(
+            !Verdict {
+                passed: false,
+                score: 0.0,
+                notes: vec![],
+                gaps: vec!["x".into()]
+            }
+            .all_passed()
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Directive JSON round-trip — serialization invariants
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn directive_serialization_roundtrip_preserves_all_fields() {
+        let mut d = Directive::from_message("build the thing");
+        d.constraints = vec!["no network".to_string(), "single file".to_string()];
+        d.acceptance_criteria = vec!["compiles".to_string()];
+        d.output_schema = Some(serde_json::json!({"type": "object"}));
+
+        let json = serde_json::to_value(&d).unwrap();
+        let back: Directive = serde_json::from_value(json).unwrap();
+        assert_eq!(back.goal, d.goal);
+        assert_eq!(back.original_request, d.original_request);
+        assert_eq!(back.constraints, d.constraints);
+        assert_eq!(back.acceptance_criteria, d.acceptance_criteria);
+        assert_eq!(back.output_schema, d.output_schema);
+    }
+
+    #[test]
+    fn directive_serialization_omits_empty_optional_fields() {
+        // The struct uses `skip_serializing_if` for empty Vecs/None — JSON
+        // stays minimal so the LLM-side prompt doesn't see noise.
+        let d = Directive::from_message("hi");
+        let json = serde_json::to_string(&d).unwrap();
+        assert!(!json.contains("\"constraints\""));
+        assert!(!json.contains("\"acceptance_criteria\""));
+        assert!(!json.contains("\"output_schema\""));
+    }
+
+    #[test]
+    fn directive_serialization_includes_constraints_when_populated() {
+        let mut d = Directive::from_message("hi");
+        d.constraints.push("one".to_string());
+        let json = serde_json::to_string(&d).unwrap();
+        assert!(json.contains("\"constraints\""));
+        assert!(json.contains("\"one\""));
+    }
+
+    // -----------------------------------------------------------------------
+    // ExecEnv — session_id is transient (#[serde(skip)])
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn exec_env_session_id_is_skipped_from_serialization() {
+        let env = ExecEnv {
+            session_id: Some("sess-1".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&env).unwrap();
+        // session_id is per-execution and must not persist.
+        assert!(!json.contains("sess-1"));
+        assert!(!json.contains("session_id"));
+    }
+
+    #[test]
+    fn exec_env_round_trip_preserves_non_transient_fields() {
+        let env = ExecEnv {
+            workspace_context: Some("ctx".to_string()),
+            mount_paths: vec![PathBuf::from("/a"), PathBuf::from("/b")],
+            cspace_hint: Some("tmpl".to_string()),
+            model_override: Some("anthropic/claude-sonnet-4".to_string()),
+            role: Some("researcher".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&env).unwrap();
+        let back: ExecEnv = serde_json::from_value(json).unwrap();
+        assert_eq!(back.workspace_context, Some("ctx".to_string()));
+        assert_eq!(
+            back.mount_paths,
+            vec![PathBuf::from("/a"), PathBuf::from("/b")]
+        );
+        assert_eq!(back.cspace_hint, Some("tmpl".to_string()));
+        assert_eq!(
+            back.model_override,
+            Some("anthropic/claude-sonnet-4".to_string())
+        );
+        assert_eq!(back.role, Some("researcher".to_string()));
+    }
+}

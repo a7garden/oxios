@@ -6,6 +6,8 @@
 //! - QuotaExhausted skips L1 (goes straight to provider swap).
 //! - AttemptBudget bounds total attempts.
 
+#[path = "common/mod.rs"]
+mod common;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -132,7 +134,7 @@ fn build_parts(
     Arc<RoutingStats>,
 ) {
     let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let _state_store = Arc::new(oxios_kernel::StateStore::new(tmp.path().to_path_buf()).unwrap());
     let supervisor = Arc::new(FailingUntilOverrideSupervisor::new(fail_class));
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));

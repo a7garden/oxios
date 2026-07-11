@@ -458,6 +458,8 @@ pub(crate) async fn handle_update_run(
 
     let client = reqwest::Client::builder()
         .user_agent(format!("oxios/{current}"))
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| AppError::Internal(format!("failed to create HTTP client: {e}")))?;
 
@@ -624,6 +626,8 @@ async fn fetch_github_release(version: Option<&str>) -> Result<serde_json::Value
 
     let client = reqwest::Client::builder()
         .user_agent(format!("oxios/{}", env!("CARGO_PKG_VERSION")))
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| AppError::Internal(format!("HTTP client error: {e}")))?;
 

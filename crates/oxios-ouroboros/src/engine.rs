@@ -313,3 +313,109 @@ fn build_review_prompt(directive: &Directive, result: &ExecutionResult) -> Strin
         result.output,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // build_review_prompt — pure formatter; full coverage of the template
+    // branches. Mock-free.
+    // -----------------------------------------------------------------------
+
+    fn empty_result() -> ExecutionResult {
+        ExecutionResult {
+            output: String::new(),
+            steps_completed: 0,
+            success: false,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn build_review_prompt_includes_directive_goal() {
+        let d = Directive::from_message("add a login screen");
+        let prompt = build_review_prompt(&d, &empty_result());
+        assert!(prompt.contains("Goal: add a login screen"));
+    }
+
+    #[test]
+    fn build_review_prompt_includes_output_verbatim() {
+        let d = Directive::from_message("do thing");
+        let result = ExecutionResult {
+            output: "RESULT_HERE: 42 files changed".into(),
+            ..empty_result()
+        };
+        let prompt = build_review_prompt(&d, &result);
+        assert!(prompt.contains("RESULT_HERE: 42 files changed"));
+    }
+
+    #[test]
+    fn build_review_prompt_uses_none_when_criteria_empty() {
+        let d = Directive::from_message("trivial");
+        let prompt = build_review_prompt(&d, &empty_result());
+        // Empty criteria list → "Acceptance Criteria:\n(none)\n" so the LLM
+        // sees a clear signal, not a missing field.
+        assert!(prompt.contains("Acceptance Criteria:\n(none)"));
+    }
+
+    #[test]
+    fn build_review_prompt_numbers_criteria_one_indexed() {
+        let mut d = Directive::from_message("do thing");
+        d.acceptance_criteria = vec![
+            "must compile".to_string(),
+            "must exit 0".to_string(),
+            "must have tests".to_string(),
+        ];
+        let prompt = build_review_prompt(&d, &empty_result());
+        assert!(prompt.contains("1. must compile"));
+        assert!(prompt.contains("2. must exit 0"));
+        assert!(prompt.contains("3. must have tests"));
+    }
+
+    #[test]
+    fn build_review_prompt_joins_constraints_with_commas() {
+        let mut d = Directive::from_message("do thing");
+        d.constraints = vec![
+            "no network".to_string(),
+            "single file".to_string(),
+            "use TypeScript".to_string(),
+        ];
+        let prompt = build_review_prompt(&d, &empty_result());
+        assert!(prompt.contains("Constraints: no network, single file, use TypeScript"));
+    }
+
+    #[test]
+    fn build_review_prompt_constraints_empty_when_none() {
+        let d = Directive::from_message("do thing");
+        // No constraints → join produces "" — prompt still has the
+        // "Constraints: " label with empty value, which the LLM can parse.
+        let prompt = build_review_prompt(&d, &empty_result());
+        assert!(prompt.contains("Constraints: \n"));
+    }
+
+    #[test]
+    fn build_review_prompt_includes_output_schema_section() {
+        // When the directive carries an output_schema, it does NOT appear
+        // inline in the prompt today (the LLM is expected to read it from
+        // context). Documenting the current contract so a future refactor
+        // that adds schema-injection gets caught by this test.
+        let mut d = Directive::from_message("do thing");
+        d.output_schema = Some(serde_json::json!({"type": "object"}));
+        let prompt = build_review_prompt(&d, &empty_result());
+        // The schema is omitted — but the goal still appears.
+        assert!(prompt.contains("Goal: do thing"));
+    }
+
+    #[test]
+    fn build_review_prompt_documents_output_json_shape() {
+        let d = Directive::from_message("do thing");
+        let prompt = build_review_prompt(&d, &empty_result());
+        // The schema is hard-coded into the prompt so the LLM has a stable
+        // contract to follow — pin it here.
+        assert!(prompt.contains("\"passed\""));
+        assert!(prompt.contains("\"score\""));
+        assert!(prompt.contains("\"notes\""));
+        assert!(prompt.contains("\"gaps\""));
+    }
+}

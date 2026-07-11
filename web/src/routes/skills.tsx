@@ -1158,9 +1158,14 @@ function SkillsShDetail({ id, onClose }: { id: string; onClose: () => void }) {
     },
   })
 
-  if (isLoading) return <div className="text-sm text-muted-foreground">Loading...</div>
+  if (isLoading)
+    return <div className="text-sm text-muted-foreground">{t('common.loading', 'Loading...')}</div>
   if (isError || !data)
-    return <div className="text-sm text-destructive">Failed to load skill detail</div>
+    return (
+      <div className="text-sm text-destructive">
+        {t('skills.loadDetailFailed', 'Failed to load skill detail')}
+      </div>
+    )
 
   const skillMd = data.files?.find(
     (f) => f.path === 'SKILL.md' || f.path.toLowerCase() === 'skill.md',

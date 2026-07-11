@@ -205,26 +205,42 @@ impl Default for SqliteMemoryConfig {
 /// Embedding provider configuration (RFC-012).
 ///
 /// Controls which embedding model is used for semantic search.
-/// When `embedding-mlx` feature is enabled and `provider = "mlx"`,
-/// uses EmbeddingGemma-300m via MLX on Apple Silicon.
-/// Otherwise falls back to TF-IDF.
+/// When `provider = "api"`, uses an OpenAI-compatible remote embedding
+/// endpoint. When `provider = "gguf"` and the `embedding-gguf` feature is
+/// enabled on aarch64, uses EmbeddingGemma-300m locally. Otherwise
+/// falls back to TF-IDF (sparse vectors; no sqlite-vec KNN).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbeddingConfig {
-    /// Embedding provider: "tfidf" (default) or "mlx" (Apple Silicon).
+    /// Embedding provider: "tfidf" (default), "gguf", or "api".
     #[serde(default = "default_embedding_provider")]
     pub provider: String,
-    /// Matryoshka dimension: 128, 256, 512, or 768.
-    /// Only used when provider = "mlx".
+    /// Matryoshka dimension: 128, 256, 512, or 768 (gguf).
+    /// For "api", defaults to the model's known dimensionality
+    /// (text-embedding-3-small=1536, text-embedding-3-large=3072).
     #[serde(default = "default_embedding_dim")]
     pub dimension: usize,
     /// Model TTL in seconds. Unloaded after this duration of inactivity.
-    /// Only used when provider = "mlx".
+    /// Only used when provider = "gguf".
     #[serde(default = "default_model_ttl")]
     pub model_ttl_secs: u64,
+    /// API endpoint URL (provider = "api"). E.g.
+    /// `https://api.openai.com/v1/embeddings`.
+    #[serde(default)]
+    pub api_endpoint: String,
+    /// API bearer key (provider = "api"). Empty → inherit from active
+    /// LLM provider's api_key at boot.
+    #[serde(default)]
+    pub api_key: String,
+    /// Embedding model name (provider = "api"). E.g.
+    /// `text-embedding-3-small`.
+    #[serde(default)]
+    pub api_model: String,
 }
 
 fn default_embedding_provider() -> String {
-    "gguf".to_string()
+    // Default to TF-IDF; users opt into "api" or "gguf" via config.
+    // GGUF/MLX feature gating happens at runtime in `kernel.rs`.
+    "tfidf".to_string()
 }
 
 fn default_model_ttl() -> u64 {
@@ -237,6 +253,9 @@ impl Default for EmbeddingConfig {
             provider: default_embedding_provider(),
             dimension: default_embedding_dim(),
             model_ttl_secs: default_model_ttl(),
+            api_endpoint: String::new(),
+            api_key: String::new(),
+            api_model: String::new(),
         }
     }
 }

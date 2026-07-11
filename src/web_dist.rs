@@ -120,6 +120,8 @@ async fn fetch_latest_release_tag() -> Result<String> {
     let url = format!("https://api.github.com/repos/{GITHUB_REPO}/releases/latest");
     let client = reqwest::Client::builder()
         .user_agent("oxios-web")
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .context("failed to create HTTP client")?;
     let resp: serde_json::Value = client
@@ -219,6 +221,8 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
 
     let client = reqwest::Client::builder()
         .user_agent("oxios-web")
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .context("failed to create HTTP client")?;
 

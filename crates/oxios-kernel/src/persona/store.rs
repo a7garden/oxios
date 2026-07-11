@@ -13,6 +13,23 @@ use std::sync::Arc;
 
 use super::Persona;
 
+/// Canonical ordering for default personas. Ensures `list_enabled()`
+/// returns "dev" first (the primary persona) rather than alphabetical order.
+fn persona_priority(id: &str) -> usize {
+    const PRIORITY: &[&str] = &[
+        "dev",
+        "review",
+        "research",
+        "architect",
+        "mentor",
+        "ops",
+        "security",
+        "writer",
+        "planner",
+    ];
+    PRIORITY.iter().position(|&p| p == id).unwrap_or(usize::MAX)
+}
+
 /// Thread-safe in-memory persona registry.
 #[derive(Debug, Default)]
 pub struct PersonaStore {
@@ -39,11 +56,11 @@ impl PersonaStore {
         personas.get(id).cloned()
     }
 
-    /// Returns all enabled personas, sorted by ID for deterministic ordering.
+    /// Returns all enabled personas in canonical priority order.
     pub fn list_enabled(&self) -> Vec<Persona> {
         let personas = self.personas.read();
         let mut result: Vec<Persona> = personas.values().filter(|p| p.enabled).cloned().collect();
-        result.sort_by(|a, b| a.id.cmp(&b.id));
+        result.sort_by_key(|p| persona_priority(&p.id));
         result
     }
 

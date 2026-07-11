@@ -1,6 +1,6 @@
 [package]
 name = "oxios-memory"
-version = "1.21.0"
+version = "1.22.0"
 edition = "2024"
 description = "Tiered agent memory — extracted from oxios-kernel per RFC-018"
 license = "MIT"
@@ -36,3 +36,4 @@ hf-hub = { version = "0.4", optional = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 tokio = { workspace = true }
+proptest = { workspace = true }

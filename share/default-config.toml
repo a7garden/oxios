@@ -187,12 +187,18 @@ enabled = true
 wal_mode = true
 
 # Embedding provider for semantic search.
-# "gguf" = local EmbeddingGemma-300m (auto-downloaded, ~329MB)
-# "tfidf" = TF-IDF fallback (no download, keyword-only)
+# "api"  = OpenAI-compatible /v1/embeddings (cross-platform, no download)
+# "gguf" = local EmbeddingGemma-300m (Apple Silicon, ~329MB download)
+# "tfidf" = TF-IDF fallback (no download, keyword-only, no vector search)
 [memory.embedding]
-provider = "gguf"
-# dimension = 256
-# model_ttl_secs = 300  # Unload after 5 min of inactivity
+provider = "tfidf"
+# dimension = 256  # GGUF: 128|256|512|768. API: auto-detected per model.
+# model_ttl_secs = 300  # GGUF only: unload after 5 min of inactivity.
+
+# API embedding provider (when provider = "api"):
+# api_endpoint = "https://api.openai.com/v1/embeddings"
+# api_key = ""  # Empty = inherit from [engine].api_key
+# api_model = "text-embedding-3-small"  # 1536-dim
 
 # Learning engine (SONA + ReasoningBank).
 [memory.learning]

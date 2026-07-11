@@ -4,6 +4,7 @@ import type {
   ChecklistItemsResponse,
   ConvertHtmlResponse,
   EmojiResponse,
+  FileDiffResponse,
   HabitsData,
   JournalTodayResponse,
   KnowledgeBacklink,
@@ -28,6 +29,19 @@ function encodeFilePath(path: string): string {
 }
 // ── File I/O ──────────────────────────────────────────────────
 
+/** FNV-1a content hash matching the server-side content_etag (S-2). */
+function fnvEtag(content: string): string {
+  const bytes = new TextEncoder().encode(content)
+  let hash = 0xcbf29ce484222325n
+  for (const byte of bytes) {
+    hash ^= BigInt(byte)
+    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn
+  }
+  return `"${hash.toString(16)}"`
+}
+
+type FileWithEtag = { content: string; etag: string | null }
+
 export function useKnowledgeTree(dir?: string) {
   return useQuery({
     queryKey: ['knowledge', 'tree', dir ?? ''],
@@ -38,21 +52,38 @@ export function useKnowledgeTree(dir?: string) {
 export function useKnowledgeFile(path: string | null) {
   return useQuery({
     queryKey: ['knowledge', 'file', path],
-    queryFn: () => api.get<string>(`/api/knowledge/file/${encodeFilePath(path!)}`),
+    queryFn: async (): Promise<FileWithEtag> => {
+      const { data, etag } = await api.getWithEtag<string>(
+        `/api/knowledge/file/${encodeFilePath(path!)}`,
+      )
+      return { content: data, etag }
+    },
     enabled: !!path,
     staleTime: 0,
+    select: (data) => data?.content,
   })
 }
 
 export function useWriteFile() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ path, content }: { path: string; content: string }) =>
-      api.put(`/api/knowledge/file/${encodeFilePath(path)}`, content, true), // raw markdown, not JSON
-    onSuccess: (_, { path }) => {
+    mutationFn: async ({ path, content }: { path: string; content: string }) => {
+      // S-2: Send the last-known ETag as If-Match for optimistic concurrency.
+      const cached = qc.getQueryData<FileWithEtag>(['knowledge', 'file', path])
+      const headers: Record<string, string> = {}
+      if (cached?.etag) headers['If-Match'] = cached.etag
+      return api.put(`/api/knowledge/file/${encodeFilePath(path)}`, content, true, headers)
+    },
+    onSuccess: (_, { path, content }) => {
+      // B-1: Update cache directly to avoid refetch race. Compute the
+      // new ETag client-side using the same FNV-1a hash as the server.
+      qc.setQueryData(['knowledge', 'file', path], { content, etag: fnvEtag(content) })
       qc.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
-      qc.invalidateQueries({ queryKey: ['knowledge', 'file', path] })
       qc.invalidateQueries({ queryKey: ['knowledge', 'backlinks'] })
+    },
+    onError: (_error, { path }) => {
+      // S-2: On conflict (409) or any error, refetch to get fresh content + ETag.
+      qc.invalidateQueries({ queryKey: ['knowledge', 'file', path] })
     },
   })
 }
@@ -317,6 +348,19 @@ export function useKnowledgeFileHistory(path: string | null) {
     queryFn: () =>
       api.get<KnowledgeHistoryResponse>(`/api/knowledge/file/${encodeFilePath(path!)}/history`),
     enabled: !!path,
+  })
+}
+
+// ── File Diff (I-6) ────────────────────────────────────────────
+
+export function useKnowledgeFileDiff(path: string | null, hash: string | null) {
+  return useQuery({
+    queryKey: ['knowledge', 'diff', path, hash],
+    queryFn: () => {
+      const params = new URLSearchParams({ path: path!, hash: hash! })
+      return api.get<FileDiffResponse>(`/api/knowledge/file-diff?${params}`)
+    },
+    enabled: !!path && !!hash,
   })
 }
 

@@ -1851,12 +1851,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "downcast"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
-
-[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2165,15 +2159,6 @@ checksum = "e076045bb43dac435333ed5f04caf35c7463631d0dae2deb2638d94dd0a5b872"
 dependencies = [
  "lazy_static",
  "num",
-]
-
-[[package]]
-name = "fragile"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8878864ba14bb86e818a412bfd6f18f9eabd4ec0f008a28e8f7eb61db532fcf9"
-dependencies = [
- "futures-core",
 ]
 
 [[package]]
@@ -3984,7 +3969,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "525e9ff3e1a4be2fbea1fdf0e98686a6d98b4d8f937e1bf7402245af1909e8c3"
 dependencies = [
  "byteorder-lite",
- "quick-error",
+ "quick-error 2.0.1",
 ]
 
 [[package]]
@@ -4789,33 +4774,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mockall"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43766c2b5203b10de348ffe19f7e54564b64f3d6018ff7648d1e2d6d3a0f0a48"
-dependencies = [
- "cfg-if",
- "downcast",
- "fragile",
- "lazy_static",
- "mockall_derive",
- "predicates",
- "predicates-tree",
-]
-
-[[package]]
-name = "mockall_derive"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af7cbce79ec385a1d4f54baa90a76401eb15d9cab93685f62e7e9f942aa00ae2"
-dependencies = [
- "cfg-if",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "moxcms"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5255,8 +5213,6 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 [[package]]
 name = "oxi-agent"
 version = "0.54.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d46a5e5cd73e35a20bdcfa9036406edb593121c772107b89d07d69f310d9817"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5285,8 +5241,6 @@ dependencies = [
 [[package]]
 name = "oxi-ai"
 version = "0.54.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "934e07c1592cdbcade500cff44930c4485de93ecdb9b8a5250eed9927b0c38fb"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5322,8 +5276,6 @@ dependencies = [
 [[package]]
 name = "oxi-hashline"
 version = "0.54.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d01b81ec7a42d3ca6873fcd665de20e310554df638d4848b916cf65b8c348d9"
 dependencies = [
  "async-trait",
  "lru 0.18.0",
@@ -5336,8 +5288,6 @@ dependencies = [
 [[package]]
 name = "oxi-sdk"
 version = "0.54.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b68c691ac3871fc582b873b8658e0758394d32836065553660c8c3f9225682"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5466,7 +5416,7 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "1.21.0"
+version = "1.22.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5484,7 +5434,6 @@ dependencies = [
  "inquire",
  "libc",
  "mime_guess",
- "mockall",
  "oxi-sdk",
  "oxios-calendar",
  "oxios-gateway",
@@ -5517,7 +5466,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-calendar"
-version = "1.21.0"
+version = "1.22.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5538,7 +5487,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-gateway"
-version = "1.21.0"
+version = "1.22.0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -5558,7 +5507,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-kernel"
-version = "1.21.0"
+version = "1.22.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5614,7 +5563,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-markdown"
-version = "1.21.0"
+version = "1.22.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5643,7 +5592,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-mcp"
-version = "1.21.0"
+version = "1.22.0"
 dependencies = [
  "anyhow",
  "parking_lot",
@@ -5655,7 +5604,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-memory"
-version = "1.21.0"
+version = "1.22.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5664,6 +5613,7 @@ dependencies = [
  "llama-gguf",
  "lru 0.10.1",
  "parking_lot",
+ "proptest",
  "rusqlite",
  "serde",
  "serde_json",
@@ -5677,7 +5627,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-ouroboros"
-version = "1.21.0"
+version = "1.22.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5685,6 +5635,7 @@ dependencies = [
  "futures",
  "oxi-sdk",
  "parking_lot",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -5980,32 +5931,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
-name = "predicates"
-version = "3.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ada8f2932f28a27ee7b70dd6c1c39ea0675c55a36879ab92f3a715eaa1e63cfe"
-dependencies = [
- "anstyle",
- "predicates-core",
-]
-
-[[package]]
-name = "predicates-core"
-version = "1.0.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cad38746f3166b4031b1a0d39ad9f954dd291e7854fcc0eed52ee41a0b50d144"
-
-[[package]]
-name = "predicates-tree"
-version = "1.0.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0de1b847b39c8131db0467e9df1ff60e6d0562ab8e9a16e568ad0fdb372e2f2"
-dependencies = [
- "predicates-core",
- "termtree",
-]
-
-[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6061,6 +5986,25 @@ checksum = "4488a4a36b9a4ba6b9334a32a39971f77c1436ec82c38707bce707699cc3bbcb"
 dependencies = [
  "quote",
  "syn",
+]
+
+[[package]]
+name = "proptest"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b45fcc2344c680f5025fe57779faef368840d0bd1f42f216291f0dc4ace4744"
+dependencies = [
+ "bit-set",
+ "bit-vec",
+ "bitflags 2.13.0",
+ "num-traits",
+ "rand 0.9.4",
+ "rand_chacha 0.9.0",
+ "rand_xorshift",
+ "regex-syntax",
+ "rusty-fork",
+ "tempfile",
+ "unarray",
 ]
 
 [[package]]
@@ -6162,6 +6106,12 @@ checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
 dependencies = [
  "bytemuck",
 ]
+
+[[package]]
+name = "quick-error"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quick-error"
@@ -6357,6 +6307,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand_xorshift"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
+dependencies = [
+ "rand_core 0.9.5",
+]
+
+[[package]]
 name = "rav1e"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6400,7 +6359,7 @@ dependencies = [
  "avif-serialize",
  "imgref",
  "loop9",
- "quick-error",
+ "quick-error 2.0.1",
  "rav1e",
  "rayon",
  "rgb",
@@ -6842,6 +6801,18 @@ name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
+
+[[package]]
+name = "rusty-fork"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc6bf79ff24e648f6da1f8d1f011e9cac26491b619e6b9280f2b47f1774e6ee2"
+dependencies = [
+ "fnv",
+ "quick-error 1.2.3",
+ "tempfile",
+ "wait-timeout",
+]
 
 [[package]]
 name = "ryu"
@@ -7485,12 +7456,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "termtree"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
-
-[[package]]
 name = "thin-vec"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7554,7 +7519,7 @@ dependencies = [
  "fax",
  "flate2",
  "half",
- "quick-error",
+ "quick-error 2.0.1",
  "weezl",
  "zune-jpeg",
 ]
@@ -8085,6 +8050,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "unarray"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
+
+[[package]]
 name = "unicase"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8327,6 +8298,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "231fdcd7ef3037e8330d8e17e61011a2c244126acc0a982f4040ac3f9f0bc077"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "wait-timeout"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ac3b126d3914f9849036f826e054cbabdc8519970b8998ddaf3b5bd3c65f11"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

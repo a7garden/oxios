@@ -764,6 +764,20 @@ impl EngineApi {
     pub fn engine_handle(&self) -> &Arc<crate::engine::EngineHandle> {
         &self.engine_handle
     }
+
+    /// Validate that a model ID is resolvable by the current engine.
+    ///
+    /// Checks the catalog→static resolution path (same as
+    /// `agent_runtime.rs:503` and `AgentBuilder::build()`). Use this
+    /// to reject unknown model IDs early — before the orchestrator
+    /// wastes time on assess/crystallize for a model that can't stream.
+    pub fn validate_model(&self, model_id: &str) -> Result<(), String> {
+        self.engine_handle
+            .get()
+            .resolve_model(model_id)
+            .map(|_| ())
+            .map_err(|e| format!("Unknown model '{model_id}': {e}"))
+    }
     /// RFC-032: Get the current role routing config (role → model mapping).
     pub fn role_routing(&self) -> crate::config::RoleRoutingConfig {
         self.config.read().engine.role_routing.clone()

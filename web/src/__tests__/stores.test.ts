@@ -568,13 +568,17 @@ describe('message-transform primitives (shared by chat + quick-ask stores)', () 
   })
 
   it('appendActivityToMessages creates a placeholder when no assistant exists', () => {
-    const phase = chunkToActivity({
-      type: 'phase',
-      phase: 'assess',
-      status: 'started',
-      summary: '',
+    // Use tool_start — a chunk type that chunkToActivity actually maps to
+    // a ChatActivity. (Previously used `phase`, but that case was never
+    // wired up in chunkToActivity, so the conversion returned null and the
+    // non-null assertion (`!`) hid the bug.)
+    const toolStart = chunkToActivity({
+      type: 'tool_start',
+      tool_name: 'bash',
+      tool_call_id: 'call-1',
+      tool_args: { cmd: 'ls' },
     })!
-    const out = appendActivityToMessages([userMsg()], phase, ctx)
+    const out = appendActivityToMessages([userMsg()], toolStart, ctx)
     expect(out).toHaveLength(2)
     expect(out[1]!.activities).toHaveLength(1)
   })

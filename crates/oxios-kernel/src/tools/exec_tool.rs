@@ -277,9 +277,14 @@ impl ExecTool {
                         })
                     }
                     Ok(Err(e)) => Err(format!("shell execution error: {e}")),
-                    Err(_) => Err(format!(
-                        "shell command timed out after {effective_timeout}ms"
-                    )),
+                    Err(_) => {
+                        // Timeout elapsed — kill the child to avoid orphans.
+                        let _ = child.kill().await;
+                        let _ = child.wait().await; // reap to avoid zombies
+                        Err(format!(
+                            "shell command timed out after {effective_timeout}ms"
+                        ))
+                    }
                 }
             }
             _ = shutdown_fut => {
@@ -401,9 +406,14 @@ impl ExecTool {
                         })
                     }
                     Ok(Err(e)) => Err(format!("structured execution error: {e}")),
-                    Err(_) => Err(format!(
-                        "structured command timed out after {effective_timeout}ms"
-                    )),
+                    Err(_) => {
+                        // Timeout elapsed — kill the child to avoid orphans.
+                        let _ = child.kill().await;
+                        let _ = child.wait().await; // reap to avoid zombies
+                        Err(format!(
+                            "structured command timed out after {effective_timeout}ms"
+                        ))
+                    }
                 }
             }
             _ = shutdown_fut => {

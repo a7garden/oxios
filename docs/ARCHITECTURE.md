@@ -1,6 +1,6 @@
 # Oxios Architecture Reference
 
-> **Version:** 0.4.0 · **Stack:** Rust 2021, tokio, serde (JSON+TOML), oxi-sdk · **License:** MIT
+> **Version:** 1.21.0 · **Stack:** Rust 2024, tokio, serde (JSON+TOML), oxi-sdk · **License:** MIT
 
 This document is a standalone reference for every subsystem in the Oxios Agent OS.
 Read it before modifying kernel structure, adding modules, or onboarding onto the project.
@@ -127,7 +127,7 @@ Oxios is built on two foundational metaphors:
         ▼
   Kernel ─── Orchestrator + Supervisor + all subsystems
         │
-        ├── KernelHandle ─── typed facade (11 APIs)
+        ├── KernelHandle ─── typed facade (13 APIs)
         │       │
         │       └── AgentRuntime ─── wraps oxi-sdk AgentLoop
         │
@@ -188,6 +188,13 @@ The Supervisor is the "init" of Oxios. It manages agent lifecycles using Unix-li
 ### 3.2 Orchestrator — The Brain
 
 The Orchestrator coordinates the full Ouroboros lifecycle for user messages. It is the top-level coordinator that does NOT know about channels or HTTP.
+
+> **Note:** The diagram below describes the legacy 5-phase Ouroboros protocol
+> (Interview → Seed → Execute → Evaluate → Evolve). The current implementation
+> (RFC-027) uses **unified intent handling** (assess → crystallize → execute →
+> review) with adaptive depth. The core concepts (Seed, Space detection,
+> multi-agent delegation, evaluation) remain, but the phase names and flow have
+> changed. This section will be updated to reflect the current protocol.
 
 ```
   User Message

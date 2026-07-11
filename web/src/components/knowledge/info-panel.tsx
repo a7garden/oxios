@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useCalendarByNote, useCalendarCreate, useCalendarUpdate } from '@/hooks/use-calendar'
 import {
   useKnowledgeBacklinks,
+  useKnowledgeFileDiff,
   useKnowledgeFileHistory,
   useKnowledgeFileRestore,
 } from '@/hooks/use-knowledge'
@@ -123,6 +124,8 @@ function FileHistoryPanel() {
   const { data, isLoading } = useKnowledgeFileHistory(currentFilePath)
   const restore = useKnowledgeFileRestore()
   const { t } = useTranslation()
+  // I-6: Track which history entry the user has expanded to view its diff.
+  const [expandedHash, setExpandedHash] = useState<string | null>(null)
 
   if (!currentFilePath) {
     return (
@@ -147,12 +150,17 @@ function FileHistoryPanel() {
       {data.history.map((entry) => (
         <li key={entry.short_hash} className="group">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              className="min-w-0 flex-1 text-left"
+              onClick={() => setExpandedHash(expandedHash === entry.hash ? null : entry.hash)}
+              title={t('knowledge.clickForDiff', 'Click to view diff')}
+            >
               <p className="text-xs text-muted-foreground truncate">
                 {entry.short_hash} · {formatTimestamp(entry.timestamp)}
               </p>
               <p className="text-sm truncate">{entry.message}</p>
-            </div>
+            </button>
             <Button
               variant="ghost"
               size="sm"
@@ -164,9 +172,40 @@ function FileHistoryPanel() {
               {t('knowledge.restore', 'Restore')}
             </Button>
           </div>
+          {expandedHash === entry.hash && (
+            <FileDiffPreview path={currentFilePath} hash={entry.hash} />
+          )}
         </li>
       ))}
     </ul>
+  )
+}
+
+/** I-6: Inline diff preview for a single history entry. */
+function FileDiffPreview({ path, hash }: { path: string; hash: string }) {
+  const { t } = useTranslation()
+  const { data, isLoading } = useKnowledgeFileDiff(path, hash)
+
+  if (isLoading) {
+    return (
+      <pre className="mt-1 text-[10px] bg-muted/50 p-2 rounded overflow-x-auto whitespace-pre-wrap font-mono text-muted-foreground">
+        {t('knowledge.loading', 'Loading...')}
+      </pre>
+    )
+  }
+
+  if (!data?.diff) {
+    return (
+      <p className="mt-1 text-[10px] text-muted-foreground italic">
+        {t('knowledge.noDiff', 'No changes from current version')}
+      </p>
+    )
+  }
+
+  return (
+    <pre className="mt-1 text-[10px] bg-muted/50 p-2 rounded overflow-x-auto whitespace-pre-wrap font-mono">
+      {data.diff}
+    </pre>
   )
 }
 

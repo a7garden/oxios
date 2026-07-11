@@ -42,9 +42,15 @@ impl SkillsShClient {
 
         let api_key = api_key.or_else(|| std::env::var("SKILLS_SH_TOKEN").ok());
 
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .map_err(|e| anyhow::anyhow!("failed to build HTTP client: {e}"))?;
+
         Ok(Self {
             base_url: base,
-            client: reqwest::Client::new(),
+            client,
             api_key,
         })
     }

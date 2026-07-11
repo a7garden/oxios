@@ -35,7 +35,7 @@ export function ToolDetail({ tool }: ToolDetailProps) {
         </div>
       )}
       {(!tool.arguments || tool.arguments.length === 0) && (
-        <p className="text-xs text-muted-foreground">No arguments</p>
+        <p className="text-xs text-muted-foreground">{t('mcp.noArguments', 'No arguments')}</p>
       )}
     </div>
   )

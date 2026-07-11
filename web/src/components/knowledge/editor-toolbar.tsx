@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EventEditor } from '@/components/calendar/event-editor'
+import { EditorSettingsPopover } from '@/components/knowledge/editor-settings-popover'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCalendarCreate } from '@/hooks/use-calendar'
@@ -181,6 +182,9 @@ export function EditorToolbar() {
           <TooltipContent>{t('calendar.scheduleNote')}</TooltipContent>
         </Tooltip>
       )}
+
+      {/* Editor appearance settings */}
+      <EditorSettingsPopover />
 
       <EventEditor
         open={editorOpen}

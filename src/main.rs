@@ -138,12 +138,16 @@ enum Command {
 
     /// Backup Oxios state.
     Backup {
+        /// Output file path (default: auto-generated timestamped file).
         #[arg(short, long)]
         output: Option<String>,
     },
 
     /// Restore Oxios state from a backup.
-    Restore { input: String },
+    Restore {
+        /// Backup file to restore from.
+        input: String,
+    },
 
     /// Show or modify configuration (default: show).
     Config {
@@ -171,9 +175,11 @@ enum Command {
         #[command(subcommand)]
         action: GitAction,
     },
-
     /// Show agent budget information.
-    Budget { agent_id: Option<String> },
+    Budget {
+        /// Agent UUID (default: show overview of all agents).
+        agent_id: Option<String>,
+    },
 
     /// Manage system service (launchd/systemd).
     Daemon {
@@ -275,35 +281,51 @@ enum ConfigAction {
 
 #[derive(Debug, Subcommand)]
 enum PkgAction {
+    /// Install a skill/program from a Git URL or local path.
     Install {
+        /// Git URL or local path to install from.
         source: String,
+        /// Branch to checkout (default: repository default).
         #[arg(short, long)]
         branch: Option<String>,
     },
+    /// Uninstall a previously installed skill/program by name.
     Uninstall {
+        /// Name of the skill/program to remove.
         name: String,
     },
+    /// List all installed skills/programs.
     List,
+    /// List installed skills with descriptions (alias for a richer `list`).
     Search,
 }
 
 #[derive(Debug, Subcommand)]
 enum AgentAction {
+    /// List all running agents.
     List,
-    Kill { id: String },
+    /// Terminate a running agent by ID.
+    Kill {
+        /// Agent UUID to terminate.
+        id: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
 enum GitAction {
+    /// Show recent commits in the state store history.
     Log {
+        /// Maximum number of commits to show (default: 20).
         limit: Option<usize>,
     },
+    /// Create a tagged checkpoint in the state store.
     Tag {
+        /// Tag name.
         name: String,
+        /// Optional descriptive message.
         message: Option<String>,
     },
 }
-
 #[derive(Debug, Subcommand)]
 enum DaemonAction {
     /// Install as system service (launchd/systemd).
@@ -561,21 +583,23 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
             }
         }
         PkgAction::Search => {
-            // Redirect to marketplace search
-            println!(
-                "  {} Use `oxios marketplace search --query <term>` instead.",
-                style("Tip:").cyan()
-            );
             let skills = handle.extensions.list_skills_entries().await;
             if skills.is_empty() {
                 println!("  No skills installed.");
             } else {
+                println!("  {} Installed skills:", style("✔").green().bold());
+                println!();
                 for s in &skills {
-                    println!("{}", style(&s.skill.name).bold());
-                    println!("  {}", s.skill.description);
+                    println!("  {}", style(&s.skill.name).bold());
+                    println!("    {}", s.skill.description);
                     println!();
                 }
             }
+            println!(
+                "  {} To find new skills, use {}",
+                style("Tip:").cyan(),
+                style("oxios marketplace search --query <term>").bold()
+            );
         }
     }
     Ok(())
@@ -594,6 +618,17 @@ async fn cmd_config(action: &ConfigAction, config_path: &Path) -> Result<()> {
             println!("{value}");
         }
         ConfigAction::Set { key, value } => {
+            // Warn if the key isn't a known config field (avoids silently
+            // writing ignored keys from typos).
+            let defaults = OxiosConfig::default();
+            if config_get(&defaults, key).is_err() {
+                eprintln!(
+                    "  {} Unknown config key '{}'. It will be written but may be ignored.",
+                    style("⚠").yellow().bold(),
+                    key
+                );
+                eprintln!("  Run `oxios config list` to see available keys.");
+            }
             config_set(config_path, key, value)?;
             println!("  {} {} = {}", style("Set").green(), key, value);
         }
@@ -1479,19 +1514,25 @@ fn week_range() -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>
 fn parse_range(
     from: Option<String>,
     to: Option<String>,
-) -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
-    let f = from
-        .as_deref()
-        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
-        .unwrap_or_else(|| chrono::Local::now().date_naive());
-    let t = to
-        .as_deref()
-        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
-        .unwrap_or_else(|| f + chrono::Duration::days(1));
-    (
+) -> Result<(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)> {
+    // `None` → sensible default; `Some(bad)` → error (don't silently fall
+    // back to today, which hides a typo from the user).
+    let f = match from.as_deref() {
+        None => chrono::Local::now().date_naive(),
+        Some(s) => chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| {
+            anyhow::anyhow!("Invalid --from date '{s}': {e}. Use ISO 8601 date, e.g. 2026-06-01")
+        })?,
+    };
+    let t = match to.as_deref() {
+        None => f + chrono::Duration::days(1),
+        Some(s) => chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| {
+            anyhow::anyhow!("Invalid --to date '{s}': {e}. Use ISO 8601 date, e.g. 2026-06-30")
+        })?,
+    };
+    Ok((
         f.and_hms_opt(0, 0, 0).unwrap().and_utc(),
         t.and_hms_opt(23, 59, 59).unwrap().and_utc(),
-    )
+    ))
 }
 
 fn parse_dt_cli(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
@@ -1768,10 +1809,29 @@ fn install_panic_hook() {
     }));
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     install_panic_hook();
-    if let Err(e) = run().await {
+
+    // Parse CLI and set OXI_HOME BEFORE starting the tokio runtime.
+    // Rust 2024: env::set_var is UB when other threads may access the
+    // environment concurrently. The multi-threaded tokio runtime (created
+    // below) spawns worker threads, so we set this env var first.
+    let cli = Cli::parse();
+    let config_path = oxios_kernel::config::expand_home(&cli.config);
+    let oxios_home = oxios_home_from_config(&config_path);
+    if std::env::var("OXI_HOME").is_err() {
+        // SAFETY: single-threaded — tokio runtime hasn't been created yet.
+        unsafe {
+            std::env::set_var("OXI_HOME", &oxios_home);
+        }
+    }
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("failed to create tokio runtime");
+
+    if let Err(e) = runtime.block_on(run(cli)) {
         eprintln!();
         eprintln!("  {} {}", style("error:").red().bold(), e);
         eprintln!(
@@ -1782,25 +1842,11 @@ async fn main() {
     }
 }
 
-async fn run() -> Result<()> {
-    let cli = Cli::parse();
-
+async fn run(cli: Cli) -> Result<()> {
     let config_path = oxios_kernel::config::expand_home(&cli.config);
     let oxios_home = oxios_home_from_config(&config_path);
-    // Isolate oxi-ai's product-home namespace: route the embedded library's
-    // catalog/cache/auth state to oxios's own `~/.oxios/` instead of oxi-cli's
-    // `~/.oxi/`. Must precede any oxi-ai catalog/provider init (oxi-ai 0.50+
-    // honors `OXI_HOME`). Credential reads stay compatible with the standalone
-    // `oxi` CLI via CredentialStore's shared-store fallback (~/.oxi/auth.json);
-    // only oxios's own writes move under `~/.oxios`.
-    //
-    // SAFETY: first statement after CLI parse; no other task is running yet, so
-    // there is no concurrent environment access.
-    if std::env::var("OXI_HOME").is_err() {
-        unsafe {
-            std::env::set_var("OXI_HOME", &oxios_home);
-        }
-    }
+    // OXI_HOME was set in main() before the tokio runtime started — Rust 2024
+    // requires single-threaded env mutation.
 
     // Detect first run (before ensure_workspace creates the dir).
     let is_first_run = !oxios_home.join("config.toml").exists();
@@ -2091,6 +2137,11 @@ async fn run() -> Result<()> {
                 }
             };
             oxios_kernel::backup::create_backup(handle.state.store(), &output_path).await?;
+            println!(
+                "  {} Backup written to {}",
+                style("✓").green().bold(),
+                style(output_path.display()).cyan()
+            );
             Ok(())
         }
 
@@ -2098,6 +2149,11 @@ async fn run() -> Result<()> {
             let handle = kernel.handle();
             let input_path = PathBuf::from(&input);
             oxios_kernel::backup::restore_backup(handle.state.store(), &input_path).await?;
+            println!(
+                "  {} Restored from {}",
+                style("✓").green().bold(),
+                style(input_path.display()).cyan()
+            );
             Ok(())
         }
 
@@ -2252,10 +2308,36 @@ async fn run() -> Result<()> {
                     Ok(())
                 }
                 None => {
+                    let agents = handle
+                        .agents
+                        .list()
+                        .await
+                        .map_err(|e| anyhow::anyhow!("failed to list agents: {e}"))?;
                     println!("\n  Agent Budget Overview");
-                    println!("  {}", "─".repeat(48));
-                    println!("  Run `oxios agent list` to find agent IDs,");
-                    println!("  then `oxios budget <agent-id>` for details.");
+                    println!("  {}", "─".repeat(60));
+                    if agents.is_empty() {
+                        println!("  No active agents.");
+                        println!("  Run `oxios run \"<prompt>\"` to start one.");
+                    } else {
+                        println!("  {:<38} {:<14} {}", "AGENT ID", "STATUS", "TOKENS LEFT");
+                        println!("  {}", "─".repeat(60));
+                        for agent in &agents {
+                            let budget = handle.agents.check_budget(&agent.id);
+                            let status = if budget.is_exhausted {
+                                style("⚠ EXHAUSTED").yellow().bold().to_string()
+                            } else {
+                                format!("{:?}", agent.status)
+                            };
+                            println!(
+                                "  {:<38} {:<14} {}",
+                                agent.id, status, budget.tokens_remaining
+                            );
+                        }
+                        println!(
+                            "\n  {} agent(s). Use `oxios budget <agent-id>` for details.",
+                            agents.len()
+                        );
+                    }
                     println!();
                     Ok(())
                 }
@@ -2599,7 +2681,13 @@ async fn run() -> Result<()> {
                     }
                 }
                 CalendarAction::List { from, to } => {
-                    let (f, t) = parse_range(from.clone(), to.clone());
+                    let (f, t) = match parse_range(from.clone(), to.clone()) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            eprintln!("{} {}", style("✗").red().bold(), e);
+                            return Ok(());
+                        }
+                    };
                     match api.list(f, t).await {
                         Ok(events) => print_events(
                             &format!(
@@ -2674,7 +2762,13 @@ async fn run() -> Result<()> {
                     let (from, to) = if d == "today" {
                         today_range()
                     } else {
-                        parse_range(Some(d.to_string()), None)
+                        match parse_range(Some(d.to_string()), None) {
+                            Ok(r) => r,
+                            Err(e) => {
+                                eprintln!("{} {}", style("✗").red().bold(), e);
+                                return Ok(());
+                            }
+                        }
                     };
                     match api.freebusy(from, to).await {
                         Ok(slots) => {

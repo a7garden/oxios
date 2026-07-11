@@ -19,7 +19,9 @@ export function SplitEditor({ filePath }: SplitEditorProps) {
           key={filePath}
           filePath={filePath}
           initialContent={content ?? ''}
-          onSave={(content) => writeFile.mutate({ path: filePath, content })}
+          onSave={async (content) => {
+            await writeFile.mutateAsync({ path: filePath, content })
+          }}
         />
       </div>
     </div>

@@ -448,9 +448,10 @@ impl Gateway {
                 guard.get(&channel_name).map(|e| e.channel.clone())
             };
             let collector = channel_for_collector.map(|channel| {
-                let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<
-                    oxios_kernel::agent_runtime::StreamDelta,
-                >();
+                let (tx, mut rx) =
+                    tokio::sync::mpsc::channel::<oxios_kernel::agent_runtime::StreamDelta>(
+                        oxios_kernel::streaming_sink::STREAMING_CHANNEL_CAPACITY,
+                    );
                 let sender_arc: oxios_kernel::streaming_sink::StreamingSinkSender = Arc::new(tx);
                 // RFC-033: register under the same key the agent runtime will
                 // look up — the chat session id, or the request id for a

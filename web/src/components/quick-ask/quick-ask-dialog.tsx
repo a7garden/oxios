@@ -3,9 +3,9 @@ import { Check, Copy, MessageSquarePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { ChatInput } from '@/components/chat/chat-input'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
-import { ChatInput } from '@/components/chat/chat-input'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,

@@ -178,7 +178,10 @@ impl ResourceMonitor {
             let mut ticker = tokio::time::interval(std::time::Duration::from_secs(interval));
             loop {
                 ticker.tick().await;
-                monitor.record_snapshot();
+                // Run snapshot (which may walk the directory tree) on a
+                // blocking thread so it never stalls the async runtime.
+                let m = Arc::clone(&monitor);
+                let _ = tokio::task::spawn_blocking(move || m.record_snapshot()).await;
             }
         })
     }
@@ -267,6 +270,12 @@ fn walk_dir_size(path: &std::path::Path) -> u64 {
             if m.is_file() {
                 total += m.len();
             } else if m.is_dir() {
+                // Skip build caches and VCS dirs — they dwarf workspace data
+                // and make the walk prohibitively slow on large repos.
+                const SKIP_DIRS: &[&str] = &["target", "node_modules", ".git", ".next", "dist"];
+                if SKIP_DIRS.iter().any(|s| entry.file_name() == *s) {
+                    continue;
+                }
                 total += walk(&entry.path(), depth + 1);
             }
         }

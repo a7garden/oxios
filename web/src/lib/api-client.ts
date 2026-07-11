@@ -85,8 +85,29 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
 export const api = {
   get: <T>(path: string, params?: Record<string, string>) => apiClient<T>(path, { params }),
   post: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'POST', body }),
-  put: <T>(path: string, body?: unknown, rawBody?: boolean) =>
-    apiClient<T>(path, { method: 'PUT', body, rawBody }),
+  put: <T>(path: string, body?: unknown, rawBody?: boolean, headers?: Record<string, string>) =>
+    apiClient<T>(path, { method: 'PUT', body, rawBody, headers }),
+  /** GET that also returns the ETag response header (S-2 optimistic concurrency). */
+  getWithEtag: async <T>(path: string): Promise<{ data: T; etag: string | null }> => {
+    const url = new URL(`${API_BASE}${path}`, window.location.origin)
+    const token = useAuthStore.getState().token
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    })
+    if (!res.ok) {
+      if (res.status === 401) useAuthStore.getState().logout()
+      const text = await res.text().catch(() => '')
+      throw new ApiError(res.status, res.statusText, text)
+    }
+    if (res.status === 204) return { data: undefined as T, etag: null }
+    const etag = res.headers.get('etag')
+    const contentType = res.headers.get('content-type') ?? ''
+    const data: T = contentType.includes('application/json')
+      ? ((await res.json()) as T)
+      : ((await res.text()) as T)
+    return { data, etag }
+  },
   patch: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => apiClient<T>(path, { method: 'DELETE' }),
   /** POST a FormData body (multipart upload) — browser sets Content-Type. */

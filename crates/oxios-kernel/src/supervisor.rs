@@ -338,10 +338,25 @@ impl Supervisor for BasicSupervisor {
                     reasoning_text: String::new(),
                 })
             } else {
-                let mut ctx = session_ctx.write().await;
-                runtime
-                    .execute_directive(id, &directive, &env, &mut ctx)
-                    .await
+                // Snapshot recall_timing under a brief read lock, execute
+                // WITHOUT holding any lock, then write back. SessionContext's
+                // only mutation during execution is recall_with_proactive
+                // (agent_runtime.rs:426); project IDs are read-only. Holding
+                // the write lock for the entire multi-minute execution was
+                // serializing all agents in the same session.
+                let mut temp_ctx = {
+                    let ctx = session_ctx.read().await;
+                    let mut c = crate::session_context::SessionContext::new();
+                    c.recall_timing = ctx.recall_timing.clone();
+                    c
+                };
+                let exec_result = runtime
+                    .execute_directive(id, &directive, &env, &mut temp_ctx)
+                    .await;
+                // Write back the mutated recall_timing (last-write-wins for
+                // concurrent agents — recall_timing is a heuristic tracker).
+                session_ctx.write().await.recall_timing = temp_ctx.recall_timing;
+                exec_result
             };
             // Receiver gone (run_with_directive returned early) → ignore error.
             let _ = done_tx.send(result);

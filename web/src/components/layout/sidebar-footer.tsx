@@ -23,9 +23,11 @@ export function SidebarFooter({ collapsed }: { collapsed: boolean }) {
   }
 
   const cycleLang = () => {
-    const next = i18n.language === 'ko' ? 'en' : 'ko'
+    // P3: startsWith handles BCP 47 tags like `ko-KR`.
+    const next = i18n.resolvedLanguage?.startsWith('ko') ? 'en' : 'ko'
     i18n.changeLanguage(next)
-    localStorage.setItem('i18nextLng', next)
+    // No manual localStorage write — LanguageDetector with `caches: ['localStorage']`
+    // already persists the new language under the `i18nextLng` key (see i18n/index.ts).
   }
 
   const themeIcon =

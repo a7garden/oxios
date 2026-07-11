@@ -147,7 +147,7 @@ impl Supervisor for MockSupervisor {
 /// Used by the RFC-027 tests that wire a MockIntentEngine instead.
 fn build_test_parts() -> (Arc<MockSupervisor>, EventBus, Arc<StateStore>) {
     let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let state_store =
         Arc::new(StateStore::new(tmp.path().to_path_buf()).expect("StateStore creation failed"));
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));

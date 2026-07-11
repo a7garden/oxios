@@ -130,6 +130,7 @@ impl Kernel {
                             let _ = tx.send((path, change)).await;
                         });
                     });
+                    let reconcile_prefix = prefix.clone();
 
                     // Background consumer — commits knowledge changes to git
                     tokio::spawn(async move {
@@ -165,6 +166,34 @@ impl Kernel {
                             }
                         }
                     });
+
+                    // S-4: Post-crash reconciliation — commit knowledge files
+                    // whose disk content diverged from git HEAD (e.g. process
+                    // crashed between note_write and the async commit consumer).
+                    // The I-3 dedup in commit_file_with skips files whose
+                    // content matches HEAD, so this only creates commits for
+                    // genuinely diverged files.
+                    let reconcile_git = self.git_layer.clone();
+                    if reconcile_git.is_enabled() {
+                        if let Ok(files) = knowledge.list_all_md_files() {
+                            let mut count = 0;
+                            for (path, _) in &files {
+                                let rel = format!("{reconcile_prefix}/{path}");
+                                if let Ok(info) = reconcile_git
+                                    .commit_file(&rel, "knowledge: post-crash reconcile")
+                                {
+                                    if info.hash != "(disabled)" {
+                                        count += 1;
+                                    }
+                                }
+                            }
+                            if count > 0 {
+                                tracing::info!(
+                                    "Post-crash git reconcile: {count} diverged files re-committed"
+                                );
+                            }
+                        }
+                    }
                 }
 
                 let mut agent_api = oxios_kernel::AgentApi::new(
@@ -628,6 +657,8 @@ async fn daily_health_check(web_dist: oxios_gateway::ActiveWebDist) -> anyhow::R
     // Fetch latest release tag from GitHub
     let client = reqwest::Client::builder()
         .user_agent("oxios-health")
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()?;
 
     let resp: serde_json::Value = client
@@ -729,14 +760,55 @@ impl KernelBuilder {
 
     /// Create the appropriate embedding provider based on config.
     ///
-    /// - `"tfidf"` → TfIdfEmbeddingProvider (default, zero-dependency)
-    /// - `"gguf"` → GGUF-based embedding (requires `embedding-gguf` feature)
+    /// - `"api"`   → ApiEmbeddingProvider (OpenAI-compatible /v1/embeddings)
+    /// - `"gguf"`  → GgufEmbeddingProvider (requires `embedding-gguf` feature, aarch64)
+    /// - `"tfidf"` → TfIdfEmbeddingProvider (default, sparse vectors, no sqlite-vec KNN)
     #[cfg(feature = "sqlite-memory")]
     fn create_embedding_provider(config: &OxiosConfig) -> Arc<dyn oxios_kernel::EmbeddingProvider> {
         use oxios_kernel::TfIdfEmbeddingProvider;
         let emb_config = &config.memory.embedding;
 
         match emb_config.provider.as_str() {
+            "api" => {
+                use oxios_kernel::embedding::api::ApiEmbeddingProvider;
+                // Inherit API key from active provider if not explicitly set.
+                let api_key = if emb_config.api_key.is_empty() {
+                    config.engine.api_key.clone().unwrap_or_default()
+                } else {
+                    emb_config.api_key.clone()
+                };
+                let api_model = if emb_config.api_model.is_empty() {
+                    "text-embedding-3-small".to_string()
+                } else {
+                    emb_config.api_model.clone()
+                };
+                let endpoint = if emb_config.api_endpoint.is_empty() {
+                    "https://api.openai.com/v1/embeddings".to_string()
+                } else {
+                    emb_config.api_endpoint.clone()
+                };
+                let dim = emb_config.dimension;
+                match ApiEmbeddingProvider::new(
+                    endpoint.clone(),
+                    api_key,
+                    api_model.clone(),
+                    if dim > 0 { Some(dim) } else { None },
+                ) {
+                    Ok(p) => {
+                        tracing::info!(
+                            endpoint = %endpoint,
+                            model = %api_model,
+                            dim = dim,
+                            "Using API embedding provider"
+                        );
+                        Arc::new(p)
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "API embedding provider init failed; falling back to TF-IDF");
+                        Arc::new(TfIdfEmbeddingProvider)
+                    }
+                }
+            }
             "gguf" => {
                 #[cfg(feature = "embedding-gguf")]
                 {
@@ -944,7 +1016,22 @@ impl KernelBuilder {
                         tracing::warn!(error = %e, "Memory migration failed (non-fatal)");
                     }
 
-                    memory_manager.set_sqlite_store(Arc::new(sqlite_store));
+                    // Reconcile vector dimensions (detect embedding model change)
+                    let _ = sqlite_store.reconcile_vector_dimension(sqlite_config.embedding_dim);
+
+                    // Wrap in Arc for sharing between MemoryManager and background tasks
+                    let sqlite_store = Arc::new(sqlite_store);
+
+                    // Background backfill: populate vectors for existing entries
+                    // that lack them (e.g., after switching from TF-IDF to API).
+                    let store_for_backfill = Arc::clone(&sqlite_store);
+                    tokio::spawn(async move {
+                        if let Err(e) = store_for_backfill.backfill_vectors().await {
+                            tracing::warn!(error = %e, "Vector backfill failed (non-fatal)");
+                        }
+                    });
+
+                    memory_manager.set_sqlite_store(sqlite_store);
                     tracing::info!(
                         path = %db_path.display(),
                         dim = sqlite_config.embedding_dim,

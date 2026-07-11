@@ -131,8 +131,14 @@ pub(crate) async fn handle_chat(
 
     // Per-message model override. Carried via gateway metadata to the
     // orchestrator, which forwards it as ExecEnv::model_override (highest
-    // precedence in agent_runtime model resolution).
+    // precedence in agent_runtime model resolution). Validate early so an
+    // unknown model ID fails immediately instead of after assess/crystallize.
     if let Some(m) = &body.model {
+        state
+            .kernel
+            .engine
+            .validate_model(m)
+            .map_err(AppError::BadRequest)?;
         msg.metadata.insert("model_override".to_owned(), m.clone());
     }
 
@@ -867,6 +873,8 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     //   `{ type: "message", content: "...", session_id?, project_id? }`
     set.spawn({
         let pong_signal = pong_signal.clone();
+        let state = state.clone();
+        let ws_tx = ws_tx.clone();
         async move {
             while let Some(Ok(msg)) = FuturesStreamExt::next(&mut ws_rx).await {
                 match msg {
@@ -913,6 +921,22 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             .and_then(|v| v.as_str())
                             .filter(|s| !s.is_empty())
                             .map(String::from);
+                        // Validate model override early — reject unknown IDs
+                        // before the orchestrator wastes time on assess/crystallize.
+                        if let Some(ref m) = incoming_model {
+                            if let Err(e) = state.kernel.engine.validate_model(m) {
+                                let err_json = serde_json::json!({
+                                    "type": "error",
+                                    "message": e
+                                });
+                                let _ = ws_tx
+                                    .lock()
+                                    .await
+                                    .send(Message::Text(err_json.to_string().into()))
+                                    .await;
+                                continue;
+                            }
+                        }
                         // One-shot (QuickAsk) requests set `ephemeral: true`.
                         // The recv task skips the pending-message insert so
                         // the send task's persist guard finds no

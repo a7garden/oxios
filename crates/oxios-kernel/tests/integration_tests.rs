@@ -257,7 +257,7 @@ async fn test_event_bus_no_subscribers_ok() {
 
 #[tokio::test]
 async fn test_state_store_save_load_markdown() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let store = StateStore::new(tmp.path().to_path_buf()).unwrap();
 
     store
@@ -271,7 +271,7 @@ async fn test_state_store_save_load_markdown() {
 
 #[tokio::test]
 async fn test_state_store_load_nonexistent() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let store = StateStore::new(tmp.path().to_path_buf()).unwrap();
 
     let loaded = store.load_markdown("memory", "nope").await.unwrap();
@@ -280,7 +280,7 @@ async fn test_state_store_load_nonexistent() {
 
 #[tokio::test]
 async fn test_state_store_list_category() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let store = StateStore::new(tmp.path().to_path_buf()).unwrap();
 
     store
@@ -298,7 +298,7 @@ async fn test_state_store_list_category() {
 
 #[tokio::test]
 async fn test_state_store_save_load_json() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let store = StateStore::new(tmp.path().to_path_buf()).unwrap();
 
     let data = serde_json::json!({
@@ -313,7 +313,7 @@ async fn test_state_store_save_load_json() {
 
 #[tokio::test]
 async fn test_state_store_path_traversal_blocked() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let store = StateStore::new(tmp.path().to_path_buf()).unwrap();
 
     // Category traversal should be blocked.
@@ -362,7 +362,7 @@ fn make_evolution_config(max_iterations: u32) -> OrchestratorConfig {
 async fn test_orchestrator_happy_path() {
     let supervisor = Arc::new(MockSupervisor::new(EventBus::new(64)));
     let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
     let (orchestrator, _mock) =
@@ -396,7 +396,7 @@ async fn test_orchestrator_happy_path() {
 async fn test_orchestrator_events_published() {
     let event_bus = EventBus::new(64);
     let mut rx = event_bus.subscribe();
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
@@ -456,7 +456,7 @@ async fn test_orchestrator_events_published() {
 #[tokio::test]
 async fn test_gateway_routes_message_through_orchestrator() {
     let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
@@ -501,7 +501,7 @@ async fn test_gateway_routes_message_through_orchestrator() {
 #[tokio::test]
 async fn test_gateway_unknown_channel() {
     let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
@@ -661,7 +661,7 @@ impl Supervisor for TrackingSupervisor {
 #[tokio::test]
 async fn test_orchestrator_routes_to_supervisor() {
     let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = common::setup_tempdir();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
     let supervisor = Arc::new(TrackingSupervisor::new(event_bus.clone()));

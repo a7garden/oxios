@@ -1,28 +1,20 @@
 import { useNavigate } from '@tanstack/react-router'
-import {
-  BookOpen,
-  CheckCircle2,
-  FilePlus,
-  Inbox,
-  Lightbulb,
-  Network,
-  Zap,
-} from 'lucide-react'
+import { BookOpen, CheckCircle2, FilePlus, Inbox, Lightbulb, Network, Zap } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   useChatMessages,
+  useJournalToday,
   useKnowledgeDoneToday,
   useKnowledgeGraph,
   useKnowledgeTree,
-  useJournalToday,
   useWriteFile,
 } from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
-import { useKnowledgeStore } from '@/stores/knowledge'
 import { useCommandPaletteStore } from '@/stores/command-palette'
+import { useKnowledgeStore } from '@/stores/knowledge'
 
 /** Count actual checklist items in the raw inbox stream (skip date headers). */
 function useInboxCount(): number {
@@ -63,16 +55,18 @@ function StatTile({
 }) {
   return (
     <Card
-      className={cn(
-        'flex flex-col transition-shadow',
-        onClick && 'cursor-pointer hover:shadow-md',
-      )}
+      className={cn('flex flex-col transition-shadow', onClick && 'cursor-pointer hover:shadow-md')}
       onClick={onClick}
     >
       <CardContent className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">{label}</span>
-          <span className={cn('flex h-7 w-7 items-center justify-center rounded-lg bg-muted', iconClassName)}>
+          <span
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-lg bg-muted',
+              iconClassName,
+            )}
+          >
             {icon}
           </span>
         </div>
@@ -154,7 +148,9 @@ export function KnowledgeHome() {
             iconClassName={inboxCount > 0 ? 'text-primary' : 'text-muted-foreground'}
             label={t('knowledge.homeInbox')}
             value={inboxCount}
-            sublabel={inboxCount > 0 ? t('knowledge.homeInboxPending') : t('knowledge.homeInboxEmpty')}
+            sublabel={
+              inboxCount > 0 ? t('knowledge.homeInboxPending') : t('knowledge.homeInboxEmpty')
+            }
             onClick={openChat}
             actionLabel={inboxCount > 0 ? t('knowledge.homeProcess') : t('knowledge.homeView')}
           />

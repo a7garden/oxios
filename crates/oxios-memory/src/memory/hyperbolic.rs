@@ -439,7 +439,144 @@ impl HyperbolicEmbedding {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
+    // -----------------------------------------------------------------------
+    // Property tests — invariant-style checks proptest is built for.
+    // The inline #[test] cases above pin specific shapes; these exercise
+    // a wider input space and catch subtle floating-point regressions.
+    // -----------------------------------------------------------------------
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// euclidean_to_poincare preserves length: input and output have
+        /// the same number of dimensions.
+        #[test]
+        fn prop_euclidean_to_poincare_preserves_dim(
+            v in proptest::collection::vec(-2.0_f32..2.0, 1..16),
+        ) {
+            let out = euclidean_to_poincare(&v, -1.0);
+            prop_assert_eq!(out.len(), v.len());
+        }
+
+        /// euclidean_to_poincare(zero) == zero for any dimension.
+        #[test]
+        fn prop_euclidean_to_poincare_zero_is_zero(dim in 1_usize..16) {
+            let v = vec![0.0_f32; dim];
+            let out = euclidean_to_poincare(&v, -1.0);
+            prop_assert_eq!(out, v);
+        }
+
+        /// Result always lies strictly inside the open ball: norm < 1/√c.
+        /// (Note: the function uses tanh so the norm is actually bounded
+        /// strictly less than max_norm for any non-zero input.)
+        #[test]
+        fn prop_euclidean_to_poincare_stays_in_ball(
+            v in proptest::collection::vec(-1.0_f32..1.0, 1..8),
+        ) {
+            let out = euclidean_to_poincare(&v, -1.0);
+            let norm_sq: f32 = out.iter().map(|x| x * x).sum();
+            let norm = norm_sq.sqrt();
+            let max_norm = 1.0 / 1.0_f32.sqrt(); // c = |-1.0| = 1.0
+            prop_assert!(norm <= max_norm + 1e-5, "norm {} > max {}", norm, max_norm);
+        }
+
+        /// hyperbolic_distance is non-negative for any two inputs.
+        #[test]
+        fn prop_distance_is_nonneg(
+            a in proptest::collection::vec(-0.5_f32..0.5, 1..8),
+            b in proptest::collection::vec(-0.5_f32..0.5, 1..8),
+        ) {
+            let d = hyperbolic_distance(&a, &b, -1.0);
+            prop_assert!(d >= 0.0, "distance must be non-negative, got {}", d);
+        }
+
+        /// hyperbolic_distance(a, a) == 0 (identity of indiscernibles).
+        #[test]
+        fn prop_distance_self_is_zero(
+            a in proptest::collection::vec(-0.5_f32..0.5, 1..8),
+        ) {
+            let d = hyperbolic_distance(&a, &a, -1.0);
+            // Allow tiny epsilon for floating-point noise near boundary.
+            prop_assert!(d < 1e-4, "distance(a, a) should be 0, got {}", d);
+        }
+
+        /// hyperbolic_distance is symmetric: d(a, b) == d(b, a).
+        #[test]
+        fn prop_distance_is_symmetric(
+            a in proptest::collection::vec(-0.5_f32..0.5, 1..8),
+            b in proptest::collection::vec(-0.5_f32..0.5, 1..8),
+        ) {
+            let d_ab = hyperbolic_distance(&a, &b, -1.0);
+            let d_ba = hyperbolic_distance(&b, &a, -1.0);
+            prop_assert!(
+                (d_ab - d_ba).abs() < 1e-4,
+                "d(a,b)={} d(b,a)={}",
+                d_ab,
+                d_ba
+            );
+        }
+
+        /// Triangle inequality: d(a, c) ≤ d(a, b) + d(b, c).
+        #[test]
+        fn prop_distance_triangle_inequality(
+            (a, b, c) in (1usize..6).prop_flat_map(|n| (
+                proptest::collection::vec(-0.4_f32..0.4, n.clone()),
+                proptest::collection::vec(-0.4_f32..0.4, n.clone()),
+                proptest::collection::vec(-0.4_f32..0.4, n),
+            )),
+        ) {
+            let d_ab = hyperbolic_distance(&a, &b, -1.0);
+            let d_bc = hyperbolic_distance(&b, &c, -1.0);
+            let d_ac = hyperbolic_distance(&a, &c, -1.0);
+            // f32::MAX sentinel for boundary points can break the inequality.
+            if d_ab < f32::MAX && d_bc < f32::MAX && d_ac < f32::MAX {
+                prop_assert!(
+                    d_ac <= d_ab + d_bc + 1e-2,
+                    "triangle inequality violated: d(a,c)={} d(a,b)={} d(b,c)={}",
+                    d_ac,
+                    d_ab,
+                    d_bc
+                );
+            }
+        }
+
+        /// mobius_add preserves dimension.
+        #[test]
+        fn prop_mobius_add_preserves_dim(
+            (a, b) in (1usize..8).prop_flat_map(|n| (
+                proptest::collection::vec(-0.4_f32..0.4, n.clone()),
+                proptest::collection::vec(-0.4_f32..0.4, n),
+            )),
+        ) {
+            let sum = mobius_add(&a, &b, -1.0);
+            prop_assert_eq!(sum.len(), a.len());
+        }
+
+        /// mobius_add(a, 0) == a (zero is the additive identity).
+        #[test]
+        fn prop_mobius_add_zero_identity(
+            a in proptest::collection::vec(-0.4_f32..0.4, 1..8),
+        ) {
+            let zero = vec![0.0_f32; a.len()];
+            let sum = mobius_add(&a, &zero, -1.0);
+            for (got, want) in sum.iter().zip(a.iter()) {
+                prop_assert!((got - want).abs() < 1e-4, "{} vs {}", got, want);
+            }
+        }
+
+        /// mobius_scalar_mul(0, v) == 0 (zero scalar kills the vector).
+        #[test]
+        fn prop_mobius_scalar_mul_zero(
+            v in proptest::collection::vec(-0.4_f32..0.4, 1..8),
+        ) {
+            let r = mobius_scalar_mul(0.0, &v, -1.0, 1e-5);
+            for x in &r {
+                prop_assert!(x.abs() < 1e-4, "expected 0, got {}", x);
+            }
+        }
+    }
     #[test]
     fn test_euclidean_to_poincare_zero() {
         let result = euclidean_to_poincare(&[0.0, 0.0, 0.0], -1.0);

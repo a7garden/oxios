@@ -125,3 +125,9 @@ export interface KnowledgeHistoryResponse {
   history: KnowledgeHistoryEntry[]
   count: number
 }
+
+// File diff
+export interface FileDiffResponse {
+  diff: string
+  has_changes: boolean
+}

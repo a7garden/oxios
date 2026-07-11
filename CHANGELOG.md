@@ -6,6 +6,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-07-11
+
+### Added
+- **Memory system overhaul** — New embedding API module (`embedding/api.rs`),
+  hyperbolic distance/Möbius operations with improved numerical stability,
+  SQLite store backfill optimization, and proptest coverage.
+- **Knowledge editor redesign** — Configurable editor preferences store
+  (`editor-prefs.ts`), settings popover component, and 6 component updates
+  across the knowledge editor suite.
+- **ResourceMonitor async safety** — `record_snapshot()` now runs on a
+  `spawn_blocking` thread to prevent async runtime stalls during directory walks.
+
+### Fixed
+- **Frontend CI (v1.21.0 known issues)** — Typecheck null-safety in
+  `use-tab-shortcuts.ts`, `chunkToActivity` phase-chunk handling in
+  `stores.test.ts`, and biome organizeImports across 7 files.
+- **Credential suffix fallback** — Single-element for-loop clippy fix in
+  `-coding-plan` auth token resolution.
+- **Git layer** — Collapsible if-let chain (clippy `collapsible_if`).
+- **Resource monitor disk walk** — Skip `target/`, `node_modules/`, `.git/`,
+  `dist/` in `walk_dir_size` to prevent 90s+ hangs on large repos.
+- **chat.rs** — Missing function closing brace in `kernel_event_to_ws_chunk`.
+- **knowledge_routes.rs** — Borrow-after-move in file diff handler.
+- **Persona ordering** — Canonical priority sort (dev-first) instead of
+  alphabetical ID sort in `list_enabled()`.
+- **ExecutionResult serialization** — `skip_serializing_if = "Vec::is_empty"`
+  on `tool_calls` field.
+- **Hyperbolic proptests** — Same-dimension vector generation to prevent
+  cross-dimension assertion failures.
+
+### Removed
+- **Playwright e2e suite** — 8 spec files + config removed; replaced by
+  vitest unit/integration tests (279 passing).
+
 ## [1.21.0] - 2026-07-09
 
 ### Removed

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::Utc;
 
 use super::cache;
@@ -151,9 +151,22 @@ impl SqliteMemoryStore {
             .unwrap_or(0)
         }; // conn dropped here, before any .await
 
-        // Compute and store dense embedding
-        let embedding_vec = self.embedding.embed(&entry.content).await?;
-        if let Some(f32_vec) = embedding_vec.to_f32_dense() {
+        // Compute dense embedding (non-fatal: a transient API error must not
+        // lose the memory entry — text + FTS5 are already inserted above;
+        // we skip the vector and continue, matching mnemopi's graceful
+        // degradation. See Phase 2b in the design doc.)
+        let f32_vec = match self.embedding.embed(&entry.content).await {
+            Ok(v) => v.to_f32_dense(),
+            Err(e) => {
+                tracing::warn!(
+                    id = %id,
+                    error = %e,
+                    "Embedding API failed; memory stored without vector"
+                );
+                None
+            }
+        };
+        if let Some(f32_vec) = f32_vec {
             if let Err(e) = memory_insert_vector(&self.db, rowid, &f32_vec) {
                 tracing::debug!(id = %id, error = %e, "Failed to insert vector (non-fatal)");
             }
@@ -726,6 +739,100 @@ impl SqliteMemoryStore {
         let _ = cache::put_cached(&self.db, query, &f32_vec);
 
         Ok(Some(f32_vec))
+    }
+
+    /// Backfill dense vectors for memory rows that don't yet have one.
+    ///
+    /// Called on first boot with a dense embedding provider (Phase 2c in the
+    /// design doc). Iterates `memories` rows whose `rowid` is missing from
+    /// the `memory_vectors` vec0 table, computes their embedding, and
+    /// inserts the resulting f32 vector. Sparse (TF-IDF) providers skip
+    /// this method since `EmbeddingVector::to_f32_dense()` returns None.
+    ///
+    /// Returns the number of rows successfully backfilled.
+    pub async fn backfill_vectors(&self) -> Result<usize> {
+        // Collect target rowids (lock dropped before any await).
+        let missing: Vec<(i64, String)> = {
+            let conn = self.db.conn();
+            let mut stmt = conn
+                .prepare(
+                    "SELECT m.rowid, m.content
+                     FROM memories m
+                     LEFT JOIN memory_vectors_rowids v ON v.rowid = m.rowid
+                     WHERE v.rowid IS NULL",
+                )
+                .context("prepare backfill query")?;
+            stmt.query_map([], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .context("query backfill candidates")?
+            .filter_map(Result::ok)
+            .collect()
+        };
+
+        let total = missing.len();
+        if total == 0 {
+            tracing::debug!("backfill_vectors: nothing to do");
+            return Ok(0);
+        }
+        tracing::info!(count = total, "backfill_vectors: starting");
+
+        let mut done = 0usize;
+        for (rowid, content) in missing {
+            // Per-row embedding: errors are skipped (best-effort backfill).
+            let embedding_vec = match self.embedding.embed(&content).await {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!(rowid, error = %e, "backfill embedding failed; skipping row");
+                    continue;
+                }
+            };
+            let Some(f32_vec) = embedding_vec.to_f32_dense() else {
+                tracing::debug!(
+                    rowid,
+                    "backfill: provider returned non-dense vector; skipping"
+                );
+                continue;
+            };
+            if memory_insert_vector(&self.db, rowid, &f32_vec).is_ok() {
+                done += 1;
+            }
+        }
+        tracing::info!(done, total, "backfill_vectors: complete");
+        Ok(done)
+    }
+
+    /// Detect embedding-dimension mismatch with the stored vec0 table.
+    ///
+    /// On mismatch (e.g. user switched from `text-embedding-3-small` 1536-dim
+    /// to `text-embedding-3-large` 3072-dim), wipe the `memory_vectors`
+    /// table so subsequent writes use the new dimension. The text rows are
+    /// unaffected — vectors will be rebuilt via `backfill_vectors()`.
+    ///
+    /// Mirrors mnemopi's `reconcileEmbeddingModel()` (`memory.ts:435`).
+    pub fn reconcile_vector_dimension(&self, new_dim: usize) -> Result<()> {
+        let conn = self.db.conn();
+        let stored_len: Option<i64> = conn
+            .query_row(
+                "SELECT length(embedding) FROM memory_vectors LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .ok();
+        if let Some(bytes) = stored_len {
+            // f32 stored as 4 bytes each, so dim = bytes / 4.
+            let stored_dim = (bytes as usize) / 4;
+            if stored_dim != new_dim {
+                tracing::warn!(
+                    stored_dim,
+                    new_dim,
+                    "reconcile_vector_dimension: dimension mismatch; wiping memory_vectors",
+                );
+                conn.execute("DELETE FROM memory_vectors", [])
+                    .context("wipe memory_vectors on dimension mismatch")?;
+            }
+        }
+        Ok(())
     }
 }
 

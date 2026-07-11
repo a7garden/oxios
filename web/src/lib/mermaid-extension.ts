@@ -15,8 +15,9 @@
  *    unchanged (round-trip safe). CM6 only calls `toDOM()` for widgets
  *    in the visible viewport, keeping the lazy mermaid render off-screen.
  */
-import { StateEffect, StateField } from '@codemirror/state'
+
 import type { EditorState, Range } from '@codemirror/state'
+import { StateEffect, StateField } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -109,8 +110,7 @@ export function buildMermaidDecorations(state: EditorState): DecorationSet {
   const builder: Range<Decoration>[] = []
   const text = state.doc.toString()
   MERMAID_RE.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = MERMAID_RE.exec(text)) !== null) {
+  for (let m = MERMAID_RE.exec(text); m !== null; m = MERMAID_RE.exec(text)) {
     builder.push(
       Decoration.replace({ widget: new MermaidWidget(m[1] ?? '') }).range(
         m.index,

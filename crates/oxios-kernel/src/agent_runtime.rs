@@ -96,7 +96,7 @@ pub enum StreamDelta {
 /// orchestrator → lifecycle → runtime boundary. The receiver lives in a
 /// collector task owned by the gateway dispatch layer; see the design doc
 /// §8.1 for the conn_id scoping rationale.
-pub type StreamingSinkTx = std::sync::Arc<tokio::sync::mpsc::UnboundedSender<StreamDelta>>;
+pub type StreamingSinkTx = std::sync::Arc<tokio::sync::mpsc::Sender<StreamDelta>>;
 
 /// Configuration for creating AgentRuntime instances.
 #[derive(Debug, Clone)]
@@ -1091,7 +1091,7 @@ async fn run_agent(
                     && !model_id_for_callback.is_empty()
                     && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
                 {
-                    let _ = tx.send(StreamDelta::Model(model_id_for_callback.clone()));
+                    let _ = tx.try_send(StreamDelta::Model(model_id_for_callback.clone()));
                     sent_model_for_cb = true;
                 }
                 let mut s = exec_state_cb.lock();
@@ -1338,7 +1338,7 @@ async fn run_agent(
                         if let Some(ref sid) = transparency_session
                             && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
                         {
-                            let _ = tx.send(StreamDelta::Text(text.clone()));
+                            let _ = tx.try_send(StreamDelta::Text(text.clone()));
                         }
                     }
                     AgentEvent::Thinking => {
@@ -1349,7 +1349,7 @@ async fn run_agent(
                         if let Some(ref sid) = transparency_session
                             && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
                         {
-                            let _ = tx.send(StreamDelta::Thinking);
+                            let _ = tx.try_send(StreamDelta::Thinking);
                         }
                     }
                     AgentEvent::ThinkingDelta { text } => {
@@ -1376,7 +1376,7 @@ async fn run_agent(
                         if let Some(ref sid) = transparency_session
                             && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
                         {
-                            let _ = tx.send(StreamDelta::ThinkingDelta(text.clone()));
+                            let _ = tx.try_send(StreamDelta::ThinkingDelta(text.clone()));
                         }
                     }
                     _ => {}
@@ -1658,7 +1658,7 @@ fn build_system_prompt_inner(
          - **File tools**: read, write, edit files; grep, find, ls for searching\n\
          - **Web tools**: web_search for searching the web, get_search_results for retrieving cached results\n\
          - **Exec**: run shell commands\n\
-         - **Memory tools**: memory_read, memory_write, memory_search — agent's internal recall\n\
+         - **Memory tools**: memory_write (store facts/preferences), memory_read (list entries), memory_search (find relevant memories) — your cross-session recall. Use memory_write proactively when the user shares preferences, facts, or corrections worth remembering.
          - **Knowledge**: knowledge — personal markdown vault for documents and notes\n\
          - **Kernel tools**: agent, project, persona, cron, security, budget, resource\n\n\
          **Important**: When the task involves fetching information from the internet,\n\

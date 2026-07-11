@@ -36,10 +36,7 @@ use crate::access_manager::{AccessGate, AgentContext};
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::builtin::*;
 use crate::tools::gated_tool::GatedTool;
-use crate::tools::{
-    A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, KnowledgeTool, MemoryReadTool,
-    MemorySearchTool, MemoryWriteTool,
-};
+use crate::tools::{A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, KnowledgeTool};
 use crate::types::AgentId;
 
 /// Register the always-on tool set into a [`ToolRegistry`].
@@ -128,8 +125,7 @@ pub fn register_always_on_gated(
 /// | ResourceRef | Required rights | Registered tools |
 /// |-------------|----------------|-----------------|
 /// | `Exec { .. }` | `EXECUTE` | `ExecTool` |
-/// | `KernelDomain { "memory" }` | `READ` | `MemoryReadTool`, `MemorySearchTool` |
-/// | `KernelDomain { "memory" }` | `WRITE` | `MemoryWriteTool` |
+/// | `KernelDomain { "memory" }` | — | *(registered unconditionally in `register_all_kernel_tools`)* |
 /// | `KernelDomain { "project" }` | any | `ProjectTool` |
 /// | `KernelDomain { "agent" }` | any | `KernelAgentTool` |
 /// | `KernelDomain { "a2a" }` | any | `A2aDelegateTool`, `A2aSendTool`, `A2aQueryTool` |
@@ -164,16 +160,7 @@ pub fn register_tools_from_cspace(
 
             // Kernel domain tools
             ResourceRef::KernelDomain { domain } => match domain.as_str() {
-                "memory" => {
-                    if cap.rights.contains(Rights::READ) {
-                        registry.register(MemoryReadTool::from_kernel(kernel));
-                        registry.register(MemorySearchTool::from_kernel(kernel));
-                    }
-                    if cap.rights.contains(Rights::WRITE) {
-                        registry.register(MemoryWriteTool::from_kernel(kernel));
-                    }
-                }
-                "space" => registry.register(ProjectTool::from_kernel(kernel)),
+                "memory" => { /* Registered unconditionally in register_all_kernel_tools */ }
                 "agent" => registry.register(KernelAgentTool::from_kernel(kernel)),
                 "a2a" => {
                     registry.register(A2aDelegateTool::from_kernel(kernel, agent_id));
@@ -247,15 +234,7 @@ pub fn register_tools_from_cspace_gated(
 
             // Kernel domain tools (same as ungated — these already use KernelHandle internally)
             ResourceRef::KernelDomain { domain } => match domain.as_str() {
-                "memory" => {
-                    if cap.rights.contains(Rights::READ) {
-                        registry.register(MemoryReadTool::from_kernel(kernel));
-                        registry.register(MemorySearchTool::from_kernel(kernel));
-                    }
-                    if cap.rights.contains(Rights::WRITE) {
-                        registry.register(MemoryWriteTool::from_kernel(kernel));
-                    }
-                }
+                "memory" => { /* Registered unconditionally in register_all_kernel_tools */ }
                 "space" => registry.register(ProjectTool::from_kernel(kernel)),
                 "agent" => registry.register(KernelAgentTool::from_kernel(kernel)),
                 "a2a" => {

@@ -328,6 +328,13 @@ impl KnowledgeBase {
         Ok(fs.files_and_dirs(dir)?)
     }
 
+    /// List all markdown files in the knowledge base (path, size).
+    /// Used by startup git reconciliation to detect post-crash drift.
+    pub fn list_all_md_files(&self) -> Result<Vec<(String, i64)>> {
+        let fs = self.fs.read();
+        Ok(fs.all_md_files()?)
+    }
+
     // ── Search (file-name based only) ────────────────────────────
 
     /// Search notes by file name fuzzy matching.

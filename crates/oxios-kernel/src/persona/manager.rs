@@ -76,7 +76,8 @@ impl PersonaManager {
             })
     }
 
-    /// Creates the three default personas (Dev, Review, Research).
+    /// Creates the default personas (Dev, Review, Research, Architect, Mentor,
+    /// Ops, Security, Writer, Planner).
     pub fn create_default_personas(&self) {
         let defaults = default_personas();
         for persona in defaults {
