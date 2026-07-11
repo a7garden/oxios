@@ -196,7 +196,7 @@ tempfile = { workspace = true }
 [patch.crates-io]
 oxios-kernel = { path = "crates/oxios-kernel" }
 # oxi-sdk 0.54.0 AgentBuilder resolver drops the catalog port — patched
-# locally until 0.54.1 ships to crates.io.
-oxi-ai = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-ai" }
-oxi-agent = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-agent" }
-oxi-sdk = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-sdk" }
+# locally until 0.54.1 ships to crates.io. Uncomment for local development:
+# oxi-ai = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-ai" }
+# oxi-agent = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-agent" }
+# oxi-sdk = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-sdk" }
