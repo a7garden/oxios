@@ -24,18 +24,22 @@ import {
 } from '@codemirror/autocomplete'
 import { history, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { bracketMatching, defaultHighlightStyle, HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import {
+  bracketMatching,
+  defaultHighlightStyle,
+  HighlightStyle,
+  syntaxHighlighting,
+} from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { EditorSelection, type Extension, Prec } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { keymap } from '@codemirror/view'
-import { Strikethrough, Table, TaskList } from '@lezer/markdown'
 import { tags as lmTags } from '@lezer/highlight'
+import { Strikethrough, Table, TaskList } from '@lezer/markdown'
 import CodeMirror, { EditorView, type ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { type EditorStats, countWords } from './editor-status-bar'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
 import { emojiFoldExtension } from '@/lib/emoji-fold-extension'
@@ -50,6 +54,7 @@ import { cn } from '@/lib/utils'
 import { wikilinkExtension } from '@/lib/wikilink-extension'
 import { useEditorPrefs } from '@/stores/editor-prefs'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { countWords, type EditorStats } from './editor-status-bar'
 
 interface MarkdownEditorProps {
   filePath: string
@@ -403,9 +408,7 @@ export function MarkdownEditor({
     if (prefs.markerColor) {
       exts.push(
         syntaxHighlighting(
-          HighlightStyle.define([
-            { tag: lmTags.processingInstruction, color: prefs.markerColor },
-          ]),
+          HighlightStyle.define([{ tag: lmTags.processingInstruction, color: prefs.markerColor }]),
         ),
       )
     }

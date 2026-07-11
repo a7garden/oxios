@@ -65,6 +65,7 @@ function ColorRow({
       <div className="flex items-center gap-1.5 shrink-0">
         {value && (
           <button
+            type="button"
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => onChange('')}
           >
@@ -246,10 +247,16 @@ export function EditorSettingsPopover() {
               <span className="text-sm">{t('knowledge.editorPrefHeadingColors')}</span>
               {Object.values(prefs.headingColors).some(Boolean) && (
                 <button
+                  type="button"
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() =>
                     prefs.setPref('headingColors', {
-                      h1: '', h2: '', h3: '', h4: '', h5: '', h6: '',
+                      h1: '',
+                      h2: '',
+                      h3: '',
+                      h4: '',
+                      h5: '',
+                      h6: '',
                     })
                   }
                 >
@@ -272,7 +279,9 @@ export function EditorSettingsPopover() {
                         })
                       }
                       className={`h-7 w-full rounded border cursor-pointer bg-transparent ${
-                        hasCustom ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : 'border-border'
+                        hasCustom
+                          ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                          : 'border-border'
                       }`}
                     />
                     <span className="text-[10px] text-muted-foreground">{lvl.toUpperCase()}</span>
