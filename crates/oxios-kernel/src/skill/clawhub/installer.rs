@@ -197,6 +197,23 @@ impl ClawHubInstaller {
         };
         let origin_path = target_dir.join(".clawhub").join("origin.json");
         fs::create_dir_all(origin_path.parent().unwrap())?;
+
+        fs::write(
+            &origin_path,
+            serde_json::to_string_pretty(&origin).context("serialize origin")?,
+        )?;
+        self.update_lockfile(slug, &latest)?;
+
+        Ok(UpdateResult {
+            ok: true,
+            slug: slug.to_string(),
+            previous_version: current,
+            version: latest,
+            changed: true,
+            error: None,
+        })
+    }
+
     /// Verify a ClawHub skill's stored integrity hash by re-downloading the
     /// same version and comparing the computed SHA-256 to the one stored in
     /// the skill's `origin.json` (audit F-12 — the hash was previously
@@ -211,8 +228,7 @@ impl ClawHubInstaller {
             anyhow::bail!("skill '{slug}' is not installed (no origin.json)");
         }
         let buf = std::fs::read_to_string(&origin_path).context("read origin.json")?;
-        let origin: ClawHubOrigin =
-            serde_json::from_str(&buf).context("parse origin.json")?;
+        let origin: ClawHubOrigin = serde_json::from_str(&buf).context("parse origin.json")?;
 
         let expected = origin.sha256.as_deref().unwrap_or("");
         if expected.is_empty() {
@@ -229,7 +245,11 @@ impl ClawHubInstaller {
         let _ = std::fs::remove_file(&archive.path);
 
         if actual == expected {
-            tracing::info!(slug = %slug, version = %origin.installed_version, "ClawHub skill integrity verified");
+            tracing::info!(
+                slug = %slug,
+                version = %origin.installed_version,
+                "ClawHub skill integrity verified"
+            );
             Ok(true)
         } else {
             tracing::warn!(
@@ -241,22 +261,6 @@ impl ClawHubInstaller {
             );
             Ok(false)
         }
-    }
-
-        fs::write(
-            &origin_path,
-            serde_json::to_string_pretty(&origin).context("serialize origin")?,
-        )?;
-        self.update_lockfile(slug, &latest)?;
-
-        Ok(UpdateResult {
-            ok: true,
-            slug: slug.to_string(),
-            previous_version: current,
-            version: latest,
-            changed: true,
-            error: None,
-        })
     }
 
     /// Update all installed ClawHub skills.

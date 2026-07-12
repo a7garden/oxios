@@ -30,7 +30,7 @@
 //! dying gateway).
 
 use std::sync::atomic::{AtomicU64, Ordering};
- use std::time::{Duration, Instant};
+use std::time::{Duration, Instant};
 
 use futures::stream::{FuturesUnordered, StreamExt};
 use parking_lot::RwLock;
@@ -415,8 +415,8 @@ impl TaskSupervisor {
                 None
             }
         }
+    }
 
-    /// Fire the pending web restart once its backoff elapsed.
     async fn fire_web_restart(&mut self) -> Option<ShutdownOutcome> {
         let _pending = self.pending.take()?;
         // Audit F-4: invariant — web state must exist while a web restart
@@ -588,9 +588,12 @@ mod tests {
         let root = CancellationToken::new();
         let mut sup = TaskSupervisor::new(root.clone(), RestartConfig::default());
         // Task that never completes.
-        sup.track_critical("stuck", tokio::spawn(async {
-            std::future::pending::<()>().await;
-        }));
+        sup.track_critical(
+            "stuck",
+            tokio::spawn(async {
+                std::future::pending::<()>().await;
+            }),
+        );
         root.cancel();
         // run() will drain with timeout — must not hang.
         let start = Instant::now();

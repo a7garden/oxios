@@ -19,8 +19,8 @@ use oxios_markdown::knowledge::FileChange;
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
- use std::sync::OnceLock;
 
 /// Fully assembled Oxios kernel with all components wired together.
 ///
@@ -657,6 +657,8 @@ impl Kernel {
         let health_task = self.start_daily_health_check(web_dist);
 
         (guardian_task, health_task)
+    }
+
     /// Start the daily health check loop.
     ///
     /// Runs at 03:00 AM every day (user's local time) via cron expression.
@@ -701,6 +703,7 @@ impl Kernel {
             }
         })
     }
+}
 
 /// Synchronous Guardian tick — runs on the blocking pool via spawn_blocking.
 ///
@@ -1058,9 +1061,7 @@ impl KernelBuilder {
         }
         let access_manager = Arc::new(parking_lot::Mutex::new(access_manager));
 
-        let persona_manager = Arc::new(
-            PersonaManager::new().with_state_store(state_store.clone()),
-        );
+        let persona_manager = Arc::new(PersonaManager::new().with_state_store(state_store.clone()));
         // RFC-039: 디스크에서 페르소나 로드 → config 적용 → 활성 결정 → intent 시드.
         // 손상은 silent fallback 하지 않고 tracing log 에 남김.
         if let Err(e) = persona_manager.load_from_state_store(&state_store).await {
