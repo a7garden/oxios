@@ -170,7 +170,23 @@ impl ClawHubInstaller {
         fs::create_dir_all(&target_dir).context("create skills_dir")?;
         self.extract_archive(&archive, &target_dir)?;
 
-        // Update origin file
+        // Audit F-12: read+log the old origin hash before overwriting so the
+        // previous integrity value is not silently lost. (Use
+        // `verify_skill_integrity` to actually re-check it against a fresh
+        // download.)
+        if let Some(prev) = self.get_installed_version(slug) {
+            let prev_origin_path = self.skills_dir.join(slug).join(".clawhub/origin.json");
+            if let Ok(buf) = std::fs::read_to_string(&prev_origin_path) {
+                if let Ok(prev_origin) = serde_json::from_str::<ClawHubOrigin>(&buf) {
+                    tracing::info!(
+                        slug = %slug,
+                        previous_version = %prev,
+                        previous_sha256 = ?prev_origin.sha256,
+                        "Updating ClawHub skill (replacing stored hash)"
+                    );
+                }
+            }
+        }
         let origin = ClawHubOrigin {
             version: 1,
             registry: self.client.base_url().to_string(),
@@ -181,6 +197,52 @@ impl ClawHubInstaller {
         };
         let origin_path = target_dir.join(".clawhub").join("origin.json");
         fs::create_dir_all(origin_path.parent().unwrap())?;
+    /// Verify a ClawHub skill's stored integrity hash by re-downloading the
+    /// same version and comparing the computed SHA-256 to the one stored in
+    /// the skill's `origin.json` (audit F-12 — the hash was previously
+    /// write-only: stored at install/update but never re-checked).
+    ///
+    /// Returns `Ok(true)` if the hashes match (integrity verified),
+    /// `Ok(false)` on mismatch (possible registry update or tampering),
+    /// or `Err` if the skill is not installed or the download fails.
+    pub async fn verify_skill_integrity(&self, slug: &str) -> Result<bool> {
+        let origin_path = self.skills_dir.join(slug).join(".clawhub/origin.json");
+        if !origin_path.exists() {
+            anyhow::bail!("skill '{slug}' is not installed (no origin.json)");
+        }
+        let buf = std::fs::read_to_string(&origin_path).context("read origin.json")?;
+        let origin: ClawHubOrigin =
+            serde_json::from_str(&buf).context("parse origin.json")?;
+
+        let expected = origin.sha256.as_deref().unwrap_or("");
+        if expected.is_empty() {
+            anyhow::bail!("no stored sha256 for skill '{slug}' (legacy install)");
+        }
+
+        // Re-download the exact same version and compare.
+        let archive = self
+            .client
+            .download_skill(slug, Some(&origin.installed_version))
+            .await?;
+        let actual = &archive.sha256;
+        // Clean up the temp archive (client keeps it by default for install).
+        let _ = std::fs::remove_file(&archive.path);
+
+        if actual == expected {
+            tracing::info!(slug = %slug, version = %origin.installed_version, "ClawHub skill integrity verified");
+            Ok(true)
+        } else {
+            tracing::warn!(
+                slug = %slug,
+                version = %origin.installed_version,
+                expected = %expected,
+                actual = %actual,
+                "ClawHub skill hash mismatch — possible registry update, tampering, or corrupted install"
+            );
+            Ok(false)
+        }
+    }
+
         fs::write(
             &origin_path,
             serde_json::to_string_pretty(&origin).context("serialize origin")?,

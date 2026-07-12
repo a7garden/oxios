@@ -80,8 +80,12 @@ impl A2ACircuitBreaker {
     }
 
     /// Current circuit state.
+    ///
+    /// `SeqCst` so a freshly-OPEN breaker is visible to every thread that
+    /// gates request flow on this read (audit F-15 — `Relaxed` could let a
+    /// burst of requests past a transition that hasn't propagated yet).
     pub fn state(&self) -> CircuitState {
-        CircuitState::from_u8(self.state.load(Ordering::Relaxed))
+        CircuitState::from_u8(self.state.load(Ordering::SeqCst))
     }
 
     /// Whether a request is allowed through the circuit.
@@ -90,13 +94,13 @@ impl A2ACircuitBreaker {
             CircuitState::Closed => true,
             CircuitState::Open => {
                 // Check if reset timeout has passed
-                let last_failure = self.last_failure_time.load(Ordering::Relaxed);
+                let last_failure = self.last_failure_time.load(Ordering::Acquire);
                 let elapsed = now_epoch_secs().saturating_sub(last_failure);
                 if elapsed > self.reset_timeout.as_secs() {
-                    // Transition to half-open
+                    // Transition to half-open.
                     self.state
-                        .store(CircuitState::HalfOpen as u8, Ordering::Relaxed);
-                    self.success_count.store(0, Ordering::Relaxed);
+                        .store(CircuitState::HalfOpen as u8, Ordering::SeqCst);
+                    self.success_count.store(0, Ordering::Release);
                     true
                 } else {
                     false
@@ -104,7 +108,7 @@ impl A2ACircuitBreaker {
             }
             CircuitState::HalfOpen => {
                 // Allow limited requests (up to 2)
-                self.success_count.load(Ordering::Relaxed) < 2
+                self.success_count.load(Ordering::Acquire) < 2
             }
         }
     }
@@ -113,18 +117,18 @@ impl A2ACircuitBreaker {
     pub fn record_success(&self) {
         match self.state() {
             CircuitState::HalfOpen => {
-                let successes = self.success_count.fetch_add(1, Ordering::Relaxed) + 1;
+                let successes = self.success_count.fetch_add(1, Ordering::AcqRel) + 1;
                 if successes >= 2 {
                     // Recovery successful → closed
                     self.state
-                        .store(CircuitState::Closed as u8, Ordering::Relaxed);
-                    self.failure_count.store(0, Ordering::Relaxed);
+                        .store(CircuitState::Closed as u8, Ordering::SeqCst);
+                    self.failure_count.store(0, Ordering::Release);
                     tracing::info!("A2A circuit breaker CLOSED (recovery successful)");
                 }
             }
             CircuitState::Closed => {
                 // Reset failure count on success
-                self.failure_count.store(0, Ordering::Relaxed);
+                self.failure_count.store(0, Ordering::Release);
             }
             CircuitState::Open => {}
         }
@@ -132,13 +136,13 @@ impl A2ACircuitBreaker {
 
     /// Record a failed request.
     pub fn record_failure(&self) {
-        let failures = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
+        let failures = self.failure_count.fetch_add(1, Ordering::AcqRel) + 1;
         self.last_failure_time
-            .store(now_epoch_secs(), Ordering::Relaxed);
+            .store(now_epoch_secs(), Ordering::Release);
 
         if failures >= self.threshold && self.state() != CircuitState::Open {
             self.state
-                .store(CircuitState::Open as u8, Ordering::Relaxed);
+                .store(CircuitState::Open as u8, Ordering::SeqCst);
             tracing::warn!(
                 failures,
                 threshold = self.threshold,
