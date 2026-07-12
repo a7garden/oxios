@@ -29,6 +29,7 @@
 //! window (a web restart backoff of up to 30s never blinds the loop to a
 //! dying gateway).
 
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
@@ -267,18 +268,20 @@ impl TaskSupervisor {
         loop {
             // Snapshot the pending deadline into a local so the timer branch
             // owns no borrow of `self` (lets the arm body borrow `self` mutably).
-            let timer = self
-                .pending
-                .as_ref()
-                .map(|p| tokio::time::sleep_until(p.deadline.into()));
+            let timer: std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> =
+                match self.pending.as_ref() {
+                    Some(p) => Box::pin(tokio::time::sleep_until(p.deadline.into())),
+                    None => Box::pin(std::future::pending::<()>()),
+                };
 
             // Heartbeat timer: sleep when Guardian is registered, pending
             // forever when not — same select!-safety pattern as timer.
-            let hb_timer = if self.guardian_heartbeat.is_some() {
-                tokio::time::sleep(GUARDIAN_CHECK_INTERVAL)
-            } else {
-                std::future::pending::<()>()
-            };
+            let hb_timer: std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> =
+                if self.guardian_heartbeat.is_some() {
+                    Box::pin(tokio::time::sleep(GUARDIAN_CHECK_INTERVAL))
+                } else {
+                    Box::pin(std::future::pending::<()>())
+                };
 
             tokio::select! {
                 biased;
@@ -291,14 +294,11 @@ impl TaskSupervisor {
                         return outcome;
                     }
                 }
-                // Backoff deadline elapsed → fire the pending web restart.
                 _ = async {
-                    match timer {
-                        Some(sleep) => sleep.await,
-                        None => std::future::pending::<()>().await,
-                    }
+                    timer.as_mut().await;
                 } => {
                     if let Some(outcome) = self.fire_web_restart().await {
+
                         return outcome;
                     }
                 }
