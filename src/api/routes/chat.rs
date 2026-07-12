@@ -734,7 +734,19 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         let has_error = msg.meta.as_ref().and_then(|m| m.error.as_ref()).is_some();
 
                         if has_error {
-                            let err = msg.meta.as_ref().and_then(|m| m.error.as_ref()).unwrap();
+                            // Audit F-4: `has_error` already confirmed the error is
+                            // Some, but assert it (defensive) instead of unwrapping
+                            // — under `panic=abort` an unwrap here would kill the
+                            // daemon and drop the rest of the stream.
+                            let err = match msg.meta.as_ref().and_then(|m| m.error.as_ref()) {
+                                Some(e) => e,
+                                None => {
+                                    tracing::error!(
+                                        "chat forward: has_error=true but error missing — inconsistent state"
+                                    );
+                                    continue;
+                                }
+                            };
                             let error_chunk = serde_json::json!({
                                 "type": "error",
                                 "seq": msg.seq,

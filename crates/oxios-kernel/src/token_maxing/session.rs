@@ -156,11 +156,21 @@ impl TokenMaxingSession {
                 ..Default::default()
             });
         }
-        let rec = self
-            .providers
-            .iter_mut()
-            .find(|r| r.provider == provider)
-            .expect("provider record just ensured to exist");
+        // Audit F-4: the just-pushed/ensured record must exist. If the
+        // search invariant is broken, log loudly and skip the per-task
+        // rollup rather than panicking (which under `panic=abort` would
+        // kill the daemon). Changing the public signature to Result is
+        // tracked separately.
+        let rec = match self.providers.iter_mut().find(|r| r.provider == provider) {
+            Some(r) => r,
+            None => {
+                tracing::error!(
+                    provider = %provider,
+                    "token_maxing: provider record missing after ensure — skipping per-task rollup"
+                );
+                return;
+            }
+        };
         rec.tasks_run += 1;
         rec.tokens_consumed += tokens;
         if !rec.models_used.contains(&model) {

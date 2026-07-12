@@ -162,11 +162,13 @@ impl WebSurfaceRestarter {
             self.gateway.register(channel).await?;
         }
         // WebSurface::start always spawns exactly one server task.
-        Ok(handle
+        // Audit F-4: surface.start() contract is to spawn exactly one task;
+        // return an explicit error instead of panicking if violated.
+        handle
             .tasks
             .into_iter()
             .next()
-            .expect("web surface spawns a server task"))
+            .ok_or_else(|| anyhow::anyhow!("WebSurface::start returned no server task"))
     }
 }
 
@@ -365,7 +367,22 @@ impl TaskSupervisor {
             }
             Tag::Web => {
                 let reason = describe_exit("web", result);
-                let ws = self.web.as_mut().expect("web state present while tracked");
+                // Audit F-4: the web state must be present while a web task
+                // is tracked. If it's not, this is a supervisor invariant
+                // violation — escalate to fatal rather than panic.
+                let ws = match self.web.as_mut() {
+                    Some(ws) => ws,
+                    None => {
+                        tracing::error!(
+                            task = "web",
+                            "Web state missing while web task is tracked — supervisor invariant broken"
+                        );
+                        return Some(ShutdownOutcome::Fatal {
+                            name: "web".to_string(),
+                            reason: format!("{reason} (missing web state)"),
+                        });
+                    }
+                };
                 // Reset the retry budget if the surface ran stably long enough.
                 if ws.last_start.elapsed() >= self.restart.reset_after {
                     ws.retries = 0;
@@ -398,12 +415,25 @@ impl TaskSupervisor {
                 None
             }
         }
-    }
 
     /// Fire the pending web restart once its backoff elapsed.
     async fn fire_web_restart(&mut self) -> Option<ShutdownOutcome> {
         let _pending = self.pending.take()?;
-        let ws = self.web.as_mut().expect("web state present while tracked");
+        // Audit F-4: invariant — web state must exist while a web restart
+        // is pending. If missing, escalate to fatal rather than panic.
+        let ws = match self.web.as_mut() {
+            Some(ws) => ws,
+            None => {
+                tracing::error!(
+                    task = "web",
+                    "Web state missing during fire_web_restart — supervisor invariant broken"
+                );
+                return Some(ShutdownOutcome::Fatal {
+                    name: "web".to_string(),
+                    reason: "missing web state during restart".into(),
+                });
+            }
+        };
         // Fresh child token for the new instance (root cancel still cascades).
         let child = self.root.child_token();
         match ws.restarter.start(child).await {

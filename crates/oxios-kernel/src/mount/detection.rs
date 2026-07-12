@@ -117,6 +117,10 @@ pub fn detect_mounts(message: &str, mounts: &[Mount]) -> DetectionResult {
         }
         if matching.len() > 1 {
             // Prefer the most specific path (longest matching prefix).
+            // Audit F-4: matching is non-empty (guarded by len()>1), but if
+            // the max_by_key closure somehow yields no elements (e.g. all
+            // .paths() return None), avoid panicking — fall back to the
+            // first matching entry instead of aborting the daemon.
             let best = matching
                 .into_iter()
                 .max_by_key(|m| {
@@ -127,8 +131,16 @@ pub fn detect_mounts(message: &str, mounts: &[Mount]) -> DetectionResult {
                         .max()
                         .unwrap_or(0)
                 })
-                .expect("non-empty");
-            return DetectionResult::Found(best.id);
+                .or_else(|| {
+                    tracing::warn!("mount detection: max_by_key yielded None; using first match");
+                    None
+                });
+            return match best {
+                Some(b) => DetectionResult::Found(b.id),
+                None => DetectionResult::NoMatch {
+                    detected_path: Some(path),
+                },
+            };
         }
         return DetectionResult::NoMatch {
             detected_path: Some(path),
