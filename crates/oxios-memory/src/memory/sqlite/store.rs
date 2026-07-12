@@ -333,11 +333,13 @@ impl SqliteMemoryStore {
         // Flash Attention re-ranking
         let fa = crate::memory::flash_attention::FlashAttention::with_dimensions(query_vec.len());
 
-        let queries = vec![query_vec.clone()];
+        let queries = vec![query_vec];
         let keys: Vec<Vec<f32>> = candidate_vecs.iter().map(|(_, v)| v.clone()).collect();
-        let values = keys.clone(); // K=V for self-supervised re-ranking
 
-        let attention_output = fa.attention(&queries, &keys, &values);
+        // K=V for self-supervised re-ranking: pass the same slice for keys
+        // and values instead of cloning it a second time (audit F-9 — the
+        // former `values = keys.clone()` doubled the ~3.5 MB f32 traffic).
+        let attention_output = fa.attention(&queries, &keys, &keys);
         let output = match attention_output.first() {
             Some(o) => o,
             None => return Ok(candidates.into_iter().take(max_recall).collect()),
