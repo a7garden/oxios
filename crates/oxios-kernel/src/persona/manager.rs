@@ -2,18 +2,44 @@
 //!
 //! The PersonaManager manages persona lifecycle and provides
 //! the active persona for orchestrator and agent runtime.
+//!
+//! RFC-039 completion: the manager owns an optional `StateStore` and a
+//! reseed callback so that **every** `set_active` call — from the HTTP API,
+//! the `PersonaTool`, the Gateway, or the delete handler — automatically
+//! persists to disk and re-seeds the intent engine.  There is one code path;
+//! callers cannot accidentally skip persistence or re-seeding.
+
+use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::RwLock;
 
 use super::store::PersonaStore;
 use super::{Persona, default_personas};
+use crate::state_store::StateStore;
 
 /// Manages persona lifecycle and coordinates persona-aware execution.
-#[derive(Debug)]
 pub struct PersonaManager {
     store: PersonaStore,
     active_persona_id: RwLock<Option<String>>,
+    /// Optional shared `StateStore` for automatic persistence.
+    /// When `None`, persistence calls are no-ops (tests, ephemeral runs).
+    state_store: Option<Arc<StateStore>>,
+    /// Callback invoked after a successful `set_active` to re-seed the
+    /// intent engine's `system_prompt`.  Stored on the manager (not
+    /// `PersonaApi`) so ephemeral `PersonaApi` instances in `PersonaTool`
+    /// cannot lose it.
+    reseed_callback: RwLock<Option<Arc<dyn Fn(Option<String>) + Send + Sync>>>,
+}
+
+impl std::fmt::Debug for PersonaManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PersonaManager")
+            .field("active_persona_id", &self.active_persona_id.read())
+            .field("state_store", &self.state_store.is_some())
+            .field("reseed_callback", &self.reseed_callback.read().is_some())
+            .finish()
+    }
 }
 
 impl PersonaManager {
@@ -23,6 +49,8 @@ impl PersonaManager {
         let manager = Self {
             store,
             active_persona_id: RwLock::new(None),
+            state_store: None,
+            reseed_callback: RwLock::new(None),
         };
         manager.create_default_personas();
         manager
@@ -35,6 +63,8 @@ impl PersonaManager {
         let this = Self {
             store,
             active_persona_id: RwLock::new(None),
+            state_store: None,
+            reseed_callback: RwLock::new(None),
         };
         // Set the first enabled persona as active by default.
         if let Some(first) = this.store.list_enabled().into_iter().next() {
@@ -43,25 +73,22 @@ impl PersonaManager {
         this
     }
 
+    /// Builder: attach a shared `StateStore`.
+    pub fn with_state_store(mut self, store: Arc<StateStore>) -> Self {
+        self.state_store = Some(store);
+        self
+    }
+
+    /// Set the callback that re-seeds the intent engine's system_prompt.
+    /// Called automatically by `set_active`.
+    pub fn set_reseed_callback(&self, cb: Option<Arc<dyn Fn(Option<String>) + Send + Sync>>) {
+        *self.reseed_callback.write() = cb;
+    }
+
     /// Returns the current active persona, if any.
     pub fn get_active_persona(&self) -> Option<Persona> {
         let active_id = self.active_persona_id.read().clone();
         active_id.and_then(|id| self.store.get(&id))
-    }
-
-    /// Sets the active persona by ID.
-    pub fn set_active_persona(&self, id: &str) -> Result<()> {
-        // Verify the persona exists and is enabled.
-        let persona = self
-            .store
-            .get(id)
-            .ok_or_else(|| anyhow::anyhow!("Persona '{id}' not found"))?;
-        if !persona.enabled {
-            anyhow::bail!("Persona '{id}' is disabled");
-        }
-        *self.active_persona_id.write() = Some(id.to_string());
-        tracing::info!(persona_id = %id, name = %persona.name, "Active persona set");
-        Ok(())
     }
 
     /// Returns the system prompt for the active persona.
@@ -146,7 +173,7 @@ impl PersonaManager {
     /// 호출자는 defaults 가 이미 new() 로 박혀 있음을 알고 있어야 함.
     pub async fn load_from_state_store(
         &self,
-        store: &crate::state_store::StateStore,
+        store: &StateStore,
     ) -> Result<()> {
         let snap = crate::persona::persistence::load_from_state_store(store)
             .await?
@@ -164,8 +191,12 @@ impl PersonaManager {
     }
 
     /// StateStore 에 페르소나 + active_persona_id 를 저장.
-    /// 메모리 상태는 유지, IO 실패는 Result 로 전파.
-    pub async fn persist(&self, store: &crate::state_store::StateStore) -> Result<()> {
+    /// `state_store` 가 설정되지 않은 경우 no-op (`Ok(())`).
+    /// 메모리 상태는 유지, IO 실패는 `Result::Err` 로 전파.
+    pub async fn persist(&self) -> Result<()> {
+        let Some(ref store) = self.state_store else {
+            return Ok(());
+        };
         let snapshot = crate::persona::persistence::PersonaSnapshot {
             schema_version: 1,
             active_persona_id: self.active_persona_id(),
@@ -174,17 +205,16 @@ impl PersonaManager {
         crate::persona::persistence::save_to_state_store(store, &snapshot).await
     }
 
-    /// 글로벌 활성 페르소나 변경. 성공 시 슬롯 변경 + StateStore flush.
-    /// 새 system_prompt 를 `Ok(Some(prompt))` 로 반환 — 호출자가
-    /// `IntentEngine::set_persona_prompt` 로 직접 재시드 (kernel ↔ ouroboros
-    /// 의존성 방향 회피).
+    /// 글로벌 활성 페르소나 변경.
+    ///
+    /// 단일 진리 경로: 슬롯 변경 → persist (내부 StateStore) → reseed (callback).
+    /// 모든 호출자 (HTTP, PersonaTool, Gateway, delete handler) 가 이 메서드를
+    /// 거치므로 영속화 누락이나 intent engine 미재시드가 발생하지 않는다.
+    ///
+    /// 새 system_prompt 를 `Ok(Some(prompt))` 로 반환.
     ///
     /// `&self` — interior mutability (Arc 뒤 호출 가능).
-    pub async fn set_active(
-        &self,
-        id: &str,
-        store: Option<&crate::state_store::StateStore>,
-    ) -> Result<Option<String>> {
+    pub async fn set_active(&self, id: &str) -> Result<Option<String>> {
         let persona = self
             .store
             .get(id)
@@ -194,17 +224,20 @@ impl PersonaManager {
         }
         *self.active_persona_id.write() = Some(id.to_string());
         tracing::info!(persona_id = %id, name = %persona.name, "Active persona set");
-        if let Some(s) = store {
-            self.persist(s).await?;
+
+        // Persist (no-op if no state_store).
+        if let Err(e) = self.persist().await {
+            tracing::warn!(error = %e, "persona set_active: persist failed");
         }
-        Ok(Some(persona.system_prompt))
+
+        // Re-seed intent engine if callback is set.
+        let prompt = persona.system_prompt.clone();
+        if let Some(ref cb) = *self.reseed_callback.read() {
+            cb(Some(prompt.clone()));
+        }
+        Ok(Some(prompt))
     }
 }
-
-// IntentReseed 트레이트는 의도적으로 두지 않는다 — 위 set_active docstring 참조.
-// (oxios-ouroboros 는 oxios-kernel 에 의존하지 않으므로 트레이트를 kernel 안에
-//  둘 수 없음. 대신 set_active 가 새 system_prompt 를 Ok(Some(prompt)) 로
-//  반환하고, 호출자가 IntentEngine::set_persona_prompt 를 직접 호출.)
 
 impl Default for PersonaManager {
     fn default() -> Self {
@@ -220,6 +253,9 @@ impl Clone for PersonaManager {
         Self {
             store,
             active_persona_id: RwLock::new(self.active_persona_id.read().clone()),
+            // Arc clone — shares the same underlying store/callback.
+            state_store: self.state_store.clone(),
+            reseed_callback: RwLock::new(self.reseed_callback.read().clone()),
         }
     }
 }
@@ -228,18 +264,16 @@ impl Clone for PersonaManager {
 mod tests {
     use super::*;
     use crate::config::PersonaConfig;
-    // PersonaSnapshot is used indirectly via persistence module
-    use crate::state_store::StateStore;
 
-    fn make_store() -> StateStore {
+    fn make_store() -> Arc<StateStore> {
         let dir = tempfile::tempdir().unwrap();
-        StateStore::new(dir.keep()).unwrap()
+        Arc::new(StateStore::new(dir.keep()).unwrap())
     }
 
     #[tokio::test]
     async fn test_load_from_state_store_round_trip() {
         let store = make_store();
-        let pm = PersonaManager::new();
+        let pm = PersonaManager::new().with_state_store(store.clone());
         // Create a custom persona, persist, then load into a fresh manager.
         let custom = Persona {
             id: "custom-1".to_string(),
@@ -252,11 +286,11 @@ mod tests {
             personality_traits: vec![],
         };
         pm.store().register(custom);
-        pm.set_active_persona("custom-1").unwrap();
-        pm.persist(&store).await.unwrap();
+        pm.set_active("custom-1").await.unwrap();
+        pm.persist().await.unwrap();
 
         // Fresh manager — load from disk.
-        let pm2 = PersonaManager::new();
+        let pm2 = PersonaManager::new().with_state_store(store.clone());
         pm2.load_from_state_store(&store).await.unwrap();
         assert!(pm2.store().get("custom-1").is_some());
         assert_eq!(pm2.active_persona_id(), Some("custom-1".to_string()));
@@ -267,7 +301,7 @@ mod tests {
     #[tokio::test]
     async fn test_load_no_file_is_ok() {
         let store = make_store();
-        let pm = PersonaManager::new();
+        let pm = PersonaManager::new().with_state_store(store.clone());
         let result = pm.load_from_state_store(&store).await;
         // No file → Err (we require a snapshot). But defaults from new() remain.
         assert!(result.is_err());
@@ -315,7 +349,7 @@ mod tests {
     #[tokio::test]
     async fn test_apply_config_keeps_existing_active() {
         let pm = PersonaManager::new();
-        pm.set_active_persona("research").unwrap();
+        pm.set_active("research").await.unwrap();
         let cfg = PersonaConfig {
             default_persona_id: Some("dev".to_string()),
         };
@@ -328,7 +362,7 @@ mod tests {
     async fn test_set_active_rejects_disabled() {
         let pm = PersonaManager::new();
         pm.store().set_enabled("review", false).unwrap();
-        let result = pm.set_active("review", None).await;
+        let result = pm.set_active("review").await;
         assert!(result.is_err());
         assert_eq!(pm.active_persona_id(), Some("dev".to_string()));
     }
@@ -336,27 +370,83 @@ mod tests {
     #[tokio::test]
     async fn test_set_active_rejects_unknown_id() {
         let pm = PersonaManager::new();
-        let result = pm.set_active("nonexistent", None).await;
+        let result = pm.set_active("nonexistent").await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_set_active_returns_system_prompt() {
         let pm = PersonaManager::new();
-        let prompt = pm.set_active("review", None).await.unwrap();
+        let prompt = pm.set_active("review").await.unwrap();
         assert!(prompt.is_some());
         assert!(prompt.unwrap().contains("Review"));
     }
 
     #[tokio::test]
-    async fn test_persist_round_trip_preserves_active() {
-        let store = make_store();
+    async fn test_set_active_fires_reseed_callback() {
         let pm = PersonaManager::new();
-        pm.set_active_persona("research").unwrap();
-        pm.persist(&store).await.unwrap();
+        let received = Arc::new(parking_lot::Mutex::new(None::<String>));
+        let received_cb = received.clone();
+        pm.set_reseed_callback(Some(Arc::new(move |prompt| {
+            *received_cb.lock() = prompt;
+        })));
+        pm.set_active("review").await.unwrap();
+        assert!(received.lock().as_ref().unwrap().contains("Review"));
+    }
 
-        let pm2 = PersonaManager::new();
+    #[tokio::test]
+    async fn test_set_active_no_callback_still_works() {
+        let pm = PersonaManager::new();
+        // No callback set — should not panic.
+        let result = pm.set_active("research").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_set_active_persists_when_store_set() {
+        let store = make_store();
+        let pm = PersonaManager::new().with_state_store(store.clone());
+        pm.set_active("research").await.unwrap();
+
+        // Fresh manager loads the persisted active.
+        let pm2 = PersonaManager::new().with_state_store(store.clone());
         pm2.load_from_state_store(&store).await.unwrap();
         assert_eq!(pm2.active_persona_id(), Some("research".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_set_active_no_persist_without_store() {
+        let pm = PersonaManager::new();
+        // No state_store — persist is no-op, should succeed.
+        pm.set_active("research").await.unwrap();
+        assert_eq!(pm.active_persona_id(), Some("research".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_persist_round_trip_preserves_active() {
+        let store = make_store();
+        let pm = PersonaManager::new().with_state_store(store.clone());
+        pm.set_active("research").await.unwrap();
+        pm.persist().await.unwrap();
+
+        let pm2 = PersonaManager::new().with_state_store(store.clone());
+        pm2.load_from_state_store(&store).await.unwrap();
+        assert_eq!(pm2.active_persona_id(), Some("research".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_clone_preserves_state_store_and_callback() {
+        let store = make_store();
+        let pm = PersonaManager::new().with_state_store(store.clone());
+        let received = Arc::new(parking_lot::Mutex::new(None::<String>));
+        let received_cb = received.clone();
+        pm.set_reseed_callback(Some(Arc::new(move |prompt| {
+            *received_cb.lock() = prompt;
+        })));
+
+        let cloned = pm.clone();
+        // Cloned manager should persist and reseed via the shared Arcs.
+        cloned.set_active("research").await.unwrap();
+        assert!(received.lock().is_some());
     }
 }

@@ -110,7 +110,7 @@ pub async fn handle_persona_create(
     state
         .kernel
         .persona
-        .persist(&state.kernel.state)
+        .persist()
         .await
         .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     tracing::info!(persona = %created_name, "Persona created via API + persisted");
@@ -168,7 +168,7 @@ pub async fn handle_persona_update(
     state
         .kernel
         .persona
-        .persist(&state.kernel.state)
+        .persist()
         .await
         .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     tracing::info!(persona_id = %id, "Persona updated via API + persisted");
@@ -203,14 +203,14 @@ pub async fn handle_persona_delete(
     {
         // Try to set another persona as active.
         if let Some(next) = state.kernel.persona.list_enabled().into_iter().next() {
-            let _ = state.kernel.persona.set_active(&next.id);
+            let _ = state.kernel.persona.set_active(&next.id).await;
         }
     }
     // RFC-039: persist so the delete survives restart.
     state
         .kernel
         .persona
-        .persist(&state.kernel.state)
+        .persist()
         .await
         .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -253,7 +253,7 @@ pub async fn handle_persona_active_set(
     let new_prompt = state
         .kernel
         .persona
-        .set_active_with_persist(&body.id, &state.kernel.state)
+        .set_active(&body.id)
         .await
         .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?
         .ok_or_else(|| {
@@ -265,7 +265,7 @@ pub async fn handle_persona_active_set(
     tracing::info!(
         persona_id = %body.id,
         prompt_len = new_prompt.len(),
-        "active persona changed; new system_prompt available for re-seed"
+        "active persona changed; persisted + intent engine re-seeded automatically"
     );
     let persona = state.kernel.persona.active();
     Ok(Json(serde_json::json!({

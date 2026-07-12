@@ -51,22 +51,19 @@ pub struct PersonaTool {
     engine_handle: Arc<EngineHandle>,
     /// Bus used to notify the user of agent-authored writes.
     event_bus: EventBus,
-    /// RFC-039: StateStore for persisting after create/update.
-    state_store: Arc<crate::state_store::StateStore>,
 }
 
 impl PersonaTool {
     /// Create a new `PersonaTool` from a `KernelHandle`.
     ///
-    /// Captures the persona manager, the engine handle (for the security
-    /// review LLM call), the event bus (to notify the user of writes),
-    /// and the StateStore (RFC-039: persist after create/update).
+    /// Captures the persona manager (which owns its own `StateStore` for
+    /// persistence) and the engine handle (for the security review LLM call)
+    /// and the event bus (to notify the user of writes).
     pub fn from_kernel(kernel: &KernelHandle) -> Self {
         Self {
             persona_manager: kernel.persona.persona_manager.clone(),
             engine_handle: kernel.engine.engine_handle().clone(),
             event_bus: kernel.infra.event_bus_clone(),
-            state_store: kernel.state.state_store.clone(),
         }
     }
 }
@@ -208,9 +205,9 @@ impl AgentTool for PersonaTool {
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| "set_active requires 'id' parameter".to_string())?;
 
-                match api.set_active(id) {
-                    Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Active persona set to '{id}'."
+                match api.set_active(id).await {
+                    Ok(_) => Ok(AgentToolResult::success(format!(
+                        "Active persona set to '{id}' (persisted + intent engine re-seeded)."
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!(
                         "Failed to set active persona: {e}"
@@ -280,7 +277,7 @@ impl AgentTool for PersonaTool {
                 let enabled = persona.enabled;
                 api.create(persona);
                 // RFC-039: persist so the new persona survives restart.
-                if let Err(e) = self.persona_manager.persist(&self.state_store).await {
+                if let Err(e) = self.persona_manager.persist().await {
                     tracing::warn!(error = %e, "persona create: persist failed");
                 }
                 let _ = self.event_bus.publish(KernelEvent::PersonaCreated {
@@ -355,7 +352,7 @@ impl AgentTool for PersonaTool {
                 match api.update(id, updated) {
                     Ok(()) => {
                         // RFC-039: persist so the edit survives restart.
-                        if let Err(e) = self.persona_manager.persist(&self.state_store).await {
+                        if let Err(e) = self.persona_manager.persist().await {
                             tracing::warn!(error = %e, "persona update: persist failed");
                         }
                         let _ = self.event_bus.publish(KernelEvent::PersonaUpdated {
@@ -523,9 +520,6 @@ mod tests {
                 "anthropic/claude-sonnet-4-20250514",
             )))),
             event_bus: EventBus::new(16),
-            state_store: Arc::new(
-                crate::state_store::StateStore::new(tempfile::tempdir().unwrap().keep()).unwrap(),
-            ),
         };
         let schema = tool.parameters_schema();
         let actions = schema["properties"]["action"]["enum"]

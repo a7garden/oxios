@@ -865,8 +865,8 @@ impl Gateway {
             };
 
             match (persona_api, channel) {
-                (Some(api), Some(channel)) => match api.set_active(&persona_id) {
-                    Ok(()) => {
+                (Some(api), Some(channel)) => match api.set_active(&persona_id).await {
+                    Ok(_) => {
                         let response = format!("✅ Switched persona to '{persona_id}'.");
                         let mut outgoing = OutgoingMessage::success(
                             msg.id,

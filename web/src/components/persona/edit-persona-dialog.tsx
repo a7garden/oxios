@@ -103,34 +103,28 @@ export function EditPersonaDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-5 w-5" />
-            {t('personas.edit', '페르소나 편집')}
+            {t('personas.edit')}
           </DialogTitle>
-          <DialogDescription>
-            {t('personas.editDescription', '페르소나의 이름, 설명, 시스템 프롬프트를 변경합니다.')}
-          </DialogDescription>
+          <DialogDescription>{t('personas.editDescription')}</DialogDescription>
         </DialogHeader>
         {detail.isLoading ? (
-          <div className="text-sm text-muted-foreground p-4 text-center">
-            {t('common.loading', '로딩 중...')}
-          </div>
+          <div className="text-sm text-muted-foreground p-4 text-center">{t('common.loading')}</div>
         ) : detail.isError ? (
           <div className="space-y-3 p-2">
-            <p className="text-sm text-destructive">
-              {t('personas.loadFailed', '페르소나를 불러오지 못했습니다.')}
-            </p>
+            <p className="text-sm text-destructive">{t('personas.loadFailed')}</p>
             <Button
               type="button"
               variant="outline"
               onClick={() => detail.refetch()}
               disabled={detail.isFetching}
             >
-              {t('common.retry', '재시도')}
+              {t('common.retry')}
             </Button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="persona-edit-name">{t('personas.personaName', '이름')}</Label>
+              <Label htmlFor="persona-edit-name">{t('personas.personaName')}</Label>
               <Input
                 id="persona-edit-name"
                 value={name}
@@ -139,7 +133,7 @@ export function EditPersonaDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="persona-edit-desc">{t('common.description', '설명')}</Label>
+              <Label htmlFor="persona-edit-desc">{t('common.description')}</Label>
               <Input
                 id="persona-edit-desc"
                 value={description}
@@ -147,9 +141,7 @@ export function EditPersonaDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="persona-edit-prompt">
-                {t('personas.systemPrompt', '시스템 프롬프트')}
-              </Label>
+              <Label htmlFor="persona-edit-prompt">{t('personas.systemPrompt')}</Label>
               <Textarea
                 id="persona-edit-prompt"
                 value={systemPrompt}
@@ -159,10 +151,10 @@ export function EditPersonaDialog({
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={close}>
-                {t('common.cancel', '취소')}
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={!name.trim() || isPending}>
-                {isPending ? t('common.saving', '저장 중...') : t('common.save', '저장')}
+                {isPending ? t('common.saving') : t('common.save')}
               </Button>
             </DialogFooter>
           </form>

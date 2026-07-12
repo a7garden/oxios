@@ -96,10 +96,10 @@ function PersonasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['personas'] })
       setEditing(null)
-      toast.success(t('personas.saved', '페르소나가 저장되었습니다'))
+      toast.success(t('personas.saved'))
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : t('personas.saveFailed', '저장 실패'))
+      toast.error(err instanceof Error ? err.message : t('personas.saveFailed'))
     },
   })
 
@@ -138,16 +138,11 @@ function PersonasPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('personas.createPersona')}</DialogTitle>
-            <DialogDescription>
-              {t(
-                'personas.createPersonaDescription',
-                'Create a new persona for agent customization.',
-              )}
-            </DialogDescription>
+            <DialogDescription>{t('personas.createPersonaDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="persona-name">{t('personas.nameLabel', 'Name')}</Label>
+              <Label htmlFor="persona-name">{t('personas.nameLabel')}</Label>
               <Input
                 id="persona-name"
                 value={name}
@@ -166,9 +161,7 @@ function PersonasPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="persona-prompt">
-                {t('personas.systemPromptLabel', 'System prompt')}
-              </Label>
+              <Label htmlFor="persona-prompt">{t('personas.systemPromptLabel')}</Label>
               <Textarea
                 id="persona-prompt"
                 value={systemPrompt}
@@ -225,7 +218,7 @@ function PersonasPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setEditing(persona)}
-                    aria-label={t('common.edit', '편집')}
+                    aria-label={t('common.edit')}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -279,13 +272,8 @@ function PersonasPage() {
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('personas.deletePersonaConfirmTitle', 'Delete persona?')}</DialogTitle>
-            <DialogDescription>
-              {t(
-                'personas.deletePersonaConfirmDescription',
-                'This will permanently delete the persona. Agents that depend on it will lose their configuration.',
-              )}
-            </DialogDescription>
+            <DialogTitle>{t('personas.deletePersonaConfirmTitle')}</DialogTitle>
+            <DialogDescription>{t('personas.deletePersonaConfirmDescription')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
@@ -307,7 +295,7 @@ function PersonasPage() {
               }}
               disabled={deleteMutation.isPending}
             >
-              {t('common.delete', '삭제')}
+              {t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
