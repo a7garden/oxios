@@ -67,7 +67,7 @@ function AgentDetailPage() {
             <div className="flex items-start gap-2 text-sm text-destructive">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">{t('agents.error', 'Execution Error')}</p>
+                <p className="font-medium">{t('agents.error')}</p>
                 <p className="text-xs font-mono mt-1 whitespace-pre-wrap break-all">
                   {agent.error}
                 </p>
@@ -83,13 +83,13 @@ function AgentDetailPage() {
           <div className="grid gap-2 md:grid-cols-3 text-sm">
             {agent.project_id && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.project', 'Project')}:</span>
+                <span className="text-muted-foreground">{t('agents.project')}:</span>
                 <span className="text-xs font-mono">{agent.project_id.slice(0, 8)}...</span>
               </div>
             )}
             {(agent as { session_id?: string | null }).session_id && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.session', 'Session')}:</span>
+                <span className="text-muted-foreground">{t('agents.session')}:</span>
                 <Button
                   variant="link"
                   className="h-auto p-0 text-xs"
@@ -110,23 +110,19 @@ function AgentDetailPage() {
             </div>
             {agent.started_at && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.startedAt', 'Started')}:</span>
+                <span className="text-muted-foreground">{t('agents.startedAt')}:</span>
                 <span>{new Date(agent.started_at).toLocaleString()}</span>
               </div>
             )}
             {agent.completed_at && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">
-                  {t('agents.completedAt', 'Completed')}:
-                </span>
+                <span className="text-muted-foreground">{t('agents.completedAt')}:</span>
                 <span>{new Date(agent.completed_at).toLocaleString()}</span>
               </div>
             )}
             {agent.steps_completed > 0 && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">
-                  {t('agents.stepsCompleted', 'Steps')}:
-                </span>
+                <span className="text-muted-foreground">{t('agents.stepsCompleted')}:</span>
                 <span>
                   {agent.steps_completed}
                   {agent.steps_total ? ` / ${agent.steps_total}` : ''}
@@ -135,19 +131,19 @@ function AgentDetailPage() {
             )}
             {agent.model_id && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.model', 'Model')}:</span>
+                <span className="text-muted-foreground">{t('agents.model')}:</span>
                 <span className="text-xs font-mono">{agent.model_id}</span>
               </div>
             )}
             {agent.tokens_used > 0 && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.tokens', 'Tokens')}:</span>
+                <span className="text-muted-foreground">{t('agents.tokens')}:</span>
                 <span>{agent.tokens_used.toLocaleString()}</span>
               </div>
             )}
             {agent.cost_usd > 0 && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.cost', 'Cost')}:</span>
+                <span className="text-muted-foreground">{t('agents.cost')}:</span>
                 <span>${agent.cost_usd.toFixed(4)}</span>
               </div>
             )}

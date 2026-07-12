@@ -69,7 +69,7 @@ export function formatUsd(value: number): string {
 export function formatRelativeTime(date: string | Date, t?: (...args: any[]) => any): string {
   const d = typeof date === 'string' ? new Date(date) : date
   const diff = Date.now() - d.getTime()
-  if (diff < 60000) return t ? t('common.justNow', 'just now') : 'just now'
+  if (diff < 60000) return t ? t('common.justNow') : 'just now'
   if (diff < 3600000) {
     const mins = Math.floor(diff / 60000)
     return t ? t('common.minutesAgo', { count: mins }) : `${mins}m ago`
@@ -93,7 +93,7 @@ export function formatRelativeDate(date: string | Date, t?: (...args: any[]) => 
   const absDiff = Math.abs(diffMs)
   const isFuture = diffMs < 0
 
-  if (absDiff < 60_000) return t ? t('common.justNow', 'just now') : '방금 전'
+  if (absDiff < 60_000) return t ? t('common.justNow') : '방금 전'
 
   const mins = Math.floor(absDiff / 60_000)
   const hours = Math.floor(mins / 60)

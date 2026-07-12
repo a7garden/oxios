@@ -233,8 +233,8 @@ function RoleRow({
         className="h-7 w-7 p-0 shrink-0"
         onClick={onRemove}
         disabled={disabled}
-        title={t('common.delete', 'Delete')}
-        aria-label={`${t('common.delete', 'Delete')} ${name}`}
+        title={t('common.delete')}
+        aria-label={`${t('common.delete')} ${name}`}
       >
         <CircleX className="h-4 w-4 text-muted-foreground" />
       </Button>

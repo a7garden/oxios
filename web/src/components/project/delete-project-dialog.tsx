@@ -30,12 +30,12 @@ export function DeleteProjectDialog({ project, open, onOpenChange }: DeleteProje
 
     deleteProject.mutate(project.id, {
       onSuccess: () => {
-        toast(t('projects.deleteSuccess', 'Project deleted'))
+        toast(t('projects.deleteSuccess'))
         onOpenChange(false)
         navigate({ to: '/projects' })
       },
-      onError: (err) => {
-        toast.error(t('projects.deleteError', `Failed to delete: ${err}`))
+      onError: () => {
+        toast.error(t('projects.deleteError'))
       },
     })
   }
@@ -47,27 +47,24 @@ export function DeleteProjectDialog({ project, open, onOpenChange }: DeleteProje
           <DialogTitle>
             {t('projects.deleteTitle', 'Delete "{{name}}"?', { name: project?.name ?? '' })}
           </DialogTitle>
-          <DialogDescription>
-            {t('projects.deleteDesc', 'This will remove the project but NOT delete:')}
-          </DialogDescription>
+          <DialogDescription>{t('projects.deleteDesc')}</DialogDescription>
         </DialogHeader>
 
         <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
-          <li>{t('projects.deleteMemories', 'Memories associated with this project')}</li>
-          <li>{t('projects.deleteFiles', 'Files in the project paths')}</li>
+          <li>{t('projects.deleteMemories')}</li>
+          <li>{t('projects.deleteFiles')}</li>
         </ul>
 
         <p className="text-xs text-destructive font-medium">
-          <AlertTriangle className="h-4 w-4 shrink-0" />{' '}
-          {t('projects.undoWarning', 'This action cannot be undone.')}
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {t('projects.undoWarning')}
         </p>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('common.cancel', 'Cancel')}
+            {t('common.cancel')}
           </Button>
           <Button variant="destructive" onClick={handleDelete} disabled={deleteProject.isPending}>
-            {deleteProject.isPending ? '...' : t('projects.delete', 'Delete')}
+            {deleteProject.isPending ? '...' : t('projects.delete')}
           </Button>
         </DialogFooter>
       </DialogContent>

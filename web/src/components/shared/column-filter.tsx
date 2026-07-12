@@ -65,7 +65,7 @@ export function ColumnFilter({ label, options, selected, onChange }: ColumnFilte
             className="cursor-pointer text-muted-foreground border-t mt-1"
           >
             <X className="mr-2 h-3.5 w-3.5" />
-            {t('dataTable.clearFilters', 'Clear filters')}
+            {t('dataTable.clearFilters')}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

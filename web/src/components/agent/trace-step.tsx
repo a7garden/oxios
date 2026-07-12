@@ -30,9 +30,9 @@ function kindLabel(
 ): string | null {
   switch (kind) {
     case 'memory':
-      return t('agents.memoryRecall', 'Memory Recall')
+      return t('agents.memoryRecall')
     case 'reasoning':
-      return t('agents.reasoning', 'Reasoning')
+      return t('agents.reasoning')
     default:
       return null
   }
@@ -77,7 +77,7 @@ export function TraceStepCard({ step }: TraceStepProps) {
         <div className="border-t px-3 py-2 space-y-2 bg-muted/30">
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1">
-              {t('agents.inputLabel', 'Input')}
+              {t('agents.inputLabel')}
             </p>
             <pre className="text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
               {typeof step.input === 'string' ? step.input : JSON.stringify(step.input, null, 2)}
@@ -85,7 +85,7 @@ export function TraceStepCard({ step }: TraceStepProps) {
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1">
-              {t('agents.outputLabel', 'Output')}
+              {t('agents.outputLabel')}
             </p>
             <pre className="text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48">
               {typeof step.output === 'string' ? step.output : JSON.stringify(step.output, null, 2)}

@@ -32,9 +32,7 @@ export function ToolApprovalCard({
         <div className="rounded-xl border bg-card shadow-sm">
           <div className="flex items-center gap-2 px-4 py-3 border-b">
             <ShieldAlert className="h-4 w-4 text-warning shrink-0" />
-            <span className="text-sm font-medium">
-              {t('chat.toolApproval.title', '도구 권한 승인')}
-            </span>
+            <span className="text-sm font-medium">{t('chat.toolApproval.title')}</span>
             <span className="ml-auto px-2 py-0.5 rounded bg-muted text-xs font-mono">
               {toolName}
             </span>
@@ -42,12 +40,12 @@ export function ToolApprovalCard({
           <div className="px-4 py-3">
             <p className="text-sm text-muted-foreground">{reason}</p>
             <p className="text-xs text-muted-foreground mt-2">
-              {t('chat.toolApproval.description', '이 세션에서 해당 도구 사용을 허용하시겠습니까?')}
+              {t('chat.toolApproval.description')}
             </p>
           </div>
           <div className="flex justify-end gap-2 px-4 py-3 border-t">
             <Button onClick={onDeny} variant="ghost" size="sm" disabled={disabled}>
-              {t('chat.toolApproval.deny', '거부')}
+              {t('chat.toolApproval.deny')}
             </Button>
             <Button
               onClick={onApprove}
@@ -55,7 +53,7 @@ export function ToolApprovalCard({
               disabled={disabled}
               className="bg-success/90 hover:bg-success text-white"
             >
-              {t('chat.toolApproval.approve', '승인')} ✅
+              {t('chat.toolApproval.approve')} ✅
             </Button>
           </div>
         </div>

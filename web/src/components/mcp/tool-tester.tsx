@@ -63,25 +63,25 @@ export function ToolTester() {
     <div className="space-y-4 max-w-3xl">
       {/* Server selector */}
       <div className="space-y-2">
-        <Label>{t('mcp.servers', 'Server')}</Label>
+        <Label>{t('mcp.servers')}</Label>
         <Select
           value={selectedServer}
           onValueChange={(v) => {
             setSelectedServer(v)
             setSelectedTool('')
           }}
-          placeholder={t('common.selectPlaceholder', 'Select...')}
+          placeholder={t('common.selectPlaceholder')}
           options={enabledServers.map((s) => ({ label: s.name, value: s.name }))}
         />
       </div>
 
       {/* Tool selector */}
       <div className="space-y-2">
-        <Label>{t('mcp.tools', 'Tool')}</Label>
+        <Label>{t('mcp.tools')}</Label>
         <Select
           value={selectedTool}
           onValueChange={setSelectedTool}
-          placeholder={t('common.selectPlaceholder', 'Select...')}
+          placeholder={t('common.selectPlaceholder')}
           options={serverTools.map((tool) => ({ label: tool.name, value: tool.name }))}
           className={!selectedServer ? 'pointer-events-none opacity-50' : ''}
         />
@@ -98,7 +98,7 @@ export function ToolTester() {
 
       {/* Arguments */}
       <div className="space-y-2">
-        <Label>{t('mcp.args', 'Arguments')} (JSON)</Label>
+        <Label>{t('mcp.args')} (JSON)</Label>
         <Textarea
           value={argsJson}
           onChange={(e) => setArgsJson(e.target.value)}
@@ -114,13 +114,13 @@ export function ToolTester() {
         disabled={!selectedServer || !selectedTool || callTool.isPending}
       >
         <Play className="h-4 w-4 mr-1" />
-        {callTool.isPending ? t('common.loading', 'Loading...') : t('mcp.execute', 'Execute')}
+        {callTool.isPending ? t('common.loading') : t('mcp.execute')}
       </Button>
 
       {/* Duration */}
       {duration !== null && (
         <p className="text-xs text-muted-foreground">
-          {t('mcp.duration', 'Duration')}: {duration}ms
+          {t('mcp.duration')}: {duration}ms
         </p>
       )}
 
@@ -135,7 +135,7 @@ export function ToolTester() {
       {/* Result */}
       {result && (
         <div className="space-y-2">
-          <Label>{t('mcp.result', 'Result')}</Label>
+          <Label>{t('mcp.result')}</Label>
           <pre className="rounded-lg border bg-muted p-3 text-xs font-mono overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap">
             {result}
           </pre>

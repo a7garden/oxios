@@ -39,18 +39,18 @@ function MountsPage() {
   const handleDelete = async (mount: Mount) => {
     try {
       await deleteMount.mutateAsync(mount.id)
-      toast.success(t('mounts.deleted', 'Mount가 삭제되었습니다'))
+      toast.success(t('mounts.deleted'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('mounts.deleteFailed', '삭제 실패'))
+      toast.error(err instanceof Error ? err.message : t('mounts.deleteFailed'))
     }
   }
 
   const handleRescan = async (mount: Mount) => {
     try {
       await rescanMount.mutateAsync(mount.id)
-      toast.success(t('mounts.rescanned', 'Mount가 갱신되었습니다'))
+      toast.success(t('mounts.rescanned'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('mounts.rescanFailed', '갱신 실패'))
+      toast.error(err instanceof Error ? err.message : t('mounts.rescanFailed'))
     }
   }
 
@@ -59,14 +59,12 @@ function MountsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('mounts.title', 'Mounts')}</h1>
-          <p className="text-muted-foreground text-sm">
-            {t('mounts.desc', '경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.')}
-          </p>
+          <h1 className="text-2xl font-bold">{t('mounts.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('mounts.desc')}</p>
         </div>
         <Button onClick={() => setShowCreate(true)}>
           <FolderPlus className="h-4 w-4 mr-2" />
-          {t('mounts.create', 'Mount 만들기')}
+          {t('mounts.create')}
         </Button>
       </div>
 
@@ -75,7 +73,7 @@ function MountsPage() {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('mounts.searchPlaceholder', '이름, 설명, 언어로 검색...')}
+          placeholder={t('mounts.searchPlaceholder')}
           className="max-w-xs"
         />
         <RefreshButton onClick={() => refetch()} />
@@ -89,15 +87,12 @@ function MountsPage() {
       ) : mounts.length === 0 ? (
         <EmptyState
           icon={<FolderPlus className="h-8 w-8" />}
-          title={t('mounts.empty', 'Mount가 없습니다')}
-          description={t(
-            'mounts.emptyDesc',
-            'Mount를 만들어 경로에 이름을 붙이세요. 에이전트가 자동으로 설명을 채웁니다.',
-          )}
+          title={t('mounts.empty')}
+          description={t('mounts.emptyDesc')}
           action={
             <Button onClick={() => setShowCreate(true)}>
               <FolderPlus className="h-4 w-4 mr-2" />
-              {t('mounts.create', 'Mount 만들기')}
+              {t('mounts.create')}
             </Button>
           }
         />
@@ -116,7 +111,7 @@ function MountsPage() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => setEditingMount(mount)}
-                  aria-label={t('common.edit', '편집')}
+                  aria-label={t('common.edit')}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
@@ -125,7 +120,7 @@ function MountsPage() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => handleRescan(mount)}
-                  aria-label={t('mounts.rescan', '갱신')}
+                  aria-label={t('mounts.rescan')}
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
@@ -134,7 +129,7 @@ function MountsPage() {
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"
                   onClick={() => setDeleteTarget(mount)}
-                  aria-label={t('common.delete', '삭제')}
+                  aria-label={t('common.delete')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -150,7 +145,7 @@ function MountsPage() {
                 <h3 className="font-semibold truncate">{mount.name}</h3>
                 {mount.source === 'auto_promoted' && (
                   <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-xs text-violet-600">
-                    {t('mounts.autoPromoted', '자동 생성')}
+                    {t('mounts.autoPromoted')}
                   </span>
                 )}
                 {mount.enrichment_pending && (
@@ -158,9 +153,9 @@ function MountsPage() {
                     type="button"
                     onClick={() => handleRescan(mount)}
                     className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 hover:bg-amber-500/20 transition-colors"
-                    title={t('mounts.rescan', '갱신')}
+                    title={t('mounts.rescan')}
                   >
-                    {t('mounts.needsRefresh', '갱신 필요')} ↻
+                    {t('mounts.needsRefresh')} ↻
                   </button>
                 )}
               </div>
@@ -210,13 +205,8 @@ function MountsPage() {
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('mounts.deleteConfirmTitle', 'Delete mount?')}</DialogTitle>
-            <DialogDescription>
-              {t(
-                'mounts.deleteConfirmDescription',
-                'This will permanently remove the mount. Agents that depend on it will lose access.',
-              )}
-            </DialogDescription>
+            <DialogTitle>{t('mounts.deleteConfirmTitle')}</DialogTitle>
+            <DialogDescription>{t('mounts.deleteConfirmDescription')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
@@ -237,7 +227,7 @@ function MountsPage() {
               }}
               disabled={deleteMount.isPending}
             >
-              {t('common.delete', '삭제')}
+              {t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

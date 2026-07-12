@@ -31,7 +31,7 @@ export function BottomNav() {
 
   return (
     <nav
-      aria-label={t('common.modeNavigation', 'Mode navigation')}
+      aria-label={t('common.modeNavigation')}
       className={cn(
         'lg:hidden shrink-0 flex items-stretch justify-around',
         'border-t bg-background/95 backdrop-blur-sm',

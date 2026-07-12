@@ -86,10 +86,10 @@ function GitPage() {
   const verifyMutation = useMutation({
     mutationFn: () => api.post<{ valid?: boolean; message?: string }>('/api/git/verify'),
     onSuccess: (res) => {
-      toast.success(res?.message ?? t('git.verifySuccess', 'Git integrity verified'))
+      toast.success(res?.message ?? t('git.verifySuccess'))
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : t('git.verifyFailed', 'Verification failed'))
+      toast.error(err instanceof Error ? err.message : t('git.verifyFailed'))
     },
   })
 

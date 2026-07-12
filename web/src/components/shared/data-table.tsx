@@ -279,7 +279,7 @@ export function DataTable<T>({
           ))}
           {sort && (
             <span className="ml-auto text-xs text-muted-foreground">
-              {t('dataTable.sortedBy', 'Sorted by')}{' '}
+              {t('dataTable.sortedBy')}{' '}
               {columns.find((c) => {
                 const acc = c.accessor
                 return typeof acc !== 'function' && acc === sort.key
@@ -341,7 +341,7 @@ export function DataTable<T>({
                 <td colSpan={columns.length} className="py-12 text-center">
                   <EmptyState
                     icon={<FolderOpen className="h-8 w-8" />}
-                    title={emptyMessage ?? t('dataTable.noResults', 'No results found')}
+                    title={emptyMessage ?? t('dataTable.noResults')}
                     className="py-6"
                   />
                 </td>

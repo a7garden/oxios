@@ -68,15 +68,13 @@ export function EditCronDialog({ job, isPending, onOpenChange, onSave }: EditCro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-5 w-5" />
-            {t('cronJobs.edit', 'Cron 작업 편집')}
+            {t('cronJobs.edit')}
           </DialogTitle>
-          <DialogDescription>
-            {t('cronJobs.editDescription', '작업의 이름, 스케줄, 목표를 변경합니다.')}
-          </DialogDescription>
+          <DialogDescription>{t('cronJobs.editDescription')}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="cron-edit-name">{t('cronJobs.name', '이름')}</Label>
+            <Label htmlFor="cron-edit-name">{t('cronJobs.name')}</Label>
             <Input
               id="cron-edit-name"
               value={name}
@@ -85,27 +83,27 @@ export function EditCronDialog({ job, isPending, onOpenChange, onSave }: EditCro
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="cron-edit-schedule">{t('cronJobs.schedule', '스케줄')}</Label>
+            <Label htmlFor="cron-edit-schedule">{t('cronJobs.schedule')}</Label>
             <CronScheduleEditor id="cron-edit-schedule" value={schedule} onChange={setSchedule} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="cron-edit-goal">{t('cronJobs.goal', '목표')}</Label>
+            <Label htmlFor="cron-edit-goal">{t('cronJobs.goal')}</Label>
             <Input
               id="cron-edit-goal"
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              placeholder={t('cronJobs.goalPlaceholder', 'Goal or prompt for the agent')}
+              placeholder={t('cronJobs.goalPlaceholder')}
             />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close}>
-              {t('common.cancel', '취소')}
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={!name.trim() || !schedule.trim() || !goal.trim() || isPending}
             >
-              {isPending ? t('common.saving', '저장 중...') : t('common.save', '저장')}
+              {isPending ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </form>

@@ -255,7 +255,7 @@ export function ModelPicker({
     ? activeRoleEntry.name
     : routingModel
       ? shortModelId(routingModel.id)
-      : t('chat.modelPicker.defaultLabel', 'Default model')
+      : t('chat.modelPicker.defaultLabel')
   const triggerProvider = activeRoleEntry
     ? roleModel
       ? shortProvider(roleModel.id.split('/')[0] ?? '')
@@ -277,8 +277,8 @@ export function ModelPicker({
             'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             activeRoleEntry && 'border-primary/40 bg-primary/5',
           )}
-          title={t('chat.modelPicker.triggerHint', 'Choose a model for the next message')}
-          aria-label={t('chat.modelPicker.trigger', 'Model')}
+          title={t('chat.modelPicker.triggerHint')}
+          aria-label={t('chat.modelPicker.trigger')}
         >
           <span
             className={cn(
@@ -319,7 +319,7 @@ export function ModelPicker({
               setFocusIndex(0)
             }}
             onKeyDown={onSearchKey}
-            placeholder={t('chat.modelPicker.search', 'Search models…')}
+            placeholder={t('chat.modelPicker.search')}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
           />
           {query && (
@@ -339,11 +339,8 @@ export function ModelPicker({
           {hasNoModels ? (
             <EmptyState
               icon={<Cpu className="h-5 w-5" />}
-              title={t('chat.modelPicker.noModels', 'No models available')}
-              hint={t(
-                'chat.modelPicker.noModelsHint',
-                'Connect a provider in Settings to add models.',
-              )}
+              title={t('chat.modelPicker.noModels')}
+              hint={t('chat.modelPicker.noModelsHint')}
             />
           ) : hasNoMatches ? (
             <EmptyState
@@ -369,10 +366,7 @@ export function ModelPicker({
           <div className="border-t border-border px-3 py-1.5 bg-muted/20">
             <p className="text-2xs text-muted-foreground/70 flex items-center gap-1.5">
               <Tag className="h-3 w-3 shrink-0" />
-              {t(
-                'chat.modelPicker.noRolesHint',
-                'No roles yet. Add them in Settings → Engine → Roles.',
-              )}
+              {t('chat.modelPicker.noRolesHint')}
             </p>
           </div>
         )}
@@ -394,10 +388,10 @@ export function ModelPicker({
             )}
             title={
               !activeModelId
-                ? t('chat.modelPicker.setAsDefaultHintNoModel', 'Pick a model first')
+                ? t('chat.modelPicker.setAsDefaultHintNoModel')
                 : isCurrentDefault
-                  ? t('chat.modelPicker.currentDefault', 'Current default')
-                  : t('chat.modelPicker.setAsDefault', 'Set as default')
+                  ? t('chat.modelPicker.currentDefault')
+                  : t('chat.modelPicker.setAsDefault')
             }
           >
             <Star
@@ -407,14 +401,14 @@ export function ModelPicker({
               )}
             />
             {isCurrentDefault
-              ? t('chat.modelPicker.currentDefault', 'Current default')
-              : t('chat.modelPicker.setAsDefault', 'Set as default')}
+              ? t('chat.modelPicker.currentDefault')
+              : t('chat.modelPicker.setAsDefault')}
           </button>
 
           <div className="flex items-center gap-2 text-2xs text-muted-foreground/80">
             <span>
-              {t('chat.modelPicker.kbd.navigate', '↑↓')} {t('chat.modelPicker.kbd.select', '↵')}{' '}
-              {t('chat.modelPicker.kbd.close', 'esc')}
+              {t('chat.modelPicker.kbd.navigate')} {t('chat.modelPicker.kbd.select')}{' '}
+              {t('chat.modelPicker.kbd.close')}
             </span>
           </div>
         </div>
@@ -471,7 +465,7 @@ function ListRows({
             className="px-2 mt-1.5 pb-1 text-2xs uppercase tracking-wider text-muted-foreground/70 font-semibold border-t border-border pt-2 flex items-center gap-1.5"
           >
             <Tag className="h-3 w-3" />
-            {t('chat.modelPicker.rolesTitle', 'Roles')}
+            {t('chat.modelPicker.rolesTitle')}
           </div>,
         )
       }
@@ -505,12 +499,10 @@ function ListRows({
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Sparkles className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="text-xs font-medium truncate">
-              {row.model
-                ? shortModelId(row.model.id)
-                : t('chat.modelPicker.defaultLabel', 'Default model')}
+              {row.model ? shortModelId(row.model.id) : t('chat.modelPicker.defaultLabel')}
             </span>
             <span className="text-2xs text-muted-foreground/70 shrink-0">
-              {t('chat.modelPicker.isDefault', 'Default')}
+              {t('chat.modelPicker.isDefault')}
             </span>
           </div>
           {activeModelId === null && activeRole === null && (
@@ -546,7 +538,7 @@ function ListRows({
         </div>
         {hasReasoning && (
           <SubHeader icon={<Sparkles className="h-3 w-3" />}>
-            {t('chat.modelPicker.reasoning', 'Reasoning')}
+            {t('chat.modelPicker.reasoning')}
           </SubHeader>
         )}
         {groupRows
@@ -563,7 +555,7 @@ function ListRows({
               onClick={() => onPick(rows[g.idx]!)}
             />
           ))}
-        {hasStandard && <SubHeader>{t('chat.modelPicker.standard', 'Standard')}</SubHeader>}
+        {hasStandard && <SubHeader>{t('chat.modelPicker.standard')}</SubHeader>}
         {groupRows
           .filter((g) => !g.model.reasoning)
           .map((g) => (
@@ -648,7 +640,7 @@ function ModelRow({
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         {model.reasoning && (
           <span
-            title={t('chat.modelPicker.supportsReasoning', 'Supports reasoning')}
+            title={t('chat.modelPicker.supportsReasoning')}
             className="inline-flex shrink-0 text-warning"
           >
             <Sparkles className="h-3 w-3" />
@@ -656,7 +648,7 @@ function ModelRow({
         )}
         {model.input.includes('image') && (
           <span
-            title={t('chat.modelPicker.supportsVision', 'Supports vision')}
+            title={t('chat.modelPicker.supportsVision')}
             className="inline-flex shrink-0 text-info"
           >
             <Eye className="h-3 w-3" />
@@ -665,7 +657,7 @@ function ModelRow({
         <span className="text-xs font-medium truncate">{model.name}</span>
         {isDefault && (
           <span className="text-2xs text-primary/80 font-medium shrink-0">
-            · {t('chat.modelPicker.isDefault', 'Default')}
+            · {t('chat.modelPicker.isDefault')}
           </span>
         )}
       </div>

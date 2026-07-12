@@ -53,55 +53,47 @@ export function AddServerDialog({ open, onOpenChange }: AddServerDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('mcp.addServer', 'Add MCP Server')}</DialogTitle>
+          <DialogTitle>{t('mcp.addServer')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="mcp-name">{t('mcp.serverName', 'Server Name')}</Label>
+            <Label htmlFor="mcp-name">{t('mcp.serverName')}</Label>
             <Input
               id="mcp-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={t('mcp.serverNamePlaceholder', 'e.g. filesystem')}
+              placeholder={t('mcp.serverNamePlaceholder')}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mcp-command">{t('mcp.command', 'Command')}</Label>
+            <Label htmlFor="mcp-command">{t('mcp.command')}</Label>
             <Input
               id="mcp-command"
               value={command}
               onChange={(e) => setCommand(e.target.value)}
-              placeholder={t(
-                'mcp.commandPlaceholder',
-                'e.g. npx -y @modelcontextprotocol/server-filesystem',
-              )}
+              placeholder={t('mcp.commandPlaceholder')}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mcp-args">{t('mcp.args', 'Arguments')}</Label>
+            <Label htmlFor="mcp-args">{t('mcp.args')}</Label>
             <Input
               id="mcp-args"
               value={args}
               onChange={(e) => setArgs(e.target.value)}
-              placeholder={t(
-                'mcp.argsPlaceholder',
-                'Comma-separated, e.g. /path/to/dir, --verbose',
-              )}
+              placeholder={t('mcp.argsPlaceholder')}
             />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t('common.cancel', 'Cancel')}
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={!name.trim() || !command.trim() || registerServer.isPending}
             >
-              {registerServer.isPending
-                ? t('common.loading', 'Loading...')
-                : t('mcp.register', 'Register')}
+              {registerServer.isPending ? t('common.loading') : t('mcp.register')}
             </Button>
           </DialogFooter>
         </form>

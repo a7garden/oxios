@@ -73,13 +73,13 @@ function sourceBadgeClass(source: string): string {
 function sourceLabel(source: string, t: ReturnType<typeof useTranslation>['t']): string {
   switch (source) {
     case 'env':
-      return t('settings.secretSourceEnv', 'Env Var')
+      return t('settings.secretSourceEnv')
     case 'auth_store':
-      return t('settings.secretSourceStore', 'Auth Store')
+      return t('settings.secretSourceStore')
     case 'config':
-      return t('settings.secretSourceConfig', 'Config')
+      return t('settings.secretSourceConfig')
     default:
-      return t('settings.secretSourceNone', 'Not Set')
+      return t('settings.secretSourceNone')
   }
 }
 export function SecretsSectionCard() {
@@ -101,12 +101,12 @@ export function SecretsSectionCard() {
       }),
     onSuccess: (res) => {
       if (res.valid) {
-        toast.success(res.message ?? t('settings.secretValid', 'Secret is valid'))
+        toast.success(res.message ?? t('settings.secretValid'))
       } else {
-        toast.error(res.message ?? t('settings.secretInvalid', 'Secret is invalid'))
+        toast.error(res.message ?? t('settings.secretInvalid'))
       }
     },
-    onError: () => toast.error(t('settings.secretValidateFailed', 'Failed to validate secret')),
+    onError: () => toast.error(t('settings.secretValidateFailed')),
   })
 
   const saveMutation = useMutation({
@@ -119,18 +119,18 @@ export function SecretsSectionCard() {
         delete next[vars.key]
         return next
       })
-      toast.success(t('settings.secretSaved', 'Secret saved'))
+      toast.success(t('settings.secretSaved'))
     },
-    onError: () => toast.error(t('settings.secretSaveFailed', 'Failed to save secret')),
+    onError: () => toast.error(t('settings.secretSaveFailed')),
   })
 
   const deleteMutation = useMutation({
     mutationFn: (key: string) => api.delete(`/api/secrets/${encodeURIComponent(key)}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['secrets'] })
-      toast.success(t('settings.secretDeleted', 'Secret deleted'))
+      toast.success(t('settings.secretDeleted'))
     },
-    onError: () => toast.error(t('settings.secretDeleteFailed', 'Failed to delete secret')),
+    onError: () => toast.error(t('settings.secretDeleteFailed')),
   })
 
   const toggleVisible = (key: string) => {
@@ -144,8 +144,8 @@ export function SecretsSectionCard() {
 
   return (
     <SectionCard
-      title={t('settings.sectionSecrets', 'Secrets')}
-      description={t('settings.secretsDescription', 'Manage API keys and credentials securely')}
+      title={t('settings.sectionSecrets')}
+      description={t('settings.secretsDescription')}
       icon={<KeyRound className="h-3.5 w-3.5" />}
       sectionId="secrets"
       fieldCount={Object.keys(SECRET_LABELS).length}
@@ -184,12 +184,12 @@ export function SecretsSectionCard() {
                     size="sm"
                     className="h-7 text-xs"
                     onClick={() => {
-                      if (window.confirm(t('settings.secretDeleteConfirm', 'Delete this secret?')))
+                      if (window.confirm(t('settings.secretDeleteConfirm')))
                         deleteMutation.mutate(secret.key)
                     }}
                   >
                     <Trash2 className="h-3 w-3 mr-1" />
-                    {t('common.delete', 'Delete')}
+                    {t('common.delete')}
                   </Button>
                 )}
               </div>
@@ -202,7 +202,7 @@ export function SecretsSectionCard() {
                     onChange={(e) =>
                       setEditValues((prev) => ({ ...prev, [secret.key]: e.target.value }))
                     }
-                    placeholder={t('settings.secretEnterValue', 'Enter value…')}
+                    placeholder={t('settings.secretEnterValue')}
                     className="flex-1"
                   />
                   <Button
@@ -221,7 +221,7 @@ export function SecretsSectionCard() {
                     disabled={!editValues[secret.key] || saveMutation.isPending}
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                    {t('common.save', 'Save')}
+                    {t('common.save')}
                   </Button>
                   {PROVIDER_KEYS.has(secret.key) && (
                     <Button
@@ -236,7 +236,7 @@ export function SecretsSectionCard() {
                       disabled={!editValues[secret.key] || validateMutation.isPending}
                     >
                       <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-                      {t('settings.verify', 'Verify')}
+                      {t('settings.verify')}
                     </Button>
                   )}
                 </div>
@@ -247,9 +247,7 @@ export function SecretsSectionCard() {
                     size="sm"
                     onClick={() => setEditValues((prev) => ({ ...prev, [secret.key]: '' }))}
                   >
-                    {secret.has_value
-                      ? t('settings.secretUpdate', 'Update')
-                      : t('settings.secretSet', 'Set Value')}
+                    {secret.has_value ? t('settings.secretUpdate') : t('settings.secretSet')}
                   </Button>
                 </div>
               )}

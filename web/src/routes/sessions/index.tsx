@@ -45,7 +45,7 @@ function SessionsListPage() {
       ),
     },
     {
-      header: t('sessions.title', 'Title'),
+      header: t('sessions.title'),
       mobilePriority: 'primary',
       accessor: (row: Session) => row.title ?? '—',
     },

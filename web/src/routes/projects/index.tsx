@@ -33,15 +33,13 @@ function ProjectsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('projects.title', 'Projects')}</h1>
-          <p className="text-muted-foreground text-sm">
-            {t('projects.desc', 'Registered work contexts with paths and associated memories')}
-          </p>
+          <h1 className="text-2xl font-bold">{t('projects.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('projects.desc')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setShowCreate(true)} size="sm">
             <Plus className="h-4 w-4 mr-1" />
-            {t('projects.new', 'New Project')}
+            {t('projects.new')}
           </Button>
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
         </div>
@@ -50,7 +48,7 @@ function ProjectsPage() {
       {/* Search */}
       <div className="flex items-center gap-2">
         <Input
-          placeholder={t('projects.search', 'Search by name, description, or tag...')}
+          placeholder={t('projects.search')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
@@ -70,21 +68,13 @@ function ProjectsPage() {
       ) : projects.length === 0 ? (
         <EmptyState
           icon={<Package className="h-10 w-10" />}
-          title={
-            search
-              ? t('projects.noResults', 'No projects found')
-              : t('projects.empty', 'No projects yet')
-          }
-          description={
-            search
-              ? t('projects.noResultsDesc', 'Try a different search term')
-              : t('projects.emptyDesc', 'Create your first project to get started')
-          }
+          title={search ? t('projects.noResults') : t('projects.empty')}
+          description={search ? t('projects.noResultsDesc') : t('projects.emptyDesc')}
           action={
             !search ? (
               <Button onClick={() => setShowCreate(true)}>
                 <Plus className="h-4 w-4 mr-1" />
-                {t('projects.new', 'New Project')}
+                {t('projects.new')}
               </Button>
             ) : undefined
           }

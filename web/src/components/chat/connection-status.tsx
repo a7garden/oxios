@@ -16,7 +16,7 @@ export function ConnectionStatus({ connected, className }: ConnectionStatusProps
           connected ? 'bg-success' : 'bg-warning animate-pulse',
         )}
       />
-      {connected ? t('chat.connected', 'Connected') : t('chat.connecting', 'Connecting...')}
+      {connected ? t('chat.connected') : t('chat.connecting')}
     </span>
   )
 }

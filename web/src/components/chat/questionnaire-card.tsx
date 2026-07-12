@@ -93,7 +93,7 @@ export function QuestionnaireCard({
         <div className="rounded-xl border bg-card shadow-sm">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b">
-            <span className="text-sm font-medium">{t('questionnaire.title', 'Questions')}</span>
+            <span className="text-sm font-medium">{t('questionnaire.title')}</span>
             <span className="text-xs text-muted-foreground">
               {t('questionnaire.count', '{{count}} questions', {
                 count: questions.length,
@@ -121,15 +121,12 @@ export function QuestionnaireCard({
             {/* Free-text area for additional context (always available) */}
             <div>
               <p className="text-xs text-muted-foreground mb-1.5">
-                {t('questionnaire.additionalThoughts', 'Additional thoughts (optional)')}
+                {t('questionnaire.additionalThoughts')}
               </p>
               <Textarea
                 value={freeText}
                 onChange={(e) => setFreeText(e.target.value)}
-                placeholder={t(
-                  'questionnaire.optionalPlaceholder',
-                  'Anything else you want to add...',
-                )}
+                placeholder={t('questionnaire.optionalPlaceholder')}
                 className="min-h-[60px] resize-none text-sm"
                 disabled={disabled}
               />
@@ -139,14 +136,14 @@ export function QuestionnaireCard({
           {/* Submit / Cancel */}
           <div className="flex justify-end gap-2 px-4 py-3 border-t">
             <Button onClick={handleCancel} variant="ghost" size="sm" disabled={disabled}>
-              {t('questionnaire.cancel', 'Cancel')}
+              {t('questionnaire.cancel')}
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={!allChoiceAnswered || disabled}
               size="icon"
               className="h-7 w-7"
-              title={t('questionnaire.submit', 'Submit')}
+              title={t('questionnaire.submit')}
             >
               <ArrowRight className="h-3.5 w-3.5" />
             </Button>

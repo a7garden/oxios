@@ -202,7 +202,7 @@ function CronJobsPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setEditingJob(job)}
-                    aria-label={t('common.edit', '편집')}
+                    aria-label={t('common.edit')}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>

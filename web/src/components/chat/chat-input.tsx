@@ -385,7 +385,7 @@ export function ChatInput({
             <span
               key={`mount-${m.id}`}
               className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs text-primary"
-              title={t('chat.mountBound', 'Bound to this session')}
+              title={t('chat.input.mountBound')}
             >
               <HardDrive className="h-3 w-3" />
               <span className="truncate max-w-[140px]">{m.label}</span>
@@ -393,7 +393,7 @@ export function ChatInput({
                 type="button"
                 onClick={() => onRemoveMount(m.id)}
                 className="ml-0.5 -mr-1 rounded-full p-0.5 hover:bg-primary/20 transition-colors"
-                aria-label={t('chat.removeMount', 'Remove mount')}
+                aria-label={t('chat.input.removeMount')}
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -414,7 +414,7 @@ export function ChatInput({
                 type="button"
                 onClick={() => removeAttachment(ctx.id)}
                 className="ml-0.5 -mr-1 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
-                aria-label={t('chat.removeAttachment', 'Remove attachment')}
+                aria-label={t('chat.input.removeAttachment')}
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -440,10 +440,7 @@ export function ChatInput({
           onCompositionStart={() => setIsComposing(true)}
           onCompositionEnd={() => setIsComposing(false)}
           placeholder={
-            placeholder ??
-            (connected
-              ? t('chat.inputPlaceholder', 'Message Oxios… (@ to add context)')
-              : t('chat.waitingForConnection', 'Waiting for connection...'))
+            placeholder ?? (connected ? t('chat.inputPlaceholder') : t('chat.waitingForConnection'))
           }
           disabled={disabled || !connected}
           rows={1}
@@ -479,11 +476,11 @@ export function ChatInput({
                 variant="destructive"
                 size="sm"
                 className="h-8 rounded-lg px-3 text-xs gap-1.5"
-                aria-label={t('chat.stop', 'Stop')}
-                title={t('chat.stop', 'Stop')}
+                aria-label={t('chat.stop')}
+                title={t('chat.stop')}
               >
                 <Square className="h-3 w-3 fill-current" />
-                {t('chat.stop', 'Stop')}
+                {t('chat.stop')}
               </Button>
             )}
             <Button
@@ -496,8 +493,8 @@ export function ChatInput({
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
                   : 'bg-muted text-muted-foreground',
               )}
-              aria-label={isStreaming ? t('chat.queue', 'Queue') : t('common.sendMessage', 'Send')}
-              title={isStreaming ? t('chat.queue', 'Queue') : t('common.sendMessage', 'Send')}
+              aria-label={isStreaming ? t('chat.queue') : t('common.sendMessage')}
+              title={isStreaming ? t('chat.queue') : t('common.sendMessage')}
             >
               <Send className="h-3.5 w-3.5" />
             </Button>
@@ -507,9 +504,9 @@ export function ChatInput({
 
       {/* ── Hint ── */}
       <div className="mt-1.5 flex items-center justify-center gap-3 text-2xs text-muted-foreground/70 hidden sm:flex">
-        <Hint kbd="Enter" label={t('chat.send', 'send')} />
-        <Hint kbd="Shift+Enter" label={t('chat.newline', 'new line')} />
-        {showNewChatHint && <Hint kbd="⌘⇧N" label={t('chat.newConversation', 'new chat')} />}
+        <Hint kbd="Enter" label={t('chat.send')} />
+        <Hint kbd="Shift+Enter" label={t('chat.input.newline')} />
+        {showNewChatHint && <Hint kbd="⌘⇧N" label={t('chat.newConversation')} />}
       </div>
     </div>
   )

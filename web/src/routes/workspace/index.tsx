@@ -447,7 +447,7 @@ function WorkspacePage() {
               onClick={confirmDelete}
               disabled={deleteFile.isPending}
             >
-              {t('common.delete', '삭제')}
+              {t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

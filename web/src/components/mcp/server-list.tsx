@@ -30,8 +30,8 @@ export function ServerList() {
       <>
         <EmptyState
           icon={<Server className="h-8 w-8" />}
-          title={t('mcp.noServers', 'No MCP servers configured')}
-          description={t('mcp.noServersDescription', 'Add an MCP server to get started.')}
+          title={t('mcp.noServers')}
+          description={t('mcp.noServersDescription')}
           className="py-6"
         />
         <EditMcpServerDialog server={editing} onOpenChange={(o) => !o && setEditing(null)} />

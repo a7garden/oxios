@@ -16,7 +16,7 @@ export function ToolDetail({ tool }: ToolDetailProps) {
       {tool.arguments && tool.arguments.length > 0 && (
         <div>
           <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            {t('mcp.args', 'Arguments')}
+            {t('mcp.args')}
           </h4>
           <div className="space-y-1.5">
             {tool.arguments.map((arg) => (
@@ -35,7 +35,7 @@ export function ToolDetail({ tool }: ToolDetailProps) {
         </div>
       )}
       {(!tool.arguments || tool.arguments.length === 0) && (
-        <p className="text-xs text-muted-foreground">{t('mcp.noArguments', 'No arguments')}</p>
+        <p className="text-xs text-muted-foreground">{t('mcp.noArguments')}</p>
       )}
     </div>
   )

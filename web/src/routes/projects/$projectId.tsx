@@ -33,7 +33,7 @@ function ProjectPathsCard({ project }: { project: Project }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{t('projects.paths', 'Paths')}</CardTitle>
+        <CardTitle className="text-base">{t('projects.paths')}</CardTitle>
       </CardHeader>
       <CardContent>
         {project.paths && project.paths.length > 0 ? (
@@ -48,9 +48,7 @@ function ProjectPathsCard({ project }: { project: Project }) {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            {t('projects.noPaths', 'No paths — this is a non-code project')}
-          </p>
+          <p className="text-sm text-muted-foreground">{t('projects.noPaths')}</p>
         )}
       </CardContent>
     </Card>
@@ -62,18 +60,18 @@ function ProjectDetailsCard({ project }: { project: Project }) {
   const sourceColor = SOURCE_COLORS[project.source ?? 'manual'] ?? SOURCE_COLORS.manual
 
   const details = [
-    { label: t('projects.source', 'Source'), value: project.source ?? 'manual' },
+    { label: t('projects.source'), value: project.source ?? 'manual' },
     {
-      label: t('projects.memoryVisible', 'Memory Visible'),
+      label: t('projects.memoryVisible'),
       value: project.memory_visible ? 'Yes' : 'No',
     },
-    { label: t('projects.createdAt', 'Created'), value: formatDate(project.created_at) },
+    { label: t('projects.createdAt'), value: formatDate(project.created_at) },
     {
-      label: t('projects.updatedAt', 'Updated'),
+      label: t('projects.updatedAt'),
       value: formatDate(project.updated_at ?? project.created_at),
     },
     {
-      label: t('projects.lastActive', 'Last Active'),
+      label: t('projects.lastActive'),
       value: formatRelativeTime(
         project.last_active_at ?? project.updated_at ?? project.created_at,
         t,
@@ -84,16 +82,14 @@ function ProjectDetailsCard({ project }: { project: Project }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{t('projects.details', 'Details')}</CardTitle>
+        <CardTitle className="text-base">{t('projects.details')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
           {/* Description */}
           {project.description && (
             <div>
-              <p className="text-xs text-muted-foreground mb-1">
-                {t('projects.description', 'Description')}
-              </p>
+              <p className="text-xs text-muted-foreground mb-1">{t('projects.description')}</p>
               <p className="text-sm">{project.description}</p>
             </div>
           )}
@@ -101,7 +97,7 @@ function ProjectDetailsCard({ project }: { project: Project }) {
           {/* Tags */}
           {project.tags && project.tags.length > 0 && (
             <div>
-              <p className="text-xs text-muted-foreground mb-1">{t('projects.tags', 'Tags')}</p>
+              <p className="text-xs text-muted-foreground mb-1">{t('projects.tags')}</p>
               <div className="flex flex-wrap gap-1">
                 {project.tags.map((tag) => (
                   <Badge key={tag} variant="secondary" className="text-xs">
@@ -145,7 +141,7 @@ function ProjectMemoriesCard({ project }: { project: Project }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          {t('projects.memories', 'Memories')}
+          {t('projects.memories')}
           {memories.length > 0 && (
             <Badge variant="secondary" className="text-xs">
               {memories.length}
@@ -161,9 +157,7 @@ function ProjectMemoriesCard({ project }: { project: Project }) {
             ))}
           </div>
         ) : memories.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {t('projects.noMemories', 'No memories linked to this project')}
-          </p>
+          <p className="text-sm text-muted-foreground">{t('projects.noMemories')}</p>
         ) : (
           <div className="space-y-2">
             {memories.map((mem: any) => (
@@ -187,12 +181,10 @@ function ProjectActivityCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{t('projects.activity', 'Activity')}</CardTitle>
+        <CardTitle className="text-base">{t('projects.activity')}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">
-          {t('projects.activityDesc', 'Session history and memory changes — coming in Phase 3')}
-        </p>
+        <p className="text-sm text-muted-foreground">{t('projects.activityDesc')}</p>
       </CardContent>
     </Card>
   )
@@ -210,8 +202,7 @@ function ProjectDetailPage() {
 
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
-  if (!project)
-    return <p className="text-muted-foreground">{t('projects.notFound', 'Project not found')}</p>
+  if (!project) return <p className="text-muted-foreground">{t('projects.notFound')}</p>
 
   return (
     <div className="space-y-4">
@@ -221,7 +212,7 @@ function ProjectDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => navigate({ to: '/projects' })}
-          aria-label={t('common.back', 'Back')}
+          aria-label={t('common.back')}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -232,11 +223,11 @@ function ProjectDetailPage() {
         <div className="flex items-center gap-1 shrink-0">
           <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
             <Edit className="h-3 w-3 mr-1" />
-            {t('common.edit', 'Edit')}
+            {t('common.edit')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowDelete(true)}>
             <Trash2 className="h-3 w-3 mr-1" />
-            {t('common.delete', 'Delete')}
+            {t('common.delete')}
           </Button>
         </div>
       </div>
@@ -249,10 +240,10 @@ function ProjectDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="details" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="details">{t('projects.tabs.details', 'Details')}</TabsTrigger>
-          <TabsTrigger value="paths">{t('projects.tabs.paths', 'Paths')}</TabsTrigger>
-          <TabsTrigger value="memories">{t('projects.tabs.memories', 'Memories')}</TabsTrigger>
-          <TabsTrigger value="activity">{t('projects.tabs.activity', 'Activity')}</TabsTrigger>
+          <TabsTrigger value="details">{t('projects.tabs.details')}</TabsTrigger>
+          <TabsTrigger value="paths">{t('projects.tabs.paths')}</TabsTrigger>
+          <TabsTrigger value="memories">{t('projects.tabs.memories')}</TabsTrigger>
+          <TabsTrigger value="activity">{t('projects.tabs.activity')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details">

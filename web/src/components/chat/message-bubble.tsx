@@ -43,7 +43,7 @@ export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: M
   const relTime = (() => {
     if (!message.timestamp) return ''
     const d = new Date(message.timestamp)
-    if (Date.now() - d.getTime() < 60000) return t('common.justNow', 'just now')
+    if (Date.now() - d.getTime() < 60000) return t('common.justNow')
     const hm = d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
     if (d.toDateString() === new Date().toDateString()) return hm
     return `${d.toLocaleDateString(i18n.language, { month: 'numeric', day: 'numeric' })} ${hm}`
@@ -108,7 +108,7 @@ export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: M
           <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <ClipboardList className="h-3 w-3" />
             <span>
-              {t('chat.interviewTitle', 'Interview')}
+              {t('chat.interviewTitle')}
               {message._interviewRound ? ` R${message._interviewRound}` : ''}
             </span>
           </div>
@@ -135,12 +135,12 @@ export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: M
           <div className="min-w-0 flex-1">
             <p className="font-medium text-error">
               {message.metadata.errorKind === 'quota_exceeded'
-                ? t('chat.error.quotaExceeded', '선택한 프로바이더에 토큰이 남아있지 않습니다.')
+                ? t('chat.error.quotaExceeded')
                 : message.metadata.errorKind === 'auth'
-                  ? t('chat.error.authFailed', '프로바이더 인증에 실패했습니다.')
+                  ? t('chat.error.authFailed')
                   : message.metadata.errorKind === 'routing'
-                    ? t('chat.error.noRoute', '라우팅 가능한 프로바이더가 없습니다.')
-                    : t('chat.error.generateFailed', '응답을 생성하지 못했습니다.')}
+                    ? t('chat.error.noRoute')
+                    : t('chat.error.generateFailed')}
             </p>
             {message.content && (
               <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
@@ -154,7 +154,7 @@ export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: M
                 className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-error/30 bg-background px-2.5 py-1 text-xs font-medium text-error transition-colors hover:bg-error/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <RefreshCw className="h-3 w-3" />
-                {t('chat.retry', '다시 시도')}
+                {t('chat.retry')}
               </button>
             )}
           </div>

@@ -57,10 +57,10 @@ export function EditMountDialog({ mount, onOpenChange }: EditMountDialogProps) {
 
     try {
       await updateMount.mutateAsync({ id: mount.id, name: trimmedName, paths: [trimmedPath] })
-      toast.success(t('mounts.saved', '마운트가 저장되었습니다'))
+      toast.success(t('mounts.saved'))
       close()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('mounts.saveFailed', '저장 실패'))
+      toast.error(err instanceof Error ? err.message : t('mounts.saveFailed'))
     }
   }
 
@@ -70,15 +70,13 @@ export function EditMountDialog({ mount, onOpenChange }: EditMountDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-5 w-5" />
-            {t('mounts.edit', 'Mount 편집')}
+            {t('mounts.edit')}
           </DialogTitle>
-          <DialogDescription>
-            {t('mounts.editDescription', '마운트의 이름과 경로를 변경합니다.')}
-          </DialogDescription>
+          <DialogDescription>{t('mounts.editDescription')}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="mount-name-edit">{t('mounts.name', '이름')}</Label>
+            <Label htmlFor="mount-name-edit">{t('mounts.name')}</Label>
             <Input
               id="mount-name-edit"
               value={name}
@@ -87,7 +85,7 @@ export function EditMountDialog({ mount, onOpenChange }: EditMountDialogProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mount-path-edit">{t('mounts.path', '경로')}</Label>
+            <Label htmlFor="mount-path-edit">{t('mounts.path')}</Label>
             <Input
               id="mount-path-edit"
               value={path}
@@ -95,16 +93,14 @@ export function EditMountDialog({ mount, onOpenChange }: EditMountDialogProps) {
               className="font-mono text-sm"
               placeholder="/path/to/project"
             />
-            <p className="text-xs text-muted-foreground">
-              {t('mounts.pathEditHint', '경로를 바꾸면 자동 설명과 기술 스택이 다시 채워집니다.')}
-            </p>
+            <p className="text-xs text-muted-foreground">{t('mounts.pathEditHint')}</p>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close}>
-              {t('common.cancel', '취소')}
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={!name.trim() || !path.trim() || updateMount.isPending}>
-              {updateMount.isPending ? t('common.saving', '저장 중...') : t('common.save', '저장')}
+              {updateMount.isPending ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </form>

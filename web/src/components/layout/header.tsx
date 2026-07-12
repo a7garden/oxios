@@ -19,7 +19,7 @@ export function Header() {
         type="button"
         className="shrink-0 rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring lg:hidden"
         onClick={() => setMobileOpen(true)}
-        aria-label={t('common.openNav', 'Open navigation menu')}
+        aria-label={t('common.openNav')}
       >
         <Menu className="h-5 w-5" />
       </button>

@@ -60,11 +60,8 @@ export function NotificationSectionCard() {
 
   return (
     <SectionCard
-      title={t('settings.sectionNotifications', 'Notifications')}
-      description={t(
-        'settings.notificationsDescription',
-        'Desktop notifications and sound preferences',
-      )}
+      title={t('settings.sectionNotifications')}
+      description={t('settings.notificationsDescription')}
       icon={<Bell className="h-3.5 w-3.5" />}
       sectionId="notifications"
       fieldCount={PREF_TOGGLES.length + 1}
@@ -102,12 +99,8 @@ export function NotificationSectionCard() {
       <div className="mt-4 border-t pt-4">
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">
-            <label className="text-sm font-medium leading-none">
-              {t('settings.timeFormat', 'Time Format')}
-            </label>
-            <p className="text-xs text-muted-foreground">
-              {t('settings.timeFormatDesc', '12-hour or 24-hour clock display')}
-            </p>
+            <label className="text-sm font-medium leading-none">{t('settings.timeFormat')}</label>
+            <p className="text-xs text-muted-foreground">{t('settings.timeFormatDesc')}</p>
           </div>
           <div className="flex shrink-0 rounded-lg bg-muted p-0.5">
             {(['12h', '24h'] as TimeFormat[]).map((fmt) => (
@@ -121,9 +114,7 @@ export function NotificationSectionCard() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {fmt === '12h'
-                  ? t('settings.format12h', '12-hour')
-                  : t('settings.format24h', '24-hour')}
+                {fmt === '12h' ? t('settings.format12h') : t('settings.format24h')}
               </button>
             ))}
           </div>

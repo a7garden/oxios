@@ -63,26 +63,17 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
       if (!trimmed) continue
       const eq = trimmed.indexOf('=')
       if (eq <= 0) {
-        toast.error(
-          t('mcp.envParseError', '환경변수 형식이 잘못되었습니다. KEY=VALUE 형식이어야 합니다.'),
-        )
+        toast.error(t('mcp.envParseError'))
         return
       }
       const key = trimmed.slice(0, eq).trim()
       const value = trimmed.slice(eq + 1).trim()
       if (!key) {
-        toast.error(
-          t('mcp.envParseError', '환경변수 형식이 잘못되었습니다. KEY=VALUE 형식이어야 합니다.'),
-        )
+        toast.error(t('mcp.envParseError'))
         return
       }
       if (value === '') {
-        toast.error(
-          t(
-            'mcp.envEmptyValue',
-            '환경변수 값이 비어있습니다. 값을 지정하거나 해당 줄을 삭제하세요.',
-          ),
-        )
+        toast.error(t('mcp.envEmptyValue'))
         return
       }
       parsedEnv[key] = value
@@ -97,11 +88,11 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
       { name: server.name, body },
       {
         onSuccess: () => {
-          toast.success(t('mcp.updated', 'MCP 서버가 업데이트되었습니다'))
+          toast.success(t('mcp.updated'))
           close()
         },
         onError: (err) => {
-          toast.error(err instanceof Error ? err.message : t('mcp.updateFailed', '업데이트 실패'))
+          toast.error(err instanceof Error ? err.message : t('mcp.updateFailed'))
         },
       },
     )
@@ -113,28 +104,18 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-5 w-5" />
-            {t('mcp.edit', 'MCP 서버 편집')}
+            {t('mcp.edit')}
           </DialogTitle>
-          <DialogDescription>
-            {t(
-              'mcp.editDescription',
-              '서버의 명령, 인자, 환경변수를 변경합니다. 저장 시 재시작됩니다.',
-            )}
-          </DialogDescription>
+          <DialogDescription>{t('mcp.editDescription')}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>{t('mcp.name', '이름')}</Label>
+            <Label>{t('mcp.name')}</Label>
             <Input value={server?.name ?? ''} disabled className="font-mono" />
-            <p className="text-xs text-muted-foreground">
-              {t(
-                'mcp.nameImmutable',
-                '이름은 변경할 수 없습니다. 변경하려면 삭제 후 새로 등록하세요.',
-              )}
-            </p>
+            <p className="text-xs text-muted-foreground">{t('mcp.nameImmutable')}</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mcp-edit-command">{t('mcp.command', '명령')}</Label>
+            <Label htmlFor="mcp-edit-command">{t('mcp.command')}</Label>
             <Input
               id="mcp-edit-command"
               value={command}
@@ -144,7 +125,7 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mcp-edit-args">{t('mcp.args', '인자 (콤마 구분)')}</Label>
+            <Label htmlFor="mcp-edit-args">{t('mcp.args')}</Label>
             <Input
               id="mcp-edit-args"
               value={args}
@@ -154,9 +135,7 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mcp-edit-env">
-              {t('mcp.env', '환경변수 (KEY=VALUE, 줄바꿈 구분)')}
-            </Label>
+            <Label htmlFor="mcp-edit-env">{t('mcp.env')}</Label>
             <textarea
               id="mcp-edit-env"
               value={envText}
@@ -173,14 +152,14 @@ export function EditMcpServerDialog({ server, onOpenChange }: EditMcpServerDialo
               onChange={(e) => setEnabled(e.target.checked)}
               className="h-4 w-4 rounded border-input"
             />
-            {t('common.enabled', '활성화')}
+            {t('common.enabled')}
           </label>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close}>
-              {t('common.cancel', '취소')}
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={!command.trim() || updateServer.isPending}>
-              {updateServer.isPending ? t('common.saving', '저장 중...') : t('common.save', '저장')}
+              {updateServer.isPending ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </form>

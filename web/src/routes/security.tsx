@@ -170,7 +170,7 @@ function SecurityPage() {
                     setAuditQuery(e.target.value)
                     setAuditPage(1)
                   }}
-                  placeholder={t('security.searchAudit', 'Search audit trail…')}
+                  placeholder={t('security.searchAudit')}
                   className="pl-7 h-8 w-56"
                 />
               </div>
@@ -184,7 +184,7 @@ function SecurityPage() {
                 className="gap-1.5"
               >
                 <Filter className="h-3.5 w-3.5" />
-                {t('security.onlyDenied', 'Only denied')}
+                {t('security.onlyDenied')}
               </Button>
             </div>
           </div>
@@ -195,7 +195,7 @@ function SecurityPage() {
               icon={<Shield className="h-8 w-8" />}
               title={
                 q || auditOnlyDenied
-                  ? t('security.noMatchingEntries', 'No entries match the filter')
+                  ? t('security.noMatchingEntries')
                   : t('security.noAuditEntries')
               }
               description={t('security.noAuditEntriesDescription')}

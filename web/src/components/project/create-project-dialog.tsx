@@ -125,18 +125,13 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               { id: created.id, mount_ids: toAttach },
               {
                 onSuccess: () => {
-                  toast(t('projects.createSuccess', 'Project created'))
+                  toast(t('projects.createSuccess'))
                   reset()
                   onOpenChange(false)
                 },
-                onError: (err) => {
+                onError: () => {
                   // Project was created; surface the attach failure but still close.
-                  toast.error(
-                    t(
-                      'projects.attachMountsError',
-                      `Project created, but attaching mounts failed: ${err}`,
-                    ),
-                  )
+                  toast.error(t('projects.attachMountsError'))
                   reset()
                   onOpenChange(false)
                 },
@@ -144,12 +139,12 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             )
             return
           }
-          toast(t('projects.createSuccess', 'Project created'))
+          toast(t('projects.createSuccess'))
           reset()
           onOpenChange(false)
         },
-        onError: (err) => {
-          toast.error(t('projects.createError', `Failed to create project: ${err}`))
+        onError: () => {
+          toast.error(t('projects.createError'))
         },
       },
     )
@@ -159,16 +154,14 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('projects.createTitle', 'New Project')}</DialogTitle>
-          <DialogDescription>
-            {t('projects.createDesc', 'Register a new work context.')}
-          </DialogDescription>
+          <DialogTitle>{t('projects.createTitle')}</DialogTitle>
+          <DialogDescription>{t('projects.createDesc')}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {/* Name */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.name', 'Name')}</label>
+            <label className="text-sm font-medium">{t('projects.name')}</label>
             <Input
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
@@ -179,7 +172,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
           {/* Emoji (icon picker) */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.icon', 'Icon')}</label>
+            <label className="text-sm font-medium">{t('projects.icon')}</label>
             <div className="flex flex-wrap gap-1">
               {ICON_OPTIONS.map((opt) => (
                 <button
@@ -200,23 +193,18 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
           {/* Instructions */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">
-              {t('projects.instructions', 'Instructions')}
-            </label>
+            <label className="text-sm font-medium">{t('projects.instructions')}</label>
             <Textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               rows={3}
-              placeholder={t(
-                'projects.instructionsPlaceholder',
-                '이 Project에서 항상 지켜야 할 규칙. 시스템 프롬프트에 주입됩니다.',
-              )}
+              placeholder={t('projects.instructionsPlaceholder')}
             />
           </div>
 
           {/* RFC-025: Mount references — click-toggle chips */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.mounts', 'Mounts')}</label>
+            <label className="text-sm font-medium">{t('projects.mounts')}</label>
             {availableMounts.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {availableMounts.map((m) => {
@@ -245,16 +233,14 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               </div>
             ) : (
               <div className="rounded-md border border-dashed p-3 text-center">
-                <p className="text-xs text-muted-foreground mb-2">
-                  {t('projects.noMountsYet', '마운트가 없습니다. 마운트를 먼저 만들어주세요.')}
-                </p>
+                <p className="text-xs text-muted-foreground mb-2">{t('projects.noMountsYet')}</p>
                 <Link
                   to="/mounts"
                   onClick={() => onOpenChange(false)}
                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                 >
                   <FolderOpen className="h-3 w-3" />
-                  {t('mounts.create', 'Mount 만들기')}
+                  {t('mounts.create')}
                 </Link>
               </div>
             )}
@@ -263,10 +249,10 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('common.cancel', 'Cancel')}
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={!name.trim() || create.isPending}>
-            {create.isPending ? '...' : t('projects.create', 'Create')}
+            {create.isPending ? '...' : t('projects.create')}
           </Button>
         </DialogFooter>
       </DialogContent>

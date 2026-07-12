@@ -34,9 +34,7 @@ function ProjectSelector({
           {currentProject.emoji ?? '📦'} <span className="font-medium">{currentProject.name}</span>
         </span>
       ) : (
-        <span className="text-xs text-muted-foreground">
-          {t('sessions.noProject', '— No project')}
-        </span>
+        <span className="text-xs text-muted-foreground">{t('sessions.noProject')}</span>
       )}
     </div>
   )
@@ -117,7 +115,7 @@ function SessionDetailPage() {
             <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
               <span className="text-sm text-muted-foreground flex items-center gap-1">
                 <FolderKanban className="h-3 w-3" />
-                {t('sessions.project', 'Project')}
+                {t('sessions.project')}
               </span>
               <ProjectSelector currentProjectId={(session as any).project_id ?? null} />
             </div>

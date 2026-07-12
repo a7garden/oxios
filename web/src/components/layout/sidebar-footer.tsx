@@ -40,11 +40,7 @@ export function SidebarFooter({ collapsed }: { collapsed: boolean }) {
     )
 
   const themeLabel =
-    theme === 'dark'
-      ? t('common.dark', 'Dark')
-      : theme === 'light'
-        ? t('common.light', 'Light')
-        : t('common.system', 'System')
+    theme === 'dark' ? t('common.dark') : theme === 'light' ? t('common.light') : t('common.system')
 
   const langLabel = i18n.language === 'ko' ? '한국어' : 'English'
 

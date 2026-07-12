@@ -37,12 +37,12 @@ export function CreateMountDialog({ open, onOpenChange }: CreateMountDialogProps
 
     try {
       await createMount.mutateAsync({ name: name.trim(), paths: [path.trim()] })
-      toast.success(t('mounts.created', 'Mount가 생성되었습니다'))
+      toast.success(t('mounts.created'))
       setName('')
       setPath('')
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('mounts.createFailed', '생성 실패'))
+      toast.error(err instanceof Error ? err.message : t('mounts.createFailed'))
     }
   }
 
@@ -52,18 +52,13 @@ export function CreateMountDialog({ open, onOpenChange }: CreateMountDialogProps
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderPlus className="h-5 w-5" />
-            {t('mounts.create', 'Mount 만들기')}
+            {t('mounts.create')}
           </DialogTitle>
-          <DialogDescription>
-            {t(
-              'mounts.createDescription',
-              '경로에 이름을 붙입니다. 설명과 기술 스택은 에이전트가 자동으로 채웁니다.',
-            )}
-          </DialogDescription>
+          <DialogDescription>{t('mounts.createDescription')}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="mount-name">{t('mounts.name', '이름')}</Label>
+            <Label htmlFor="mount-name">{t('mounts.name')}</Label>
             <Input
               id="mount-name"
               value={name}
@@ -73,7 +68,7 @@ export function CreateMountDialog({ open, onOpenChange }: CreateMountDialogProps
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mount-path">{t('mounts.path', '경로')}</Label>
+            <Label htmlFor="mount-path">{t('mounts.path')}</Label>
             <Input
               id="mount-path"
               value={path}
@@ -83,12 +78,10 @@ export function CreateMountDialog({ open, onOpenChange }: CreateMountDialogProps
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t('common.cancel', '취소')}
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={!name.trim() || !path.trim() || createMount.isPending}>
-              {createMount.isPending
-                ? t('common.creating', '생성 중...')
-                : t('mounts.create', 'Mount 만들기')}
+              {createMount.isPending ? t('common.creating') : t('mounts.create')}
             </Button>
           </DialogFooter>
         </form>

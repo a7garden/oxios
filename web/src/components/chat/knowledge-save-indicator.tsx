@@ -29,9 +29,7 @@ export function KnowledgeSaveIndicator({ sessionId, messageIndex }: KnowledgeSav
     if (confirmDelete) {
       return (
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-2xs text-muted-foreground">
-            {t('chat.knowledgeDeleteConfirm', '이 노트를 삭제하시겠습니까?')}
-          </span>
+          <span className="text-2xs text-muted-foreground">{t('chat.knowledgeDeleteConfirm')}</span>
           <button
             type="button"
             className="text-2xs text-destructive hover:underline"
@@ -41,14 +39,14 @@ export function KnowledgeSaveIndicator({ sessionId, messageIndex }: KnowledgeSav
             }}
             disabled={removeMutation.isPending}
           >
-            {t('common.delete', '삭제')}
+            {t('common.delete')}
           </button>
           <button
             type="button"
             className="text-2xs text-muted-foreground hover:underline"
             onClick={() => setConfirmDelete(false)}
           >
-            {t('common.cancel', '취소')}
+            {t('common.cancel')}
           </button>
         </div>
       )
@@ -62,11 +60,11 @@ export function KnowledgeSaveIndicator({ sessionId, messageIndex }: KnowledgeSav
           'hover:text-foreground transition-colors cursor-pointer',
         )}
         onClick={() => setConfirmDelete(true)}
-        title={t('chat.knowledgeClickToDelete', '클릭하여 삭제')}
+        title={t('chat.knowledgeClickToDelete')}
       >
         <FileText className="h-3 w-3" />
         <span>
-          {t('chat.knowledgeSaved', '저장됨')} · {save.knowledge_path}
+          {t('chat.knowledgeSaved')} · {save.knowledge_path}
         </span>
       </button>
     )
@@ -84,7 +82,7 @@ export function KnowledgeSaveIndicator({ sessionId, messageIndex }: KnowledgeSav
       disabled={saveMutation.isPending}
     >
       <Save className="h-3 w-3" />
-      <span>{t('chat.knowledgeSave', '지식에 저장')}</span>
+      <span>{t('chat.knowledgeSave')}</span>
     </button>
   )
 }

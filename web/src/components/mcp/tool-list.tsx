@@ -37,11 +37,8 @@ export function ToolList() {
     return (
       <EmptyState
         icon={<Wrench className="h-8 w-8" />}
-        title={t('mcp.noTools', 'No MCP tools available')}
-        description={t(
-          'mcp.noToolsDescription',
-          'Register and enable an MCP server to see its tools.',
-        )}
+        title={t('mcp.noTools')}
+        description={t('mcp.noToolsDescription')}
         className="py-6"
       />
     )
@@ -52,11 +49,11 @@ export function ToolList() {
       <Input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder={`${t('common.search', 'Search')}...`}
+        placeholder={`${t('common.search')}...`}
         className="max-w-sm"
       />
       {Object.entries(grouped).length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">{t('common.noData', 'No data')}</p>
+        <p className="text-sm text-muted-foreground py-4">{t('common.noData')}</p>
       ) : (
         Object.entries(grouped).map(([server, serverTools]) => (
           <div key={server} className="space-y-1">

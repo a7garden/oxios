@@ -153,7 +153,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg border bg-background p-2">
                   <div className="text-2xs uppercase tracking-wide text-muted-foreground">
-                    {t('agents.cost', 'Cost')}
+                    {t('agents.cost')}
                   </div>
                   <div className="font-mono text-sm font-medium">
                     ${node.lifecycle.cost_usd.toFixed(node.lifecycle.cost_usd < 0.01 ? 4 : 2)}
@@ -161,7 +161,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                 </div>
                 <div className="rounded-lg border bg-background p-2">
                   <div className="text-2xs uppercase tracking-wide text-muted-foreground">
-                    {t('agents.tokens', 'Tokens')}
+                    {t('agents.tokens')}
                   </div>
                   <div className="font-mono text-sm font-medium">
                     {node.lifecycle.tokens_used.toLocaleString()}
@@ -169,7 +169,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                 </div>
                 <div className="rounded-lg border bg-background p-2">
                   <div className="text-2xs uppercase tracking-wide text-muted-foreground">
-                    {t('agents.duration', 'Duration')}
+                    {t('agents.duration')}
                   </div>
                   <div className="font-mono text-sm font-medium">
                     {isRunning && node.lifecycle.duration_secs == null
@@ -185,7 +185,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                   <AgentBudgetBar agent={detail} />
                   {node.lifecycle.model_id && (
                     <div className="mt-1 text-2xs text-muted-foreground">
-                      <span className="font-medium">{t('agents.model', 'Model')}:</span>{' '}
+                      <span className="font-medium">{t('agents.model')}:</span>{' '}
                       <span className="font-mono">{node.lifecycle.model_id}</span>
                     </div>
                   )}
@@ -197,7 +197,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                 <div className="mt-3 rounded-lg border border-destructive/50 bg-destructive/5 p-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-destructive">
                     <Skull className="h-4 w-4" />
-                    {t('agents.error', 'Error')}
+                    {t('agents.error')}
                   </div>
                   <p className="mt-1 break-words text-xs text-destructive/80">
                     {node.lifecycle.error}
@@ -211,7 +211,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                   {node.a2a.capabilities.length > 0 && (
                     <div>
                       <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t('agentMonitor.capabilities', 'Capabilities')}
+                        {t('agentMonitor.capabilities')}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {node.a2a.capabilities.map((c) => (
@@ -228,7 +228,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                   {node.a2a.skills.length > 0 && (
                     <div>
                       <div className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t('agentMonitor.skills', 'Skills')}
+                        {t('agentMonitor.skills')}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {node.a2a.skills.map((s) => (
@@ -248,10 +248,10 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
               {/* Tabs: Trace | Logs | Messages */}
               <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mt-4">
                 <TabsList className="w-full">
-                  <TabsTrigger value="trace">{t('agents.trace', 'Trace')}</TabsTrigger>
-                  <TabsTrigger value="logs">{t('agents.logs', 'Logs')}</TabsTrigger>
+                  <TabsTrigger value="trace">{t('agents.trace')}</TabsTrigger>
+                  <TabsTrigger value="logs">{t('agents.logs')}</TabsTrigger>
                   <TabsTrigger value="messages">
-                    {t('agentMonitor.messages', 'Messages')}
+                    {t('agentMonitor.messages')}
                     {agentMessages.length > 0 && (
                       <Badge variant="secondary" className="ml-1 text-2xs">
                         {agentMessages.length}
@@ -271,7 +271,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                 <TabsContent value="messages" className="mt-3">
                   {agentMessages.length === 0 ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">
-                      {t('agentMonitor.noMessages', 'No A2A messages for this agent')}
+                      {t('agentMonitor.noMessages')}
                     </p>
                   ) : (
                     <div className="space-y-1.5">
@@ -311,7 +311,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                 }
               >
                 <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                {t('agentMonitor.viewFullDetail', 'Full Detail')}
+                {t('agentMonitor.viewFullDetail')}
               </Button>
               {isRunning && (
                 <Button
@@ -321,7 +321,7 @@ export function DetailPanel({ node, onClose }: DetailPanelProps) {
                   disabled={killMutation.isPending}
                 >
                   <Skull className="mr-1.5 h-3.5 w-3.5" />
-                  {t('agents.kill', 'Kill')}
+                  {t('agents.kill')}
                 </Button>
               )}
             </footer>

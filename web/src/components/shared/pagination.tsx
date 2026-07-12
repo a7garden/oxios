@@ -61,7 +61,7 @@ export function Pagination({
           />
         )}
         <span>
-          {t('dataTable.showing', 'Showing')} {start}–{end} {t('dataTable.of', 'of')} {total}
+          {t('dataTable.showing')} {start}–{end} {t('dataTable.of')} {total}
         </span>
       </div>
 
@@ -72,7 +72,7 @@ export function Pagination({
           className="h-8 w-8"
           onClick={() => go(1)}
           disabled={page <= 1}
-          aria-label={t('common.firstPage', 'First page')}
+          aria-label={t('common.firstPage')}
         >
           <ChevronsLeft className="h-4 w-4" />
         </Button>
@@ -82,7 +82,7 @@ export function Pagination({
           className="h-8 w-8"
           onClick={() => go(page - 1)}
           disabled={page <= 1}
-          aria-label={t('common.previousPage', 'Previous page')}
+          aria-label={t('common.previousPage')}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -111,7 +111,7 @@ export function Pagination({
           className="h-8 w-8"
           onClick={() => go(page + 1)}
           disabled={page >= totalPages}
-          aria-label={t('common.nextPage', 'Next page')}
+          aria-label={t('common.nextPage')}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -121,7 +121,7 @@ export function Pagination({
           className="h-8 w-8"
           onClick={() => go(totalPages)}
           disabled={page >= totalPages}
-          aria-label={t('common.lastPage', 'Last page')}
+          aria-label={t('common.lastPage')}
         >
           <ChevronsRight className="h-4 w-4" />
         </Button>

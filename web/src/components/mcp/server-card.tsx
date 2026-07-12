@@ -34,10 +34,10 @@ export function ServerCard({
       : 'bg-error'
 
   const statusText = !server.enabled
-    ? t('common.disabled', 'Disabled')
+    ? t('common.disabled')
     : server.initialized
-      ? t('mcp.connected', 'Connected')
-      : t('mcp.disconnected', 'Disconnected')
+      ? t('mcp.connected')
+      : t('mcp.disconnected')
 
   return (
     <div className="flex items-center gap-4 rounded-lg border p-4">
@@ -64,7 +64,7 @@ export function ServerCard({
           className="h-10 w-10"
           onClick={onRefresh}
           disabled={isRefreshing || !server.enabled}
-          title={t('mcp.refresh', 'Refresh')}
+          title={t('mcp.refresh')}
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
         </Button>
@@ -73,7 +73,7 @@ export function ServerCard({
           size="icon"
           className="h-10 w-10"
           onClick={onEdit}
-          title={t('mcp.edit', 'Edit')}
+          title={t('mcp.edit')}
         >
           <Pencil className="h-4 w-4" />
         </Button>
@@ -83,7 +83,7 @@ export function ServerCard({
           className="h-10 w-10"
           onClick={onToggle}
           disabled={isToggling}
-          title={server.enabled ? t('mcp.disable', 'Disable') : t('mcp.enable', 'Enable')}
+          title={server.enabled ? t('mcp.disable') : t('mcp.enable')}
         >
           <Power className="h-4 w-4" />
         </Button>
@@ -93,7 +93,7 @@ export function ServerCard({
           className="h-10 w-10 text-destructive hover:text-destructive"
           onClick={onDelete}
           disabled={isDeleting}
-          title={t('mcp.remove', 'Remove')}
+          title={t('mcp.remove')}
         >
           <Trash2 className="h-4 w-4" />
         </Button>

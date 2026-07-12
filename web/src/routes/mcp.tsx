@@ -28,14 +28,12 @@ function McpPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('mcp.title', 'MCP Servers')}</h1>
-          <p className="text-muted-foreground">
-            {t('mcp.subtitle', 'Manage Model Context Protocol servers and tools')}
-          </p>
+          <h1 className="text-2xl font-bold">{t('mcp.title')}</h1>
+          <p className="text-muted-foreground">{t('mcp.subtitle')}</p>
         </div>
         {tab === 'servers' && (
           <Button onClick={() => setAddDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> {t('mcp.addServer', 'Add Server')}
+            <Plus className="h-4 w-4 mr-1" /> {t('mcp.addServer')}
           </Button>
         )}
       </div>
@@ -51,13 +49,13 @@ function McpPage() {
       >
         <TabsList>
           <TabsTrigger value="servers" className="flex items-center gap-1.5">
-            <Server className="h-4 w-4" /> {t('mcp.servers', 'Servers')}
+            <Server className="h-4 w-4" /> {t('mcp.servers')}
           </TabsTrigger>
           <TabsTrigger value="tools" className="flex items-center gap-1.5">
-            <Wrench className="h-4 w-4" /> {t('mcp.tools', 'Tools')}
+            <Wrench className="h-4 w-4" /> {t('mcp.tools')}
           </TabsTrigger>
           <TabsTrigger value="test" className="flex items-center gap-1.5">
-            <Terminal className="h-4 w-4" /> {t('mcp.test', 'Test')}
+            <Terminal className="h-4 w-4" /> {t('mcp.test')}
           </TabsTrigger>
         </TabsList>
 

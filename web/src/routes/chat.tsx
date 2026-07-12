@@ -158,7 +158,7 @@ function ChatPage() {
         {!connected && (
           <div className="flex items-center gap-2 px-4 py-2 bg-warning/10 text-warning text-xs border-b">
             <span className="h-2 w-2 rounded-full bg-warning animate-pulse shrink-0" />
-            <span className="flex-1">{t('chat.reconnecting', 'Reconnecting...')}</span>
+            <span className="flex-1">{t('chat.reconnecting')}</span>
             <Button
               size="sm"
               variant="ghost"
@@ -169,7 +169,7 @@ function ChatPage() {
               }}
             >
               <RefreshCw className="h-3 w-3 mr-1" />
-              {t('chat.retry', 'Retry')}
+              {t('chat.retry')}
             </Button>
           </div>
         )}

@@ -44,20 +44,20 @@ export function MountDetectionBadge() {
     >
       <FolderCheck className="h-3 w-3" />
       <span>{detectedMountTag}</span>
-      <span className="text-primary/60">{t('mounts.applied', '적용됨')}</span>
+      <span className="text-primary/60">{t('mounts.applied')}</span>
       <button
         type="button"
         onClick={handleAccept}
         className="ml-1 rounded px-1 hover:bg-primary/20"
-        aria-label={t('mounts.bind', '바인딩')}
+        aria-label={t('mounts.bind')}
       >
-        {t('common.ok', '확인')}
+        {t('common.ok')}
       </button>
       <button
         type="button"
         onClick={handleDismiss}
         className="ml-0.5 rounded p-0.5 hover:bg-primary/20"
-        aria-label={t('common.dismiss', '취소')}
+        aria-label={t('common.dismiss')}
       >
         <X className="h-3 w-3" />
       </button>

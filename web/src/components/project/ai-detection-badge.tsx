@@ -25,7 +25,7 @@ export function AiDetectionBadge({ project, onApply, onDismiss }: AiDetectionBad
           className="h-5 px-2 text-2xs text-success hover:bg-success-subtle"
           onClick={onApply}
         >
-          {t('projects.apply', 'Apply')}
+          {t('projects.apply')}
         </Button>
         <Button
           size="sm"

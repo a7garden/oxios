@@ -67,12 +67,12 @@ export function EditProjectDialog({
       },
       {
         onSuccess: () => {
-          toast(t('projects.updateSuccess', 'Project updated'))
+          toast(t('projects.updateSuccess'))
           onOpenChange(false)
           onSuccess?.()
         },
-        onError: (err) => {
-          toast.error(t('projects.updateError', `Failed to update: ${err}`))
+        onError: () => {
+          toast.error(t('projects.updateError'))
         },
       },
     )
@@ -82,7 +82,7 @@ export function EditProjectDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('projects.editTitle', 'Edit Project')}</DialogTitle>
+          <DialogTitle>{t('projects.editTitle')}</DialogTitle>
           <DialogDescription>
             {project?.name
               ? t('projects.editDesc', 'Update "{{name}}"', { name: project.name })
@@ -92,12 +92,12 @@ export function EditProjectDialog({
 
         <div className="space-y-4 py-2">
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.name', 'Name')}</label>
+            <label className="text-sm font-medium">{t('projects.name')}</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="oxios" />
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.icon', 'Icon')}</label>
+            <label className="text-sm font-medium">{t('projects.icon')}</label>
             <div className="flex flex-wrap gap-1">
               {ICON_OPTIONS.map((opt) => (
                 <button
@@ -118,7 +118,7 @@ export function EditProjectDialog({
 
           {/* RFC-025: Mount references — click-toggle chips */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.mounts', 'Mounts')}</label>
+            <label className="text-sm font-medium">{t('projects.mounts')}</label>
             {availableMounts.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {availableMounts.map((m) => (
@@ -144,16 +144,14 @@ export function EditProjectDialog({
               </div>
             ) : (
               <div className="rounded-md border border-dashed p-3 text-center">
-                <p className="text-xs text-muted-foreground mb-2">
-                  {t('projects.noMountsYet', '마운트가 없습니다. 마운트를 먼저 만들어주세요.')}
-                </p>
+                <p className="text-xs text-muted-foreground mb-2">{t('projects.noMountsYet')}</p>
                 <Link
                   to="/mounts"
                   onClick={() => onOpenChange(false)}
                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                 >
                   <FolderOpen className="h-3 w-3" />
-                  {t('mounts.create', 'Mount 만들기')}
+                  {t('mounts.create')}
                 </Link>
               </div>
             )}
@@ -161,27 +159,22 @@ export function EditProjectDialog({
 
           {/* RFC-025: Custom instructions */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">
-              {t('projects.instructions', 'Instructions')}
-            </label>
+            <label className="text-sm font-medium">{t('projects.instructions')}</label>
             <Textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               rows={3}
-              placeholder={t(
-                'projects.instructionsPlaceholder',
-                '이 Project에서 항상 지켜야 할 규칙. 시스템 프롬프트에 주입됩니다.',
-              )}
+              placeholder={t('projects.instructionsPlaceholder')}
             />
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('common.cancel', 'Cancel')}
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={!name.trim() || update.isPending}>
-            {update.isPending ? '...' : t('projects.save', 'Save')}
+            {update.isPending ? '...' : t('projects.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

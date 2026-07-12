@@ -40,10 +40,7 @@ export function ModeTabs({ collapsed = false }: { collapsed?: boolean }) {
 
   if (collapsed) {
     return (
-      <nav
-        aria-label={t('common.modeNavigation', 'Mode navigation')}
-        className="flex flex-col items-center gap-1"
-      >
+      <nav aria-label={t('common.modeNavigation')} className="flex flex-col items-center gap-1">
         {SIDEBAR_MODES.map(({ key, icon: Icon, labelKey, href }, idx) => {
           const isActive = currentMode === key
           const link = (
@@ -78,10 +75,7 @@ export function ModeTabs({ collapsed = false }: { collapsed?: boolean }) {
   }
 
   return (
-    <nav
-      aria-label={t('common.modeNavigation', 'Mode navigation')}
-      className="flex items-center gap-0.5"
-    >
+    <nav aria-label={t('common.modeNavigation')} className="flex items-center gap-0.5">
       {SIDEBAR_MODES.map(({ key, icon: Icon, labelKey, href }, idx) => {
         const isActive = currentMode === key
         return (

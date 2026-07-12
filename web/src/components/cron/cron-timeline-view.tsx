@@ -162,7 +162,7 @@ export function CronTimelineView({
                         <button
                           type="button"
                           onClick={() => onEdit(job)}
-                          aria-label={t('common.edit', '편집')}
+                          aria-label={t('common.edit')}
                           className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <Pencil className="h-3 w-3" />

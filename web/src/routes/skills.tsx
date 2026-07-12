@@ -831,11 +831,7 @@ function SkillCard({
                 setExpanded((v) => !v)
               }}
               className="ml-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label={
-                expanded
-                  ? t('skills.collapse', 'Collapse details')
-                  : t('skills.expand', 'Expand details')
-              }
+              aria-label={expanded ? t('skills.collapse') : t('skills.expand')}
             >
               {expanded ? (
                 <ChevronDown className="h-4 w-4" />
@@ -1158,14 +1154,9 @@ function SkillsShDetail({ id, onClose }: { id: string; onClose: () => void }) {
     },
   })
 
-  if (isLoading)
-    return <div className="text-sm text-muted-foreground">{t('common.loading', 'Loading...')}</div>
+  if (isLoading) return <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
   if (isError || !data)
-    return (
-      <div className="text-sm text-destructive">
-        {t('skills.loadDetailFailed', 'Failed to load skill detail')}
-      </div>
-    )
+    return <div className="text-sm text-destructive">{t('skills.loadDetailFailed')}</div>
 
   const skillMd = data.files?.find(
     (f) => f.path === 'SKILL.md' || f.path.toLowerCase() === 'skill.md',

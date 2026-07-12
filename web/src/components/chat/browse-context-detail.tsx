@@ -18,37 +18,34 @@ export function BrowseContextDetail({ context }: { context: ToolCallContext }) {
     case 'web_search':
       return (
         <div className="space-y-1">
-          <DetailRow label={t('chat.transparency.browseQuery', 'Query')} value={context.query} />
+          <DetailRow label={t('chat.transparency.browseQuery')} value={context.query} />
           {context.engine ? (
-            <DetailRow
-              label={t('chat.transparency.browseEngine', 'Engine')}
-              value={context.engine}
-            />
+            <DetailRow label={t('chat.transparency.browseEngine')} value={context.engine} />
           ) : null}
         </div>
       )
     case 'data_extraction':
       return (
         <div className="space-y-1">
-          <DetailRow label={t('chat.transparency.browseTarget', 'Target')} value={context.target} />
+          <DetailRow label={t('chat.transparency.browseTarget')} value={context.target} />
           {context.url ? (
-            <DetailRow label={t('chat.transparency.browseUrl', 'URL')} value={context.url} mono />
+            <DetailRow label={t('chat.transparency.browseUrl')} value={context.url} mono />
           ) : null}
           {context.result_count != null ? (
             <DetailRow
-              label={t('chat.transparency.browseExtracted', 'Extracted')}
+              label={t('chat.transparency.browseExtracted')}
               value={`${context.result_count} items`}
             />
           ) : null}
           {context.page_status != null ? (
             <DetailRow
-              label={t('chat.transparency.browseStatus', 'Status')}
+              label={t('chat.transparency.browseStatus')}
               value={`${context.page_status}`}
             />
           ) : null}
           {context.page_duration_ms != null ? (
             <DetailRow
-              label={t('chat.transparency.browseDuration', 'Duration')}
+              label={t('chat.transparency.browseDuration')}
               value={formatDuration(context.page_duration_ms)}
             />
           ) : null}
@@ -57,9 +54,9 @@ export function BrowseContextDetail({ context }: { context: ToolCallContext }) {
     case 'session_action':
       return (
         <div className="space-y-1">
-          <DetailRow label={t('chat.transparency.browseAction', 'Action')} value={context.action} />
+          <DetailRow label={t('chat.transparency.browseAction')} value={context.action} />
           {context.url ? (
-            <DetailRow label={t('chat.transparency.browseUrl', 'URL')} value={context.url} mono />
+            <DetailRow label={t('chat.transparency.browseUrl')} value={context.url} mono />
           ) : null}
         </div>
       )
@@ -67,13 +64,10 @@ export function BrowseContextDetail({ context }: { context: ToolCallContext }) {
       return (
         <div className="space-y-1">
           <DetailRow
-            label={t('chat.transparency.browseStep', 'Step')}
+            label={t('chat.transparency.browseStep')}
             value={`${context.current} / ${context.total}`}
           />
-          <DetailRow
-            label={t('chat.transparency.browseDescription', 'Description')}
-            value={context.step}
-          />
+          <DetailRow label={t('chat.transparency.browseDescription')} value={context.step} />
           {context.total > 0 && (
             <div className="mt-1.5">
               <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
@@ -98,32 +92,26 @@ function PageVisitDetail({
 
   return (
     <div className="space-y-1">
-      <DetailRow label={t('chat.transparency.browseUrl', 'URL')} value={context.url} mono />
+      <DetailRow label={t('chat.transparency.browseUrl')} value={context.url} mono />
       {context.reason ? <VisitReasonDetail reason={context.reason} /> : null}
       {context.navigation_error ? (
-        <DetailRow
-          label={t('chat.transparency.browseError', 'Error')}
-          value={context.navigation_error}
-        />
+        <DetailRow label={t('chat.transparency.browseError')} value={context.navigation_error} />
       ) : null}
       {context.page_title ? (
-        <DetailRow label={t('chat.transparency.browseTitle', 'Title')} value={context.page_title} />
+        <DetailRow label={t('chat.transparency.browseTitle')} value={context.page_title} />
       ) : null}
       {context.page_status != null ? (
-        <DetailRow
-          label={t('chat.transparency.browseStatus', 'Status')}
-          value={`${context.page_status}`}
-        />
+        <DetailRow label={t('chat.transparency.browseStatus')} value={`${context.page_status}`} />
       ) : null}
       {context.page_bytes != null ? (
         <DetailRow
-          label={t('chat.transparency.browseSize', 'Size')}
+          label={t('chat.transparency.browseSize')}
           value={formatBytes(context.page_bytes)}
         />
       ) : null}
       {context.page_duration_ms != null ? (
         <DetailRow
-          label={t('chat.transparency.browseDuration', 'Duration')}
+          label={t('chat.transparency.browseDuration')}
           value={formatDuration(context.page_duration_ms)}
         />
       ) : null}
@@ -138,7 +126,7 @@ function VisitReasonDetail({ reason }: { reason: VisitReason }) {
   if (reason === 'direct_navigation') {
     return (
       <DetailRow
-        label={t('chat.transparency.browseReason', 'Reason')}
+        label={t('chat.transparency.browseReason')}
         value={t('chat.transparency.visitReasonDirect')}
       />
     )
@@ -146,7 +134,7 @@ function VisitReasonDetail({ reason }: { reason: VisitReason }) {
   if ('search_result' in reason) {
     return (
       <DetailRow
-        label={t('chat.transparency.browseReason', 'Reason')}
+        label={t('chat.transparency.browseReason')}
         value={t('chat.transparency.visitReasonSearch', {
           position: reason.search_result.position,
         })}
@@ -156,7 +144,7 @@ function VisitReasonDetail({ reason }: { reason: VisitReason }) {
   if ('link_followed' in reason) {
     return (
       <DetailRow
-        label={t('chat.transparency.browseReason', 'Reason')}
+        label={t('chat.transparency.browseReason')}
         value={t('chat.transparency.visitReasonLink')}
       />
     )
@@ -170,16 +158,13 @@ function ScreenshotDetail({ meta }: { meta: ScreenshotMeta }) {
   return (
     <div className="space-y-1">
       <p className="text-2xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">
-        {t('chat.transparency.browseScreenshot', 'Screenshot')}
+        {t('chat.transparency.browseScreenshot')}
       </p>
       <div className="rounded border bg-muted/50 px-2 py-1.5 space-y-0.5">
+        <DetailRow label={t('chat.transparency.browseSize')} value={formatBytes(meta.bytes)} />
+        <DetailRow label={t('chat.transparency.browseWidth')} value={`${meta.width}px`} />
         <DetailRow
-          label={t('chat.transparency.browseSize', 'Size')}
-          value={formatBytes(meta.bytes)}
-        />
-        <DetailRow label={t('chat.transparency.browseWidth', 'Width')} value={`${meta.width}px`} />
-        <DetailRow
-          label={t('chat.transparency.browseDuration', 'Duration')}
+          label={t('chat.transparency.browseDuration')}
           value={formatDuration(meta.duration_ms)}
         />
       </div>

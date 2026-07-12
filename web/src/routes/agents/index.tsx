@@ -272,7 +272,7 @@ function AgentsListPage() {
       accessor: (row) => <StatusIndicator status={row.status?.toLowerCase() ?? 'unknown'} />,
     },
     {
-      header: t('agents.cost', 'Cost'),
+      header: t('agents.cost'),
       mobilePriority: 'secondary',
       accessor: (row) =>
         row.cost_usd > 0 ? (
@@ -282,7 +282,7 @@ function AgentsListPage() {
         ),
     },
     {
-      header: t('agents.duration', 'Duration'),
+      header: t('agents.duration'),
       mobilePriority: 'hidden',
       accessor: (row) =>
         row.duration_secs != null ? (
@@ -301,7 +301,7 @@ function AgentsListPage() {
       ),
     },
     {
-      header: t('agents.tokens', 'Tokens'),
+      header: t('agents.tokens'),
       mobilePriority: 'secondary',
       accessor: (row) =>
         row.tokens_used > 0 ? (
@@ -377,7 +377,7 @@ function AgentsListPage() {
               )}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
-              {t('agentMonitor.canvas', 'Canvas')}
+              {t('agentMonitor.canvas')}
             </button>
             <button
               type="button"
@@ -390,7 +390,7 @@ function AgentsListPage() {
               )}
             >
               <TableIcon className="h-3.5 w-3.5" />
-              {t('agentMonitor.table', 'Table')}
+              {t('agentMonitor.table')}
             </button>
           </div>
           {view === 'table' && (
@@ -432,10 +432,7 @@ function AgentsListPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9"
-              placeholder={t(
-                'agents.searchPlaceholder',
-                'Search agents by name, error, or tool output…',
-              )}
+              placeholder={t('agents.searchPlaceholder')}
               defaultValue={searchQuery}
               onChange={(e) => {
                 const val = e.target.value
@@ -458,7 +455,7 @@ function AgentsListPage() {
           >
             <TabsList>
               <TabsTrigger value="all">
-                {t('agents.all', 'All')}
+                {t('agents.all')}
                 {tableQuery.data && (
                   <Badge variant="outline" className="ml-1 text-xs">
                     {tableQuery.data.total}
@@ -466,7 +463,7 @@ function AgentsListPage() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="running">
-                {t('agents.running', 'Running')}
+                {t('agents.running')}
                 {tableQuery.data?.stats.count_running ? (
                   <Badge variant="outline" className="ml-1 text-xs">
                     {tableQuery.data.stats.count_running}
@@ -474,7 +471,7 @@ function AgentsListPage() {
                 ) : null}
               </TabsTrigger>
               <TabsTrigger value="completed">
-                {t('agents.completed', 'Completed')}
+                {t('agents.completed')}
                 {tableQuery.data?.stats.count_completed ? (
                   <Badge variant="outline" className="ml-1 text-xs">
                     {tableQuery.data.stats.count_completed}
@@ -482,7 +479,7 @@ function AgentsListPage() {
                 ) : null}
               </TabsTrigger>
               <TabsTrigger value="failed">
-                {t('agents.failed', 'Failed')}
+                {t('agents.failed')}
                 {tableQuery.data?.stats.count_failed ? (
                   <Badge variant="outline" className="ml-1 text-xs">
                     {tableQuery.data.stats.count_failed}

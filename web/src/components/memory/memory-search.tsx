@@ -42,9 +42,7 @@ export function MemorySearch() {
           )}
         </Badge>
         {semanticSearch.isError && (
-          <p className="text-xs text-destructive">
-            {t('memory.searchFailed', 'Search failed. Please try again.')}
-          </p>
+          <p className="text-xs text-destructive">{t('memory.searchFailed')}</p>
         )}
       </div>
       <div className="flex gap-2">

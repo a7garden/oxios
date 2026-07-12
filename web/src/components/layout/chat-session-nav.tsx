@@ -118,9 +118,9 @@ function ExpandedChatNav() {
       if (useChatStore.getState().activeSessionId === draggedId) {
         useChatStore.setState({ activeProjectId: projectId })
       }
-      toast.success(t('chat.sessionMoved', '세션이 이동되었습니다'))
+      toast.success(t('chat.sessionMoved'))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('chat.sessionMoveFailed', '이동 실패'))
+      toast.error(err instanceof Error ? err.message : t('chat.sessionMoveFailed'))
     }
   }
 
@@ -142,9 +142,7 @@ function ExpandedChatNav() {
       {/* Sessions tree */}
       <div className="flex-1 overflow-y-auto">
         <div className="flex items-center justify-between px-2 mb-1">
-          <span className={sectionHeader.replace('mb-1 ', '')}>
-            {t('chat.sessionsLabel', 'Sessions')}
-          </span>
+          <span className={sectionHeader.replace('mb-1 ', '')}>{t('chat.sessionsLabel')}</span>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -218,7 +216,7 @@ function ExpandedChatNav() {
                   ))}
                 {!isCollapsed && sessions.length === 0 && (
                   <p className="px-7 py-0.5 text-2xs text-muted-foreground/40">
-                    {t('chat.noSessionsInProject', '대화 없음')}
+                    {t('chat.noSessionsInProject')}
                   </p>
                 )}
               </div>
@@ -231,7 +229,7 @@ function ExpandedChatNav() {
           <div className={sectionGap}>
             <div className="flex items-center gap-1 px-2 py-1 text-sm text-muted-foreground">
               <Inbox className="h-3.5 w-3.5" />
-              <span className="font-medium">{t('chat.unfiled', '분류 안 됨')}</span>
+              <span className="font-medium">{t('chat.unfiled')}</span>
               <span className="ml-auto text-2xs text-muted-foreground/60">
                 {unfiledSessions.length}
               </span>
@@ -291,13 +289,13 @@ function ExpandedChatNav() {
           <DropdownMenuItem asChild>
             <Link to="/projects">
               <FolderKanban className="h-4 w-4" />
-              {t('chat.manageProjects', 'Manage Projects')}
+              {t('chat.manageProjects')}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link to="/mounts">
               <HardDrive className="h-4 w-4" />
-              {t('chat.manageMounts', '마운트 관리')}
+              {t('chat.manageMounts')}
             </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
