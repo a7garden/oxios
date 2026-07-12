@@ -105,10 +105,9 @@ pub(crate) use knowledge_routes::{
     handle_knowledge_checklist_remove, handle_knowledge_config_get, handle_knowledge_config_put,
     handle_knowledge_convert_html, handle_knowledge_copilot, handle_knowledge_emoji,
     handle_knowledge_file_diff, handle_knowledge_file_or_sub, handle_knowledge_graph,
-    handle_knowledge_habits, handle_knowledge_habits_last_week, handle_knowledge_journal_add,
-    handle_knowledge_journal_emoji, handle_knowledge_journal_today, handle_knowledge_search,
-    handle_knowledge_stats_done_today, handle_knowledge_stats_today, handle_knowledge_tree,
-    handle_knowledge_worker_nightly, handle_knowledge_worker_scheduled,
+    handle_knowledge_journal_add,
+    handle_knowledge_journal_emoji, handle_knowledge_journal_today, handle_knowledge_move,
+    handle_knowledge_search,
 };
 pub(crate) use marketplace::{
     handle_marketplace_install, handle_marketplace_search, handle_marketplace_skill_detail,
@@ -545,7 +544,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         // Knowledge
         .route("/api/knowledge/tree", get(handle_knowledge_tree))
-        // Knowledge — file CRUD + git sub-paths unified under one catch-all.
+        .route("/api/knowledge/move", post(handle_knowledge_move))
         // axum 0.8: `{*path}` MUST be the last segment, so we dispatch on method/path
         // in a single handler rather than registering separate sub-path routes.
         .route(

@@ -27,18 +27,23 @@ import {
 } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { FileTree } from '@/components/knowledge/file-tree'
 import { HabitsDialog } from '@/components/knowledge/habits-dialog'
 import { KnowledgeSettingsDialog } from '@/components/knowledge/knowledge-settings-dialog'
+import { NewFolderDialog } from '@/components/knowledge/new-folder-dialog'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   useDeleteFile,
   useJournalToday,
-  useKnowledgeTree,
+  useKnowledgeRecursiveTree,
+  useMoveFile,
   useWriteFile,
 } from '@/hooks/use-knowledge'
+import { generateUniqueName } from '@/lib/tree-utils'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { deriveSidebarMode, useSidebarStore } from '@/stores/sidebar'
@@ -46,28 +51,11 @@ import { ChatSessionNav } from './chat-session-nav'
 import { ModeTabs } from './mode-tabs'
 import { SidebarFooter } from './sidebar-footer'
 
-// ── Types ──────────────────────────────────────────────────────
+// ── Shared sidebar design primitives (consumed by ChatSessionNav) ──
 
-export interface NavItem {
-  labelKey: string
-  href: string
-  icon: React.ReactNode
-  show?: boolean
-  badge?: number
-}
-
-// ── Sidebar design primitives ─────────────────────────────────
-//
-// Shared tokens for all three sidebar modes (Console, Knowledge, Chat).
-// Every item, section header, and separator must use these constants
-// so the three modes feel visually identical.
-//
-
-/** Primary navigation item (icon + label). */
 export const itemBase =
   'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full text-left select-none transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar'
 
-/** Dense list item (session rows, file rows). */
 export const itemDense =
   'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs w-full text-left select-none transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
 
@@ -77,17 +65,22 @@ export const itemInactive =
 export const itemCollapsedBase =
   'flex items-center justify-center rounded-lg p-2 select-none transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
 
-/** Section header label. */
 export const sectionHeader =
   'px-2 mb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider select-none'
 
-/** Vertical spacing between sections. */
 export const sectionGap = 'mb-3'
 
-/** Horizontal separator between sections. */
 export const sectionSeparator = 'border-t border-sidebar-border my-2'
 
 // ── Console mode nav groups ────────────────────────────────────
+
+export interface NavItem {
+  labelKey: string
+  href: string
+  icon: React.ReactNode
+  external?: boolean
+  badge?: number
+}
 
 export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
   {
@@ -107,27 +100,15 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: 'common.projects',
     items: [
-      {
-        labelKey: 'common.projects',
-        href: '/projects',
-        icon: <FolderKanban className="h-4 w-4" />,
-      },
-      {
-        labelKey: 'common.mounts',
-        href: '/mounts',
-        icon: <FolderPlus className="h-4 w-4" />,
-      },
+      { labelKey: 'common.projects', href: '/projects', icon: <FolderKanban className="h-4 w-4" /> },
+      { labelKey: 'common.mounts', href: '/mounts', icon: <FolderPlus className="h-4 w-4" /> },
     ],
   },
   {
     labelKey: 'common.storage',
     items: [
       { labelKey: 'common.memory', href: '/memory', icon: <Brain className="h-4 w-4" /> },
-      {
-        labelKey: 'common.workspace',
-        href: '/workspace',
-        icon: <FolderOpen className="h-4 w-4" />,
-      },
+      { labelKey: 'common.workspace', href: '/workspace', icon: <FolderOpen className="h-4 w-4" /> },
     ],
   },
   {
@@ -135,11 +116,7 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
       { labelKey: 'common.cost', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
-      {
-        labelKey: 'common.tokenMaxing',
-        href: '/token-maxing',
-        icon: <Flame className="h-4 w-4" />,
-      },
+      { labelKey: 'common.tokenMaxing', href: '/token-maxing', icon: <Flame className="h-4 w-4" /> },
     ],
   },
   {
@@ -167,7 +144,6 @@ export function Sidebar() {
   const router = useRouterState()
   const currentPath = router.location.pathname
 
-  // Sync mode from route
   useEffect(() => {
     const derivedMode = deriveSidebarMode(currentPath)
     setMode(derivedMode)
@@ -177,11 +153,9 @@ export function Sidebar() {
     <aside
       className={cn(
         'flex h-full w-72 max-w-[85vw] flex-col overflow-hidden border-r bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-[var(--animate-in-easing)]',
-        // Desktop collapses to icon rail; mobile drawer stays full width
         collapsed ? 'lg:w-16 lg:max-w-none' : 'lg:w-60 lg:max-w-none',
       )}
     >
-      {/* Header — brand + collapse toggle */}
       <div
         className={cn(
           'flex h-14 items-center px-3',
@@ -194,7 +168,6 @@ export function Sidebar() {
             <span className="font-bold text-lg">Oxios</span>
           </div>
         )}
-        {/* Desktop collapse toggle */}
         <button
           type="button"
           onClick={toggle}
@@ -205,24 +178,18 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Desktop mode switcher — single source of truth for Console /
-          Knowledge / Chat on desktop. Collapses to an icon rail (VS Code
-          Activity Bar) when the sidebar is collapsed. Mobile mode switching
-          lives in the BottomNav bar. */}
       <div className="hidden lg:block px-2 pb-2">
         <ModeTabs collapsed={collapsed} />
       </div>
 
       <Separator />
 
-      {/* Nav content — mode-specific */}
       <nav className="flex-1 overflow-y-auto p-2">
         {mode === 'console' && <ConsoleNav />}
         {mode === 'knowledge' && <KnowledgeNav />}
         {mode === 'chat' && <ChatSessionNav />}
       </nav>
 
-      {/* Footer — global preferences (theme / language / settings) */}
       <Separator />
       <SidebarFooter collapsed={collapsed && !mobileOpen} />
     </aside>
@@ -263,32 +230,70 @@ function KnowledgeNav() {
   const { collapsed } = useSidebarStore()
   const router = useRouterState()
   const currentPath = router.location.pathname
-  const { mode, currentFilePath, openFile, openChat, openHome } = useKnowledgeStore()
-  const { data: entries, isLoading, refetch } = useKnowledgeTree()
+  const { mode, currentFilePath, openFile, openChat, openHome, markFileCreated } = useKnowledgeStore()
+  const moveFile = useMoveFile()
+  const { data: tree, isLoading } = useKnowledgeRecursiveTree()
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
   const journalToday = useJournalToday()
+
+  // Phase 4: rename via the atomic move API (no more write+delete).
+  const renameFile = useCallback(
+    async (oldPath: string, newName: string) => {
+      const parentDir = oldPath.includes('/')
+        ? oldPath.split('/').slice(0, -1).join('/')
+        : ''
+      const target = parentDir ? `${parentDir}/${newName}` : newName
+      if (target === oldPath) return
+      try {
+        await moveFile.mutateAsync({ from: oldPath, to: target })
+      } catch (err) {
+        console.error('rename failed', err)
+      }
+    },
+    [moveFile],
+  )
+
   const [habitsOpen, setHabitsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [newFolderOpen, setNewFolderOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
-  const handleNewFile = useCallback(async () => {
-    const name = 'New file.md'
-    await writeFile.mutateAsync({ path: name, content: `# New file\n\n` })
-    openFile(name)
-    refetch()
-  }, [writeFile, openFile, refetch])
+  // Phase 4 (R6): generate a unique filename across the whole tree.
+  const handleNewFile = useCallback(
+    async (dir?: string) => {
+      const basePath = dir ? `${dir}/` : ''
+      const name = tree ? generateUniqueName(tree, basePath, 'New file.md') : 'New file.md'
+      try {
+        await writeFile.mutateAsync({
+          path: `${basePath}${name}`,
+          content: `# New file\n\n`,
+        })
+      } catch (err) {
+        console.error('create failed', err)
+        return
+      }
+      openFile(`${basePath}${name}`)
+      markFileCreated(`${basePath}${name}`)
+    },
+    [tree, writeFile, openFile, markFileCreated],
+  )
 
-  const handleNewFolder = useCallback(async () => {
-    const name = prompt('Enter folder name:', 'New Folder')
-    if (!name?.trim()) return
-    await writeFile.mutateAsync({ path: `${name.trim()}/.keep`, content: '' })
-    refetch()
-  }, [writeFile, refetch])
-
-  const handleDelete = useCallback(async () => {
+  // Phase 4 follow-up: replace window.prompt() with an in-app Dialog.
+  const handleNewFolder = useCallback(() => {
+    setNewFolderOpen(true)
+  }, [])
+  const handleDelete = useCallback(() => {
     if (!currentFilePath) return
-    if (confirm(`Delete ${currentFilePath}?`)) {
+    setDeleteOpen(true)
+  }, [currentFilePath])
+
+  const performDelete = useCallback(async () => {
+    if (!currentFilePath) return
+    try {
       await deleteFile.mutateAsync(currentFilePath)
+    } catch (err) {
+      console.error('delete failed', err)
     }
   }, [deleteFile, currentFilePath])
 
@@ -298,7 +303,6 @@ function KnowledgeNav() {
     }
   }, [journalToday.data, openFile])
 
-  // Collapsed: show minimal icons
   if (collapsed) {
     return (
       <>
@@ -325,7 +329,7 @@ function KnowledgeNav() {
                 <MessageSquare className="h-4 w-4" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="right">{t('knowledge.chatTitle', 'Quick Notes')}</TooltipContent>
+            <TooltipContent side="right">{t('knowledge.chatTitle')}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -357,7 +361,7 @@ function KnowledgeNav() {
             <TooltipTrigger asChild>
               <button
                 type="button"
-                onClick={handleNewFile}
+                onClick={() => handleNewFile()}
                 className={cn(itemCollapsedBase, itemInactive)}
               >
                 <FilePlus className="h-4 w-4" />
@@ -392,13 +396,29 @@ function KnowledgeNav() {
         </div>
         <HabitsDialog open={habitsOpen} onOpenChange={setHabitsOpen} />
         <KnowledgeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <NewFolderDialog
+          open={newFolderOpen}
+          onOpenChange={setNewFolderOpen}
+          onConfirm={async (folderName) => {
+            await writeFile.mutateAsync({ path: `${folderName}/.keep`, content: '' })
+            toast.success(t('knowledge.folderCreated'))
+          }}
+        />
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          title={t('knowledge.deleteConfirmTitle')}
+          description={t('knowledge.deleteConfirmBody', { path: currentFilePath ?? '' })}
+          confirmLabel={t('common.delete')}
+          destructive
+          onConfirm={performDelete}
+        />
       </>
     )
   }
 
   return (
     <>
-      {/* Views — Home, Quick Notes, Journal, Graph */}
       <div className={sectionGap}>
         <button
           type="button"
@@ -414,7 +434,7 @@ function KnowledgeNav() {
           className={cn(itemBase, mode === 'chat' ? itemActive : itemInactive)}
         >
           <MessageSquare className="h-4 w-4" />
-          <span>{t('knowledge.chatTitle', 'Quick Notes')}</span>
+          <span>{t('knowledge.chatTitle')}</span>
         </button>
         <button
           type="button"
@@ -438,25 +458,39 @@ function KnowledgeNav() {
 
       <div className={sectionSeparator} />
 
-      {/* File tree */}
-      <p className={sectionHeader}>{t('knowledge.files', 'Files')}</p>
+      <p className={sectionHeader}>{t('knowledge.files')}</p>
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="px-4 py-2 text-xs text-sidebar-foreground/50">
             {t('knowledge.loading')}
           </div>
-        ) : entries ? (
-          <FileTree entries={entries} onFileSelect={openFile} currentPath={currentFilePath} />
+        ) : tree ? (
+          <FileTree
+            nodes={tree}
+            currentPath={currentFilePath}
+            onFileSelect={openFile}
+            onRename={renameFile}
+            onMove={(from, to) => {
+              moveFile
+                .mutateAsync({ from, to })
+                .then(() => openFile(to))
+                .catch((err) => console.error('tree move failed', err))
+            }}
+            onContextMenu={(node) => {
+              if (node.is_dir) handleNewFile(node.path)
+            }}
+          />
         ) : null}
       </div>
 
-      {/* Action bar — file ops (left) · tools (right) */}
-      <div className="flex items-center gap-0.5 pt-2 border-t border-sidebar-border mt-2 px-1">
+      <div className={sectionSeparator} />
+
+      <div className="flex items-center gap-0.5 pt-2 px-1">
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7 hover:bg-sidebar-accent/50"
-          onClick={handleNewFile}
+          onClick={() => handleNewFile()}
           title={t('knowledge.newFileShortcut')}
         >
           <FilePlus className="h-4 w-4" />
@@ -506,6 +540,23 @@ function KnowledgeNav() {
       </div>
       <HabitsDialog open={habitsOpen} onOpenChange={setHabitsOpen} />
       <KnowledgeSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <NewFolderDialog
+        open={newFolderOpen}
+        onOpenChange={setNewFolderOpen}
+        onConfirm={async (folderName) => {
+          await writeFile.mutateAsync({ path: `${folderName}/.keep`, content: '' })
+          toast.success(t('knowledge.folderCreated'))
+        }}
+      />
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t('knowledge.deleteConfirmTitle')}
+        description={t('knowledge.deleteConfirmBody', { path: currentFilePath ?? '' })}
+        confirmLabel={t('common.delete')}
+        destructive
+        onConfirm={performDelete}
+      />
     </>
   )
 }

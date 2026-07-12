@@ -103,7 +103,7 @@ export function InfoPanel() {
         {tab === 'history' && (
           <div className="p-3">
             <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
-              {t('knowledge.versionHistory', 'Version History')}
+              {t('knowledge.versionHistory')}
             </h3>
             <FileHistoryPanel />
           </div>
@@ -128,21 +128,15 @@ function FileHistoryPanel() {
   const [expandedHash, setExpandedHash] = useState<string | null>(null)
 
   if (!currentFilePath) {
-    return (
-      <p className="text-xs text-muted-foreground">{t('knowledge.noFileOpen', 'No file open')}</p>
-    )
+    return <p className="text-xs text-muted-foreground">{t('knowledge.noFileOpen')}</p>
   }
 
   if (isLoading) {
-    return <p className="text-xs text-muted-foreground">{t('knowledge.loading', 'Loading...')}</p>
+    return <p className="text-xs text-muted-foreground">{t('knowledge.loading')}</p>
   }
 
   if (!data || data.history.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        {t('knowledge.noHistory', 'No version history yet')}
-      </p>
-    )
+    return <p className="text-xs text-muted-foreground">{t('knowledge.noHistory')}</p>
   }
 
   return (
@@ -154,7 +148,7 @@ function FileHistoryPanel() {
               type="button"
               className="min-w-0 flex-1 text-left"
               onClick={() => setExpandedHash(expandedHash === entry.hash ? null : entry.hash)}
-              title={t('knowledge.clickForDiff', 'Click to view diff')}
+              title={t('knowledge.clickForDiff')}
             >
               <p className="text-xs text-muted-foreground truncate">
                 {entry.short_hash} · {formatTimestamp(entry.timestamp)}
@@ -167,9 +161,9 @@ function FileHistoryPanel() {
               className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
               onClick={() => restore.mutate({ path: currentFilePath, hash: entry.hash })}
               disabled={restore.isPending}
-              title={t('knowledge.restoreVersion', 'Restore this version')}
+              title={t('knowledge.restoreVersion')}
             >
-              {t('knowledge.restore', 'Restore')}
+              {t('knowledge.restore')}
             </Button>
           </div>
           {expandedHash === entry.hash && (
@@ -189,17 +183,13 @@ function FileDiffPreview({ path, hash }: { path: string; hash: string }) {
   if (isLoading) {
     return (
       <pre className="mt-1 text-[10px] bg-muted/50 p-2 rounded overflow-x-auto whitespace-pre-wrap font-mono text-muted-foreground">
-        {t('knowledge.loading', 'Loading...')}
+        {t('knowledge.loading')}
       </pre>
     )
   }
 
   if (!data?.diff) {
-    return (
-      <p className="mt-1 text-[10px] text-muted-foreground italic">
-        {t('knowledge.noDiff', 'No changes from current version')}
-      </p>
-    )
+    return <p className="mt-1 text-[10px] text-muted-foreground italic">{t('knowledge.noDiff')}</p>
   }
 
   return (

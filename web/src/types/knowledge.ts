@@ -7,6 +7,28 @@ export interface KnowledgeTreeEntry {
   oxios_quality?: 'raw' | 'curated' | 'refined' | null
 }
 
+/**
+ * Recursive tree node — returned by `GET /api/knowledge/tree?recursive=true`.
+ * Replaces the legacy flat `KnowledgeTreeEntry` for the sidebar's file tree
+ * (Phase 3 redesign). The legacy type is kept only because `useKnowledgeTree(dir)`
+ * still calls the non-recursive endpoint for backwards compatibility.
+ */
+export interface KnowledgeTreeNode {
+  name: string
+  /** Full path relative to knowledge root (e.g. "brain/Rust.md"). */
+  path: string
+  is_dir: boolean
+  /** Modification time in epoch ms; 0 for directories. */
+  ctime: number
+  /** Display name without extension. */
+  display_name: string
+  /** False when the file is an empty placeholder. Drives opacity cue. */
+  has_content: boolean
+  /** RFC-022: note quality from frontmatter. null/undefined = user-written. */
+  oxios_quality?: 'raw' | 'curated' | 'refined' | null
+  children: KnowledgeTreeNode[]
+}
+
 // Search
 export interface KnowledgeSearchHit {
   path: string

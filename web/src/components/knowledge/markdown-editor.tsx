@@ -463,7 +463,7 @@ export function MarkdownEditor({
       } catch {
         // I-1: Save failed — keep dirty so the unsaved indicator
         // stays visible and the user knows their edits are at risk.
-        toast.error(t('knowledge.saveFailed', 'Save failed'))
+        toast.error(t('knowledge.saveFailed'))
       }
     }
     document.addEventListener('knowledge:save', handler)
@@ -500,7 +500,7 @@ export function MarkdownEditor({
         setIsDirty(false)
       }
     } catch {
-      toast.error(t('knowledge.saveFailed', 'Save failed'))
+      toast.error(t('knowledge.saveFailed'))
     }
   }, [isDirty])
 
@@ -607,7 +607,7 @@ export function MarkdownEditor({
                 setIsDirty(false)
               }
             } catch {
-              toast.error(t('knowledge.saveFailed', 'Save failed'))
+              toast.error(t('knowledge.saveFailed'))
             }
           }, 1000)
         }}

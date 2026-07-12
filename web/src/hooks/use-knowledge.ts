@@ -14,10 +14,10 @@ import type {
   KnowledgeHistoryResponse,
   KnowledgeSearchResult,
   KnowledgeTreeEntry,
+  KnowledgeTreeNode,
   NightlyReport,
   TodayReport,
 } from '@/types/knowledge'
-
 // F7: encode a knowledge-base file path for safe interpolation into a URL.
 // Each path segment is encoded individually so '/' separators are preserved
 // while characters like '?', '#', spaces, and non-ASCII bytes are escaped.
@@ -46,6 +46,14 @@ export function useKnowledgeTree(dir?: string) {
   return useQuery({
     queryKey: ['knowledge', 'tree', dir ?? ''],
     queryFn: () => api.get<KnowledgeTreeEntry[]>('/api/knowledge/tree', dir ? { dir } : undefined),
+  })
+}
+
+export function useKnowledgeRecursiveTree(enabled = true) {
+  return useQuery({
+    queryKey: ['knowledge', 'tree', 'recursive'],
+    queryFn: () => api.get<KnowledgeTreeNode[]>('/api/knowledge/tree', { recursive: 'true' }),
+    enabled,
   })
 }
 
@@ -98,6 +106,21 @@ export function useDeleteFile() {
   })
 }
 
+/**
+ * Atomically move/rename a note via `POST /api/knowledge/move`.
+ * Backlinks are re-indexed server-side; git detects the rename.
+ */
+export function useMoveFile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ from, to }: { from: string; to: string }) =>
+      api.post('/api/knowledge/move', { from, to }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
+      qc.invalidateQueries({ queryKey: ['knowledge', 'backlinks'] })
+    },
+  })
+}
 // ── Search ────────────────────────────────────────────────────
 
 export function useKnowledgeSearch() {

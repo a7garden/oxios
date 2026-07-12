@@ -322,6 +322,23 @@
     }
   }
 
+  /* Newly created file highlight — pulses the surface twice. */
+  @keyframes file-blink {
+    0%,
+    100% {
+      background-color: transparent;
+    }
+    25%,
+    75% {
+      background-color: color-mix(in oklch, var(--primary) 16%, transparent);
+    }
+  }
+
+  /* Utility used by FileTree to draw the eye to a freshly created node. */
+  .animate-file-blink {
+    animation: file-blink 1.5s ease-in-out 2;
+  }
+
   /* Typing indicator bounce */
   @keyframes typing-bounce {
     0%,

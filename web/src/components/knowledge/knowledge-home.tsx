@@ -9,9 +9,10 @@ import {
   useJournalToday,
   useKnowledgeDoneToday,
   useKnowledgeGraph,
-  useKnowledgeTree,
+  useKnowledgeRecursiveTree,
   useWriteFile,
 } from '@/hooks/use-knowledge'
+import { flattenTree, generateUniqueName } from '@/lib/tree-utils'
 import { cn } from '@/lib/utils'
 import { useCommandPaletteStore } from '@/stores/command-palette'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -21,16 +22,16 @@ function useInboxCount(): number {
   const { data } = useChatMessages()
   return useMemo(() => {
     if (!data) return 0
-    return data.filter((line) => /^- \[[xX ]\]/.test(line)).length
+    return data.filter((m) => !m.startsWith('# ')).length
   }, [data])
 }
 
-/** Flatten the tree to count note files (non-dir). */
+/** Flatten the recursive tree to count note files (non-dir). */
 function useNoteCount(): number {
-  const { data } = useKnowledgeTree()
+  const { data } = useKnowledgeRecursiveTree()
   return useMemo(() => {
     if (!data) return 0
-    return data.filter((e) => !e.is_dir).length
+    return flattenTree(data).filter((n) => !n.is_dir).length
   }, [data])
 }
 
@@ -48,33 +49,33 @@ function StatTile({
   icon: React.ReactNode
   iconClassName?: string
   label: string
-  value: React.ReactNode
+  value: string | number
   sublabel?: string
   onClick?: () => void
   actionLabel?: string
 }) {
   return (
     <Card
-      className={cn('flex flex-col transition-shadow', onClick && 'cursor-pointer hover:shadow-md')}
+      className={cn(
+        'group flex flex-1 flex-col transition-colors',
+        onClick && 'cursor-pointer hover:bg-accent/30',
+      )}
       onClick={onClick}
     >
       <CardContent className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">{label}</span>
-          <span
-            className={cn(
-              'flex h-7 w-7 items-center justify-center rounded-lg bg-muted',
-              iconClassName,
-            )}
-          >
-            {icon}
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+            {label}
           </span>
+          <span className={cn('opacity-70', iconClassName)}>{icon}</span>
         </div>
-        <div className="text-2xl font-bold tabular-nums leading-none">{value}</div>
-        {sublabel && <p className="text-xs text-muted-foreground">{sublabel}</p>}
+        <div className="text-2xl font-semibold tracking-tight">{value}</div>
+        {sublabel && (
+          <div className="text-xs text-muted-foreground truncate">{sublabel}</div>
+        )}
         {actionLabel && (
           <div className="mt-auto pt-1">
-            <span className="text-xs font-medium text-primary">{actionLabel} →</span>
+            <span className="text-xs font-medium text-primary">{actionLabel}</span>
           </div>
         )}
       </CardContent>
@@ -91,6 +92,7 @@ export function KnowledgeHome() {
   const openPalette = useCommandPaletteStore((s) => s.openPalette)
   const inboxCount = useInboxCount()
   const noteCount = useNoteCount()
+  const { data: homeTree } = useKnowledgeRecursiveTree()
 
   const { data: doneData } = useKnowledgeDoneToday()
   const { data: journalToday } = useJournalToday()
@@ -104,9 +106,13 @@ export function KnowledgeHome() {
   const hasJournal = !!journalToday?.path
 
   const handleNewFile = async () => {
-    const name = 'New file.md'
-    await writeFile.mutateAsync({ path: name, content: `# New file\n\n` })
-    openFile(name)
+    const name = homeTree ? generateUniqueName(homeTree, '', 'New file.md') : 'New file.md'
+    try {
+      await writeFile.mutateAsync({ path: name, content: `# New file\n\n` })
+      openFile(name)
+    } catch (err) {
+      console.error('create failed', err)
+    }
   }
 
   const handleOpenJournal = () => {
@@ -142,7 +148,6 @@ export function KnowledgeHome() {
 
         {/* KPI grid */}
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          {/* Inbox — triage entry point */}
           <StatTile
             icon={<Inbox className="h-4 w-4" />}
             iconClassName={inboxCount > 0 ? 'text-primary' : 'text-muted-foreground'}
@@ -155,10 +160,9 @@ export function KnowledgeHome() {
             actionLabel={inboxCount > 0 ? t('knowledge.homeProcess') : t('knowledge.homeView')}
           />
 
-          {/* Done today */}
           <StatTile
             icon={<CheckCircle2 className="h-4 w-4" />}
-            iconClassName={doneCount > 0 ? 'text-success' : 'text-muted-foreground'}
+            iconClassName="text-success"
             label={t('knowledge.homeDoneToday')}
             value={doneCount}
             sublabel={
@@ -168,7 +172,6 @@ export function KnowledgeHome() {
             }
           />
 
-          {/* Knowledge graph */}
           <StatTile
             icon={<Network className="h-4 w-4" />}
             iconClassName="text-info"
@@ -179,7 +182,6 @@ export function KnowledgeHome() {
             actionLabel={graphNodes > 0 ? t('knowledge.homeExplore') : undefined}
           />
 
-          {/* Today's journal */}
           <StatTile
             icon={<BookOpen className="h-4 w-4" />}
             iconClassName={hasJournal ? 'text-success' : 'text-muted-foreground'}

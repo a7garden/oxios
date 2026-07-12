@@ -6,7 +6,6 @@
     "noAgentsDescription": "에이전트를 시작하면 캔버스에 표시됩니다. 다중 에이전트 위임 시 연결이 여기에 표시됩니다.",
     "graphControls": "그래프 컨트롤",
     "graphMinimap": "그래프 미니맵",
-    "inspectorTitle": "에이전트 {{name}}",
     "capabilities": "기능",
     "skills": "스킬",
     "messages": "메시지",
@@ -77,7 +76,8 @@
     "memoryRecall": "메모리 회상",
     "reasoning": "추론",
     "previous": "← 이전",
-    "next": "다음 →"
+    "next": "다음 →",
+    "kill": "에이전트 종료"
   },
   "approvals": {
     "title": "승인",
@@ -395,7 +395,8 @@
         "navigate": "↑↓ 이동",
         "select": "↵ 선택",
         "close": "esc 닫기"
-      }
+      },
+      "setAsDefaultHintNoModel": "먼저 모델을 선택하세요"
     },
     "input": {
       "placeholder": "Oxios에 메시지 보내기…",
@@ -409,8 +410,10 @@
       "stopHint": "생성 중단",
       "removeMount": "마운트 제거",
       "removeAttachment": "첨부 제거",
-      "newline": "줄바꿈"
-    }
+      "newline": "줄바꿈",
+      "mountBound": "이 세션에 연결됨"
+    },
+    "emptyHint": "아래 최근 대화를 선택하거나, 새 대화를 입력해 시작하세요."
   },
   "commandPalette": {
     "placeholder": "명령 검색 또는 메모 입력…",
@@ -418,7 +421,6 @@
     "empty": "결과 없음",
     "sectionNavigation": "이동",
     "sectionCapture": "빠른 캡처",
-    "sectionDestination": "목적지",
     "sectionActions": "액션",
     "captureMemo": "메모 캡처",
     "captureTo": "{{route}}에 추가",
@@ -469,7 +471,6 @@
     "newMount": "새 마운트",
     "hintNavigate": "이동",
     "hintSelect": "선택",
-    "hintRoute": "라우팅",
     "hintVerbs": "명령",
     "hintEntity": "대상",
     "hintClose": "닫기"
@@ -618,13 +619,9 @@
     "spend": "지출",
     "noData": "지출 데이터가 없습니다",
     "period": {
-      "today": "오늘",
-      "week": "7일",
-      "month": "30일",
-      "all": "전체"
+      "month": "30일"
     },
     "providerQuota": "제공자 할당량",
-    "noProviderQuota": "사용 가능한 제공자 할당량이 없습니다",
     "noProviderQuotaDesc": "지원되는 제공자의 API 키를 설정하면 계정 잔액과 지출을 확인할 수 있습니다.",
     "periodSpend": "이번 기간",
     "spendLimitNote": "지출 한도는 알림 전용입니다. 에이전트별 실행 한도는 아래 예산 섹션에서 관리하세요.",
@@ -708,8 +705,18 @@
       "now": "현재",
       "disabled": "비활성",
       "parseFailed": "파싱 실패",
-      "nextRun": "다음 실행"
-    }
+      "nextRun": "다음 실행",
+      "jobCount_one": "작업 {{count}}개",
+      "fireCount_one": "예정 실행 {{count}}회"
+    },
+    "everyNMinutes": "매분",
+    "everyNMinutes_one": "매분",
+    "everyNHours_one": "매시간",
+    "descMinutes_one": "매분",
+    "descHourly_one": "매시간 :{{minute}}분에",
+    "goal": "목표",
+    "name": "이름",
+    "everyNHours": "매시간"
   },
   "dashboard": {
     "title": "대시보드",
@@ -870,7 +877,9 @@
     "totalSent": "총 발송",
     "userHint": "비워두면 이메일 주소를 사용합니다.",
     "userLabel": "사용자 이름",
-    "viewDetails": "보기"
+    "viewDetails": "보기",
+    "hidePassword": "비밀번호 숨기기",
+    "showPassword": "비밀번호 보기"
   },
   "engine": {
     "reasoning": "추론",
@@ -966,16 +975,14 @@
     "commitLog": "커밋 로그",
     "noCommits": "커밋 없음",
     "noCommitsDescription": "커밋 기록이 여기에 표시됩니다.",
-    "repository": "저장소",
-    "branch": "브랜치",
-    "status": "상태",
-    "noChanges": "변경 사항 없음",
     "restoreConfirmTitle": "이 커밋으로 복원하시겠습니까?",
     "restoreConfirmDesc": "{{hash}}(으)로 작업 디렉터리를 복원합니다. 커밋되지 않은 변경 사항은 손실될 수 있습니다.",
     "useHashForRestore": "이 해시를 복원 입력에 사용",
     "deleteTag": "태그 삭제",
     "tagDeleted": "태그가 삭제되었습니다",
-    "tagDeleteFailed": "태그 삭제에 실패했습니다"
+    "tagDeleteFailed": "태그 삭제에 실패했습니다",
+    "verifyFailed": "검증 실패",
+    "verifySuccess": "Git 무결성 검증 완료"
   },
   "knowledge": {
     "title": "지식",
@@ -1047,7 +1054,12 @@
     "toggleInfoPanel": "정보 패널 전환",
     "toJournal": "일지로",
     "deleteCurrentFile": "현재 파일 삭제 (⌘D)",
-    "moveToFolder": "폴더로 이동...",
+    "deleteConfirmTitle": "파일을 삭제할까요?",
+    "deleteConfirmBody": "다음 파일을 영구적으로 삭제합니다: {{path}}",
+    "treeFilterPlaceholder": "트리에서 필터...",
+    "treeFilterClear": "필터 지우기",
+    "treeFilterResults": "필터 결과",
+    "treeFilterNoMatch": "일치하는 파일 없음",
     "copilotPlaceholder": "노트에 대해 질문...",
     "newFileShortcut": "새 파일 (⌘N)",
     "newFolderShortcut": "새 폴더 (⌘⇧N)",
@@ -1095,9 +1107,16 @@
     "habitCompleted": "완료",
     "habitWeekend": "주말 완료",
     "chatTitle": "빠른 메모",
+    "emptyTree": "아직 노트가 없습니다",
+    "emptyTreeHint": "아래 + 버튼으로 첫 노트를 만들어 보세요.",
     "files": "파일",
-    "noFileOpen": "열린 파일 없음",
     "noHistory": "버전 기록 없음",
+    "newFolderInPath": "{{path}} 안에 새 폴더를 만듭니다.",
+    "newFolderPlaceholder": "폴더 이름",
+    "create": "만들기",
+    "folderCreated": "폴더가 생성되었습니다.",
+    "createFolderFailed": "폴더 생성 실패",
+    "noFileOpen": "열린 파일 없음",
     "restore": "복원",
     "restoreVersion": "이 버전 복원",
     "versionHistory": "버전 기록",
@@ -1133,7 +1152,10 @@
     "statusWords": "{{n}}단어",
     "statusChars": "{{n}}자",
     "statusLines": "{{n}}줄",
-    "statusCursor": "{{line}}줄 {{col}}열"
+    "statusCursor": "{{line}}줄 {{col}}열",
+    "clickForDiff": "차이를 보려면 클릭",
+    "noDiff": "현재 버전과 차이 없음",
+    "saveFailed": "저장 실패"
   },
   "marketplace": {
     "title": "마켓플레이스",
@@ -1181,7 +1203,8 @@
     "nameImmutable": "이름은 변경할 수 없습니다. 변경하려면 삭제 후 새로 등록하세요.",
     "envEmptyValue": "환경변수 값이 비어있습니다. 값을 지정하거나 해당 줄을 삭제하세요.",
     "env": "환경변수 (줄당 KEY=VALUE)",
-    "noArguments": "인자 없음"
+    "noArguments": "인자 없음",
+    "name": "이름"
   },
   "memory": {
     "title": "메모리",
@@ -1272,7 +1295,8 @@
     "key": "키",
     "updated": "수정일",
     "lastAccessed": "마지막 접근",
-    "summary": "요약"
+    "summary": "요약",
+    "searchFailed": "검색에 실패했습니다. 다시 시도해 주세요."
   },
   "mounts": {
     "title": "마운트",
@@ -1299,15 +1323,15 @@
     "editDescription": "마운트의 이름과 경로를 변경합니다.",
     "saved": "마운트가 저장되었습니다",
     "saveFailed": "마운트 저장에 실패했습니다",
-    "pathEditHint": "경로를 바꾸면 자동 설명과 기술 스택이 다시 채워집니다."
+    "pathEditHint": "경로를 바꾸면 자동 설명과 기술 스택이 다시 채워집니다.",
+    "deleteConfirmTitle": "마운트를 삭제하시겠습니까?",
+    "deleteConfirmDescription": "이 마운트가 영구적으로 제거됩니다. 이 마운트에 의존하던 에이전트는 접근 권한을 잃습니다."
   },
   "notificationCenter": {
     "title": "알림 센터",
-    "schedule": "일정",
     "notifications": "알림",
     "nextEvent": "다음 일정",
     "noUpcoming": "예정된 일정이 없어요",
-    "openCalendar": "캘린더 열기",
     "calendarDisabled": "캘린더가 비활성화되어 있어요",
     "enableCalendar": "설정에서 활성화"
   },
@@ -1325,17 +1349,13 @@
   },
   "personas": {
     "title": "페르소나",
-    "newPersona": "새 페르소나",
     "personaName": "페르소나 이름",
     "noPersonas": "페르소나 없음",
-    "createFirstPersona": "첫 번째 페르소나를 만드세요",
     "subtitle": "에이전트 페르소나 관리",
     "singleActiveHint": "한 번에 하나만 활성화됩니다",
     "createPersona": "페르소나 만들기",
     "personaNamePlaceholder": "페르소나 이름",
-    "descriptionPlaceholder": "설명",
     "systemPromptPlaceholder": "시스템 프롬프트...",
-    "description": "에이전트에 독특한 페르소나를 부여하려면 페르소나를 만드세요.",
     "activatePersona": "페르소나 활성화",
     "deletePersona": "페르소나 삭제",
     "descriptionHint": "에이전트에 독특한 페르소나를 부여하려면 페르소나를 만드세요.",
@@ -1343,7 +1363,14 @@
     "edit": "페르소나 편집",
     "editDescription": "페르소나의 이름, 설명, 시스템 프롬프트를 변경합니다.",
     "saveFailed": "페르소나 저장에 실패했습니다",
-    "loadFailed": "페르소나를 불러오지 못했습니다."
+    "loadFailed": "페르소나를 불러오지 못했습니다.",
+    "createPersonaDescription": "에이전트 사용자 정의를 위한 새 페르소나를 만듭니다.",
+    "deletePersonaConfirmTitle": "페르소나를 삭제하시겠습니까?",
+    "deletePersonaConfirmDescription": "이 페르소나가 영구적으로 삭제됩니다. 의존하던 에이전트는 설정을 잃습니다.",
+    "nameLabel": "이름",
+    "saved": "페르소나가 저장되었습니다",
+    "systemPrompt": "시스템 프롬프트",
+    "systemPromptLabel": "시스템 프롬프트"
   },
   "projects": {
     "activity": "활동",
@@ -1406,7 +1433,8 @@
     "undoWarning": "이 작업은 되돌릴 수 없습니다.",
     "updateError": "수정 실패: {{error}}",
     "updateSuccess": "프로젝트가 수정되었습니다",
-    "updatedAt": "수정일"
+    "updatedAt": "수정일",
+    "attachMountsError": "프로젝트는 생성되었으나 마운트 연결에 실패했습니다: {{err}}"
   },
   "questionnaire": {
     "additionalThoughts": "추가 의견 (선택)",
@@ -1435,7 +1463,6 @@
     "memory": "메모리",
     "disk": "디스크",
     "cpu": "CPU",
-    "noResourceData": "리소스 데이터 없음",
     "resourceHistory": "리소스 기록",
     "notEnoughData": "차트를 표시할 데이터가 부족합니다. 시간이 지나면 데이터가 수집됩니다."
   },
@@ -1457,21 +1484,20 @@
     "noAuditEntriesDescription": "보안 감사 이벤트가 여기에 표시됩니다.",
     "permission": "권한",
     "readOnly": "읽기 전용",
-    "showingEntries": "{{total}}개 중 {{start}}–{{end}} 표시"
+    "showingEntries": "{{total}}개 중 {{start}}–{{end}} 표시",
+    "noMatchingEntries": "필터에 일치하는 항목이 없습니다",
+    "onlyDenied": "거부된 것만",
+    "searchAudit": "감사 로그 검색…"
   },
   "sessions": {
     "title": "세션",
     "sessionId": "세션 ID",
     "createdAt": "생성일",
-    "lastActive": "마지막 활동",
     "noSessions": "세션 없음",
-    "viewSession": "세션 보기",
     "agent": "에이전트",
     "messages": "메시지",
     "updated": "수정됨",
     "deleteSession": "세션 삭제",
-    "count": "{{count}}개 세션",
-    "description": "에이전트 상호작용 후 세션이 여기에 표시됩니다.",
     "notFound": "세션을 찾을 수 없습니다",
     "sessionDetail": "세션 상세",
     "sessionInfo": "세션 정보",
@@ -1826,7 +1852,11 @@
     "timeFormat": "시간 표시",
     "timeFormatDesc": "12시간제 또는 24시간제 선택",
     "format12h": "12시간제",
-    "format24h": "24시간제"
+    "format24h": "24시간제",
+    "secretInvalid": "시크릿이 유효하지 않습니다",
+    "secretValid": "시크릿이 유효합니다",
+    "secretValidateFailed": "시크릿 검증 실패",
+    "verify": "검증"
   },
   "sidebar": {
     "console": "콘솔",
@@ -1911,7 +1941,9 @@
     "summaryDisabled": "비활성",
     "saveActivate": "저장하고 활성화",
     "loadContentFailed": "스킬 콘텐츠를 불러오지 못했습니다.",
-    "loadDetailFailed": "스킬 상세 정보를 불러오지 못했습니다"
+    "loadDetailFailed": "스킬 상세 정보를 불러오지 못했습니다",
+    "collapse": "세부 정보 접기",
+    "expand": "세부 정보 펼치기"
   },
   "spaces": {
     "title": "공간",
@@ -1946,8 +1978,7 @@
     "log": "로그",
     "logDescription": "최근 데몬 로그를 확인합니다.",
     "noLogEntries": "로그 항목이 없습니다.",
-    "showingLines": "{{total}}개 중 {{shown}}개 라인 표시",
-    "run": "실행"
+    "showingLines": "{{total}}개 중 {{shown}}개 라인 표시"
   },
   "tokenMaxing": {
     "title": "토큰 맥싱",
@@ -2038,16 +2069,10 @@
       "stopReason": "중단 사유",
       "tokensFmt": "{{tokens}} 토큰",
       "duration": "{{seconds}}초",
-      "source": {
-        "skill": "스킬",
-        "project": "프로젝트",
-        "recurring": "반복"
-      }
+      "source": {}
     }
   },
-  "ui": {
-    "selectPlaceholder": "선택..."
-  },
+  "ui": {},
   "update": {
     "title": "업데이트",
     "checking": "업데이트 확인 중...",
@@ -2071,7 +2096,6 @@
   },
   "workspace": {
     "title": "작업공간",
-    "subtitle": "파일 브라우저",
     "files": "파일",
     "noWorkspace": "작업공간 없음",
     "description": "작업공간 파일이 여기에 표시됩니다.",
@@ -2079,7 +2103,6 @@
     "doubleClickEdit": "더블클릭으로 편집",
     "deleteConfirmTitle": "파일을 삭제하시겠습니까?",
     "deleteConfirmDesc": "{{path}} 파일이 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
-    "uploadFile": "파일 업로드",
-    "hideUpload": "업로드 숨기기"
+    "uploadFile": "파일 업로드"
   }
 }

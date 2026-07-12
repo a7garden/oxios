@@ -75,13 +75,6 @@ use crate::api::server::AppState;
 // Request / Response types
 // ---------------------------------------------------------------------------
 
-/// Query parameters for tree listing.
-#[derive(Debug, Deserialize)]
-pub(crate) struct KnowledgeTreeParams {
-    /// Subdirectory within knowledge/ to list.
-    #[serde(default)]
-    pub dir: Option<String>,
-}
 
 /// File tree entry.
 #[derive(Debug, Serialize, Clone)]
@@ -95,6 +88,47 @@ pub(crate) struct KnowledgeTreeEntry {
     /// RFC-022: note quality from frontmatter. null = user-written.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oxios_quality: Option<String>,
+}
+
+/// Query parameters for recursive tree listing (new recursive mode).
+#[derive(Debug, Deserialize)]
+pub(crate) struct KnowledgeTreeQuery {
+    /// Subdirectory to list (ignored when recursive=true).
+    #[serde(default)]
+    pub dir: Option<String>,
+    /// When true, returns the full nested tree in one response.
+    #[serde(default)]
+    pub recursive: Option<bool>,
+}
+
+/// Recursive tree node (used when `?recursive=true`).
+///
+/// `size` is intentionally omitted: `FileEntry` doesn't expose it and the
+/// knowledge tree UI only shows `has_content` (empty-file opacity cue).
+/// If a future feature needs raw size, add a `file_size(path)` accessor to
+/// `oxios-markdown` and surface it here.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct KnowledgeTreeNode {
+    pub name: String,
+    /// Full path relative to knowledge root.
+    pub path: String,
+    pub is_dir: bool,
+    /// Modification time (epoch ms, 0 for dirs).
+    pub ctime: i64,
+    /// Display name without extension.
+    pub display_name: String,
+    /// False for empty placeholder files.
+    pub has_content: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oxios_quality: Option<String>,
+    pub children: Vec<KnowledgeTreeNode>,
+}
+
+/// Request body for POST /api/knowledge/move.
+#[derive(Debug, Deserialize)]
+pub(crate) struct KnowledgeMoveBody {
+    pub from: String,
+    pub to: String,
 }
 
 /// Search request body.
@@ -411,61 +445,161 @@ fn guess_knowledge_mime(path: &str) -> String {
 // ---------------------------------------------------------------------------
 
 /// GET /api/knowledge/tree — File tree of the knowledge directory.
+///
+/// Two modes:
+/// - Default (legacy): returns flat list of entries in the requested dir.
+/// - `?recursive=true`: returns the full nested tree (one request covers the
+///   whole KB). Used by the redesigned sidebar file-tree (R2/D1).
 pub(crate) async fn handle_knowledge_tree(
     state: State<Arc<AppState>>,
-    Query(params): Query<KnowledgeTreeParams>,
-) -> Result<Json<Vec<KnowledgeTreeEntry>>, AppError> {
-    let dir = params.dir.as_deref().unwrap_or("");
-    let entries = state
-        .kernel
-        .knowledge
-        .note_tree(dir)
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Query(params): Query<KnowledgeTreeQuery>,
+) -> Result<Json<TreeResponse>, AppError> {
+    let recursive = params.recursive.unwrap_or(false);
 
-    let mut result: Vec<KnowledgeTreeEntry> = entries
-        .into_iter()
-        .filter(|e| !e.name.starts_with('.') && e.name != ".DS_Store")
-        .map(|e| {
-            // Read frontmatter for quality badge (RFC-022)
-            let oxios_quality = if !e.is_dir {
-                let rel_path = if dir.is_empty() || dir == "/" {
-                    e.name.clone()
-                } else {
-                    format!("{}/{}", dir.trim_start_matches('/'), e.name)
-                };
-                state
-                    .kernel
-                    .knowledge
-                    .note_read(&rel_path)
-                    .ok()
-                    .flatten()
-                    .and_then(|content| {
-                        let (meta, _) = oxios_markdown::knowledge::parse_note_meta(&content);
-                        meta.map(|m| {
-                            match m.quality {
+    if recursive {
+        let tree = build_recursive_tree(&state.kernel.knowledge, "")
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        Ok(Json(TreeResponse::Recursive(tree)))
+    } else {
+        let dir = params.dir.as_deref().unwrap_or("");
+        let entries = state
+            .kernel
+            .knowledge
+            .note_tree(dir)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let mut result: Vec<KnowledgeTreeEntry> = entries
+            .into_iter()
+            .filter(|e| !e.name.starts_with('.') && e.name != ".DS_Store")
+            .map(|e| {
+                let oxios_quality = if !e.is_dir {
+                    let rel_path = if dir.is_empty() || dir == "/" {
+                        e.name.clone()
+                    } else {
+                        format!("{}/{}", dir.trim_start_matches('/'), e.name)
+                    };
+                    state
+                        .kernel
+                        .knowledge
+                        .note_read(&rel_path)
+                        .ok()
+                        .flatten()
+                        .and_then(|content| {
+                            let (meta, _) =
+                                oxios_markdown::knowledge::parse_note_meta(&content);
+                            meta.map(|m| match m.quality {
                                 oxios_markdown::types::NoteQuality::Raw => "raw",
                                 oxios_markdown::types::NoteQuality::Curated => "curated",
                                 oxios_markdown::types::NoteQuality::Refined => "refined",
+                                _ => "raw",
                             }
-                            .to_string()
+                            .to_string())
                         })
-                    })
-            } else {
-                None
-            };
-            KnowledgeTreeEntry {
-                name: e.name,
-                is_dir: e.is_dir,
-                size: 0,
-                oxios_quality,
-            }
-        })
-        .collect();
+                } else {
+                    None
+                };
+                KnowledgeTreeEntry {
+                    name: e.name,
+                    is_dir: e.is_dir,
+                    size: 0,
+                    oxios_quality,
+                }
+            })
+            .collect();
+        // Sort: directories first, then alphabetical (legacy behavior).
+        result.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
+        Ok(Json(TreeResponse::Flat(result)))
+    }
+}
 
-    // Sort: directories first, then alphabetical
+/// Tagged response for tree endpoint (axum requires a single body type).
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum TreeResponse {
+    Flat(Vec<KnowledgeTreeEntry>),
+    Recursive(Vec<KnowledgeTreeNode>),
+}
+
+/// Build a recursive tree by repeatedly calling `note_tree`.
+/// The knowledge base's `note_tree` returns one directory at a time, so
+/// recursion is unavoidable client-side. For personal KBs (tens to hundreds
+/// of files) this is cheap.
+fn build_recursive_tree(
+    kb: &oxios_markdown::KnowledgeBase,
+    dir: &str,
+) -> anyhow::Result<Vec<KnowledgeTreeNode>> {
+    let entries = kb.note_tree(dir)?;
+    let mut result = Vec::with_capacity(entries.len());
+    // Collect first, then sort, to match the legacy flat mode's ordering
+    // (directories first, then alphabetical).
+    for e in entries
+        .into_iter()
+        .filter(|e| !e.name.starts_with('.') && e.name != ".DS_Store")
+    {
+        let path = if dir.is_empty() || dir == "/" {
+            e.name.clone()
+        } else {
+            format!("{}/{}", dir, e.name)
+        };
+        let oxios_quality = if !e.is_dir {
+            kb.note_read(&path)
+                .ok()
+                .flatten()
+                .and_then(|content| {
+                    let (meta, _) = oxios_markdown::knowledge::parse_note_meta(&content);
+                    meta.map(|m| match m.quality {
+                        oxios_markdown::types::NoteQuality::Raw => "raw",
+                        oxios_markdown::types::NoteQuality::Curated => "curated",
+                        oxios_markdown::types::NoteQuality::Refined => "refined",
+                        _ => "raw",
+                    }
+                    .to_string())
+                })
+        } else {
+            None
+        };
+        let children = if e.is_dir {
+            build_recursive_tree(kb, &path)?
+        } else {
+            vec![]
+        };
+        result.push(KnowledgeTreeNode {
+            name: e.name.clone(),
+            path,
+            is_dir: e.is_dir,
+            ctime: e.ctime,
+            display_name: e.display_name.clone(),
+            has_content: e.has_content,
+            oxios_quality,
+            children,
+        });
+    }
+    // S6: server-side dirs-first, alpha ordering matches the legacy flat
+    // mode. The client also sorts in `sortNodes`, but having the server
+    // canonicalize lets other clients (e.g. terminal tui) skip re-sorting.
     result.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
+    Ok(result)
+}
 
-    Ok(Json(result))
+/// POST /api/knowledge/move — atomically move/rename a note.
+///
+/// Delegates to `KnowledgeBase::note_move` which:
+/// - calls `VirtualFs::rename_path` (atomic on the same filesystem → git detects rename)
+/// - re-indexes the backlinks
+/// - emits a `FileChange::Moved` notification
+pub(crate) async fn handle_knowledge_move(
+    state: State<Arc<AppState>>,
+    Json(body): Json<KnowledgeMoveBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    state
+        .kernel
+        .knowledge
+        .note_move(&body.from, &body.to)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "from": body.from,
+        "to": body.to,
+    })))
 }
 
 /// GET /api/knowledge/file/{*path} — Read a knowledge file.

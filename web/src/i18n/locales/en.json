@@ -6,7 +6,6 @@
     "noAgentsDescription": "Start an agent to see it appear on the canvas. Multi-agent delegation shows connections here.",
     "graphControls": "Graph controls",
     "graphMinimap": "Graph minimap",
-    "inspectorTitle": "Agent {{name}}",
     "capabilities": "Capabilities",
     "skills": "Skills",
     "messages": "Messages",
@@ -77,7 +76,8 @@
     "memoryRecall": "Memory Recall",
     "reasoning": "Reasoning",
     "previous": "← Previous",
-    "next": "Next →"
+    "next": "Next →",
+    "kill": "Kill"
   },
   "approvals": {
     "title": "Approvals",
@@ -349,6 +349,7 @@
     "cancel": "Cancel",
     "connected": "Connected",
     "greeting": "What can I help you with?",
+    "emptyHint": "Pick a recent conversation below, or type anything to start a new one.",
     "roleYou": "You",
     "interviewTitle": "Interview",
     "retry": "Retry",
@@ -395,7 +396,8 @@
         "navigate": "↑↓ navigate",
         "select": "↵ select",
         "close": "esc close"
-      }
+      },
+      "setAsDefaultHintNoModel": "Pick a model first"
     },
     "input": {
       "placeholder": "Message Oxios…",
@@ -409,7 +411,8 @@
       "stopHint": "Stop generating",
       "removeMount": "Remove mount",
       "removeAttachment": "Remove attachment",
-      "newline": "new line"
+      "newline": "new line",
+      "mountBound": "Bound to this session"
     }
   },
   "commandPalette": {
@@ -418,7 +421,6 @@
     "empty": "No results",
     "sectionNavigation": "Go to",
     "sectionCapture": "Quick capture",
-    "sectionDestination": "Destination",
     "sectionActions": "Actions",
     "captureMemo": "Capture memo",
     "captureTo": "Add to {{route}}",
@@ -469,7 +471,6 @@
     "newMount": "New mount",
     "hintNavigate": "navigate",
     "hintSelect": "select",
-    "hintRoute": "route",
     "hintVerbs": "commands",
     "hintEntity": "entity",
     "hintClose": "close"
@@ -618,13 +619,9 @@
     "spend": "Spend",
     "noData": "No spend data yet",
     "period": {
-      "today": "Today",
-      "week": "7 Days",
-      "month": "30 Days",
-      "all": "All Time"
+      "month": "30 Days"
     },
     "providerQuota": "Provider Quota",
-    "noProviderQuota": "No quota information available",
     "noProviderQuotaDesc": "This provider does not expose quota data or no requests have been made yet.",
     "periodSpend": "This period",
     "spendLimitNote": "The spend limit is alert-only. Manage per-agent enforcement limits in the Budget section below.",
@@ -715,7 +712,11 @@
       "disabled": "Disabled",
       "parseFailed": "Parse failed",
       "nextRun": "next run"
-    }
+    },
+    "goal": "Goal",
+    "name": "Name",
+    "everyNMinutes": "Every minute",
+    "everyNHours": "Every hour"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -876,7 +877,9 @@
     "totalSent": "total sent",
     "userHint": "Defaults to the email address if empty.",
     "userLabel": "Username",
-    "viewDetails": "View"
+    "viewDetails": "View",
+    "hidePassword": "Hide password",
+    "showPassword": "Show password"
   },
   "engine": {
     "reasoning": "Reasoning",
@@ -972,16 +975,14 @@
     "commitLog": "Commit Log",
     "noCommits": "No commits",
     "noCommitsDescription": "Commit history will appear here.",
-    "repository": "Repository",
-    "branch": "Branch",
-    "status": "Status",
-    "noChanges": "No changes",
     "restoreConfirmTitle": "Restore to this commit?",
     "restoreConfirmDesc": "Restores the working directory to {{hash}}. Uncommitted changes may be lost.",
     "useHashForRestore": "Use this hash for restore",
     "deleteTag": "Delete tag",
     "tagDeleted": "Tag deleted",
-    "tagDeleteFailed": "Failed to delete tag"
+    "tagDeleteFailed": "Failed to delete tag",
+    "verifyFailed": "Verification failed",
+    "verifySuccess": "Git integrity verified"
   },
   "knowledge": {
     "title": "Knowledge",
@@ -1053,7 +1054,12 @@
     "toggleInfoPanel": "Toggle info panel",
     "toJournal": "To Journal",
     "deleteCurrentFile": "Delete current file (⌘D)",
-    "moveToFolder": "Move to folder...",
+    "deleteConfirmTitle": "Delete this file?",
+    "deleteConfirmBody": "Permanently delete this file: {{path}}",
+    "treeFilterPlaceholder": "Filter tree...",
+    "treeFilterClear": "Clear filter",
+    "treeFilterResults": "Filter results",
+    "treeFilterNoMatch": "No matching files",
     "copilotPlaceholder": "Ask about your notes...",
     "newFileShortcut": "New file (⌘N)",
     "newFolderShortcut": "New folder (⌘⇧N)",
@@ -1102,6 +1108,15 @@
     "habitWeekend": "Weekend completion",
     "chatTitle": "Quick Notes",
     "files": "Files",
+    "emptyTree": "No notes yet",
+    "emptyTreeHint": "Use the + buttons below to create your first note.",
+    "newFolderDialogTitle": "New folder",
+    "newFolderAtRoot": "Creates a new folder at the root of your knowledge base.",
+    "newFolderInPath": "Creates a new folder inside {{path}}.",
+    "newFolderPlaceholder": "Folder name",
+    "create": "Create",
+    "folderCreated": "Folder created.",
+    "createFolderFailed": "Failed to create folder",
     "noFileOpen": "No file open",
     "noHistory": "No version history yet",
     "restore": "Restore",
@@ -1139,7 +1154,10 @@
     "statusWords": "{{n}} words",
     "statusChars": "{{n}} chars",
     "statusLines": "{{n}} lines",
-    "statusCursor": "Ln {{line}}, Col {{col}}"
+    "statusCursor": "Ln {{line}}, Col {{col}}",
+    "clickForDiff": "Click to view diff",
+    "noDiff": "No changes from current version",
+    "saveFailed": "Save failed"
   },
   "marketplace": {
     "title": "Marketplace",
@@ -1187,7 +1205,8 @@
     "nameImmutable": "Name cannot be changed. Delete and re-register to rename.",
     "envEmptyValue": "Environment variable value is empty. Set a value or remove the line.",
     "env": "Environment variables (KEY=VALUE per line)",
-    "noArguments": "No arguments"
+    "noArguments": "No arguments",
+    "name": "Name"
   },
   "memory": {
     "title": "Memory",
@@ -1278,7 +1297,8 @@
     "key": "Key",
     "updated": "Updated",
     "lastAccessed": "Last accessed",
-    "summary": "Summary"
+    "summary": "Summary",
+    "searchFailed": "Search failed. Please try again."
   },
   "mounts": {
     "title": "Mounts",
@@ -1305,15 +1325,15 @@
     "editDescription": "Update this mount's name and path.",
     "saved": "Mount saved",
     "saveFailed": "Failed to save mount",
-    "pathEditHint": "Changing the path re-seeds the auto description and tech stack."
+    "pathEditHint": "Changing the path re-seeds the auto description and tech stack.",
+    "deleteConfirmTitle": "Delete mount?",
+    "deleteConfirmDescription": "This will permanently remove the mount. Agents that depend on it will lose access."
   },
   "notificationCenter": {
     "title": "Notification Center",
-    "schedule": "Schedule",
     "notifications": "Notifications",
     "nextEvent": "Next event",
     "noUpcoming": "No upcoming events",
-    "openCalendar": "Open calendar",
     "calendarDisabled": "Calendar is disabled",
     "enableCalendar": "Enable in Settings"
   },
@@ -1331,17 +1351,13 @@
   },
   "personas": {
     "title": "Personas",
-    "newPersona": "New Persona",
     "personaName": "Persona Name",
     "noPersonas": "No personas yet",
-    "createFirstPersona": "Create your first persona",
     "subtitle": "Manage agent personas",
     "singleActiveHint": "Only one persona active at a time",
     "createPersona": "Create Persona",
     "personaNamePlaceholder": "Persona name",
-    "descriptionPlaceholder": "Description",
     "systemPromptPlaceholder": "System prompt...",
-    "description": "Create personas to give agents distinct personalities.",
     "activatePersona": "Activate persona",
     "deletePersona": "Delete persona",
     "descriptionHint": "Create personas to give agents distinct personalities.",
@@ -1349,7 +1365,14 @@
     "edit": "Edit Persona",
     "editDescription": "Change the persona's name, description, and system prompt.",
     "saveFailed": "Failed to save persona",
-    "loadFailed": "Failed to load persona."
+    "loadFailed": "Failed to load persona.",
+    "createPersonaDescription": "Create a new persona for agent customization.",
+    "deletePersonaConfirmTitle": "Delete persona?",
+    "deletePersonaConfirmDescription": "This will permanently delete the persona. Agents that depend on it will lose their configuration.",
+    "nameLabel": "Name",
+    "saved": "Persona saved",
+    "systemPrompt": "System prompt",
+    "systemPromptLabel": "System prompt"
   },
   "projects": {
     "activity": "Activity",
@@ -1412,14 +1435,13 @@
     "undoWarning": "This action cannot be undone.",
     "updateError": "Failed to update: {{error}}",
     "updateSuccess": "Project updated",
-    "updatedAt": "Updated"
+    "updatedAt": "Updated",
+    "attachMountsError": "Project created, but attaching mounts failed: {{err}}"
   },
   "questionnaire": {
     "additionalThoughts": "Additional thoughts (optional)",
     "cancel": "Cancel",
     "count": "{{count}} questions",
-    "count_one": "{{count}} question",
-    "count_other": "{{count}} questions",
     "optionalPlaceholder": "Anything else you want to add...",
     "submit": "Submit",
     "title": "Questions",
@@ -1443,7 +1465,6 @@
     "memory": "Memory",
     "disk": "Disk",
     "cpu": "CPU",
-    "noResourceData": "No resource data available",
     "resourceHistory": "Resource History",
     "notEnoughData": "Not enough data to display chart. Data is collected over time."
   },
@@ -1465,21 +1486,20 @@
     "noAuditEntriesDescription": "Security audit events will appear here.",
     "permission": "permission",
     "readOnly": "Read-only",
-    "showingEntries": "Showing {{start}}–{{end}} of {{total}}"
+    "showingEntries": "Showing {{start}}–{{end}} of {{total}}",
+    "noMatchingEntries": "No entries match the filter",
+    "onlyDenied": "Only denied",
+    "searchAudit": "Search audit trail…"
   },
   "sessions": {
     "title": "Sessions",
     "sessionId": "Session ID",
     "createdAt": "Created",
-    "lastActive": "Last Active",
     "noSessions": "No sessions yet",
-    "viewSession": "View Session",
     "agent": "Agent",
     "messages": "Messages",
     "updated": "Updated",
     "deleteSession": "Delete session",
-    "count": "{{count}} session(s)",
-    "description": "Sessions will appear here after agent interactions.",
     "notFound": "Session not found",
     "sessionDetail": "Session detail",
     "sessionInfo": "Session Information",
@@ -1834,7 +1854,11 @@
     "timeFormat": "Time Format",
     "timeFormatDesc": "12-hour or 24-hour clock display",
     "format12h": "12-hour",
-    "format24h": "24-hour"
+    "format24h": "24-hour",
+    "secretInvalid": "Secret is invalid",
+    "secretValid": "Secret is valid",
+    "secretValidateFailed": "Failed to validate secret",
+    "verify": "Verify"
   },
   "sidebar": {
     "console": "Console",
@@ -1919,7 +1943,9 @@
     "summaryDisabled": "disabled",
     "saveActivate": "Save & Activate",
     "loadContentFailed": "Failed to load skill content.",
-    "loadDetailFailed": "Failed to load skill detail"
+    "loadDetailFailed": "Failed to load skill detail",
+    "collapse": "Collapse details",
+    "expand": "Expand details"
   },
   "spaces": {
     "title": "Spaces",
@@ -1954,8 +1980,7 @@
     "log": "Log",
     "logDescription": "View recent daemon log entries.",
     "noLogEntries": "No log entries.",
-    "showingLines": "Showing {{shown}} of {{total}} lines",
-    "run": "Run"
+    "showingLines": "Showing {{shown}} of {{total}} lines"
   },
   "tokenMaxing": {
     "title": "Token Maxing",
@@ -2046,16 +2071,10 @@
       "stopReason": "Stop reason",
       "tokensFmt": "{{tokens}} tokens",
       "duration": "{{seconds}}s",
-      "source": {
-        "skill": "Skill",
-        "project": "Project",
-        "recurring": "Recurring"
-      }
+      "source": {}
     }
   },
-  "ui": {
-    "selectPlaceholder": "Select..."
-  },
+  "ui": {},
   "update": {
     "title": "Update",
     "checking": "Checking for updates...",
@@ -2079,7 +2098,6 @@
   },
   "workspace": {
     "title": "Workspace",
-    "subtitle": "File browser",
     "files": "Files",
     "noWorkspace": "No workspace",
     "description": "Workspace files will appear here.",
@@ -2087,7 +2105,6 @@
     "doubleClickEdit": "Double-click to edit",
     "deleteConfirmTitle": "Delete this file?",
     "deleteConfirmDesc": "{{path}} will be permanently deleted. This cannot be undone.",
-    "uploadFile": "Upload file",
-    "hideUpload": "Hide upload"
+    "uploadFile": "Upload file"
   }
 }

@@ -234,19 +234,40 @@ State (Zustand):
 #### `KnowledgeSidebar` + `FileTree`
 
 **원본**: `lib/sidebar.js`, `lib/sidebar.css`
+**갱신**: 2026-07-12 — [갭 분석 + UI 재설계](designs/2026-07-12-knowledge-filetree-design.md)
 
 ```
-API: GET /api/knowledge/tree?dir=
+API:
+  GET  /api/knowledge/tree                       → 기존 단일 디렉토리 (호환)
+  GET  /api/knowledge/tree?recursive=true        → 전체 트리 (1회)
+  POST /api/knowledge/move                       → 원자적 move/rename
 
 기능:
-  - GET /tree → 디렉토리 트리 렌더링
-  - 디렉토리 확장/축소 (지연 로딩)
+  - GET /tree?recursive=true → 디렉토리 트리 1회 렌더 (N+1 제거)
+  - Zustand persist + expandToPath로 확장 상태 관리 (R1 해결)
   - 파일 클릭 → openFile(path)
-  - 우클릭 컨텍스트 메뉴: 이름 변경, 삭제, 새 파일
-  - 시스템 디렉토리 숨김 (archive, .config)
-  - 새로 생성된 파일 깜박임 (원본 sidebar-blink)
-  - 드래그 리사이즈 핸들
-  - [+New File] / [+New Dir] 버튼
+  - 폴더 우클릭 → "새 파일 만들기" 인라인 (R5 부분 해결)
+  - 시스템 디렉토리 숨김은 백엔드 IGNORED_NAMES에 위임
+  - [+/New File] / [+/New Dir] — `generateUniqueName`으로 충돌 방지 (R6 해결)
+  - 인라인 이름 변경 (F2/이름 더블클릭 대신 Enter, C3/C4/C7 수정 적용)
+  - DnD 리페어런팅 — `POST /api/knowledge/move` 직접 호출, 순환 가드
+
+부가:
+  - ARIA: role="tree/treeitem", aria-level/expanded/selected (D6)
+  - sidebar-accent 토큰 통일
+  - 활성 파일 좌측 2px 액센트 바 (다크모드 가시성)
+  - `depth * 16 + 8`px 들여쓰기 (workspace 트리와 통일, D5)
+  - 공유 유틸: web/src/lib/tree-utils.ts (indentStyle, fileTint, countFilesRecursive,
+    flattenTree, generateUniqueName)
+  - 빈 상태: `EmptyState` 컴포넌트
+
+이후 (선택):
+  - 키보드 탐색 (Arrow/Enter/Space/Home/End/F2/Delete/Escape) — Phase 5
+  - 새 파일 깜박임 애니메이션
+  - 인라인 필터 (§8.6)
+  - workspace/chat-session 트리 정렬 통일
+
+see also: docs/designs/2026-07-12-knowledge-filetree-design.md §3-§10
 ```
 
 ---

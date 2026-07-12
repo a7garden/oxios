@@ -19,6 +19,13 @@ interface KnowledgeState {
   splitEditorOpen: boolean
   splitFilePath: string | null
 
+  // Tree expansion (D2 — Phase 2)
+  expandedPaths: string[]
+  // Focused tree item (D6 — roving tabindex, Phase 5)
+  focusedPath: string | null
+  // Path of the most recently created file (Phase 5 §8.4: file-blink animation).
+  // Cleared automatically after a short timeout to limit blast radius.
+  recentlyCreatedPath: string | null
   // Actions
   openFile: (path: string) => void
   openChat: () => void
@@ -28,6 +35,29 @@ interface KnowledgeState {
   toggleInfoPanel: () => void
   openSplit: (path: string) => void
   closeSplit: () => void
+
+  // Tree actions
+  toggleExpand: (path: string) => void
+  expandPath: (path: string) => void // idempotent
+  collapseAll: () => void
+  expandToPath: (filePath: string) => void // expand all parent dirs
+  setFocus: (path: string | null) => void
+  // Phase 5 §8.4 — file-blink animation. Triggers the highlight on
+  // the given path and clears it after ~1.5s.
+  markFileCreated: (path: string) => void
+}
+
+/** Expand every parent directory of `filePath`. E.g. "brain/rust/x.md" → ["brain", "brain/rust"]. */
+function expandToPathSegments(filePath: string): string[] {
+  if (!filePath.includes('/')) return []
+  const dirs = filePath.split('/').slice(0, -1)
+  const out: string[] = []
+  let acc = ''
+  for (const dir of dirs) {
+    acc = acc ? `${acc}/${dir}` : dir
+    out.push(acc)
+  }
+  return out
 }
 
 export const useKnowledgeStore = create<KnowledgeState>()(
@@ -40,19 +70,25 @@ export const useKnowledgeStore = create<KnowledgeState>()(
       infoPanelOpen: false,
       splitEditorOpen: false,
       splitFilePath: null,
+      expandedPaths: [],
+      focusedPath: null,
+      recentlyCreatedPath: null,
 
       openFile: (path) => {
         const { history, historyIndex } = get()
         // Trim forward history
         const newHistory = [...history.slice(0, historyIndex + 1), path]
+        // Auto-expand ancestors so the active file is visible (§3.2 / Phase 2 step 7)
+        const toExpand = expandToPathSegments(path)
+        const expandedPaths = Array.from(new Set([...get().expandedPaths, ...toExpand]))
         set({
           mode: 'editor',
           currentFilePath: path,
           history: newHistory,
           historyIndex: newHistory.length - 1,
+          expandedPaths,
         })
       },
-
       openChat: () => {
         set({ mode: 'chat' })
       },
@@ -96,10 +132,48 @@ export const useKnowledgeStore = create<KnowledgeState>()(
       closeSplit: () => {
         set({ splitEditorOpen: false, splitFilePath: null })
       },
+
+      // ── Tree actions ──
+      toggleExpand: (path) => {
+        const cur = get().expandedPaths
+        set({
+          expandedPaths: cur.includes(path)
+            ? cur.filter((p) => p !== path)
+            : [...cur, path],
+        })
+      },
+      expandPath: (path) => {
+        const cur = get().expandedPaths
+        if (!cur.includes(path)) set({ expandedPaths: [...cur, path] })
+      },
+      collapseAll: () => set({ expandedPaths: [] }),
+      expandToPath: (filePath) => {
+        const toExpand = expandToPathSegments(filePath)
+        if (toExpand.length === 0) return
+        set({
+          expandedPaths: Array.from(new Set([...get().expandedPaths, ...toExpand])),
+        })
+      },
+      setFocus: (path) => set({ focusedPath: path }),
+
+      markFileCreated: (path) => {
+        set({ recentlyCreatedPath: path })
+        if (typeof window !== 'undefined') {
+          window.setTimeout(() => {
+            const cur = get().recentlyCreatedPath
+            // Only clear if still pointing at this file (avoid clobbering a
+            // newer blink that started during the timeout window).
+            if (cur === path) set({ recentlyCreatedPath: null })
+          }, 1500)
+        }
+      },
     }),
     {
       name: 'oxios-knowledge',
-      partialize: () => ({}),
+      partialize: (s) => ({
+        expandedPaths: s.expandedPaths,
+        focusedPath: s.focusedPath,
+      }),
     },
   ),
 )
