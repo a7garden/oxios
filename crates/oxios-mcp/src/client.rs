@@ -104,13 +104,24 @@ impl McpClient {
             return Ok(());
         }
 
+        // SECURITY (audit F-1): validate the command and sanitize the env at
+        // the spawn chokepoint — every MCP server spawn flows through here
+        // (HTTP register, boot config, OXIOS_MCP_* env vars), so enforcing
+        // here closes the blocklist-bypass that existed when validation lived
+        // only in the HTTP layer. Shell interpreters, metacharacters, path
+        // traversal, and loader/interpreter env injection (LD_PRELOAD,
+        // DYLD_*, PYTHONPATH, NODE_OPTIONS, …) are rejected here.
+        crate::validation::validate_mcp_command(&self.server.command)
+            .map_err(|reason| anyhow!("MCP server '{}' rejected: {reason}", self.server.name))?;
+        let safe_env = crate::validation::sanitize_env(&self.server.env);
+
         // Spawn the child process. `kill_on_drop(true)` guarantees the child
         // is killed if the `Child` handle is dropped without an explicit
         // kill — e.g. when `McpClient` is dropped or a handle is overwritten
         // by a retry (F3, F7).
         let mut child = Command::new(&self.server.command)
             .args(&self.server.args)
-            .envs(&self.server.env)
+            .envs(safe_env)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())

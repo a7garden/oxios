@@ -26,9 +26,11 @@
 
 pub mod client;
 pub mod protocol;
+pub mod validation;
 
 pub use client::McpClient;
 pub use protocol::*;
+pub use validation::{sanitize_env, validate_mcp_command, BLOCKED_MCP_SHELLS};
 
 use std::collections::HashMap;
 use std::sync::Arc;

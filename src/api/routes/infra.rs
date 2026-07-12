@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use oxios_kernel::ArgumentDef;
 use oxios_kernel::access_manager::AuditEntry;
 use oxios_kernel::metrics::registry;
+use oxios_kernel::mcp::validate_mcp_command;
 
 use crate::api::server::AppState;
 
@@ -274,70 +275,10 @@ fn default_true() -> bool {
     true
 }
 
-/// Shell interpreters that must never be spawned as an MCP server.
-/// Spawning any of these lets a caller run arbitrary commands via
-/// `args = ["-c", "<cmd>"]`, which defeats the purpose of the MCP
-/// command surface (RCE by design of the report's F4 scenario).
-const BLOCKED_MCP_SHELLS: &[&str] = &[
-    "sh",
-    "bash",
-    "dash",
-    "zsh",
-    "ksh",
-    "csh",
-    "tcsh",
-    "fish",
-    "ash",
-    "busybox",
-    "cmd",
-    "cmd.exe",
-    "powershell",
-    "powershell.exe",
-    "pwsh",
-    "pwsh.exe",
-];
-
-/// Validate an MCP server command before spawning it.
-///
-/// Rejects shell interpreters (which would allow `args = ["-c", ...]`
-/// arbitrary code execution) and commands containing shell metacharacters
-/// or path-traversal sequences. Returns the (possibly canonicalized)
-/// command basename for allowlist checks.
-fn validate_mcp_command(command: &str) -> Result<(), String> {
-    if command.is_empty() {
-        return Err("command must not be empty".into());
-    }
-    // Reject control / NUL bytes outright.
-    if command.chars().any(|c| c.is_control() || c == '\u{0}') {
-        return Err("command contains control characters".into());
-    }
-    // Reject shell metacharacters and whitespace — MCP commands are a
-    // single token (e.g. `npx`, `python`, `node`). Any of these would
-    // indicate an attempt to chain or inject.
-    const FORBIDDEN: &[char] = &[
-        ' ', '\t', ';', '|', '&', '>', '<', '`', '$', '(', ')', '{', '}', '\n', '\r', '*', '?',
-        '\\', '"', '\'',
-    ];
-    if command.contains(FORBIDDEN) {
-        return Err(format!(
-            "command contains forbidden characters (shell metacharacters or whitespace): {command:?}"
-        ));
-    }
-    // Reject path traversal in case the command is a path.
-    if command.contains("..") {
-        return Err("command must not contain path traversal (..)".into());
-    }
-    // Basename of the command for the shell blocklist check.
-    let basename = command.rsplit('/').next().unwrap_or(command);
-    let basename_lower = basename.to_ascii_lowercase();
-    if BLOCKED_MCP_SHELLS.iter().any(|s| *s == basename_lower) {
-        return Err(format!(
-            "refusing to spawn shell interpreter '{basename}' as an MCP server \
-             (would allow arbitrary command execution)"
-        ));
-    }
-    Ok(())
-}
+// MCP command validation lives in `oxios_mcp::validation` and is enforced
+// at the spawn chokepoint (McpClient::initialize). This HTTP layer re-uses
+// the shared `validate_mcp_command` to give users a friendly 400 before the
+// server is even registered; the authoritative check is at spawn (audit F-1).
 
 /// POST /api/mcp/servers — Register a new MCP server and start it.
 pub(crate) async fn handle_mcp_server_register(

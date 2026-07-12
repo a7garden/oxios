@@ -12,7 +12,7 @@ use oxios_kernel::{
     HnswMemoryIndex, MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator,
     OxiosConfig, OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, SkillManager,
     SkillsShClient, SkillsShInstaller, SubsystemState, Supervisor, access_manager::AccessManager,
-    auth::AuthManager, config::load_config,
+    auth::AuthManager, config::load_config, mcp::validate_mcp_command,
 };
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
@@ -612,7 +612,7 @@ impl Kernel {
         &self,
         web_dist: oxios_gateway::ActiveWebDist,
         heartbeat: Arc<AtomicU64>,
-    ) -> tokio::task::JoinHandle<()> {
+    ) -> (tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>) {
         let handle = self.handle();
         let guardian_task = tokio::spawn(async move {
             loop {
@@ -652,16 +652,21 @@ impl Kernel {
         });
 
         // Daily health check: web UI update, self-update check.
-        self.start_daily_health_check(web_dist);
+        // Returns the JoinHandle so callers can track it for clean shutdown
+        // (audit F-14 — previously fire-and-forget).
+        let health_task = self.start_daily_health_check(web_dist);
 
-        guardian_task
-    }
-
+        (guardian_task, health_task)
     /// Start the daily health check loop.
     ///
     /// Runs at 03:00 AM every day (user's local time) via cron expression.
     /// First tick is calculated to land on the next 3 AM, then every 24h after.
-    fn start_daily_health_check(&self, web_dist: oxios_gateway::ActiveWebDist) {
+    /// Returns the `JoinHandle` so callers can track it for clean shutdown
+    /// (audit F-14).
+    fn start_daily_health_check(
+        &self,
+        web_dist: oxios_gateway::ActiveWebDist,
+    ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
             let now = chrono::Local::now();
             let mut next = now
@@ -694,9 +699,8 @@ impl Kernel {
                     tracing::warn!(error = %e, "Daily health check failed");
                 }
             }
-        });
+        })
     }
-}
 
 /// Synchronous Guardian tick — runs on the blocking pool via spawn_blocking.
 ///
@@ -1832,6 +1836,14 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
     let bridge = McpBridge::new();
 
     for (name, def) in &config.mcp.servers {
+        // SECURITY (audit F-1): reject dangerous commands at registration
+        // time so a bad config surfaces at boot, not at first spawn. The
+        // spawn chokepoint (McpClient::initialize) re-checks regardless.
+        if let Err(reason) = validate_mcp_command(&def.command) {
+            tracing::warn!(server = %name, command = %def.command, %reason,
+                "Skipping MCP server from config (unsafe command)");
+            continue;
+        }
         let mut server = McpServer::new(name, &def.command);
         server.args = def.args.clone();
         server.env = def.env.clone();
@@ -1844,6 +1856,13 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
         if let Some(name) = key.strip_prefix("OXIOS_MCP_") {
             let name = name.trim_end_matches("_COMMAND");
             if name.is_empty() || config.mcp.servers.contains_key(name) {
+                continue;
+            }
+            // SECURITY (audit F-1): env-injected commands get the same
+            // blocklist check as config commands.
+            if let Err(reason) = validate_mcp_command(&value) {
+                tracing::warn!(server = %name, command = %value, %reason,
+                    "Skipping MCP server from environment (unsafe command)");
                 continue;
             }
             let mut server = McpServer::new(name, &value);
