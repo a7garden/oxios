@@ -174,7 +174,7 @@ impl ClawHubInstaller {
         // previous integrity value is not silently lost. (Use
         // `verify_skill_integrity` to actually re-check it against a fresh
         // download.)
-        if let Some(prev) = self.get_installed_version(slug) {
+        if let Ok(prev) = self.get_installed_version(slug) {
             let prev_origin_path = self.skills_dir.join(slug).join(".clawhub/origin.json");
             if let Ok(buf) = std::fs::read_to_string(&prev_origin_path) {
                 if let Ok(prev_origin) = serde_json::from_str::<ClawHubOrigin>(&buf) {
