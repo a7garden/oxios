@@ -4,11 +4,27 @@
 //! functions between MCP-native types and Oxios kernel types (`ToolDef`).
 
 pub use oxios_mcp::{
-    ClientInfo, InitializeParams, InitializeResult, MappedResource, McpBridge, McpCapabilities,
-    McpClient, McpContentBlock, McpError, McpRequest, McpResponse, McpServer, McpServerConfig,
-    McpTool, McpToolCallResult, McpToolsResult, ServerInfo,
+    BLOCKED_MCP_SHELLS,
+    ClientInfo,
+    InitializeParams,
+    InitializeResult,
+    MappedResource,
+    McpBridge,
+    McpCapabilities,
+    McpClient,
+    McpContentBlock,
+    McpError,
+    McpRequest,
+    McpResponse,
+    McpServer,
+    McpServerConfig,
+    McpTool,
+    McpToolCallResult,
+    McpToolsResult,
+    ServerInfo,
     // Spawn-validation chokepoint (audit F-1): command blocklist + env sanitize.
-    sanitize_env, validate_mcp_command, BLOCKED_MCP_SHELLS,
+    sanitize_env,
+    validate_mcp_command,
 };
 
 use crate::tools::tool_types::{ArgumentDef, ToolDef};

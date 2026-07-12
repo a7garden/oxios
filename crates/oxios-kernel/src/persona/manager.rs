@@ -171,10 +171,7 @@ impl PersonaManager {
     /// StateStore 에서 페르소나 + active_persona_id 를 로드.
     /// 손상·부재 시 silent fallback 하지 않고 `Result::Err` 로 전파.
     /// 호출자는 defaults 가 이미 new() 로 박혀 있음을 알고 있어야 함.
-    pub async fn load_from_state_store(
-        &self,
-        store: &StateStore,
-    ) -> Result<()> {
+    pub async fn load_from_state_store(&self, store: &StateStore) -> Result<()> {
         let snap = crate::persona::persistence::load_from_state_store(store)
             .await?
             .ok_or_else(|| anyhow::anyhow!("persona: no snapshot present"))?;

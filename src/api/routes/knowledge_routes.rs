@@ -75,7 +75,6 @@ use crate::api::server::AppState;
 // Request / Response types
 // ---------------------------------------------------------------------------
 
-
 /// File tree entry.
 #[derive(Debug, Serialize, Clone)]
 pub(crate) struct KnowledgeTreeEntry {
@@ -484,15 +483,16 @@ pub(crate) async fn handle_knowledge_tree(
                         .ok()
                         .flatten()
                         .and_then(|content| {
-                            let (meta, _) =
-                                oxios_markdown::knowledge::parse_note_meta(&content);
-                            meta.map(|m| match m.quality {
-                                oxios_markdown::types::NoteQuality::Raw => "raw",
-                                oxios_markdown::types::NoteQuality::Curated => "curated",
-                                oxios_markdown::types::NoteQuality::Refined => "refined",
-                                _ => "raw",
-                            }
-                            .to_string())
+                            let (meta, _) = oxios_markdown::knowledge::parse_note_meta(&content);
+                            meta.map(|m| {
+                                match m.quality {
+                                    oxios_markdown::types::NoteQuality::Raw => "raw",
+                                    oxios_markdown::types::NoteQuality::Curated => "curated",
+                                    oxios_markdown::types::NoteQuality::Refined => "refined",
+                                    _ => "raw",
+                                }
+                                .to_string()
+                            })
                         })
                 } else {
                     None
@@ -541,19 +541,18 @@ fn build_recursive_tree(
             format!("{}/{}", dir, e.name)
         };
         let oxios_quality = if !e.is_dir {
-            kb.note_read(&path)
-                .ok()
-                .flatten()
-                .and_then(|content| {
-                    let (meta, _) = oxios_markdown::knowledge::parse_note_meta(&content);
-                    meta.map(|m| match m.quality {
+            kb.note_read(&path).ok().flatten().and_then(|content| {
+                let (meta, _) = oxios_markdown::knowledge::parse_note_meta(&content);
+                meta.map(|m| {
+                    match m.quality {
                         oxios_markdown::types::NoteQuality::Raw => "raw",
                         oxios_markdown::types::NoteQuality::Curated => "curated",
                         oxios_markdown::types::NoteQuality::Refined => "refined",
                         _ => "raw",
                     }
-                    .to_string())
+                    .to_string()
                 })
+            })
         } else {
             None
         };

@@ -15,10 +15,7 @@ fn stale_pidfile_detected_and_cleaned() {
     let pid_file = tmp.path().join("oxios.pid");
     // Write a PID that is virtually guaranteed not to exist.
     std::fs::write(&pid_file, "999999").unwrap();
-    let dm = DaemonManager::new(
-        pid_file.to_str().unwrap(),
-        tmp.path().to_str().unwrap(),
-    );
+    let dm = DaemonManager::new(pid_file.to_str().unwrap(), tmp.path().to_str().unwrap());
     assert!(
         matches!(dm.status(), DaemonStatus::Stale { .. }),
         "dead PID in pidfile should be Stale"
@@ -48,10 +45,7 @@ fn fresh_pidfile_reports_running() {
     let tmp = tempfile::tempdir().unwrap();
     let pid_file = tmp.path().join("oxios.pid");
     std::fs::write(&pid_file, std::process::id().to_string()).unwrap();
-    let dm = DaemonManager::new(
-        pid_file.to_str().unwrap(),
-        tmp.path().to_str().unwrap(),
-    );
+    let dm = DaemonManager::new(pid_file.to_str().unwrap(), tmp.path().to_str().unwrap());
     assert!(
         matches!(dm.status(), DaemonStatus::Running { .. }),
         "current PID in pidfile should be Running"

@@ -17,12 +17,34 @@ use std::collections::HashMap;
 /// Shell interpreters that must never be spawned directly as an MCP
 /// server — they would allow `args = ["-c", "<arbitrary>"]` code
 pub const BLOCKED_MCP_SHELLS: &[&str] = &[
-    "sh", "bash", "dash", "zsh", "ksh", "csh", "tcsh", "fish", "ash", "busybox",
+    "sh",
+    "bash",
+    "dash",
+    "zsh",
+    "ksh",
+    "csh",
+    "tcsh",
+    "fish",
+    "ash",
+    "busybox",
     // Windows interpreters — include the `.exe` variants because the
     // basename match is exact; `cmd` would not catch `cmd.exe`.
-    "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe",
+    "cmd",
+    "cmd.exe",
+    "powershell",
+    "powershell.exe",
+    "pwsh",
+    "pwsh.exe",
     // Scripting interpreters that can eval arbitrary code from args.
-    "python", "python2", "python3", "perl", "ruby", "node", "nodejs", "deno", "bun",
+    "python",
+    "python2",
+    "python3",
+    "perl",
+    "ruby",
+    "node",
+    "nodejs",
+    "deno",
+    "bun",
     "env",
 ];
 
@@ -30,8 +52,8 @@ pub const BLOCKED_MCP_SHELLS: &[&str] = &[
 /// MCP commands are a single token (e.g. `npx`, `uvx`); any of these
 /// indicates an attempt to chain, inject, or shell-out.
 const FORBIDDEN_CHARS: &[char] = &[
-    ' ', '\t', ';', '|', '&', '>', '<', '`', '$', '(', ')', '{', '}', '\n', '\r', '*', '?',
-    '\\', '"', '\'',
+    ' ', '\t', ';', '|', '&', '>', '<', '`', '$', '(', ')', '{', '}', '\n', '\r', '*', '?', '\\',
+    '"', '\'',
 ];
 
 /// Validate an MCP server command before spawning it.
@@ -106,7 +128,9 @@ pub fn sanitize_env(env: &HashMap<String, String>) -> HashMap<String, String> {
     env.iter()
         .filter(|(k, _)| {
             let key = k.as_str();
-            !BLOCKED_ENV_PREFIXES.iter().any(|prefix| key.starts_with(prefix))
+            !BLOCKED_ENV_PREFIXES
+                .iter()
+                .any(|prefix| key.starts_with(prefix))
         })
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect()

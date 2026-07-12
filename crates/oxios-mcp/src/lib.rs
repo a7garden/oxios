@@ -30,7 +30,7 @@ pub mod validation;
 
 pub use client::McpClient;
 pub use protocol::*;
-pub use validation::{sanitize_env, validate_mcp_command, BLOCKED_MCP_SHELLS};
+pub use validation::{BLOCKED_MCP_SHELLS, sanitize_env, validate_mcp_command};
 
 use std::collections::HashMap;
 use std::sync::Arc;

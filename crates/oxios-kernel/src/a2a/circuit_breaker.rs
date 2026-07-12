@@ -141,8 +141,7 @@ impl A2ACircuitBreaker {
             .store(now_epoch_secs(), Ordering::Release);
 
         if failures >= self.threshold && self.state() != CircuitState::Open {
-            self.state
-                .store(CircuitState::Open as u8, Ordering::SeqCst);
+            self.state.store(CircuitState::Open as u8, Ordering::SeqCst);
             tracing::warn!(
                 failures,
                 threshold = self.threshold,
