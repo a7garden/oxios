@@ -1116,11 +1116,27 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
         }
     });
 
-    // RFC-024 SP2 (B3): dedicated keepalive task. Sends an empty Ping
-    // every 20 s; if no Pong arrives within 60 s of the most recent
-    // activity (ping OR pong), the connection is treated as dead — the
-    // most common cause is a NAT / proxy / load-balancer silently
-    // closing the idle TCP socket.
+    // RFC-024 SP2 (B3): dedicated keepalive task.
+    //
+    // Sends a protocol Ping every 20 s. The browser answers with an
+    // automatic Pong (RFC 6455 §5.5.3) which the recv_task observes as
+    // `Message::Pong(_)` and forwards here as a `pong_signal` notification.
+    //
+    // The 60 s deadline is anchored to `last_pong` — the most recent
+    // instant at which we actually heard from the peer. A SENT Ping is
+    // NOT proof of liveness: a half-open TCP socket can buffer the
+    // write successfully while the peer is gone. Only a RECEIVED Pong
+    // is. The deadline therefore advances ONLY in the
+    // `pong_signal.notified()` branch. The ticker branch nudges the
+    // peer with another Ping but leaves `last_pong` untouched, so a
+    // dead socket trips the `last_pong + 60s` future regardless of
+    // how many Pings we managed to write into the kernel buffer.
+    //
+    // The deadline uses `sleep_until(last_pong + 60s)` with
+    // `Sleep::reset` rather than a fixed `sleep(60s)`. A fixed sleep
+    // inside `select!` is recreated every iteration that any other
+    // branch wins, so the 60 s mark becomes unreachable while the
+    // ticker is firing — the original implementation had this bug.
     set.spawn({
         let ws_tx = ws_tx.clone();
         let pong_signal = pong_signal.clone();
@@ -1128,15 +1144,30 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
         async move {
             let ping_interval = std::time::Duration::from_secs(20);
             let pong_timeout = std::time::Duration::from_secs(60);
+
+            let mut last_pong = tokio::time::Instant::now();
+            let deadline_sleep = tokio::time::sleep_until(last_pong + pong_timeout);
+            tokio::pin!(deadline_sleep);
+
             let mut ticker = tokio::time::interval(ping_interval);
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             // First tick fires immediately; skip it to give the connection
             // a chance to settle.
             ticker.tick().await;
+
             loop {
-                // Either a scheduled ping OR a pong from the client
-                // resets the 60 s deadline.
                 tokio::select! {
+                    biased;
+                    // 1. Pong received: extend the deadline by 60 s from now.
+                    //    This is the ONLY place `last_pong` advances.
+                    _ = pong_signal.notified() => {
+                        last_pong = tokio::time::Instant::now();
+                        deadline_sleep.as_mut().reset(last_pong + pong_timeout);
+                    }
+                    // 2. Scheduled tick: nudge the peer with a Ping. We do
+                    //    NOT update `last_pong` — a successful send is
+                    //    not proof of liveness. If the peer is gone, the
+                    //    deadline future will eventually fire and we close.
                     _ = ticker.tick() => {
                         if let Err(e) = ws_tx
                             .lock()
@@ -1152,11 +1183,8 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             return;
                         }
                     }
-                    _ = pong_signal.notified() => {
-                        // Pong received — deadline resets on next tick.
-                        continue;
-                    }
-                    _ = tokio::time::sleep(pong_timeout) => {
+                    // 3. Deadline elapsed: peer is dead (no Pong in 60 s).
+                    _ = &mut deadline_sleep => {
                         tracing::warn!(
                             conn_id = %conn_id,
                             "WebSocket keepalive timeout (no pong within 60 s)"
