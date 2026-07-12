@@ -489,7 +489,6 @@ pub(crate) async fn handle_knowledge_tree(
                                     oxios_markdown::types::NoteQuality::Raw => "raw",
                                     oxios_markdown::types::NoteQuality::Curated => "curated",
                                     oxios_markdown::types::NoteQuality::Refined => "refined",
-                                    _ => "raw",
                                 }
                                 .to_string()
                             })
@@ -548,7 +547,6 @@ fn build_recursive_tree(
                         oxios_markdown::types::NoteQuality::Raw => "raw",
                         oxios_markdown::types::NoteQuality::Curated => "curated",
                         oxios_markdown::types::NoteQuality::Refined => "refined",
-                        _ => "raw",
                     }
                     .to_string()
                 })
