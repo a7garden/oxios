@@ -1393,6 +1393,23 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
         );
     }
 
+    // 9. API authentication (security posture)
+    checks += 1;
+    if !config.security.auth_enabled {
+        println!(
+            "  {} Web API authentication is DISABLED (auth_enabled=false)",
+            style("⚠").yellow().bold()
+        );
+        issues.push(
+            "Web API auth is disabled. Set [security] auth_enabled=true \
+             (generate a key with `oxios auth generate`). Never bind to a \
+             non-loopback interface with auth disabled."
+                .to_string(),
+        );
+    } else {
+        println!("  {} Web API authentication enabled", style("✓").green());
+    }
+
     // Summary
     println!("  {}", "─".repeat(48));
     if issues.is_empty() {
@@ -3142,34 +3159,17 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     let channel_tasks = activate_channels(kernel, config_path).await?;
 
     // Start guardian (RFC-024 SP3 + RFC-040 A: heartbeat watchdog for hang
-    // detection). The returned handle is tracked as a secondary safety net
-    // for clean exits; hang detection is via the heartbeat watchdog.
-    let guardian_heartbeat = Arc::new(AtomicU64::new(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0),
-    ));
-    let guardian_task = kernel.start_guardian(active_web_dist, guardian_heartbeat.clone());
+    // detection) and daily health check. Both handles are tracked as
+    // secondary safety nets for clean exits (audit F-14: health check was
+    // previously fire-and-forget); hang detection is via the heartbeat.
+    let (guardian_task, health_task) =
+        kernel.start_guardian(active_web_dist, guardian_heartbeat.clone());
 
     // Run the gateway event loop. Propagate the Result (no `.expect`): the
     // supervisor observes the handle and treats any exit as fatal. Under
-    // panic=abort a panic aborts the process directly, so the non-panic Err
-    // path is what the supervisor actually intercepts here.
-    let gateway = kernel.gateway();
-    let gateway_for_stop = gateway.clone();
-    let gateway_task = tokio::spawn(async move {
-        if let Err(e) = gateway.run().await {
-            tracing::error!(error = %e, "Gateway run error");
-        }
-    });
-
-    // Build the supervisor and register every task.
-    let mut supervisor = TaskSupervisor::new(root.clone(), RestartConfig::default());
-    supervisor.with_gateway_stop(move || gateway_for_stop.signal_shutdown());
-    supervisor.watch_guardian(guardian_heartbeat);
     supervisor.track_critical("gateway", gateway_task);
     supervisor.track_critical("guardian", guardian_task);
+    supervisor.track_critical("health", health_task);
     for task in channel_tasks {
         supervisor.track_critical("channel", task);
     }

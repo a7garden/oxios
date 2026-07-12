@@ -115,8 +115,12 @@ active_limit_tokens = 100000
 cache_limit_entries = 50
 
 [security]
-# NOTE: auth_enabled should be true in production.
-auth_enabled = false
+# Web API authentication. Secure by default — generate a key with
+# `oxios auth generate` (or set [engine].api_key / OXIOS_API_KEY) and
+# configure your clients to send it as `Authorization: Bearer <key>`.
+# For a trusted single-user LOCAL machine you may opt out with false,
+# but never disable auth when binding to a non-loopback interface.
+auth_enabled = true
 # Allowed CORS origins. Browsers treat `localhost` and `127.0.0.1` as distinct
 # origins, so both are included. 5173 covers the Vite dev server (`bun dev`).
 cors_origins = ["http://localhost:4200", "http://127.0.0.1:4200", "http://localhost:5173", "http://127.0.0.1:5173"]
