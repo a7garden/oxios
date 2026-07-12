@@ -268,7 +268,7 @@ impl TaskSupervisor {
         loop {
             // Snapshot the pending deadline into a local so the timer branch
             // owns no borrow of `self` (lets the arm body borrow `self` mutably).
-            let timer: std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> =
+            let mut timer: std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> =
                 match self.pending.as_ref() {
                     Some(p) => Box::pin(tokio::time::sleep_until(p.deadline.into())),
                     None => Box::pin(std::future::pending::<()>()),

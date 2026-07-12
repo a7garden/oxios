@@ -3167,6 +3167,20 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
 
     // Run the gateway event loop. Propagate the Result (no `.expect`): the
     // supervisor observes the handle and treats any exit as fatal. Under
+    // panic=abort a panic aborts the process directly, so the non-panic Err
+    // path is what the supervisor actually intercepts here.
+    let gateway = kernel.gateway();
+    let gateway_for_stop = gateway.clone();
+    let gateway_task = tokio::spawn(async move {
+        if let Err(e) = gateway.run().await {
+            tracing::error!(error = %e, "Gateway run error");
+        }
+    });
+
+    // Build the supervisor and register every task.
+    let mut supervisor = TaskSupervisor::new(root.clone(), RestartConfig::default());
+    supervisor.with_gateway_stop(move || gateway_for_stop.signal_shutdown());
+    supervisor.watch_guardian(guardian_heartbeat);
     supervisor.track_critical("gateway", gateway_task);
     supervisor.track_critical("guardian", guardian_task);
     supervisor.track_critical("health", health_task);
