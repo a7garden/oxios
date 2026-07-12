@@ -27,7 +27,8 @@ use console::style;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio_util::sync::CancellationToken;
+use std::sync::atomic::AtomicU64;
+ use tokio_util::sync::CancellationToken;
 
 use kernel::Kernel;
 use oxios_kernel::onboarding::WORKSPACE_SUBDIRS;
@@ -860,7 +861,8 @@ fn collect_leaf_keys(value: &serde_json::Value, prefix: &str, out: &mut Vec<(Str
 
 async fn cmd_status(kernel: &Kernel) -> Result<()> {
     let config = kernel.config();
-    let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+    let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir)
+        .with_probe_port(config.gateway.port);
 
     println!();
     println!(
@@ -877,7 +879,10 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
     );
 
     let daemon_status = daemon.status();
-    let is_running = matches!(daemon_status, oxios_kernel::DaemonStatus::Running { .. });
+    let is_running = matches!(
+        daemon_status,
+        oxios_kernel::DaemonStatus::Running { .. } | oxios_kernel::DaemonStatus::Orphaned { .. }
+    );
     if is_running {
         println!(
             "  {:<16}  {}",
@@ -1295,9 +1300,13 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
 
     // 4. Daemon status
     checks += 1;
-    let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+    let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir)
+        .with_probe_port(config.gateway.port);
     let daemon_status = daemon.status();
-    let is_running = matches!(daemon_status, oxios_kernel::DaemonStatus::Running { .. });
+    let is_running = matches!(
+        daemon_status,
+        oxios_kernel::DaemonStatus::Running { .. } | oxios_kernel::DaemonStatus::Orphaned { .. }
+    );
     if is_running {
         println!("  {} Daemon is running", style("✓").green());
     } else {
@@ -1910,7 +1919,8 @@ async fn run(cli: Cli) -> Result<()> {
     // ── Fast-path: commands that never need the kernel ──
     match &cli.command {
         Some(Command::Stop) => {
-            let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+            let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir)
+                .with_probe_port(config.gateway.port);
             return daemon.stop();
         }
         Some(Command::Daemon { action }) => {
@@ -1972,8 +1982,9 @@ async fn run(cli: Cli) -> Result<()> {
             // background daemon the user never launched would be surprising.
             if !*no_restart && outcome.any() {
                 println!();
-                let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
                 let port = config.gateway.port;
+                let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir)
+                    .with_probe_port(port);
                 if matches!(daemon.status(), oxios_kernel::DaemonStatus::Running { .. }) {
                     println!(
                         "  {} Restarting daemon to activate the update...",
@@ -3130,9 +3141,16 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
             .await?;
     let channel_tasks = activate_channels(kernel, config_path).await?;
 
-    // Start guardian (RFC-024 SP3: hands the atomic web-dist handle to the
-    // daily health check so auto-updates publish atomically — no 404 window).
-    kernel.start_guardian(active_web_dist);
+    // Start guardian (RFC-024 SP3 + RFC-040 A: heartbeat watchdog for hang
+    // detection). The returned handle is tracked as a secondary safety net
+    // for clean exits; hang detection is via the heartbeat watchdog.
+    let guardian_heartbeat = Arc::new(AtomicU64::new(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+    ));
+    let guardian_task = kernel.start_guardian(active_web_dist, guardian_heartbeat.clone());
 
     // Run the gateway event loop. Propagate the Result (no `.expect`): the
     // supervisor observes the handle and treats any exit as fatal. Under
@@ -3149,7 +3167,9 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     // Build the supervisor and register every task.
     let mut supervisor = TaskSupervisor::new(root.clone(), RestartConfig::default());
     supervisor.with_gateway_stop(move || gateway_for_stop.signal_shutdown());
+    supervisor.watch_guardian(guardian_heartbeat);
     supervisor.track_critical("gateway", gateway_task);
+    supervisor.track_critical("guardian", guardian_task);
     for task in channel_tasks {
         supervisor.track_critical("channel", task);
     }
@@ -3206,38 +3226,16 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         }
     }
 
-    // ── Kernel-level cleanup (runs for both outcomes) ────────────────────
-    // Task handles were already drained by the supervisor above. Here we stop
-    // the kernel's own resources: running agents, MCP servers, audit trail.
-    let handle = kernel.handle();
-    if let Ok(agents) = handle.agents.list().await
-        && !agents.is_empty()
-    {
-        tracing::info!(count = agents.len(), "Terminating agents...");
-        let mut kill_futures = Vec::new();
-        for agent in &agents {
-            let agent_id = agent.id.to_string();
-            let h = handle.clone();
-            kill_futures.push(tokio::spawn(async move {
-                if let Err(e) = h.agents.kill(&agent_id).await {
-                    tracing::warn!(agent = %agent_id, error = %e, "Failed to kill agent");
-                }
-            }));
-        }
-        for f in kill_futures {
-            let _ = f.await;
-        }
-        tracing::info!(count = agents.len(), "Agents terminated");
-    }
-
-    if let Err(e) = handle.mcp.shutdown_all().await {
-        tracing::warn!(error = %e, "MCP shutdown error");
-    }
-
-    // Flush audit trail to disk before exit
-    if let Err(e) = kernel.flush_audit() {
-        tracing::warn!(error = %e, "Audit trail flush error");
-    }
+    // ── Kernel-level cleanup (runs for both outcomes) ────────────────
+    // Task handles were already drained by the supervisor above. Here
+    // we stop the kernel's own resources (agents, MCP, audit) with a
+    // bounded timeout — a hang in any phase can't block the process
+    // exit indefinitely (RFC-040 B).
+    let cleanup_timeout = match &outcome {
+        ShutdownOutcome::Graceful => std::time::Duration::from_secs(3),
+        ShutdownOutcome::Fatal { .. } => std::time::Duration::from_secs(1),
+    };
+    kernel.cleanup(cleanup_timeout).await;
 
     match outcome {
         ShutdownOutcome::Graceful => {

@@ -150,6 +150,50 @@ jobs:
       - name: Run doc tests
         run: cargo test --workspace --doc
 
+  # ─── macOS Test ──────────────────────────────────────────────────
+  # RFC-040 C1: Compiles and runs platform-specific daemon code
+  # (launchd plist generation, bootout/unload paths, orphan detection)
+  # that the ubuntu matrix never exercises.
+  test-macos:
+    name: test (macOS)
+    runs-on: macos-latest
+    needs: [fmt]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read rust-toolchain channel
+        id: rust-channel
+        run: |
+          if grep -q 'channel = "' rust-toolchain.toml 2>/dev/null; then
+            CHANNEL=$(grep 'channel = "' rust-toolchain.toml | sed 's/.*= "\([^"]*\)".*/\1/')
+            echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          else
+            echo "channel=stable" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-channel.outputs.channel }}
+
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Frontend assets must exist before Rust compilation because
+      # rust_embed::Embed generates code from web/dist/ at compile time.
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Build web assets
+        working-directory: web
+        run: bun install --frozen-lockfile && bun run build
+
+      - name: Run tests
+        run: cargo nextest run --workspace --no-fail-fast
+
+      - name: Run doc tests
+        run: cargo test --workspace --doc
+
   # ─── Security Audit ────────────────────────────────────────────────
   audit:
     name: audit
@@ -183,7 +227,7 @@ jobs:
   # ─── Summary ───────────────────────────────────────────────────────
   summary:
     name: summary
-    needs: [fmt, frontend, test, audit]
+    needs: [fmt, frontend, test, test-macos, audit]
     runs-on: ubuntu-latest
     if: always()
     steps:

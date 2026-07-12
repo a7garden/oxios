@@ -6,6 +6,12 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
+/// Maximum time `stop` waits after SIGTERM before escalating to SIGKILL.
+/// Generous enough for a graceful agent/MCP drain; not so long that a hung
+/// daemon makes `stop` feel stuck. SIGKILL cannot be caught — it is the
+/// absolute last resort.
+const SIGTERM_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// Daemon status.
 #[derive(Debug, Clone)]
 pub enum DaemonStatus {
@@ -21,6 +27,14 @@ pub enum DaemonStatus {
     },
     /// Daemon is not running.
     Stopped,
+    /// Port is held by an oxios-shaped process that left no pidfile
+    /// (e.g. a `--foreground` debug instance launched directly).
+    /// Caller doesn't have a PID to report because there is no
+    /// pidfile/lockfile, just a port.
+    Orphaned {
+        /// Port that appears to be held by an oxios instance.
+        port: u16,
+    },
 }
 
 impl std::fmt::Display for DaemonStatus {
@@ -29,6 +43,9 @@ impl std::fmt::Display for DaemonStatus {
             DaemonStatus::Running { pid } => write!(f, "running (PID {pid})"),
             DaemonStatus::Stale { pid } => write!(f, "stale (PID {pid} dead)"),
             DaemonStatus::Stopped => write!(f, "stopped"),
+            DaemonStatus::Orphaned { port } => {
+                write!(f, "orphaned (no pidfile, port {port} in use)")
+            }
         }
     }
 }
@@ -37,6 +54,11 @@ impl std::fmt::Display for DaemonStatus {
 pub struct DaemonManager {
     pid_file: PathBuf,
     log_dir: PathBuf,
+    /// Port to consult when both pidfile and lockfile fail to identify a
+    /// live daemon. Set by the CLI (`main.rs`) from the gateway config so
+    /// `status`/`stop` can detect `--foreground` orphans that bypassed the
+    /// pidfile. `None` disables the orphan-detection path.
+    probe_port: Option<u16>,
 }
 
 impl DaemonManager {
@@ -45,21 +67,60 @@ impl DaemonManager {
         Self {
             pid_file: crate::config::expand_home(pid_file),
             log_dir: crate::config::expand_home(log_dir),
+            probe_port: None,
         }
     }
 
-    /// Check daemon status by reading the PID file.
+    /// Set the port used by orphan-detection probes. Called by the CLI
+    /// after assembling a manager; without it `status`/`stop` cannot catch
+    /// `--foreground` debug instances that escape the pidfile.
+    pub fn set_probe_port(&mut self, port: u16) {
+        self.probe_port = Some(port);
+    }
+
+    /// Consuming builder for the probe port. Lets CLI sites write
+    /// `DaemonManager::new(..).with_probe_port(port)` without binding to
+    /// `mut`, which is awkward in expression position.
+    pub fn with_probe_port(mut self, port: u16) -> Self {
+        self.probe_port = Some(port);
+        self
+    }
+
+    /// Check daemon status by reading every liveness source we have.
+    ///
+    /// Resolution order — every source that can prove an oxios daemon is
+    /// alive is consulted in turn, because each one alone is unreliable:
+    /// the pidfile can be stale or absent (a direct `--foreground` run),
+    /// the lockfile-based daemon can be invisible to a future daemon's
+    /// own write, and the launchd-managed daemon can be invisible to
+    /// both. We surface the strongest signal.
     pub fn status(&self) -> DaemonStatus {
+        // 1. Instance-lock holder: cross-binary, cross-launcher truth.
+        if let Some(pid) = self.read_lock_pid().filter(|&p| self.is_alive(p)) {
+            return DaemonStatus::Running { pid };
+        }
+        // 2. Legacy pidfile (kept for backwards compat with daemons that
+        //    weren't updated to take the instance lock).
         match self.read_pid() {
             Some(pid) => {
                 if self.is_alive(pid) {
-                    DaemonStatus::Running { pid }
-                } else {
-                    DaemonStatus::Stale { pid }
+                    return DaemonStatus::Running { pid };
                 }
+                return DaemonStatus::Stale { pid };
             }
-            None => DaemonStatus::Stopped,
+            None => {}
         }
+        // 3. Port probe: catches an orphan. This is the path that would
+        //    have caught the user's debug-instance scenario (--foreground
+        //    without a pidfile). Note: we don't surface a PID because
+        //    there isn't one to trust — port-based attribution is best-
+        //    effort, and `stop` will re-derive it via `lsof` at kill time.
+        if let Some(port) = self.probe_port
+            && self.port_in_use(port)
+        {
+            return DaemonStatus::Orphaned { port };
+        }
+        DaemonStatus::Stopped
     }
 
     /// Start the daemon in the background and wait for it to begin accepting
@@ -74,7 +135,11 @@ impl DaemonManager {
             DaemonStatus::Stale { .. } => {
                 self.cleanup()?;
             }
-            DaemonStatus::Stopped => {}
+            DaemonStatus::Stopped | DaemonStatus::Orphaned { .. } => {
+                // Orphaned means "something on the port is in the way" —
+                // fall through to the port-in-use guard, which gives the
+                // user an actionable error.
+            }
         }
 
         // Pre-spawn port guard: catches an orphaned oxios process that still
@@ -181,9 +246,9 @@ impl DaemonManager {
 
     /// Whether anything is currently accepting connections on `127.0.0.1:port`.
     ///
-    /// Pre-spawn guard used by [`start`](Self::start) to detect an orphaned
-    /// daemon that escaped the pidfile — the pidfile was removed but the
-    /// process kept the port.
+    /// Pre-spawn guard used by [`start`](Self::start) and the orphan-
+    /// detection path in [`status`](Self::status) to detect a stray daemon
+    /// that escaped the pidfile.
     fn port_in_use(&self, port: u16) -> bool {
         use std::net::{TcpStream, ToSocketAddrs};
         let Some(addr) = format!("127.0.0.1:{port}")
@@ -196,47 +261,121 @@ impl DaemonManager {
         TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(200)).is_ok()
     }
 
-    /// Stop the daemon by sending SIGTERM.
+    /// Stop the daemon.
+    ///
+    /// Resolution order — every source that can prove an oxios daemon is
+    /// alive is consulted, because each one alone is unreliable:
+    ///
+    /// 1. **Instance lock** (`<pid_file>.lock`): held by `flock` by every
+    ///    daemon (`cmd_serve`/`--foreground` AND `start()`-spawned). The PID
+    ///    recorded in the file is the authoritative owner.
+    /// 2. **PID file** (`<pid_file>`): the legacy spawn-and-fork channel.
+    ///    Kept for backwards compat with prior daemons that wrote the
+    ///    pidfile but never took the instance lock.
+    /// 3. **Orphan port probe**: when neither (1) nor (2) identifies a
+    ///    daemon, `lsof -ti tcp:PORT -sTCP:LISTEN` is consulted. This path
+    ///    catches a `--foreground` debug instance launched without writing
+    ///    a pidfile — the exact symptom the user reported.
+    /// 4. **System service**: launchd plist or systemd unit. If loaded,
+    ///    unload it for this session; otherwise KeepAlive (macOS) or
+    ///    Restart=on-failure (Linux) will silently undo our kill within
+    ///    milliseconds. We do NOT remove the plist/unit here; that's
+    ///    `uninstall_service`'s job.
+    ///
+    /// User contract: an explicit `daemon install` is the only way to opt
+    /// into the supervisor; in that mode `stop` must reverse it for this
+    /// session, otherwise the daemon respawns within seconds and `stop`
+    /// lies. A user who never ran `daemon install` and never spawned a
+    /// daemon in another shell simply gets "not running".
     pub fn stop(&self) -> Result<()> {
-        match self.status() {
-            DaemonStatus::Running { pid } => {
-                #[cfg(unix)]
-                {
-                    let ret = unsafe { libc::kill(pid as i32, libc::SIGTERM) };
-                    if ret != 0 {
-                        anyhow::bail!("failed to send SIGTERM to PID {pid}");
-                    }
-                }
-                #[cfg(not(unix))]
-                {
-                    // On non-Unix, just kill the process
-                    let _ = std::process::Command::new("taskkill")
-                        .args(["/PID", &pid.to_string(), "/F"])
-                        .output();
-                }
+        let service_loaded = self.is_service_loaded();
 
-                // Wait briefly for process to die
-                for _ in 0..10 {
-                    std::thread::sleep(std::time::Duration::from_millis(200));
-                    if !self.is_alive(pid) {
-                        break;
-                    }
-                }
+        // 1. Resolve a live PID from any source we can find it.
+        let lock_pid = self.read_lock_pid().filter(|&p| self.is_alive(p));
+        let file_pid = self.read_pid().filter(|&p| self.is_alive(p));
+        let orphan_pid = self.orphan_pid_from_port();
 
-                self.cleanup()?;
-                println!("⬡ oxios stopped");
-                Ok(())
+        match (lock_pid, file_pid, orphan_pid) {
+            (Some(pid), _, _) | (None, Some(pid), _) | (None, None, Some(pid)) => {
+                self.kill_pid(pid)?;
             }
-            DaemonStatus::Stale { .. } => {
-                self.cleanup()?;
-                println!("⬡ cleaned up stale PID file");
-                Ok(())
-            }
-            DaemonStatus::Stopped => {
-                println!("⬡ oxios is not running");
-                Ok(())
+            (None, None, None) => {
+                if service_loaded {
+                    self.unload_service()?;
+                    std::thread::sleep(std::time::Duration::from_millis(300));
+                } else {
+                    println!("⬡ oxios is not running");
+                    return Ok(());
+                }
             }
         }
+
+        // Always unload if registered. Otherwise KeepAlive (macOS) /
+        // Restart=on-failure (Linux) will silently undo our kill.
+        if service_loaded {
+            self.unload_service()?;
+        }
+
+        self.cleanup()?;
+        println!("⬡ oxios stopped");
+        Ok(())
+    }
+
+    /// Send SIGTERM to `pid`, escalating to SIGKILL after `SIGTERM_GRACE`
+    /// if the process hasn't exited. SIGKILL cannot be caught — last resort.
+    ///
+    /// The actual SIGTERM delivery is handled by `cmd_serve`'s supervisor
+    /// (it sees the signal and runs its graceful-drain path). From this
+    /// side we just wait up to `SIGTERM_GRACE` for the process to vanish;
+    /// if it doesn't, SIGKILL finishes the job.
+    fn kill_pid(&self, pid: u32) -> Result<()> {
+        #[cfg(unix)]
+        unsafe {
+            let send_ret = libc::kill(pid as i32, libc::SIGTERM);
+            if send_ret != 0 {
+                let e = std::io::Error::last_os_error();
+                // ESRCH: process died between our liveness check and now.
+                if e.raw_os_error() != Some(libc::ESRCH) {
+                    anyhow::bail!("failed to send SIGTERM to PID {pid}: {e}");
+                }
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/F"])
+                .output();
+        }
+
+        let poll_start = std::time::Instant::now();
+        let interval = std::time::Duration::from_millis(200);
+        while poll_start.elapsed() < SIGTERM_GRACE {
+            std::thread::sleep(interval);
+            if !self.is_alive(pid) {
+                return Ok(());
+            }
+        }
+
+        // Process ignored SIGTERM within `SIGTERM_GRACE` — escalate.
+        #[cfg(unix)]
+        unsafe {
+            let send_ret = libc::kill(pid as i32, libc::SIGKILL);
+            if send_ret != 0 {
+                let e = std::io::Error::last_os_error();
+                if e.raw_os_error() != Some(libc::ESRCH) {
+                    anyhow::bail!("failed to send SIGKILL to PID {pid}: {e}");
+                }
+            }
+        }
+        for _ in 0..10 {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            if !self.is_alive(pid) {
+                return Ok(());
+            }
+        }
+        anyhow::bail!(
+            "PID {pid} ignored SIGTERM and SIGKILL; cannot stop. Kill it manually: `kill -9 {pid}`"
+        )
     }
 
     /// Restart the daemon.
@@ -249,6 +388,11 @@ impl DaemonManager {
     }
 
     /// Install as a system service (launchd on macOS, systemd on Linux).
+    ///
+    /// After this returns successfully, `stop()` MUST be used to halt the
+    /// daemon in this session — a plain `kill -TERM` will be undone by
+    /// `KeepAlive` (macOS) / `Restart=on-failure` (Linux) within
+    /// milliseconds.
     pub fn install_service(&self) -> Result<()> {
         let exe = std::env::current_exe().context("failed to locate oxios binary")?;
 
@@ -278,7 +422,12 @@ impl DaemonManager {
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
     <key>StandardOutPath</key>
     <string>{log}</string>
     <key>StandardErrorPath</key>
@@ -297,9 +446,11 @@ impl DaemonManager {
             println!("✓ Installed launchd service");
             println!("  {}", plist_path.display());
             println!();
-            println!("  Start with:   launchctl load {}", plist_path.display());
-            println!("  Stop with:    launchctl unload {}", plist_path.display());
-            println!("  Or simply:    oxios start / oxios stop");
+            println!("  Loaded at boot by macOS launchd (KeepAlive=true).");
+            println!("  Stop with `oxios stop` (it will unload launchd), or:");
+            println!("    launchctl bootout gui/$UID/com.a7garden.oxios");
+            println!("  Disable auto-start on next boot:");
+            println!("    oxios daemon uninstall");
         }
 
         #[cfg(target_os = "linux")]
@@ -338,6 +489,8 @@ impl DaemonManager {
                 r#"[Unit]
 Description=Oxios Agent Operating System
 After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=60
 
 [Service]
 Type=simple
@@ -377,7 +530,13 @@ WantedBy=multi-user.target
     }
 
     /// Uninstall the system service.
+    ///
+    /// Tears down any live supervisor registration BEFORE removing the
+    /// file. On macOS, removing a loaded plist has no effect on the
+    /// running job — bootout must run first.
     pub fn uninstall_service(&self) -> Result<()> {
+        let _ = self.unload_service();
+
         #[cfg(target_os = "macos")]
         {
             let plist_path = dirs::home_dir()
@@ -386,7 +545,7 @@ WantedBy=multi-user.target
 
             if plist_path.exists() {
                 std::fs::remove_file(&plist_path)?;
-                println!("✓ Removed launchd service");
+                println!("✓ Removed launchd service (will not auto-start on next boot)");
             } else {
                 println!("  Service not installed");
             }
@@ -417,7 +576,7 @@ WantedBy=multi-user.target
         Ok(())
     }
 
-    // ── Internal helpers ──
+    // ── Internal helpers ─────────────────────────────────────────────
 
     fn read_pid(&self) -> Option<u32> {
         let content = std::fs::read_to_string(&self.pid_file).ok()?;
@@ -442,7 +601,7 @@ WantedBy=multi-user.target
     fn is_alive(&self, pid: u32) -> bool {
         #[cfg(unix)]
         {
-            // Signal 0 = check if process exists
+            // Signal 0 = check if process exists.
             unsafe { libc::kill(pid as i32, 0) == 0 }
         }
         #[cfg(not(unix))]
@@ -452,6 +611,177 @@ WantedBy=multi-user.target
             false
         }
     }
+
+    // ── Service + lock + orphan introspection ────────────────────────
+
+    /// Path of the `flock`-based single-instance lock file.
+    fn lock_path(&self) -> PathBuf {
+        self.pid_file.with_extension("lock")
+    }
+
+    /// Read the PID stored in the instance-lock file. Diagnostic only —
+    /// the flock is the real truth. Callers MUST verify `is_alive(pid)`.
+    fn read_lock_pid(&self) -> Option<u32> {
+        let path = self.lock_path();
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|s| s.trim().parse::<u32>().ok())
+    }
+
+    /// Probe `self.probe_port` for an orphaned oxios-shaped PID.
+    ///
+    /// Returns `None` when:
+    ///   - no probe port was configured
+    ///   - the port is free
+    ///   - `lsof` is missing or returns nothing parseable
+    ///
+    /// Returns `Some(pid)` only for processes that BOTH listen on
+    /// `tcp:PORT` AND have a `comm` matching `oxios`. Without the
+    /// comm check, port 4200 (the daemon's default) is also Angular's
+    /// dev-server default and other tools'; SIGKILL of a PID surfaced
+    /// from lsof alone could murder an unrelated listener — a contract
+    /// `oxios stop` must not break. `ps -o comm= -p PID` reads the
+    /// kernel-resident process name; a substring match on `oxios`
+    /// covers both release binaries and `target/debug/oxios` builds.
+    fn orphan_pid_from_port(&self) -> Option<u32> {
+        let port = self.probe_port?;
+        if !self.port_in_use(port) {
+            return None;
+        }
+        // `lsof -ti tcp:PORT -sTCP:LISTEN` returns listening PIDs.
+        let out = std::process::Command::new("lsof")
+            .args(["-ti", &format!("tcp:{port}"), "-sTCP:LISTEN"])
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let s = String::from_utf8(out.stdout).ok()?;
+        let pid: u32 = s
+            .lines()
+            .find_map(|line| line.split_whitespace().find_map(|t| t.parse().ok()))?;
+
+        // Identity check: refuse to kill anything that doesn't look like
+        // oxios. Cheaper than walking /proc, just calls `ps` for the
+        // short process name. Match is substring — `oxios` covers both
+        // `./target/debug/oxios` (comm truncation preserves the basename
+        // tail) and `oxiosd` if anyone renames it.
+        let comm = std::process::Command::new("ps")
+            .args(["-o", "comm=", "-p", &pid.to_string()])
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        if !comm.contains("oxios") {
+            eprintln!(
+                "  ⚠ port {port} held by PID {pid} ({comm}), not oxios — \
+                 not killing; resolve manually (`lsof -i :{port}`)."
+            );
+            return None;
+        }
+        Some(pid)
+    }
+
+    /// Whether the OS-managed supervisor (launchd LaunchAgent or systemd
+    /// unit) currently considers oxios loaded.
+    fn is_service_loaded(&self) -> bool {
+        #[cfg(target_os = "macos")]
+        {
+            let uid = current_uid_str();
+            if uid.is_empty() {
+                return false;
+            }
+            let target = format!("gui/{uid}/com.a7garden.oxios");
+            std::process::Command::new("launchctl")
+                .args(["print", &target])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        }
+        #[cfg(target_os = "linux")]
+        {
+            // `systemctl is-active` exits 0 only for `active` state.
+            if std::process::Command::new("systemctl")
+                .args(["--user", "is-active", "oxiosd.service"])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+            {
+                return true;
+            }
+            std::process::Command::new("systemctl")
+                .args(["is-active", "oxiosd.service"])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = self;
+            false
+        }
+    }
+
+    /// Unload the OS-level supervisor registration WITHOUT deleting the
+    /// plist/unit file. Reverses KeepAlive for the current session; the
+    /// file remains so `start`/`launchctl load` can re-arm it.
+    fn unload_service(&self) -> Result<()> {
+        #[cfg(target_os = "macos")]
+        {
+            let uid = current_uid_str();
+            if uid.is_empty() {
+                return Ok(());
+            }
+            let target = format!("gui/{uid}/com.a7garden.oxios");
+            // bootout (10.11+) is preferred; fall back to legacy `unload`.
+            let bootout_ok = std::process::Command::new("launchctl")
+                .args(["bootout", &target])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            if !bootout_ok {
+                let plist = dirs::home_dir()
+                    .map(|h| h.join("Library/LaunchAgents/com.a7garden.oxios.plist"));
+                if let Some(p) = plist.filter(|p| p.exists()) {
+                    let _ = std::process::Command::new("launchctl")
+                        .args(["unload", &p.to_string_lossy()])
+                        .output();
+                }
+            }
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let _ = std::process::Command::new("systemctl")
+                .args(["--user", "stop", "oxiosd.service"])
+                .output();
+            let _ = std::process::Command::new("systemctl")
+                .args(["stop", "oxiosd.service"])
+                .output();
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = self;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "macos")]
+/// Return the current user's numeric UID as a string.
+///
+/// Used to construct the launchd target path (`gui/$UID/<label>`), which
+/// is the only stable handle we have for a job loaded into the user
+/// domain. Returns an empty string on probe failure so callers can fall
+/// back gracefully.
+fn current_uid_str() -> String {
+    std::process::Command::new("id")
+        .arg("-u")
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
 }
 
 #[cfg(target_os = "macos")]
@@ -505,5 +835,31 @@ mod tests {
             !dm.port_in_use(port),
             "port should be reported free once the listener is dropped"
         );
+    }
+
+    #[test]
+    fn status_reports_orphaned_when_only_port_responds() {
+        // Bind a listener and verify that with no pidfile/lockfile but a
+        // configured probe port, status classifies the system as
+        // `Orphaned` rather than `Stopped` — the exact case that bit
+        // the user when `--foreground` was launched directly.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let mut dm = DaemonManager::new("/tmp/oxios-orphan-test.pid", "/tmp");
+        dm.set_probe_port(port);
+        // Hold the listener — don't drop until after status() returns.
+        let status = dm.status();
+        drop(listener);
+        match status {
+            DaemonStatus::Orphaned { port: p } => assert_eq!(p, port),
+            other => panic!("expected Orphaned, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn status_stopped_with_no_signal() {
+        let mut dm = DaemonManager::new("/tmp/oxios-stopped-test.pid", "/tmp");
+        dm.set_probe_port(1); // privileged port, never bound in tests.
+        assert!(matches!(dm.status(), DaemonStatus::Stopped));
     }
 }

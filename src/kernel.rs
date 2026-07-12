@@ -19,7 +19,8 @@ use oxios_markdown::knowledge::FileChange;
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering};
+ use std::sync::OnceLock;
 
 /// Fully assembled Oxios kernel with all components wired together.
 ///
@@ -34,7 +35,7 @@ pub struct Kernel {
     skill_manager: Arc<SkillManager>,
     supervisor: Arc<dyn Supervisor>,
     access_manager: Arc<parking_lot::Mutex<AccessManager>>,
-    persona_manager: PersonaManager,
+    persona_manager: Arc<PersonaManager>,
     mcp_bridge: Arc<McpBridge>,
     #[allow(dead_code)]
     memory_manager: Arc<MemoryManager>,
@@ -218,7 +219,7 @@ impl Kernel {
                         self.access_manager.clone(),
                         self.state_store.clone(),
                     ),
-                    oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
+                    oxios_kernel::PersonaApi::new(self.persona_manager.clone()),
                     oxios_kernel::ExtensionApi::new(Arc::clone(&self.skill_manager)),
                     oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
                     oxios_kernel::InfraApi::new(
@@ -439,6 +440,51 @@ impl Kernel {
             .map_err(|e| anyhow::anyhow!("audit flush failed: {e}"))
     }
 
+    /// Shutdown kernel resources: agents, MCP, audit. All wrapped in
+    /// a single timeout — on expiry, remaining work is abandoned and
+    /// the process exits (the OS supervisor restarts to known-good).
+    ///
+    /// `flush_audit` is synchronous, so it runs on the blocking pool
+    /// for the outer timeout to function (same rationale as Guardian's
+    /// spawn_blocking — RFC-040 A2).
+    pub async fn cleanup(&self, timeout: std::time::Duration) {
+        let handle = self.handle();
+
+        let _ = tokio::time::timeout(timeout, async {
+            // Phase 1: terminate running agents (parallel kill)
+            if let Ok(agents) = handle.agents.list().await
+                && !agents.is_empty()
+            {
+                tracing::info!(count = agents.len(), "Terminating agents...");
+                let mut kill_futures = Vec::new();
+                for agent in &agents {
+                    let agent_id = agent.id.to_string();
+                    let h = handle.clone();
+                    kill_futures.push(tokio::spawn(async move {
+                        if let Err(e) = h.agents.kill(&agent_id).await {
+                            tracing::warn!(agent = %agent_id, error = %e, "Failed to kill agent");
+                        }
+                    }));
+                }
+                for f in kill_futures {
+                    let _ = f.await;
+                }
+                tracing::info!(count = agents.len(), "Agents terminated");
+            }
+
+            // Phase 2: MCP shutdown (async, but may hang on unresponsive server)
+            if let Err(e) = handle.mcp.shutdown_all().await {
+                tracing::warn!(error = %e, "MCP shutdown error");
+            }
+
+            // Phase 3: audit flush — SYNC. Must offload to blocking pool
+            // for the outer timeout to function.
+            let kh = handle.clone();
+            let _ = tokio::task::spawn_blocking(move || kh.flush_audit()).await;
+        })
+        .await;
+    }
+
     /// RFC-025 Phase 5: signal the Mount auto-promotion scanner to stop
     /// (Promo-6). No-op when the scanner is disabled. Safe to call during
     /// graceful shutdown; the spawned task breaks its `select!` loop on the
@@ -553,58 +599,62 @@ impl Kernel {
 
     /// Start the guardian daemon (background integrity checks).
     ///
-    /// `web_dist` is the atomic handle to the active web-dist directory. It is
-    /// forwarded to the daily health check so auto-updates publish a new
-    /// generation atomically (RFC-024 SP3) instead of deleting files that
-    /// in-flight requests may be reading.
-    pub fn start_guardian(&self, web_dist: oxios_gateway::ActiveWebDist) {
-        use oxi_sdk::AuditAction;
+    /// Returns the Guardian task handle so the caller can register it
+    /// with the TaskSupervisor as a safety net for clean exits.
+    /// Hang detection is via the heartbeat watchdog (RFC-040 A3).
+    ///
+    /// `web_dist` is forwarded to the daily health check so auto-updates
+    /// publish a new generation atomically (RFC-024 SP3).
+    ///
+    /// `heartbeat` is updated every cycle completion. The supervisor
+    /// checks it every 60s; three missed cycles (900s) → abort.
+    pub fn start_guardian(
+        &self,
+        web_dist: oxios_gateway::ActiveWebDist,
+        heartbeat: Arc<AtomicU64>,
+    ) -> tokio::task::JoinHandle<()> {
         let handle = self.handle();
-        tokio::spawn(async move {
+        let guardian_task = tokio::spawn(async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(300)).await;
 
-                if let Ok(valid) = handle.security.verify_chain()
-                    && !valid
-                {
-                    handle.security.audit(
-                        "guardian",
-                        AuditAction::Other {
-                            detail: "AUDIT CHAIN BROKEN".into(),
-                        },
-                        "guardian",
-                    );
-                }
+                // All four Guardian ops (verify_chain, is_overloaded,
+                // git_verify, commit_all) are synchronous. Calling them
+                // on an async worker starves the runtime — and
+                // tokio::time::timeout cannot preempt a blocking call.
+                // spawn_blocking moves them to the blocking pool where
+                // the timeout JoinHandle can actually be polled.
+                let h = handle.clone();
+                let result = tokio::time::timeout(
+                    std::time::Duration::from_secs(180),
+                    tokio::task::spawn_blocking(move || guardian_tick_sync(&h)),
+                )
+                .await;
 
-                if handle.infra.is_overloaded() {
-                    let snap = handle.infra.resource_snapshot();
-                    handle.security.audit(
-                        "guardian",
-                        AuditAction::Other {
-                            detail: format!("OVERLOADED: cpu={:.1}%", snap.cpu_percent),
-                        },
-                        "guardian",
-                    );
+                match result {
+                    Ok(Ok(())) | Ok(Err(_)) => {
+                        // Cycle completed (success or error from
+                        // individual ops) — heartbeat alive.
+                        heartbeat.store(now_secs_epoch(), Ordering::Relaxed);
+                    }
+                    Err(_) => {
+                        // Tick hung past 180s. Do NOT update heartbeat.
+                        // The detached spawn_blocking task continues on
+                        // the blocking pool; the loop moves to next
+                        // sleep. If hangs persist across cycles,
+                        // heartbeat goes stale → watchdog aborts.
+                        tracing::warn!(
+                            "Guardian tick timed out after 180s — heartbeat not updated"
+                        );
+                    }
                 }
-
-                if let Ok(valid) = handle.infra.git_verify()
-                    && !valid
-                {
-                    handle.security.audit(
-                        "guardian",
-                        AuditAction::Other {
-                            detail: "GIT REPOSITORY CORRUPTED".into(),
-                        },
-                        "guardian",
-                    );
-                }
-
-                let _ = handle.commit_all("guardian: periodic checkpoint");
             }
         });
 
         // Daily health check: web UI update, self-update check.
         self.start_daily_health_check(web_dist);
+
+        guardian_task
     }
 
     /// Start the daily health check loop.
@@ -619,7 +669,8 @@ impl Kernel {
                 .and_hms_opt(3, 0, 0)
                 .unwrap()
                 .and_local_timezone(chrono::Local)
-                .unwrap();
+                .earliest()
+                .unwrap_or(now + chrono::Duration::hours(24));
             if next <= now {
                 next += chrono::Duration::days(1);
             }
@@ -645,6 +696,60 @@ impl Kernel {
             }
         });
     }
+}
+
+/// Synchronous Guardian tick — runs on the blocking pool via spawn_blocking.
+///
+/// All four operations (verify_chain, is_overloaded, git_verify, commit_all)
+/// are synchronous blocking calls. Extracted from the old inline loop body
+/// so they can be offloaded from the async worker thread (RFC-040 A2).
+fn guardian_tick_sync(handle: &oxios_kernel::KernelHandle) {
+    use oxi_sdk::AuditAction;
+
+    if let Ok(valid) = handle.security.verify_chain()
+        && !valid
+    {
+        handle.security.audit(
+            "guardian",
+            AuditAction::Other {
+                detail: "AUDIT CHAIN BROKEN".into(),
+            },
+            "guardian",
+        );
+    }
+
+    if handle.infra.is_overloaded() {
+        let snap = handle.infra.resource_snapshot();
+        handle.security.audit(
+            "guardian",
+            AuditAction::Other {
+                detail: format!("OVERLOADED: cpu={:.1}%", snap.cpu_percent),
+            },
+            "guardian",
+        );
+    }
+
+    if let Ok(valid) = handle.infra.git_verify()
+        && !valid
+    {
+        handle.security.audit(
+            "guardian",
+            AuditAction::Other {
+                detail: "GIT REPOSITORY CORRUPTED".into(),
+            },
+            "guardian",
+        );
+    }
+
+    let _ = handle.commit_all("guardian: periodic checkpoint");
+}
+
+/// Current time as Unix epoch seconds.
+fn now_secs_epoch() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// Daily health check logic (RFC-024 SP3: atomic publish).
@@ -949,7 +1054,9 @@ impl KernelBuilder {
         }
         let access_manager = Arc::new(parking_lot::Mutex::new(access_manager));
 
-        let persona_manager = PersonaManager::new();
+        let persona_manager = Arc::new(
+            PersonaManager::new().with_state_store(state_store.clone()),
+        );
         // RFC-039: 디스크에서 페르소나 로드 → config 적용 → 활성 결정 → intent 시드.
         // 손상은 silent fallback 하지 않고 tracing log 에 남김.
         if let Err(e) = persona_manager.load_from_state_store(&state_store).await {
@@ -960,6 +1067,13 @@ impl KernelBuilder {
             intent_engine.set_persona_prompt(Some(p.system_prompt.clone()));
             tracing::info!(persona = %p.name, "Active persona set on engines");
         }
+
+        // RFC-039: re-seed intent engine on every persona switch.
+        // Set on the manager so all callers (HTTP, tool, gateway) re-seed.
+        let ie_for_persona = intent_engine.clone();
+        persona_manager.set_reseed_callback(Some(Arc::new(move |prompt| {
+            ie_for_persona.set_persona_prompt(prompt);
+        })));
 
         let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
 
@@ -1274,15 +1388,7 @@ impl KernelBuilder {
             Arc::clone(&routing_stats),
             Arc::clone(&engine_handle),
         ));
-        let mut persona_api_unwrapped =
-            oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone()));
-        // RFC-039: auto re-seed the intent engine when the active persona
-        // changes via HTTP. The binary crate bridges kernel ↔ ouroboros.
-        let ie = intent_engine.clone();
-        persona_api_unwrapped.set_reseed_callback(Some(Arc::new(move |prompt| {
-            ie.set_persona_prompt(prompt);
-        })));
-        let persona_api = Arc::new(persona_api_unwrapped);
+        let persona_api = Arc::new(oxios_kernel::PersonaApi::new(Arc::clone(&persona_manager)));
 
         // Shared KnowledgeBase — single source of truth (RFC-003)
         let knowledge_base = Arc::new(
@@ -1324,7 +1430,7 @@ impl KernelBuilder {
                     access_manager.clone(),
                     state_store.clone(),
                 ),
-                oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())),
+                oxios_kernel::PersonaApi::new(Arc::clone(&persona_manager)),
                 oxios_kernel::ExtensionApi::new(Arc::clone(&skill_manager)),
                 oxios_kernel::McpApi::new(mcp_bridge.clone()),
                 oxios_kernel::InfraApi::new(
@@ -1412,7 +1518,7 @@ impl KernelBuilder {
             kernel_handle.clone(),
             Some(Arc::clone(&routing_stats)),
         )
-        .with_persona_manager(Arc::new(persona_manager.clone()))
+        .with_persona_manager(Arc::clone(&persona_manager))
         .with_tool_retriever(Arc::new(tool_retriever))
         .with_config({
             // Resolve API key from CredentialStore based on the model's provider.

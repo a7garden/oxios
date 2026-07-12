@@ -29,8 +29,8 @@
 //! window (a web restart backoff of up to 30s never blinds the loop to a
 //! dying gateway).
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+ use std::time::{Duration, Instant};
 
 use futures::stream::{FuturesUnordered, StreamExt};
 use parking_lot::RwLock;
@@ -40,6 +40,22 @@ use tokio_util::sync::CancellationToken;
 use oxios_gateway::{ActiveWebDist, Gateway, Surface, SurfaceContext};
 
 use crate::kernel::Kernel;
+
+/// How often the supervisor checks the Guardian heartbeat (RFC-040 A3).
+const GUARDIAN_CHECK_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Stale threshold: 3 × Guardian cycle (300s). Three consecutive missed
+/// cycles before the watchdog fires — generous enough for slow cycles,
+/// tight enough to catch real hangs.
+const GUARDIAN_STALE_THRESHOLD_SECS: u64 = 900;
+
+/// Current time as Unix epoch seconds.
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
 
 /// Outcome of the supervisor's run loop.
 pub enum ShutdownOutcome {
@@ -175,6 +191,11 @@ pub struct TaskSupervisor {
     pending: Option<PendingRestart>,
     /// Callback to stop the gateway event loop during shutdown drain.
     stop_gateway: Option<Box<dyn FnOnce() + Send>>,
+    /// Guardian heartbeat (Unix epoch seconds). `None` when no Guardian
+    /// is running (e.g. CLI subcommands that don't start the daemon).
+    /// The supervisor checks staleness every 60s via the select! timer
+    /// branch (RFC-040 A3).
+    guardian_heartbeat: Option<Arc<AtomicU64>>,
 }
 
 impl TaskSupervisor {
@@ -188,6 +209,7 @@ impl TaskSupervisor {
             web: None,
             pending: None,
             stop_gateway: None,
+            guardian_heartbeat: None,
         }
     }
 
@@ -211,6 +233,14 @@ impl TaskSupervisor {
     /// event loop so it drains in-flight dispatches before the process exits.
     pub fn with_gateway_stop(&mut self, stop: impl FnOnce() + Send + 'static) {
         self.stop_gateway = Some(Box::new(stop));
+    }
+
+    /// Register a Guardian heartbeat for watchdog monitoring (RFC-040 A3).
+    /// The supervisor checks staleness every 60s via the select! timer
+    /// branch. The heartbeat must be updated by the Guardian loop every
+    /// cycle; three missed cycles (900s) → `process::abort()`.
+    pub fn watch_guardian(&mut self, heartbeat: Arc<AtomicU64>) {
+        self.guardian_heartbeat = Some(heartbeat);
     }
 
     /// Run the supervision loop until graceful or fatal exit, then drain all
@@ -240,6 +270,14 @@ impl TaskSupervisor {
                 .as_ref()
                 .map(|p| tokio::time::sleep_until(p.deadline.into()));
 
+            // Heartbeat timer: sleep when Guardian is registered, pending
+            // forever when not — same select!-safety pattern as timer.
+            let hb_timer = if self.guardian_heartbeat.is_some() {
+                tokio::time::sleep(GUARDIAN_CHECK_INTERVAL)
+            } else {
+                std::future::pending::<()>()
+            };
+
             tokio::select! {
                 biased;
                 _ = tokio::signal::ctrl_c() => return ShutdownOutcome::Graceful,
@@ -260,6 +298,34 @@ impl TaskSupervisor {
                 } => {
                     if let Some(outcome) = self.fire_web_restart().await {
                         return outcome;
+                    }
+                }
+                // RFC-040 A3: Guardian heartbeat watchdog. Fires every 60s
+                // when a heartbeat is registered. Only reads an atomic and
+                // compares integers — zero kernel calls, survives a wedged
+                // kernel because it makes no blocking/syscall demands.
+                _ = hb_timer => {
+                    if let Some(hb) = &self.guardian_heartbeat {
+                        let last = hb.load(Ordering::Relaxed);
+                        let now = now_secs();
+                        let stale = now.saturating_sub(last);
+                        if stale > GUARDIAN_STALE_THRESHOLD_SECS {
+                            tracing::error!(
+                                last_seen = last,
+                                now = now,
+                                stale_secs = stale,
+                                threshold = GUARDIAN_STALE_THRESHOLD_SECS,
+                                "Guardian heartbeat stale — aborting process"
+                            );
+                            // tracing's non-blocking appender does not flush
+                            // on abort — write directly to stderr (redirected
+                            // to the append-mode log file by the daemon launcher)
+                            // so the diagnostic survives.
+                            eprintln!(
+                                "Guardian heartbeat stale ({stale}s > {GUARDIAN_STALE_THRESHOLD_SECS}s) — aborting"
+                            );
+                            std::process::abort();
+                        }
                     }
                 }
             }
@@ -453,5 +519,57 @@ mod tests {
         root.cancel();
         let outcome = sup.run().await;
         assert!(matches!(outcome, ShutdownOutcome::Graceful));
+    }
+
+    #[test]
+    fn heartbeat_stale_past_threshold() {
+        let hb = Arc::new(AtomicU64::new(0)); // epoch = very stale
+        let now = now_secs();
+        let stale = now.saturating_sub(hb.load(Ordering::Relaxed));
+        assert!(
+            stale > GUARDIAN_STALE_THRESHOLD_SECS,
+            "epoch 0 should be stale past threshold"
+        );
+    }
+
+    #[test]
+    fn heartbeat_fresh_under_threshold() {
+        let hb = Arc::new(AtomicU64::new(now_secs()));
+        let now = now_secs();
+        let stale = now.saturating_sub(hb.load(Ordering::Relaxed));
+        assert!(
+            stale <= GUARDIAN_STALE_THRESHOLD_SECS,
+            "current time should be fresh"
+        );
+    }
+
+    #[test]
+    fn watch_guardian_registers_heartbeat() {
+        let root = CancellationToken::new();
+        let mut sup = TaskSupervisor::new(root.clone(), RestartConfig::default());
+        assert!(sup.guardian_heartbeat.is_none());
+        let hb = Arc::new(AtomicU64::new(now_secs()));
+        sup.watch_guardian(hb);
+        assert!(sup.guardian_heartbeat.is_some());
+    }
+
+    #[tokio::test]
+    async fn drain_does_not_hang_on_unfinished_task() {
+        let root = CancellationToken::new();
+        let mut sup = TaskSupervisor::new(root.clone(), RestartConfig::default());
+        // Task that never completes.
+        sup.track_critical("stuck", tokio::spawn(async {
+            std::future::pending::<()>().await;
+        }));
+        root.cancel();
+        // run() will drain with timeout — must not hang.
+        let start = Instant::now();
+        let _ = sup.run().await;
+        // Graceful drain timeout is 10s; fatal is 3s. Either way
+        // should complete well under 15s.
+        assert!(
+            start.elapsed() < Duration::from_secs(15),
+            "drain should timeout, not hang"
+        );
     }
 }
