@@ -176,15 +176,15 @@ impl ClawHubInstaller {
         // download.)
         if let Ok(prev) = self.get_installed_version(slug) {
             let prev_origin_path = self.skills_dir.join(slug).join(".clawhub/origin.json");
-            if let Ok(buf) = std::fs::read_to_string(&prev_origin_path) {
-                if let Ok(prev_origin) = serde_json::from_str::<ClawHubOrigin>(&buf) {
-                    tracing::info!(
-                        slug = %slug,
-                        previous_version = %prev,
-                        previous_sha256 = ?prev_origin.sha256,
-                        "Updating ClawHub skill (replacing stored hash)"
-                    );
-                }
+            if let Ok(buf) = std::fs::read_to_string(&prev_origin_path)
+                && let Ok(prev_origin) = serde_json::from_str::<ClawHubOrigin>(&buf)
+            {
+                tracing::info!(
+                    slug = %slug,
+                    previous_version = %prev,
+                    previous_sha256 = ?prev_origin.sha256,
+                    "Updating ClawHub skill (replacing stored hash)"
+                );
             }
         }
         let origin = ClawHubOrigin {

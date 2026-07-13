@@ -130,10 +130,10 @@ impl HostToolScanner {
     /// Detect a single binary by name, using the cache when fresh.
     pub async fn detect(&self, name: &str) -> Option<DetectedTool> {
         // Cache hit?
-        if let Some(entry) = self.cache.read().get(name) {
-            if entry.scanned_at.elapsed() < self.ttl {
-                return entry.tool.clone();
-            }
+        if let Some(entry) = self.cache.read().get(name)
+            && entry.scanned_at.elapsed() < self.ttl
+        {
+            return entry.tool.clone();
         }
 
         let tool = self.scan_uncached(name).await;
@@ -237,10 +237,8 @@ impl HostProbe for RealProbe {
         out.push((ToolSource::Bun, home.join(".bun/bin")));
 
         // npm global — resolve dynamically only if npm is present.
-        if RealProbe::npm_global_bin().is_some() {
-            if let Some(npm_bin) = RealProbe::npm_global_bin() {
-                out.push((ToolSource::Npm, npm_bin));
-            }
+        if let Some(npm_bin) = RealProbe::npm_global_bin() {
+            out.push((ToolSource::Npm, npm_bin));
         }
 
         // pip/uv user dir
@@ -303,9 +301,7 @@ impl HostProbe for RealProbe {
 impl RealProbe {
     /// Resolve npm's global bin dir via `npm prefix -g`, only if `npm` is on PATH.
     fn npm_global_bin() -> Option<PathBuf> {
-        if which_sync("npm").is_none() {
-            return None;
-        }
+        which_sync("npm")?;
         let out = std::process::Command::new("npm")
             .arg("prefix")
             .arg("-g")
@@ -384,10 +380,9 @@ async fn version_probe(path: &Path) -> Option<String> {
         first_version_line(&String::from_utf8_lossy(&out.stdout))
     };
 
-    match tokio::time::timeout(Duration::from_secs(3), fut).await {
-        Ok(v) => v,
-        Err(_) => None, // timed out
-    }
+    tokio::time::timeout(Duration::from_secs(3), fut)
+        .await
+        .unwrap_or_default()
 }
 
 /// Extract the first non-empty, trimmed line from a `--version` output blob.

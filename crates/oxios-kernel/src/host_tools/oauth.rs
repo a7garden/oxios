@@ -348,13 +348,13 @@ impl OAuthBroker {
         let entry = {
             let mut flows = self.flows.lock();
             // Expire stale flows.
-            if let Some(flow) = flows.get(handle) {
-                if Instant::now() > flow.expires_at {
-                    flows.remove(handle);
-                    return Ok(PollResponse {
-                        status: "expired".into(),
-                    });
-                }
+            if let Some(flow) = flows.get(handle)
+                && Instant::now() > flow.expires_at
+            {
+                flows.remove(handle);
+                return Ok(PollResponse {
+                    status: "expired".into(),
+                });
             }
             flows.get(handle).map(|f| {
                 (

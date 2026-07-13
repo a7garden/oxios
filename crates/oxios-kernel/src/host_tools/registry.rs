@@ -26,10 +26,11 @@ use crate::skill::SkillInstallSpec;
 /// Which resolution path applies to a credential. Per D7 there is **no**
 /// `Provider` variant — LLM providers stay in `engine_api` and may only appear
 /// as read-only status cards via a separate UI path.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(tag = "resolver", rename_all = "lowercase")]
 pub enum CredentialResolver {
     /// No credential needed (package managers).
+    #[default]
     None,
     /// Non-provider secret → `CredentialStore::resolve_secret(store_key, env_var)`.
     /// 3-source: raw env var → oxios store → oxi-cli store.
@@ -48,12 +49,6 @@ pub enum CredentialResolver {
         #[serde(default)]
         scopes: Vec<String>,
     },
-}
-
-impl Default for CredentialResolver {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// A single registry entry.

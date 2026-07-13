@@ -101,14 +101,11 @@ impl DaemonManager {
         }
         // 2. Legacy pidfile (kept for backwards compat with daemons that
         //    weren't updated to take the instance lock).
-        match self.read_pid() {
-            Some(pid) => {
-                if self.is_alive(pid) {
-                    return DaemonStatus::Running { pid };
-                }
-                return DaemonStatus::Stale { pid };
+        if let Some(pid) = self.read_pid() {
+            if self.is_alive(pid) {
+                return DaemonStatus::Running { pid };
             }
-            None => {}
+            return DaemonStatus::Stale { pid };
         }
         // 3. Port probe: catches an orphan. This is the path that would
         //    have caught the user's debug-instance scenario (--foreground

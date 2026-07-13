@@ -29,6 +29,7 @@ pub struct PersonaManager {
     /// intent engine's `system_prompt`.  Stored on the manager (not
     /// `PersonaApi`) so ephemeral `PersonaApi` instances in `PersonaTool`
     /// cannot lose it.
+    #[allow(clippy::type_complexity)]
     reseed_callback: RwLock<Option<Arc<dyn Fn(Option<String>) + Send + Sync>>>,
 }
 
