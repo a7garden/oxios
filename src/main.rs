@@ -3188,6 +3188,12 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     // detection) and daily health check. Both handles are tracked as
     // secondary safety nets for clean exits (audit F-14: health check was
     // previously fire-and-forget); hang detection is via the heartbeat.
+    let guardian_heartbeat = Arc::new(AtomicU64::new(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+    ));
     let (guardian_task, health_task) =
         kernel.start_guardian(active_web_dist, guardian_heartbeat.clone());
 

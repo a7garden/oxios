@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.1] - 2026-07-13
+
+### Fixed
+- **Compile error in binary crate** — `guardian_heartbeat` variable was
+  referenced but never created in `src/main.rs` (deleted during audit
+  remediation refactoring). This made `cargo install oxios` fail to compile.
+
 ## [1.23.0] - 2026-07-13
 
 ### Added
