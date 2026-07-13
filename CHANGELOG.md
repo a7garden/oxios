@@ -6,6 +6,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-07-13
+
+### Added
+- **Host integrations (RFC-041)** — Cross-platform host CLI scanner (replaces
+  `which`-only `has_bin`), OAuth device-code broker (first: GitHub `gh`), and
+  provisioner for first-time SkillInstallSpec execution.
+- **Persona manager improvements** — Async `set_active` with reseed callback
+  for the intent engine's system prompt.
+- **Daemon supervision (RFC-040)** — Multi-source liveness interpretation
+  (pidfile + lock + port probe), stale pidfile cleanup, orphan detection.
+- **Recursive knowledge filetree** — Move, folder creation, and file upload
+  in the web knowledge sidebar.
+
+### Fixed
+- **Security: MCP spawn chokepoint** — Enforced single spawn path + environment
+  variable sanitization (F-1).
+- **Security: auth default** — Shipped `auth_enabled` default flipped to `true` (F-13).
+- **Integrity: ClawHub hash re-verification** — Previous origin hash logged
+  before overwrite; A2A circuit-breaker ordering fixed (F-12, F-15).
+- **Recovery: error-recovery paths** — Replaced hard `expect()` calls with
+  graceful error handling (F-4).
+- **WebSocket keepalive** — Corrected deadline calculation in `select!` loop.
+- **Knowledge routes** — Removed unreachable catch-all on exhaustive match.
+- **DaemonManager visibility** — `cleanup()` made `pub` for integration tests.
+- **Frontend** — TS strict mode errors (`noUncheckedIndexedAccess`), biome lint,
+  a11y fixes (`useSemanticElements`, `useFocusableInteractive`), settings
+  consistency test, and biome 2.5.3 config migration.
+- **Clippy** — 9 warnings resolved across kernel (single_match, collapsible_if,
+  type_complexity, derivable_impls, question_mark, manual_unwrap_or_default).
+- **CI** — `--no-verify` for publish (OOM on heavy crates), `--allow-dirty` for
+  Cargo.lock modifications, non-portable `[patch]` paths commented out.
+
+### Changed
+- **Memory recall perf** — Removed redundant embedding clone (F-9).
+- **Build profiles** — Dev `opt-level` 2→1 for faster incremental compiles;
+  new `dist` profile with thin-LTO for release binaries.
+- **Supply chain** — cargo-deny baseline config added (F-7 partial).
+- **Dependencies** — Added `flate2` + `tar` for host-tool tar.gz downloads.
+
 ## [1.22.0] - 2026-07-11
 
 ### Added
