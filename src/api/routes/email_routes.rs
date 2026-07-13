@@ -125,11 +125,17 @@ fn default_provider() -> String {
 /// Extract the email API, returning 503 if unavailable.
 macro_rules! email_api {
     ($state:expr) => {
-        $state.kernel.email.as_ref().ok_or_else(|| {
-            AppError::ServiceUnavailable(
-                "Email subsystem not available. Add [email] enabled = true to config.toml".into(),
-            )
-        })
+        $state
+            .kernel
+            .email
+            .read()
+            .as_ref()
+            .ok_or_else(|| {
+                AppError::ServiceUnavailable(
+                    "Email subsystem not available. Set up email in Settings → Email.".into(),
+                )
+            })?
+            .clone()
     };
 }
 
@@ -252,8 +258,9 @@ pub(crate) async fn handle_email_status(
     }
     .to_string();
 
-    let configured = state.kernel.email.is_some();
-    let (email, provider, template_count) = if let Some(api) = &state.kernel.email {
+    let email_guard = state.kernel.email.read();
+    let configured = email_guard.is_some();
+    let (email, provider, template_count) = if let Some(api) = &*email_guard {
         let templates = api.list_templates().unwrap_or_default();
         (
             Some(api.default_to().to_string()),
@@ -306,7 +313,7 @@ pub(crate) async fn handle_email_history_detail(
 pub(crate) async fn handle_email_templates(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let api = email_api!(state)?;
+    let api = email_api!(state);
     let names = api
         .list_templates()
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -335,7 +342,7 @@ pub(crate) async fn handle_email_template_get(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let api = email_api!(state)?;
+    let api = email_api!(state);
     let content = api
         .load_template(&name)
         .map_err(|e| AppError::NotFound(e.to_string()))?;
@@ -356,7 +363,7 @@ pub(crate) async fn handle_email_test(
     state: State<Arc<AppState>>,
     body: Option<Json<EmailTestRequest>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let api = email_api!(state)?;
+    let api = email_api!(state);
     let default_to = api.default_to().to_string();
     api.test_connection()
         .await
@@ -377,9 +384,9 @@ pub(crate) async fn handle_email_test(
     })))
 }
 
-/// POST /api/email/setup — Configure email from web UI.
+/// POST /api/email/setup — Configure email from web UI (live, no restart).
 pub(crate) async fn handle_email_setup(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
     Json(body): Json<EmailConfigRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Validate we can connect with these credentials
@@ -417,8 +424,7 @@ pub(crate) async fn handle_email_setup(
         .await
         .map_err(|e| AppError::BadRequest(format!("SMTP test failed: {e}")))?;
 
-    // Save password to env-like store
-    // Store as a token in oxi auth store
+    // Save password to the credential store
     let token = oxi_sdk::TokenBundle {
         access_token: body.password,
         refresh_token: None,
@@ -430,28 +436,48 @@ pub(crate) async fn handle_email_setup(
     oxi_sdk::save_token("email_smtp", &token)
         .map_err(|e| AppError::Internal(format!("Failed to save credentials: {e}")))?;
 
-    // Also append to config.toml if it exists
+    // Persist to config.toml (upsert — replaces existing [email] section)
     let config_path = oxios_kernel::config::expand_home("~/.oxios/config.toml");
     if config_path.exists() {
-        let _ = append_email_section_to_config(&config_path, &config);
+        let _ = upsert_email_section_in_config(&config_path, &config);
     }
+
+    // ── Live kernel update (no restart needed) ───────────────────
+    // Build a new EmailApi and swap it into the shared RwLock slot.
+    // The already-registered EmailTool picks this up immediately.
+    let workspace = std::path::PathBuf::from(&state.config.read().kernel.workspace);
+    let template_dir = workspace.join("email_templates");
+    let _ = std::fs::create_dir_all(&template_dir);
+
+    let new_api = oxios_kernel::EmailApi::new(
+        smtp,
+        template_dir,
+        state.kernel.state.store().clone(),
+        Some(state.kernel.infra.event_bus_clone()),
+        config.rate_limit_per_hour,
+    );
+
+    // Swap into the shared slot — agents using send_email see this instantly
+    *state.kernel.email.write() = Some(new_api);
+
+    // Update in-memory config so GET /api/email/status stays consistent
+    state.config.write().email = config;
+
+    tracing::info!(email = %body.my_email, "Email configured live (no restart)");
 
     Ok(Json(serde_json::json!({
         "status": "ok",
-        "message": "Email configured successfully. Restart oxios to activate.",
+        "message": "Email configured successfully.",
         "email": body.my_email,
     })))
 }
 
-/// Append [email] section to config.toml if not already present.
-fn append_email_section_to_config(
+/// Insert or replace the [email] section in config.toml.
+fn upsert_email_section_in_config(
     config_path: &std::path::Path,
     config: &oxios_kernel::config::EmailConfig,
 ) -> std::io::Result<()> {
     let content = std::fs::read_to_string(config_path)?;
-    if content.contains("[email]") {
-        return Ok(());
-    }
     let provider_str = match config.provider {
         oxios_kernel::email::SmtpProvider::Resend => "resend",
         oxios_kernel::email::SmtpProvider::Gmail => "gmail",
@@ -459,11 +485,34 @@ fn append_email_section_to_config(
         oxios_kernel::email::SmtpProvider::Fastmail => "fastmail",
         oxios_kernel::email::SmtpProvider::Custom => "custom",
     };
-    let section = format!(
-        "\n# Email (configured by web UI)\n[email]\nenabled = true\nmy_email = \"{}\"\nprovider = \"{}\"\n",
+    let new_section = format!(
+        "# Email (configured by web UI)\n[email]\nenabled = true\nmy_email = \"{}\"\nprovider = \"{}\"\n",
         config.my_email, provider_str
     );
-    std::fs::write(config_path, content + &section)?;
+
+    if let Some(email_pos) = content.find("[email]") {
+        // Replace existing section — from start of [email] line to next section or EOF
+        let line_start = content[..email_pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let rest = &content[email_pos..];
+        let section_end = rest[1..]
+            .find("\n[")
+            .map(|p| email_pos + 1 + p + 1)
+            .unwrap_or(content.len());
+        let mut result = String::with_capacity(content.len());
+        result.push_str(&content[..line_start]);
+        result.push_str(&new_section);
+        result.push_str(&content[section_end..]);
+        std::fs::write(config_path, result)?;
+    } else {
+        // Append new section
+        let mut result = content;
+        if !result.ends_with('\n') {
+            result.push('\n');
+        }
+        result.push('\n');
+        result.push_str(&new_section);
+        std::fs::write(config_path, result)?;
+    }
     Ok(())
 }
 
@@ -602,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn test_append_email_section_creates_block() {
+    fn test_upsert_email_section_creates_block() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("config.toml");
         fs::write(&path, "[kernel]\nworkspace = \"/tmp\"").unwrap();
@@ -617,7 +666,7 @@ mod tests {
             secret_ref: "email_smtp".to_string(),
             rate_limit_per_hour: 10,
         };
-        append_email_section_to_config(&path, &config).unwrap();
+        upsert_email_section_in_config(&path, &config).unwrap();
         let content = fs::read_to_string(&path).unwrap();
         assert!(content.contains("[email]"));
         assert!(content.contains("my_email = \"me@gmail.com\""));
@@ -627,7 +676,7 @@ mod tests {
     }
 
     #[test]
-    fn test_append_email_section_idempotent() {
+    fn test_upsert_email_section_replaces_existing() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("config.toml");
         let config = oxios_kernel::config::EmailConfig {
@@ -641,12 +690,18 @@ mod tests {
             secret_ref: "email_smtp".to_string(),
             rate_limit_per_hour: 10,
         };
-        // Pre-populate with [email] section
-        fs::write(&path, "[email]\nenabled = true\n").unwrap();
-        // Should be a no-op
-        append_email_section_to_config(&path, &config).unwrap();
+        // Pre-populate with stale [email] section
+        fs::write(
+            &path,
+            "[email]\nenabled = false\nmy_email = \"old@example.com\"\nprovider = \"icloud\"\n",
+        )
+        .unwrap();
+        // Should replace the section with new config
+        upsert_email_section_in_config(&path, &config).unwrap();
         let content = fs::read_to_string(&path).unwrap();
-        // Should not duplicate
+        // Should have exactly one [email] section, with new values
         assert_eq!(content.matches("[email]").count(), 1);
+        assert!(content.contains("me@gmail.com"));
+        assert!(!content.contains("old@example.com"));
     }
 }

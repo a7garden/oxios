@@ -142,6 +142,24 @@ export function SkillDetail({
                 {skill.requirements.config.length > 0 && (
                   <ReqList items={skill.requirements.config} missing={skill.missing.config} />
                 )}
+                {skill.requirements.integrations.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                    <span className="text-xs text-muted-foreground">
+                      {t('skills.requiresIntegrations')}:
+                    </span>
+                    {skill.requirements.integrations.map((id) => (
+                      <Badge key={id} variant="outline" className="font-mono text-[10px]">
+                        {id}
+                      </Badge>
+                    ))}
+                    <a
+                      className="text-[10px] text-info underline hover:opacity-80"
+                      href="/settings?section=host-tools"
+                    >
+                      {t('skills.configureInSettings')}
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -19,6 +19,7 @@ pub mod security_api;
 pub mod state_api;
 pub mod token_maxing_api;
 
+pub use crate::host_tools::HostToolsApi;
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
 pub use calendar_api::CalendarApi;
@@ -48,6 +49,7 @@ pub use token_maxing_api::TokenMaxingApi;
 
 use crate::git_layer::CommitInfo;
 use crate::readiness::ReadinessGate;
+use parking_lot::RwLock;
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -100,10 +102,12 @@ pub struct KernelHandle {
     /// Calendar events — create, update, delete, list, search, freebusy.
     pub calendar: Option<CalendarApi>,
     /// Email — send HTML emails via SMTP, template management.
-    pub email: Option<EmailApi>,
+    pub email: Arc<RwLock<Option<EmailApi>>>,
     /// Token-maxing (RFC-031): the shared QuotaTracker facade. `None` only on
     /// the incomplete preliminary handle; the cached handle attaches it.
     pub token_maxing: Option<TokenMaxingApi>,
+    /// Host Integrations (RFC-041): host-CLI discovery, OAuth, provisioning.
+    pub host_tools: HostToolsApi,
     /// RFC-024 SP4: subsystem readiness gate.
     pub readiness: Arc<ReadinessGate>,
     /// Per-session streaming sink registry (P1 chat transparency).
@@ -138,7 +142,7 @@ impl KernelHandle {
         knowledge_lens: Arc<KnowledgeLens>,
         marketplace_api: MarketplaceApi,
         calendar: Option<CalendarApi>,
-        email: Option<EmailApi>,
+        email: Arc<RwLock<Option<EmailApi>>>,
     ) -> Self {
         Self {
             state,
@@ -159,6 +163,7 @@ impl KernelHandle {
             calendar,
             email,
             token_maxing: None,
+            host_tools: HostToolsApi::new(),
             // RFC-024 SP4: default Warming/no-deadline. The Kernel
             // (src/kernel.rs) sets the actual state and deadline during
             // startup via `readiness.set_*` / a background task.

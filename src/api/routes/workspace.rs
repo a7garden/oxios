@@ -382,6 +382,18 @@ fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
                             let name = spec.package.as_deref().unwrap_or("unknown");
                             format!("Install {name} (uv)")
                         }
+                        oxios_kernel::InstallKind::Bun => {
+                            let name = spec.package.as_deref().unwrap_or("unknown");
+                            format!("Install {name} (bun)")
+                        }
+                        oxios_kernel::InstallKind::Cargo => {
+                            let name = spec.package.as_deref().unwrap_or("unknown");
+                            format!("Install {name} (cargo)")
+                        }
+                        oxios_kernel::InstallKind::Pip => {
+                            let name = spec.package.as_deref().unwrap_or("unknown");
+                            format!("Install {name} (pip)")
+                        }
                         oxios_kernel::InstallKind::Download => "Download".to_string(),
                     };
                     let bins: Vec<String> = match spec.kind {
@@ -401,6 +413,13 @@ fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
                             .map(|m| vec![m.clone()])
                             .unwrap_or_default(),
                         oxios_kernel::InstallKind::Uv => spec
+                            .package
+                            .as_ref()
+                            .map(|p| vec![p.clone()])
+                            .unwrap_or_default(),
+                        oxios_kernel::InstallKind::Bun
+                        | oxios_kernel::InstallKind::Cargo
+                        | oxios_kernel::InstallKind::Pip => spec
                             .package
                             .as_ref()
                             .map(|p| vec![p.clone()])

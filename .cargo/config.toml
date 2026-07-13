@@ -1,17 +1,14 @@
 # Oxios Cargo configuration
 
+# NOTE: [profile] sections are NOT supported in .cargo/config.toml.
+# Cargo reads profiles only from Cargo.toml (the manifest).
+# The previous [profile.*] blocks here were silently ignored —
+# all profile tuning lives in the root Cargo.toml instead.
+
 [build]
+# sccache: set via `export RUSTC_WRAPPER=sccache` in your shell, or
+# via the RUSTC_WRAPPER env var in CI. Not set here because Cargo
+# hard-fails if the wrapper binary is missing — which would break
+# builds for anyone who clones without sccache installed.
 # Use clang linker for faster linking
 rustflags = ["-C", "linker=clang"]
-
-[profile.dev]
-# Keep incremental for speed, but limit cache size
-incremental = true
-
-[profile.dev.package."*"]
-# Dependencies compile faster
-opt-level = 2
-
-[profile.release]
-lto = "thin"
-codegen-units = 16

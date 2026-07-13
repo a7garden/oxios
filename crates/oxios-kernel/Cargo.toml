@@ -53,6 +53,9 @@ lettre = { workspace = true }
 reqwest = { workspace = true }
 # ZIP extraction for ClawHub skill archives
 zip = { workspace = true }
+# tar.gz extraction for host-tool downloads (RFC-041 provisioner)
+flate2 = { workspace = true }
+tar = { workspace = true }
 # URL parsing
 url = "2.5"
 sha2 = { workspace = true }

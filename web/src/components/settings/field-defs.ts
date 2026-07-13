@@ -724,7 +724,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     id: 'system',
     labelKey: 'settings.groupSystem',
-    sectionKeys: ['kernel', 'session', 'logging', 'update', 'browser', 'budget', 'notifications'],
+    sectionKeys: ['kernel', 'session', 'logging', 'update', 'browser', 'budget', 'notifications', 'host-tools'],
   },
   {
     id: 'advanced',
@@ -795,6 +795,7 @@ export type SectionIconKey =
   | 'budget'
   | 'secrets'
   | 'notifications'
+  | 'hostTools'
 
 export interface SectionMeta {
   /** Section key, e.g. `engine`, `exec`, `memory`. */
@@ -854,6 +855,15 @@ export const SECTION_META: SectionMeta[] = [
     descriptionKey: 'settings.secretsDescription',
     groupId: 'exec_security',
     iconKey: 'secrets',
+    custom: true,
+  },
+  // Host Tools (RFC-041) — host-CLI discovery inventory
+  {
+    id: 'host-tools',
+    labelKey: 'settings.sectionHostTools',
+    descriptionKey: 'settings.hostToolsDescription',
+    groupId: 'system',
+    iconKey: 'hostTools',
     custom: true,
   },
   // Memory

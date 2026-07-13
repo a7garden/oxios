@@ -11,6 +11,11 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # sccache: caches compiled crate artifacts. The 4-way test partition
+  # each compiles the full dependency tree (~1700 crates) independently —
+  # sccache lets them share compiled artifacts via a shared cache key.
+  RUSTC_WRAPPER: sccache
+  SCCACHE_DIR: ${{ github.workspace }}/.sccache
 
 jobs:
   # ─── Formatting & Linting ────────────────────────────────────────
@@ -34,6 +39,9 @@ jobs:
         with:
           toolchain: ${{ steps.rust-channel.outputs.channel }}
           components: rustfmt, clippy
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -111,6 +119,17 @@ jobs:
       - name: Install nextest
         uses: taiki-e/install-action@nextest
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.sccache
+          key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -177,6 +196,9 @@ jobs:
 
       - name: Install nextest
         uses: taiki-e/install-action@nextest
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - uses: Swatinem/rust-cache@v2
 

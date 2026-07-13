@@ -103,10 +103,14 @@ export interface SkillRequirements {
   anyBins: string[]
   env: string[]
   config: string[]
+  /** Integration IDs this skill hard-requires (RFC-041). */
+  integrations: string[]
+  /** Integration IDs of which at least one must be satisfied. */
+  anyIntegrations: string[]
 }
 
 export interface SkillInstallSpec {
-  kind: 'brew' | 'node' | 'go' | 'uv' | 'download'
+  kind: 'brew' | 'node' | 'bun' | 'cargo' | 'pip' | 'go' | 'uv' | 'download'
   label?: string
   bins: string[]
 }

@@ -16,6 +16,16 @@ pub struct Requirements {
     pub env: Vec<String>,
     #[serde(default)]
     pub config: Vec<String>,
+    /// Integration IDs this skill hard-requires (RFC-041 D10). The skill is
+    /// ineligible unless every listed integration's credential is satisfied.
+    /// Checked where the registry is available (API/UI), not in the
+    /// host-local `check_requirements`.
+    #[serde(default)]
+    pub integrations: Vec<String>,
+    /// Integration IDs of which at least one must be satisfied (soft, mirrors
+    /// `any_bins`). Empty = no constraint.
+    #[serde(default, rename = "anyIntegrations")]
+    pub any_integrations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +56,9 @@ pub struct SkillInstallSpec {
 pub enum InstallKind {
     Brew,
     Node,
+    Bun,
+    Cargo,
+    Pip,
     Go,
     #[serde(rename = "uv")]
     Uv,
@@ -57,6 +70,9 @@ impl std::fmt::Display for InstallKind {
         match self {
             InstallKind::Brew => write!(f, "brew"),
             InstallKind::Node => write!(f, "node"),
+            InstallKind::Bun => write!(f, "bun"),
+            InstallKind::Cargo => write!(f, "cargo"),
+            InstallKind::Pip => write!(f, "pip"),
             InstallKind::Go => write!(f, "go"),
             InstallKind::Uv => write!(f, "uv"),
             InstallKind::Download => write!(f, "download"),
@@ -222,6 +238,9 @@ pub struct SkillRef {
     pub file_path: String,
     pub primary_env: Option<String>,
     pub required_env: Vec<String>,
+    /// Integration IDs this skill hard-requires (RFC-041). The UI cross-
+    /// references these against `/api/integrations` credential status.
+    pub required_integrations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -300,6 +319,8 @@ mod tests {
             any_bins: vec!["python3".to_string()],
             env: vec!["API_KEY".to_string()],
             config: vec!["server.host".to_string()],
+            integrations: vec!["github".to_string()],
+            any_integrations: vec![],
         };
         let json = serde_json::to_string(&req).unwrap();
         let restored: Requirements = serde_json::from_str(&json).unwrap();
@@ -428,6 +449,7 @@ mod tests {
                 file_path: "/skills/bash.md".to_string(),
                 primary_env: None,
                 required_env: vec![],
+                required_integrations: vec![],
             }],
             skill_filter: Some(vec!["bash".to_string()]),
         };

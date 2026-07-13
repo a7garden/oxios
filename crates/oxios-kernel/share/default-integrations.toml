@@ -1,0 +1,74 @@
+# Default integration catalog (RFC-041).
+#
+# Each [[integration]] binds a CLI to detect (optional), install spec(s), and a
+# credential descriptor. User overrides: drop TOML files in
+# ~/.oxios/integrations.d/ — an entry with the same `id` replaces this one
+# wholesale.
+#
+# Credential model: `resolver` selects the resolution path.
+#   none   — no credential (package managers)
+#   secret — CredentialStore::resolve_secret(store_key, env_var): raw env var →
+#            oxios auth store → oxi-cli store
+#   oauth  — device-code flow → TokenBundle under store_key (Phase 3)
+#
+# LLM providers (anthropic/openai/google) are intentionally ABSENT — they are
+# owned by engine_api (D7). Add them there, not here.
+
+# ─── Package managers (bootstrap; no credential) ─────────────────────────────
+
+[[integration]]
+id = "brew"
+label = "Homebrew"
+cli = "brew"
+credential = { resolver = "none" }
+
+[[integration]]
+id = "npm"
+label = "npm"
+cli = "npm"
+credential = { resolver = "none" }
+
+[[integration]]
+id = "cargo"
+label = "Cargo"
+cli = "cargo"
+credential = { resolver = "none" }
+
+[[integration]]
+id = "bun"
+label = "Bun"
+cli = "bun"
+credential = { resolver = "none" }
+
+[[integration]]
+id = "go"
+label = "Go"
+cli = "go"
+credential = { resolver = "none" }
+
+[[integration]]
+id = "uv"
+label = "uv"
+cli = "uv"
+credential = { resolver = "none" }
+
+# ─── CLI tools ───────────────────────────────────────────────────────────────
+
+# GitHub CLI — OAuth device-code (Phase 3). `provider = "github"` names a Rust
+# OAuthProvider impl; TOML selects which provider + scopes.
+[[integration]]
+id = "github"
+label = "GitHub CLI"
+cli = "gh"
+install = [
+  { kind = "brew", formula = "gh" },
+]
+credential = { resolver = "oauth", store_key = "github", provider = "github", scopes = ["repo", "read:org"] }
+
+# Resend — static API key (resolve_secret class).
+[[integration]]
+id = "resend"
+label = "Resend"
+cli = "resend"
+install = [{ kind = "node", package = "resend" }]
+credential = { resolver = "secret", store_key = "resend", env_var = "RESEND_API_KEY" }

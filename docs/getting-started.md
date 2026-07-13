@@ -77,22 +77,22 @@ $ cargo install oxios
 
 ### Option B: Build from Source
 
-Clone the repository and build a release binary:
+Clone the repository and build a distribution binary:
 
 ```bash
 $ git clone https://github.com/a7garden/oxios
 $ cd oxios
-$ cargo build --release
+$ cargo build --profile dist
   Compiling oxios v0.1.2 (...)
 
-$ ./target/release/oxios --version
+$ ./target/dist/oxios --version
 oxios 0.1.2
 ```
 
-The binary will be at `target/release/oxios`. Copy it to your PATH:
+The binary will be at `target/dist/oxios`. Copy it to your PATH:
 
 ```bash
-cp target/release/oxios ~/.cargo/bin/
+cp target/dist/oxios ~/.cargo/bin/
 ```
 
 ### Option C: Pre-built Binary
@@ -1046,8 +1046,8 @@ $ cargo install oxios --force
 ```bash
 $ cd oxios
 $ git pull
-$ cargo build --release
-$ cp target/release/oxios ~/.cargo/bin/
+$ cargo build --profile dist
+$ cp target/dist/oxios ~/.cargo/bin/
 ```
 
 ### After upgrading

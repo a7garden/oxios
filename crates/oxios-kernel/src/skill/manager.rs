@@ -99,6 +99,11 @@ impl SkillManager {
                         .as_ref()
                         .map(|m| m.requires.env.clone())
                         .unwrap_or_default(),
+                    required_integrations: e
+                        .metadata
+                        .as_ref()
+                        .map(|m| m.requires.integrations.clone())
+                        .unwrap_or_default(),
                 })
                 .collect(),
             skill_filter: skill_filter.map(|f| f.to_vec()),

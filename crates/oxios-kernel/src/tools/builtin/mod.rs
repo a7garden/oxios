@@ -121,8 +121,8 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
         registry.register(calendar_tool);
     }
 
-    // Email (optional — only if [email] is enabled)
-    if let Some(email_tool) = EmailTool::try_from_kernel(kernel) {
-        registry.register(email_tool);
-    }
+    // Email — always registered; returns a helpful setup error when unconfigured.
+    // The shared RwLock<Option<EmailApi>> slot is swapped in at runtime via the
+    // web UI setup endpoint, so no daemon restart is needed to activate email.
+    registry.register(EmailTool::from_kernel(kernel));
 }

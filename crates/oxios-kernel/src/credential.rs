@@ -110,7 +110,13 @@ impl CredentialStore {
             expires_in: 0,
             scope: None,
         };
+        Self::store_token(provider, token)
+    }
 
+    /// Store an arbitrary [`oxi_sdk::TokenBundle`] (e.g. an OAuth token with a
+    /// `refresh_token`) to the oxios auth store, applying the same legacy
+    /// migration as [`store`](Self::store). Used by the OAuth broker.
+    pub fn store_token(provider: &str, token: oxi_sdk::TokenBundle) -> Result<()> {
         // Try the normal path first.
         if let Err(e) = oxi_sdk::save_token(provider, &token) {
             // If the auth store has legacy entries (e.g. `oxi-cli` wrote
@@ -124,7 +130,7 @@ impl CredentialStore {
             }
         }
 
-        tracing::info!(provider = %provider, "API key stored to oxios auth store");
+        tracing::info!(provider = %provider, "credential stored to oxios auth store");
         Ok(())
     }
 

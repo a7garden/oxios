@@ -5,7 +5,7 @@
 # Stage 2: runtime — minimal image with tools and oxios binary
 
 # Stage 1: builder
-FROM rust:1-slim AS builder
+FROM rust:1-bookworm AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ WORKDIR /app
 COPY . .
 
 # Build oxios in release mode
-RUN cargo build --release -p oxios
+RUN cargo build --profile dist -p oxios
 
 # Stage 2: runtime
 FROM debian:bookworm-slim
@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the built binary from the builder stage
-COPY --from=builder /app/target/release/oxi /usr/local/bin/oxi
+COPY --from=builder /app/target/dist/oxios /usr/local/bin/oxios
 
 WORKDIR /workspace
 

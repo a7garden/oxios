@@ -9,19 +9,31 @@ readme = "README.md"
 keywords = ["agent", "ai", "os", "automation"]
 categories = ["command-line-utilities", "asynchronous"]
 
-# Optimize dev profile: dependencies compile at release speed,
-# workspace crates stay in debug mode for fast iteration.
-# This dramatically speeds up incremental compiles and linking.
+# Dev profile: dependencies at opt-level 1 for a good compile/runtime
+# balance. opt-level 2 (previously used) added significant LLVM pass
+# time on every clean build and cargo check without proportional
+# runtime benefit during development.
 [profile.dev.package."*"]
-opt-level = 2
+opt-level = 1
 
-# Release profile: balance between binary size, compile time, and runtime speed.
-#   lto            — cross-crate optimization at link time (~15-25% size reduction)
-#   codegen-units  — single translation unit for better inlining
-#   strip          — remove debug symbols (huge binary size win)
-#   panic          — abort (smaller binary; we don't use catch_unwind)
-# See docs/production-audit/07-infra/RELEASE-PROFILE.md for trade-off analysis.
+# Release profile — for `cargo build --release`. Optimized for fast
+# *compilation* while still producing a good binary: 16 codegen units
+# parallelize LLVM, no LTO skips the expensive cross-crate pass.
 [profile.release]
+codegen-units = 16
+opt-level = 3
+strip = true
+panic = "abort"
+
+# Dist profile — for final binary distribution (`cargo build --profile dist`).
+# Inherits release defaults, then adds maximum optimization:
+#   lto = "thin"  — cross-crate optimization (~15-25% size reduction)
+#   codegen-units = 1 — single translation unit for best inlining
+#   strip         — remove debug symbols
+#   panic = abort — smaller binary (we don't use catch_unwind)
+# See docs/production-audit/07-infra/RELEASE-PROFILE.md for trade-off analysis.
+[profile.dist]
+inherits = "release"
 lto = "thin"
 codegen-units = 1
 strip = true
@@ -87,6 +99,8 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 
 # Archive
 zip = "2"
+flate2 = "1"
+tar = "0.4"
 
 # File system paths
 dirs = "6"
@@ -190,13 +204,10 @@ tokio = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 
-# Patch oxi crates to local version with #[async_trait] on AgentTool trait.
-# Same version number (0.32.0), but the trait uses async fn + #[async_trait]
-# instead of manual Pin<Box<dyn Future>>.
 [patch.crates-io]
 oxios-kernel = { path = "crates/oxios-kernel" }
-# oxi-sdk 0.54.0 AgentBuilder resolver drops the catalog port — patched
-# locally until 0.54.1 ships to crates.io. Uncomment for local development:
+# Uncomment for local development against oxi/oxibrowser:
 # oxi-ai = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-ai" }
 # oxi-agent = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-agent" }
 # oxi-sdk = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-sdk" }
+# oxibrowser = { path = "/Volumes/MERCURY/PROJECTS/oxibrowser/crates/oxibrowser" }

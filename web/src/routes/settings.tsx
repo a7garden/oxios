@@ -25,6 +25,7 @@ import {
   type SettingsFieldDef,
 } from '@/components/settings/field-defs'
 import { FieldRow } from '@/components/settings/field-row'
+import { IntegrationsSectionCard } from '@/components/settings/integrations-section'
 import { MemorySection } from '@/components/settings/memory-section'
 import { NotificationSectionCard } from '@/components/settings/notification-section'
 import { SaveDock } from '@/components/settings/save-dock'
@@ -862,6 +863,11 @@ function renderActiveSection(
   // Secrets: dedicated secrets management card (RFC-028 SP-2c).
   if (sectionId === 'secrets') {
     return <SecretsSectionCard />
+  }
+
+  // Host Tools / Integrations (RFC-041): registry + detect + credential status.
+  if (sectionId === 'host-tools') {
+    return <IntegrationsSectionCard />
   }
 
   // Notifications: client-side prefs card (RFC-028 SP-1e).

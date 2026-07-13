@@ -1607,7 +1607,7 @@ async fn cmd_email_setup(kernel: &Kernel) {
 
     // Check if already configured
     let handle = kernel.handle();
-    if handle.email.is_some() {
+    if handle.email.read().is_some() {
         println!(
             "{} Email is already configured.",
             style("⚠").yellow().bold()
@@ -1697,15 +1697,28 @@ async fn cmd_email_setup(kernel: &Kernel) {
                     );
                     return;
                 }
-
                 // Save to config.toml
                 let config_path = oxios_kernel::config::expand_home(&format!(
                     "{}/.oxios/config.toml",
                     std::env::var("HOME").unwrap_or_default()
                 ));
                 if config_path.exists() {
-                    let _ = append_email_to_config(&config_path, &config);
+                    let _ = upsert_email_section_in_config_main(&config_path, &config);
                 }
+
+                // Live kernel update — swap into shared slot (no restart needed)
+                let handle = kernel.handle();
+                let workspace = handle.state.workspace_path().to_path_buf();
+                let template_dir = workspace.join("email_templates");
+                let _ = std::fs::create_dir_all(&template_dir);
+                let new_api = oxios_kernel::EmailApi::new(
+                    smtp,
+                    template_dir,
+                    handle.state.store().clone(),
+                    Some(handle.infra.event_bus_clone()),
+                    config.rate_limit_per_hour,
+                );
+                *handle.email.write() = Some(new_api);
 
                 println!(
                     "{} Email configured successfully!",
@@ -1713,10 +1726,6 @@ async fn cmd_email_setup(kernel: &Kernel) {
                 );
                 println!("  Email: {}", style(&my_email).cyan());
                 println!("  Provider: {}", style(&provider).cyan());
-                println!(
-                    "\n  Restart oxios to activate: {}",
-                    style("oxios restart").yellow()
-                );
             }
             Err(e) => {
                 eprintln!("{} SMTP test failed: {}", style("✗").red().bold(), e);
@@ -1728,16 +1737,12 @@ async fn cmd_email_setup(kernel: &Kernel) {
     }
 }
 
-/// Append [email] section to config.toml if not already present.
-fn append_email_to_config(
+/// Insert or replace the [email] section in config.toml.
+fn upsert_email_section_in_config_main(
     config_path: &std::path::Path,
     config: &oxios_kernel::config::EmailConfig,
 ) -> anyhow::Result<()> {
     let content = std::fs::read_to_string(config_path)?;
-    // Only append if [email] section doesn't exist
-    if content.contains("[email]") {
-        return Ok(());
-    }
     let provider_str = match config.provider {
         oxios_kernel::email::SmtpProvider::Resend => "resend",
         oxios_kernel::email::SmtpProvider::Gmail => "gmail",
@@ -1745,11 +1750,32 @@ fn append_email_to_config(
         oxios_kernel::email::SmtpProvider::Fastmail => "fastmail",
         oxios_kernel::email::SmtpProvider::Custom => "custom",
     };
-    let section = format!(
-        "\n# Email (configured by `oxios email setup`)\n[email]\nenabled = true\nmy_email = \"{}\"\nprovider = \"{}\"\n",
+    let new_section = format!(
+        "# Email (configured by `oxios email setup`)\n[email]\nenabled = true\nmy_email = \"{}\"\nprovider = \"{}\"\n",
         config.my_email, provider_str
     );
-    std::fs::write(config_path, content + &section)?;
+
+    if let Some(email_pos) = content.find("[email]") {
+        let line_start = content[..email_pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let rest = &content[email_pos..];
+        let section_end = rest[1..]
+            .find("\n[")
+            .map(|p| email_pos + 1 + p + 1)
+            .unwrap_or(content.len());
+        let mut result = String::with_capacity(content.len());
+        result.push_str(&content[..line_start]);
+        result.push_str(&new_section);
+        result.push_str(&content[section_end..]);
+        std::fs::write(config_path, result)?;
+    } else {
+        let mut result = content;
+        if !result.ends_with('\n') {
+            result.push('\n');
+        }
+        result.push('\n');
+        result.push_str(&new_section);
+        std::fs::write(config_path, result)?;
+    }
     Ok(())
 }
 
@@ -2827,8 +2853,8 @@ async fn run(cli: Cli) -> Result<()> {
                     cmd_email_setup(&kernel).await;
                 }
                 EmailAction::Test => {
-                    let api = handle.email.as_ref();
-                    if let Some(api) = api {
+                    let api = handle.email.read();
+                    if let Some(api) = api.as_ref() {
                         match api.test_connection().await {
                             Ok(()) => println!(
                                 "{} Test email sent to {}",
@@ -2906,8 +2932,8 @@ async fn run(cli: Cli) -> Result<()> {
                     }
                 }
                 EmailAction::Templates => {
-                    let api = handle.email.as_ref();
-                    if let Some(api) = api {
+                    let api = handle.email.read();
+                    if let Some(api) = api.as_ref() {
                         match api.list_templates() {
                             Ok(templates) => {
                                 if templates.is_empty() {

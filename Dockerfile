@@ -4,7 +4,7 @@
 # Browser feature is disabled in containers (no Chromium dependency).
 
 # ── Build stage ──
-FROM rust:1.85-bookworm AS builder
+FROM rust:1-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config libssl-dev \
@@ -15,13 +15,12 @@ WORKDIR /oxios
 # Copy manifests first for layer caching
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
-COPY channels/ channels/
 COPY src/ src/
 COPY share/ share/
 COPY audit.toml .clippy.toml ./
 
 # Build without browser (no Chromium needed in container)
-RUN cargo build --release --no-default-features --features "web,cli"
+RUN cargo build --profile dist --no-default-features --features "web,cli"
 
 # ── Runtime stage ──
 FROM debian:bookworm-slim
@@ -33,7 +32,7 @@ RUN apt-get update && apt-get install -y \
 # Non-root user for security
 RUN groupadd -r oxios && useradd -r -g oxios -m oxios
 
-COPY --from=builder /oxios/target/release/oxios /usr/local/bin/
+COPY --from=builder /oxios/target/dist/oxios /usr/local/bin/
 
 # Configuration and data volume
 VOLUME /home/oxios/.oxios

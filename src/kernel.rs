@@ -249,7 +249,7 @@ impl Kernel {
                     knowledge_lens,
                     self.build_marketplace_api(),
                     self.build_calendar_api(),
-                    self.build_email_api(),
+                    Arc::new(parking_lot::RwLock::new(self.build_email_api())),
                 );
                 // RFC-025: attach MountApi to the handle the HTTP API and CLI
                 // actually use. The orchestrator gets its own Arc directly; this
@@ -1470,8 +1470,8 @@ impl KernelBuilder {
                     .expect("KnowledgeLens init failed"),
                 ),
                 build_marketplace_api_value(&config),
-                None, // calendar (initialized later)
-                None, // email (initialized later)
+                None,                                     // calendar (initialized later)
+                Arc::new(parking_lot::RwLock::new(None)), // email (initialized later)
             );
 
             // RFC-015 P1: attach the streaming-sink registry so the runtime

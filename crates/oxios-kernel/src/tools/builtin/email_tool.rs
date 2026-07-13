@@ -13,6 +13,7 @@
 //! | List templates | List available templates | `list_templates: true` |
 
 use async_trait::async_trait;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -79,17 +80,20 @@ struct SentRecord {
 /// - Sent history recording
 /// - EventBus notification on success
 pub struct EmailTool {
-    api: Arc<EmailApi>,
+    api: Arc<RwLock<Option<EmailApi>>>,
 }
 
 impl EmailTool {
     /// Create a new `EmailTool` from a `KernelHandle`.
     ///
-    /// Returns `None` if email is not configured.
-    pub fn try_from_kernel(kernel: &crate::KernelHandle) -> Option<Self> {
-        kernel.email.as_ref().map(|api| Self {
-            api: Arc::new(api.clone()),
-        })
+    /// Always returns a tool — the shared `RwLock<Option<EmailApi>>` slot
+    /// starts as `None` when email is unconfigured and is swapped in at
+    /// runtime when the user sets up email via the web UI. This avoids
+    /// requiring a daemon restart to register the tool.
+    pub fn from_kernel(kernel: &crate::KernelHandle) -> Self {
+        Self {
+            api: kernel.email.clone(),
+        }
     }
 }
 
@@ -159,13 +163,23 @@ impl OxiAgentTool for EmailTool {
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
     ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+        // Clone the EmailApi from the shared slot (cheap — Arc-based).
+        // Lock is dropped before any async calls so handle_email_setup's
+        // write-lock never blocks during an SMTP round-trip.
+        let api = {
+            let guard = self.api.read();
+            guard
+                .as_ref()
+                .ok_or("Email is not configured. Set it up in Settings → Email.")?
+                .clone()
+        };
+
         let args: EmailArgs =
             serde_json::from_value(params).map_err(|e| format!("Invalid arguments: {e}"))?;
 
         // ── List templates mode ───────────────────────────────────
         if args.list_templates.unwrap_or(false) {
-            let templates = self
-                .api
+            let templates = api
                 .list_templates()
                 .map_err(|e| format!("Failed to list templates: {e}"))?;
             return Ok(AgentToolResult::success(
@@ -189,8 +203,7 @@ impl OxiAgentTool for EmailTool {
 
         // ── Resolve HTML body ─────────────────────────────────────
         let html = if let Some(name) = &args.use_template {
-            let template = self
-                .api
+            let template = api
                 .load_template(name)
                 .map_err(|e| format!("Template error: {e}"))?;
             render_template(&template, &args.template_vars.unwrap_or_default())
@@ -212,9 +225,8 @@ impl OxiAgentTool for EmailTool {
         }
 
         // ── Rate limit check ──────────────────────────────────────
-        let rate_limit = self.api.rate_limit();
-        let sent_count = self
-            .api
+        let rate_limit = api.rate_limit();
+        let sent_count = api
             .count_recent_sent(1)
             .await
             .map_err(|e| format!("Rate limit check failed: {e}"))?;
@@ -225,16 +237,14 @@ impl OxiAgentTool for EmailTool {
         }
 
         // ── Send ──────────────────────────────────────────────────
-        let receipt = self
-            .api
+        let receipt = api
             .send(subject, &html, args.body_text.as_deref())
             .await
             .map_err(|e| format!("SMTP send failed: {e}"))?;
 
         // ── Save template (if requested) ──────────────────────────
         if let Some(name) = &args.save_template_as {
-            self.api
-                .save_template(name, &html)
+            api.save_template(name, &html)
                 .map_err(|e| format!("Failed to save template: {e}"))?;
         }
 
@@ -243,7 +253,7 @@ impl OxiAgentTool for EmailTool {
             id: uuid::Uuid::new_v4().to_string(),
             sent_at: receipt.sent_at.to_rfc3339(),
             subject: subject.to_string(),
-            to: self.api.default_to().to_string(),
+            to: api.default_to().to_string(),
             template_used: args.use_template.clone().or(args.save_template_as.clone()),
             message_id: receipt.message_id.clone(),
             html_preview: html.chars().take(500).collect(),
@@ -251,12 +261,12 @@ impl OxiAgentTool for EmailTool {
             body_text: args.body_text,
             cron_job: None,
         };
-        if let Err(e) = self.api.save_sent_record(&record).await {
+        if let Err(e) = api.save_sent_record(&record).await {
             tracing::warn!(error = %e, "Failed to save email sent record");
         }
 
         // ── EventBus notification ─────────────────────────────────
-        self.api.notify_sent(
+        api.notify_sent(
             subject.to_string(),
             receipt.message_id.clone(),
             args.save_template_as.clone(),

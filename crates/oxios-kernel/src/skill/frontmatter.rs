@@ -18,6 +18,10 @@ pub(crate) struct YamlRequirements {
     pub any_bins: Option<Vec<String>>,
     pub env: Option<Vec<String>>,
     pub config: Option<Vec<String>>,
+    #[serde(default)]
+    pub integrations: Option<Vec<String>>,
+    #[serde(default, rename = "anyIntegrations")]
+    pub any_integrations: Option<Vec<String>>,
 }
 impl YamlRequirements {
     pub fn into_requirements(self) -> Requirements {
@@ -26,6 +30,8 @@ impl YamlRequirements {
             any_bins: self.any_bins.unwrap_or_default(),
             env: self.env.unwrap_or_default(),
             config: self.config.unwrap_or_default(),
+            integrations: self.integrations.unwrap_or_default(),
+            any_integrations: self.any_integrations.unwrap_or_default(),
         }
     }
 }
@@ -52,6 +58,9 @@ impl From<YamlInstallSpec> for SkillInstallSpec {
             kind: match y.kind.as_deref() {
                 Some("brew") => InstallKind::Brew,
                 Some("node") => InstallKind::Node,
+                Some("bun") => InstallKind::Bun,
+                Some("cargo") => InstallKind::Cargo,
+                Some("pip") => InstallKind::Pip,
                 Some("go") => InstallKind::Go,
                 Some("uv") => InstallKind::Uv,
                 Some("download") => InstallKind::Download,
@@ -216,6 +225,8 @@ impl OpenClawFm {
                     any_bins: reqs.any_bins.unwrap_or_default(),
                     env,
                     config: reqs.config.unwrap_or_default(),
+                    integrations: reqs.integrations.unwrap_or_default(),
+                    any_integrations: reqs.any_integrations.unwrap_or_default(),
                 },
                 install: install.into_iter().map(Into::into).collect(),
                 primary_env: penv,

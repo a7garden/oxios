@@ -66,6 +66,7 @@ pub mod onboarding;
 pub mod persona;
 
 // ─── Tools & Skills ───────────────────────────────────────────────
+pub mod host_tools;
 pub mod skill;
 pub mod token_maxing;
 pub mod tools;
@@ -271,15 +272,16 @@ pub use observability::{
 pub use types::{AgentId, AgentInfo, AgentStatus, ToolCallRecord};
 
 // ─── API Surface ────────────────────────────────────────────────────
+pub use host_tools::{CredentialStatus, DetectedTool, ToolSource};
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
     A2aApi, AgentApi, CalendarApi, CopilotResponse, EmailApi, EngineApi, EngineConfigResponse,
-    ExecApi, ExtensionApi, FallbackEvent, InfraApi, InputModality as EngineInputModality,
-    KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, ModelInfo, MountApi,
-    MountInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderCategory, ProviderInfo,
-    RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, SecurityApi,
-    SharedExecConfig, StateApi, ValidateKeyResult,
+    ExecApi, ExtensionApi, FallbackEvent, HostToolsApi, InfraApi,
+    InputModality as EngineInputModality, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi,
+    MemoryNote, ModelInfo, MountApi, MountInfo, PersonaApi, ProjectApi, ProjectInfo,
+    ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot,
+    RoutingUpdate, SecurityApi, SharedExecConfig, StateApi, ValidateKeyResult,
 };
 pub use session_context::SessionContext;
 

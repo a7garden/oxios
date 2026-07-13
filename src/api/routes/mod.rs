@@ -19,7 +19,15 @@ mod email_routes;
 mod engine_routes;
 mod events;
 mod git_routes;
+mod host_tools_routes;
 mod infra;
+pub(crate) use host_tools_routes::{handle_host_tools, handle_host_tools_detect};
+mod integrations_routes;
+pub(crate) use integrations_routes::{
+    handle_integration_credential_delete, handle_integration_credential_set,
+    handle_integration_credential_status, handle_integration_install,
+    handle_integration_oauth_poll, handle_integration_oauth_start, handle_integrations_list,
+};
 mod knowledge_routes;
 mod marketplace;
 mod mount_routes;
@@ -668,6 +676,29 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/system/audit-verify", post(handle_audit_verify_api))
         .route("/api/system/backup", post(handle_backup))
         .route("/api/system/log", get(handle_log))
+        // Host Tools (RFC-041) — host-CLI discovery inventory
+        .route("/api/host-tools", get(handle_host_tools))
+        .route("/api/host-tools/detect", post(handle_host_tools_detect))
+        // Integrations (RFC-041) — registry + credential status
+        .route("/api/integrations", get(handle_integrations_list))
+        .route(
+            "/api/integrations/{id}/credential",
+            get(handle_integration_credential_status)
+                .put(handle_integration_credential_set)
+                .delete(handle_integration_credential_delete),
+        )
+        .route(
+            "/api/integrations/{id}/install",
+            post(handle_integration_install),
+        )
+        .route(
+            "/api/integrations/{id}/oauth/start",
+            post(handle_integration_oauth_start),
+        )
+        .route(
+            "/api/integrations/{id}/oauth/poll",
+            get(handle_integration_oauth_poll),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,

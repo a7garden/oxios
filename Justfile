@@ -7,9 +7,13 @@ default: build test
 build:
     cargo build --workspace
 
-# Build in release mode
+# Build in release mode (fast — no LTO, 16 codegen units)
 release:
     cargo build --release
+
+# Build distribution binary (max optimization — LTO, single codegen unit)
+dist:
+    cargo build --profile dist
 
 # Run all tests
 test:

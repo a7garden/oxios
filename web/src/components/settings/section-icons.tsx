@@ -19,6 +19,7 @@ import {
   Sparkles,
   Terminal,
   Wallet,
+  Wrench,
   Zap,
 } from 'lucide-react'
 import type { SectionIconKey } from './field-defs'
@@ -45,6 +46,7 @@ const ICON_MAP: Record<SectionIconKey, React.ComponentType<{ className?: string 
   budget: Wallet,
   secrets: KeyRound,
   notifications: Bell,
+  hostTools: Wrench,
 }
 
 /** Generic fallback used when an id is unknown. */
