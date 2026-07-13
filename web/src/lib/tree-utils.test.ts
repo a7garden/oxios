@@ -125,17 +125,17 @@ describe('fileTint', () => {
 
 describe('countFilesRecursive', () => {
   it('returns 0 for a file node', () => {
-    const file = makeTree()[2]
+    const file = makeTree()[2]!
     expect(countFilesRecursive(file)).toBe(0)
   })
 
   it('counts only files inside a leaf folder, not the folder itself', () => {
-    const leaf = makeTree()[0].children![1] // brain/rust
+    const leaf = makeTree()[0]!.children![1]! // brain/rust
     expect(countFilesRecursive(leaf)).toBe(1) // Ownership.md
   })
 
   it('recurses into nested folders to count every descendant file', () => {
-    const brain = makeTree()[0] // brain/
+    const brain = makeTree()[0]! // brain/
     expect(countFilesRecursive(brain)).toBe(2) // Rust.md + brain/rust/Ownership.md
   })
 })
@@ -253,7 +253,3 @@ describe('isCircularMove', () => {
     expect(isCircularMove('brain', 'brain-trust')).toBe(false)
   })
 })
-// Helper for flattenTree pre-order assertion.
-function find<T extends { name: string }>(arr: T[], name: string): number {
-  return arr.findIndex((n) => n.name === name)
-}
