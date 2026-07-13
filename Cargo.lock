@@ -5424,7 +5424,7 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "1.23.1"
+version = "1.23.2"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -513,7 +513,7 @@ pub(crate) async fn handle_knowledge_tree(
 /// Tagged response for tree endpoint (axum requires a single body type).
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
-enum TreeResponse {
+pub enum TreeResponse {
     Flat(Vec<KnowledgeTreeEntry>),
     Recursive(Vec<KnowledgeTreeNode>),
 }

@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.2] - 2026-07-13
+
+### Fixed
+- **TreeResponse visibility** — `TreeResponse` enum was private but used in a
+  public route handler, preventing binary compilation. Combined with the
+  v1.23.1 `guardian_heartbeat` fix, `cargo install oxios` now compiles.
+
 ## [1.23.1] - 2026-07-13
 
 ### Fixed
