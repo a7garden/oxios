@@ -588,7 +588,7 @@ WantedBy=multi-user.target
         Ok(())
     }
 
-    fn cleanup(&self) -> Result<()> {
+    pub fn cleanup(&self) -> Result<()> {
         if self.pid_file.exists() {
             std::fs::remove_file(&self.pid_file)?;
         }
