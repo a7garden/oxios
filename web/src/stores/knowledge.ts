@@ -137,9 +137,7 @@ export const useKnowledgeStore = create<KnowledgeState>()(
       toggleExpand: (path) => {
         const cur = get().expandedPaths
         set({
-          expandedPaths: cur.includes(path)
-            ? cur.filter((p) => p !== path)
-            : [...cur, path],
+          expandedPaths: cur.includes(path) ? cur.filter((p) => p !== path) : [...cur, path],
         })
       },
       expandPath: (path) => {

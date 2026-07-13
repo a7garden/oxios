@@ -18,6 +18,7 @@ import type {
   NightlyReport,
   TodayReport,
 } from '@/types/knowledge'
+
 // F7: encode a knowledge-base file path for safe interpolation into a URL.
 // Each path segment is encoded individually so '/' separators are preserved
 // while characters like '?', '#', spaces, and non-ASCII bytes are escaped.

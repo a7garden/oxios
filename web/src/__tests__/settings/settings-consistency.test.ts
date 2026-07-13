@@ -27,7 +27,7 @@ const RENDERABLE_SECTION_IDS = new Set<string>([
   'update',
   'secrets',
   'notifications',
-  // Domain-specific sections (own sub-components)
+  'host-tools',
   'memory',
   'channels.telegram',
   // Declarative new sections (driven by NEW_SECTIONS)

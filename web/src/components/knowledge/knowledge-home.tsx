@@ -70,9 +70,7 @@ function StatTile({
           <span className={cn('opacity-70', iconClassName)}>{icon}</span>
         </div>
         <div className="text-2xl font-semibold tracking-tight">{value}</div>
-        {sublabel && (
-          <div className="text-xs text-muted-foreground truncate">{sublabel}</div>
-        )}
+        {sublabel && <div className="text-xs text-muted-foreground truncate">{sublabel}</div>}
         {actionLabel && (
           <div className="mt-auto pt-1">
             <span className="text-xs font-medium text-primary">{actionLabel}</span>

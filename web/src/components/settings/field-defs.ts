@@ -724,7 +724,16 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     id: 'system',
     labelKey: 'settings.groupSystem',
-    sectionKeys: ['kernel', 'session', 'logging', 'update', 'browser', 'budget', 'notifications', 'host-tools'],
+    sectionKeys: [
+      'kernel',
+      'session',
+      'logging',
+      'update',
+      'browser',
+      'budget',
+      'notifications',
+      'host-tools',
+    ],
   },
   {
     id: 'advanced',

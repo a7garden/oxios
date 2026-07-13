@@ -78,7 +78,7 @@ export function flattenTree<T extends Flattenable>(nodes: T[]): T[] {
  */
 export function isCircularMove(fromDir: string, toDir: string): boolean {
   if (fromDir === toDir) return true
-  return toDir.startsWith(fromDir + '/')
+  return toDir.startsWith(`${fromDir}/`)
 }
 
 export function generateUniqueName<T extends Flattenable>(
@@ -89,8 +89,7 @@ export function generateUniqueName<T extends Flattenable>(
   // Collision check is scoped to `basePath` (e.g. "brain/"). Existing paths
   // are matched by their relative form inside that scope, not their
   // absolute root key.
-  const normalizedBase =
-    basePath && !basePath.endsWith('/') ? `${basePath}/` : basePath
+  const normalizedBase = basePath && !basePath.endsWith('/') ? `${basePath}/` : basePath
   const existing = new Set(
     flattenTree(entries)
       .filter((n) => n.path.startsWith(normalizedBase))

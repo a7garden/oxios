@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { KnowledgeTreeNode } from '@/types/knowledge'
 import {
   countFilesRecursive,
   fileTint,
@@ -7,7 +8,6 @@ import {
   indentStyle,
   isCircularMove,
 } from './tree-utils'
-import type { KnowledgeTreeNode } from '@/types/knowledge'
 
 // Minimal tree fixture used across tests. Layout:
 //
@@ -193,9 +193,9 @@ describe('generateUniqueName', () => {
     ]
     // Note.md → Note 2.md → Note 3.md
     expect(generateUniqueName(tree, '', 'Note.md')).toBe('Note 2.md')
-    expect(
-      generateUniqueName([...tree, { ...tree[0], path: 'Note 2.md' }], '', 'Note.md'),
-    ).toBe('Note 3.md')
+    expect(generateUniqueName([...tree, { ...tree[0], path: 'Note 2.md' }], '', 'Note.md')).toBe(
+      'Note 3.md',
+    )
   })
 
   it('preserves the extension when the default name has one (C5 regression)', () => {

@@ -83,8 +83,7 @@ export interface DeviceCodeResponse {
 /** Start a device-code flow for an OAuth integration. */
 export function useOAuthStart() {
   return useMutation({
-    mutationFn: (id: string) =>
-      api.post<DeviceCodeResponse>(`/api/integrations/${id}/oauth/start`),
+    mutationFn: (id: string) => api.post<DeviceCodeResponse>(`/api/integrations/${id}/oauth/start`),
   })
 }
 

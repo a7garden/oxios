@@ -26,12 +26,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  countFilesRecursive,
-  fileTint,
-  flattenTree,
-  indentStyle,
-} from '@/lib/tree-utils'
+import { countFilesRecursive, fileTint, flattenTree, indentStyle } from '@/lib/tree-utils'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import type { KnowledgeTreeNode } from '@/types/knowledge'
@@ -48,12 +43,12 @@ interface FileTreeProps {
 /** S3: detect circular move (folder → itself or one of its descendants). */
 function isCircularMove(fromDir: string, toDir: string): boolean {
   if (fromDir === toDir) return true
-  return toDir.startsWith(fromDir + '/')
+  return toDir.startsWith(`${fromDir}/`)
 }
 
 function sortNodes(nodes: KnowledgeTreeNode[]): KnowledgeTreeNode[] {
-  return [...nodes].sort((a, b) =>
-    Number(b.is_dir) - Number(a.is_dir) || a.name.localeCompare(b.name),
+  return [...nodes].sort(
+    (a, b) => Number(b.is_dir) - Number(a.is_dir) || a.name.localeCompare(b.name),
   )
 }
 
@@ -85,9 +80,7 @@ export function FileTree({
       <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
         <File className="h-8 w-8 text-muted-foreground/40" aria-hidden />
         <p className="text-xs text-muted-foreground">{t('knowledge.emptyTree')}</p>
-        <p className="text-2xs text-muted-foreground/70">
-          {t('knowledge.emptyTreeHint')}
-        </p>
+        <p className="text-2xs text-muted-foreground/70">{t('knowledge.emptyTreeHint')}</p>
       </div>
     )
   }
@@ -137,7 +130,7 @@ export function FileTree({
           )}
         </ul>
       ) : (
-        <ul role="tree" aria-label="Knowledge files" className="space-y-0.5 pt-1">
+        <ul aria-label="Knowledge files" className="space-y-0.5 pt-1">
           {sorted.map((node) => (
             <FileTreeNode
               key={node.path}
@@ -175,7 +168,8 @@ function FileTreeNode({
   onContextMenu,
   onMove,
 }: FileTreeNodeProps) {
-  const { expandedPaths, toggleExpand, focusedPath, setFocus, recentlyCreatedPath } = useKnowledgeStore()
+  const { expandedPaths, toggleExpand, focusedPath, setFocus, recentlyCreatedPath } =
+    useKnowledgeStore()
   const isExpanded = expandedPaths.includes(node.path)
   const isActive = currentPath === node.path
   const isFocused = focusedPath === node.path
@@ -304,10 +298,7 @@ function FileTreeNode({
             />
           )}
           <ChevronRight
-            className={cn(
-              'h-3 w-3 shrink-0 transition-transform',
-              isExpanded && 'rotate-90',
-            )}
+            className={cn('h-3 w-3 shrink-0 transition-transform', isExpanded && 'rotate-90')}
           />
           {isExpanded ? (
             <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -316,13 +307,11 @@ function FileTreeNode({
           )}
           <span className="truncate flex-1">{node.display_name || node.name}</span>
           {fileCount > 0 && (
-            <span className="ml-auto text-2xs text-muted-foreground/60 shrink-0">
-              {fileCount}
-            </span>
+            <span className="ml-auto text-2xs text-muted-foreground/60 shrink-0">{fileCount}</span>
           )}
         </div>
         {isExpanded && node.children.length > 0 && (
-          <ul role="group" className="space-y-0.5">
+          <ul className="space-y-0.5">
             {sortNodes(node.children).map((child) => (
               <FileTreeNode
                 key={child.path}
@@ -354,29 +343,22 @@ function FileTreeNode({
         draggable={Boolean(onMove)}
         onDragStart={handleDragStart}
         className={cn(
-            'group relative flex items-center gap-2 py-1.5 rounded-lg text-xs w-full text-left select-none transition-all',
-            isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-            shouldBlink && 'animate-file-blink',
+          'group relative flex items-center gap-2 py-1.5 rounded-lg text-xs w-full text-left select-none transition-all',
+          isActive
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+          shouldBlink && 'animate-file-blink',
         )}
         style={indentStyle(depth)}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
         {isActive && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-primary"
-          />
+          <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-primary" />
         )}
         <span className="w-3 shrink-0" aria-hidden />
         <File
-          className={cn(
-            'h-4 w-4 shrink-0',
-            fileTint(node.name),
-            !node.has_content && 'opacity-30',
-          )}
+          className={cn('h-4 w-4 shrink-0', fileTint(node.name), !node.has_content && 'opacity-30')}
         />
         {renaming ? (
           <InlineRenameInput
@@ -406,7 +388,13 @@ function FileTreeFlatRow({
   const isActive = currentPath === node.path
   const [renaming, setRenaming] = useState(false)
   return (
-    <li role="treeitem" aria-level={1} aria-selected={isActive} aria-label={node.path}>
+    <li
+      role="treeitem"
+      aria-level={1}
+      aria-selected={isActive}
+      aria-label={node.path}
+      tabIndex={-1}
+    >
       <div
         draggable={Boolean(onMove)}
         onDragStart={(e) => {
@@ -427,10 +415,7 @@ function FileTreeFlatRow({
         }}
       >
         {isActive && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-primary"
-          />
+          <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-primary" />
         )}
         <File
           className={cn(
@@ -506,7 +491,6 @@ function InlineRenameInput({
 
   return (
     <input
-      autoFocus
       // @ts-expect-error — non-standard selectAll is widely supported
       selectAll
       className="flex-1 rounded bg-sidebar/80 px-1 text-xs outline-none ring-1 ring-ring"

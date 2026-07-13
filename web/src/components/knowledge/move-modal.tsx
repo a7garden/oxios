@@ -2,11 +2,7 @@ import { useRouterState } from '@tanstack/react-router'
 import { ArrowRightLeft } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  useKnowledgeFile,
-  useKnowledgeRecursiveTree,
-  useMoveFile,
-} from '@/hooks/use-knowledge'
+import { useKnowledgeFile, useKnowledgeRecursiveTree, useMoveFile } from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
@@ -130,11 +126,7 @@ export function MoveModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
-      <div
-        className="fixed inset-0 bg-black/30"
-        onClick={close}
-        aria-hidden
-      />
+      <div className="fixed inset-0 bg-black/30" onClick={close} aria-hidden />
       <div className="relative z-10 w-full max-w-md rounded-lg border bg-popover shadow-lg">
         <div className="flex items-center gap-2 border-b px-3 py-2">
           <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
@@ -166,9 +158,7 @@ export function MoveModal() {
                 onMouseEnter={() => setFocusedIndex(idx)}
                 className={cn(
                   'flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm',
-                  idx === focusedIndex
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent/50',
+                  idx === focusedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
                 )}
               >
                 <span className="font-mono text-2xs text-muted-foreground">/</span>
@@ -187,9 +177,7 @@ export function MoveModal() {
 }
 
 /** Pre-order traversal that returns every node (file + dir). */
-function flattenTree<T extends { is_dir: boolean; path: string; children?: T[] }>(
-  nodes: T[],
-): T[] {
+function flattenTree<T extends { is_dir: boolean; path: string; children?: T[] }>(nodes: T[]): T[] {
   const out: T[] = []
   for (const node of nodes) {
     out.push(node)

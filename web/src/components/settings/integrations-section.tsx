@@ -150,7 +150,7 @@ function InstallButton({ row }: { row: IntegrationRow }) {
       else
         toast.error(t('settings.integrationsInstallFailed') + (res.output ? `\n${res.output}` : ''))
     } catch (e) {
-      toast.error(t('settings.integrationsInstallFailed') + ` (${String(e)})`)
+      toast.error(`${t('settings.integrationsInstallFailed')} (${String(e)})`)
     }
   }
 

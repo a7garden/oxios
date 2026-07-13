@@ -100,7 +100,11 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: 'common.projects',
     items: [
-      { labelKey: 'common.projects', href: '/projects', icon: <FolderKanban className="h-4 w-4" /> },
+      {
+        labelKey: 'common.projects',
+        href: '/projects',
+        icon: <FolderKanban className="h-4 w-4" />,
+      },
       { labelKey: 'common.mounts', href: '/mounts', icon: <FolderPlus className="h-4 w-4" /> },
     ],
   },
@@ -108,7 +112,11 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     labelKey: 'common.storage',
     items: [
       { labelKey: 'common.memory', href: '/memory', icon: <Brain className="h-4 w-4" /> },
-      { labelKey: 'common.workspace', href: '/workspace', icon: <FolderOpen className="h-4 w-4" /> },
+      {
+        labelKey: 'common.workspace',
+        href: '/workspace',
+        icon: <FolderOpen className="h-4 w-4" />,
+      },
     ],
   },
   {
@@ -116,7 +124,11 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
       { labelKey: 'common.cost', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
-      { labelKey: 'common.tokenMaxing', href: '/token-maxing', icon: <Flame className="h-4 w-4" /> },
+      {
+        labelKey: 'common.tokenMaxing',
+        href: '/token-maxing',
+        icon: <Flame className="h-4 w-4" />,
+      },
     ],
   },
   {
@@ -230,7 +242,8 @@ function KnowledgeNav() {
   const { collapsed } = useSidebarStore()
   const router = useRouterState()
   const currentPath = router.location.pathname
-  const { mode, currentFilePath, openFile, openChat, openHome, markFileCreated } = useKnowledgeStore()
+  const { mode, currentFilePath, openFile, openChat, openHome, markFileCreated } =
+    useKnowledgeStore()
   const moveFile = useMoveFile()
   const { data: tree, isLoading } = useKnowledgeRecursiveTree()
   const writeFile = useWriteFile()
@@ -240,9 +253,7 @@ function KnowledgeNav() {
   // Phase 4: rename via the atomic move API (no more write+delete).
   const renameFile = useCallback(
     async (oldPath: string, newName: string) => {
-      const parentDir = oldPath.includes('/')
-        ? oldPath.split('/').slice(0, -1).join('/')
-        : ''
+      const parentDir = oldPath.includes('/') ? oldPath.split('/').slice(0, -1).join('/') : ''
       const target = parentDir ? `${parentDir}/${newName}` : newName
       if (target === oldPath) return
       try {
