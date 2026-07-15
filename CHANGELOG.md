@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.3] - 2026-07-15
+
+### Fixed
+- **Rate limiting** — Default `max_requests_per_minute` raised from 120 to 600
+  (local-first single-user server; ample headroom for the ~20 frontend polling
+  queries). Rate limiting can now be disabled entirely by setting the value to
+  `0`. The web client no longer retries queries on HTTP 429, avoiding amplified
+  throttling under load.
+
 ## [1.23.2] - 2026-07-13
 
 ### Fixed
