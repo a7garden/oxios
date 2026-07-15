@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { initI18n } from './i18n'
 import { routeTree } from './routeTree.gen'
 import './index.css'
-import { isSubsystemUnavailable } from './lib/api-client'
+import { ApiError, isSubsystemUnavailable } from './lib/api-client'
 
 // Initialize i18n
 initI18n()
@@ -14,7 +14,10 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30000,
-      retry: (count, error) => !isSubsystemUnavailable(error) && count < 1,
+      retry: (count, error) =>
+        error instanceof ApiError && error.status === 429
+          ? false
+          : !isSubsystemUnavailable(error) && count < 1,
     },
     mutations: {
       onError: (error: Error) => {

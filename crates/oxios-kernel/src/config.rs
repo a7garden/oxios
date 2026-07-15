@@ -1577,7 +1577,10 @@ fn default_max_audit() -> usize {
 }
 
 fn default_rate_limit_per_minute() -> u32 {
-    120
+    // Local-first single-user server — 600/min (10 req/s) gives ample headroom
+    // for the ~20 frontend polling queries without throttling legitimate use.
+    // 0 = unlimited (see RateLimiter::new).
+    600
 }
 
 fn default_cors_origins() -> Vec<String> {

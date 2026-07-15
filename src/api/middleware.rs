@@ -22,6 +22,8 @@ pub struct RateLimiter {
     state: Arc<Mutex<RateLimiterState>>,
     max_tokens: f64,
     refill_rate: f64,
+    /// When true (max_requests_per_minute == 0), allow all requests.
+    unlimited: bool,
 }
 
 #[derive(Debug)]
@@ -32,8 +34,11 @@ struct RateLimiterState {
 
 impl RateLimiter {
     /// Create a new rate limiter.
+    ///
     /// `max_requests_per_minute` determines both burst size and refill rate.
+    /// Pass `0` to disable rate limiting entirely (always allow).
     pub fn new(max_requests_per_minute: u32) -> Self {
+        let unlimited = max_requests_per_minute == 0;
         let max_tokens = max_requests_per_minute as f64;
         Self {
             state: Arc::new(Mutex::new(RateLimiterState {
@@ -42,11 +47,15 @@ impl RateLimiter {
             })),
             max_tokens,
             refill_rate: max_tokens / 60.0,
+            unlimited,
         }
     }
 
     /// Try to acquire one token. Returns true if allowed, false if rate limited.
     pub fn try_acquire(&self) -> bool {
+        if self.unlimited {
+            return true;
+        }
         let mut state = self.state.lock();
         let now = Instant::now();
         let elapsed = (now - state.last_refill).as_secs_f64();
@@ -70,6 +79,7 @@ impl Clone for RateLimiter {
             state: Arc::clone(&self.state),
             max_tokens: self.max_tokens,
             refill_rate: self.refill_rate,
+            unlimited: self.unlimited,
         }
     }
 }
