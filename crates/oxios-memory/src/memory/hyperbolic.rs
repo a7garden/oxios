@@ -522,8 +522,8 @@ mod tests {
         #[test]
         fn prop_distance_triangle_inequality(
             (a, b, c) in (1usize..6).prop_flat_map(|n| (
-                proptest::collection::vec(-0.4_f32..0.4, n.clone()),
-                proptest::collection::vec(-0.4_f32..0.4, n.clone()),
+                proptest::collection::vec(-0.4_f32..0.4, n),
+                proptest::collection::vec(-0.4_f32..0.4, n),
                 proptest::collection::vec(-0.4_f32..0.4, n),
             )),
         ) {
@@ -546,7 +546,7 @@ mod tests {
         #[test]
         fn prop_mobius_add_preserves_dim(
             (a, b) in (1usize..8).prop_flat_map(|n| (
-                proptest::collection::vec(-0.4_f32..0.4, n.clone()),
+                proptest::collection::vec(-0.4_f32..0.4, n),
                 proptest::collection::vec(-0.4_f32..0.4, n),
             )),
         ) {
