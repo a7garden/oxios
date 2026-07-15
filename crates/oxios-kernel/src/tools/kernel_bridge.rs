@@ -183,7 +183,7 @@ mod tests {
                 ),
             ),
             None, // calendar (not configured in test)
-            None, // email (not configured in test)
+            Arc::new(parking_lot::RwLock::new(None)), // email (not configured in test)
         ));
 
         let bridge = OxiosKernelBridge::new(kernel);

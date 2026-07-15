@@ -328,8 +328,7 @@ credential = { resolver = "oauth", store_key = "github", provider = "github", sc
     #[test]
     fn cli_names_dedups() {
         let reg = IntegrationRegistry {
-            by_id: SAMPLE_TOML
-                .parse::<RegistryFile>()
+            by_id: toml::from_str::<RegistryFile>(SAMPLE_TOML)
                 .unwrap()
                 .integrations
                 .into_iter()
