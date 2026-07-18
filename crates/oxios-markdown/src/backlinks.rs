@@ -76,53 +76,57 @@ impl BacklinkIndex {
     /// Index all links in a file's content.
     ///
     /// Replaces any previously indexed links for this file (incremental update).
+    /// Markdown links only — wikilinks are not resolved.
     pub fn index_file(&mut self, path: &str, content: &str) {
-        // Remove old forward links
+        self.index_file_inner(path, content, None);
+    }
+
+    /// Index both markdown links AND wikilinks. Wikilink targets are
+    /// resolved against `stem_index` (basename → paths) so a bare
+    /// `[[Rust]]` lands under the canonical path it actually points at.
+    /// Ambiguous/unresolved wikilinks are silently skipped — they're not
+    /// indexed, so a later rename of any single candidate won't rewrite
+    /// them (design doc §6).
+    pub fn index_file_with(
+        &mut self,
+        path: &str,
+        content: &str,
+        stem_index: &crate::parser::StemIndex,
+    ) {
+        self.index_file_inner(path, content, Some(stem_index));
+    }
+
+    fn index_file_inner(
+        &mut self,
+        path: &str,
+        content: &str,
+        stem_index: Option<&crate::parser::StemIndex>,
+    ) {
+        let body = strip_frontmatter(content);
+        let md_links = extract_markdown_links(body);
+        let wiki_links = match stem_index {
+            Some(_) => crate::parser::extract_wikilinks(body),
+            None => Vec::new(),
+        };
+
+        // Tear down the previous forward set for this source so re-indexing
+        // never accumulates stale entries.
         if let Some(old_targets) = self.forward.remove(path) {
             for target in &old_targets {
                 if let Some(sources) = self.backward.get_mut(target) {
                     sources.remove(path);
                 }
             }
-            self.details
-                .retain(|k, _| !k.starts_with(&format!("{path}→")));
         }
-
-        // Extract and register new links
-        let body = strip_frontmatter(content);
-        let links = extract_markdown_links(body);
-        let mut targets = HashSet::new();
-
-        for (line_num, line) in body.lines().enumerate() {
-            for (text, target) in extract_markdown_links(line) {
-                targets.insert(target.clone());
-                self.backward
-                    .entry(target.clone())
-                    .or_default()
-                    .insert(path.to_string());
-                self.details.insert(
-                    format!("{path}→{target}"),
-                    vec![Backlink {
-                        source_path: path.to_string(),
-                        target_path: target,
-                        link_text: text,
-                        line_number: line_num + 1,
-                    }],
-                );
-            }
-        }
-
-        // Deduplicate: extract_markdown_links called twice above; fix by re-extracting from full content once
-        // Actually the line-level extraction adds duplicates. Let's simplify:
-        // Clear and redo from the full-content extraction.
-        self.backward.values_mut().for_each(|s| {
-            s.remove(path);
-        });
         self.details
             .retain(|k, _| !k.starts_with(&format!("{path}→")));
 
-        let mut new_targets = HashSet::new();
-        for (text, target) in &links {
+        // Canonical targets this file points at. Markdown links are already
+        // path-shaped (their captured target IS the key); wikilinks are
+        // resolved to a canonical path before keying, so both link kinds
+        // unify under the same backward[target] bucket.
+        let mut new_targets: HashSet<String> = HashSet::new();
+        for (text, target) in &md_links {
             new_targets.insert(target.clone());
             self.backward
                 .entry(target.clone())
@@ -134,7 +138,28 @@ impl BacklinkIndex {
                     source_path: path.to_string(),
                     target_path: target.clone(),
                     link_text: text.clone(),
-                    line_number: 0, // simplified
+                    line_number: 0,
+                }],
+            );
+        }
+        for (target, alias) in &wiki_links {
+            let Some(canonical) =
+                crate::parser::resolve_wikilink(target, Some(path), stem_index.unwrap())
+            else {
+                continue;
+            };
+            new_targets.insert(canonical.clone());
+            self.backward
+                .entry(canonical.clone())
+                .or_default()
+                .insert(path.to_string());
+            self.details.insert(
+                format!("{path}→{canonical}"),
+                vec![Backlink {
+                    source_path: path.to_string(),
+                    target_path: canonical.clone(),
+                    link_text: alias.clone().unwrap_or_else(|| target.clone()),
+                    line_number: 0,
                 }],
             );
         }
@@ -167,6 +192,13 @@ impl BacklinkIndex {
             }
         }
         result
+    }
+
+    /// Get the set of source files that link to `target` (the backward index
+    /// entry). Used by `note_move` to find every file whose links must be
+    /// rewritten when the target is renamed.
+    pub fn sources_for(&self, target: &str) -> HashSet<String> {
+        self.backward.get(target).cloned().unwrap_or_default()
     }
 
     /// Get all forward links from a file (files this one references).

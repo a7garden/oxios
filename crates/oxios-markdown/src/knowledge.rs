@@ -28,7 +28,9 @@ use crate::habits::{habits, last_week_habits, write_habits};
 use crate::html::markdown_to_html;
 use crate::i18n::emoji_for;
 use crate::journal::{add_emoji as journal_add_emoji, add_record as journal_add_record};
-use crate::parser::{extract_headings, similar};
+use crate::parser::{
+    StemIndex, extract_headings, rewrite_link_targets, rewrite_wikilink_targets, similar,
+};
 use crate::plugins::world_clock_for_names;
 use crate::stats::{done_today, today_report};
 use crate::types::NoteMeta;
@@ -159,6 +161,34 @@ impl KnowledgeBase {
         }
     }
 
+    /// Build a lowercase-stem → paths[] index over every `.md` file in the KB.
+    ///
+    /// Used by `resolve_wikilink` to canonicalize `[[bare-stem]]` targets
+    /// during indexing and (transitively) to decide which wikilinks are
+    /// safe to rewrite on rename. Walks the whole tree; cheap for the
+    /// documented personal-KB scale (hundreds of files).
+    ///
+    /// MUST be called BEFORE acquiring the backlinks write lock — it takes
+    /// the fs read lock, and we never nest the two.
+    fn build_stem_index(&self) -> StemIndex {
+        let mut index: StemIndex = StemIndex::new();
+        let files = match self.list_all_md_files() {
+            Ok(f) => f,
+            Err(e) => {
+                tracing::warn!(error = %e, "stem_index walk failed; wikilinks stay unresolved");
+                return index;
+            }
+        };
+        for (path, _size) in files {
+            let stem = match path.rsplit('/').next() {
+                Some(b) => b.trim_end_matches(".md"),
+                None => path.as_str().trim_end_matches(".md"),
+            }
+            .to_lowercase();
+            index.entry(stem).or_default().push(path);
+        }
+        index
+    }
     /// Write a note — creates or overwrites.
     ///
     /// Writes the `.md` file via VirtualFs, updates the backlink index,
@@ -173,11 +203,13 @@ impl KnowledgeBase {
             fs.write_path(path, content)?;
             is_new
         };
-
+        // Build the stem index BEFORE taking the backlinks write lock
+        // (fs read lock nests under nothing here).
+        let stem_index = self.build_stem_index();
         {
             let mut backlinks = self.backlinks.write();
             backlinks.remove_file(path);
-            backlinks.index_file(path, content);
+            backlinks.index_file_with(path, content, &stem_index);
         }
 
         self.notify_change(
@@ -284,29 +316,108 @@ impl KnowledgeBase {
             let fs = self.fs.write();
             fs.write_path(path, content)?;
         }
+        let stem_index = self.build_stem_index();
         let mut backlinks = self.backlinks.write();
         backlinks.remove_file(path);
-        backlinks.index_file(path, content);
+        backlinks.index_file_with(path, content, &stem_index);
         // Intentionally skip notify_change()
         Ok(())
     }
-
     /// Move/rename a note.
+    ///
+    /// In addition to the filesystem rename and backlink reindex, this
+    /// rewrites every `[text](old_path)]` reference in **other** notes
+    /// (and any self-reference in the moved note) to point at `new_path`,
+    /// AND every `[[target]]` wikilink that resolves to old_path (with
+    /// ambiguity guard for bare stems). Without this, renaming a note
+    /// that other notes link to would silently orphan those links — a
+    /// latent bug that affected both the F2 sidebar rename and the
+    /// H1-driven rename.
     pub fn note_move(&self, old_path: &str, new_path: &str) -> Result<()> {
-        // Rename under the write lock, then read the destination's content
-        // before dropping the guard (note_read would re-acquire the lock).
+        // 0. Build the stem index BEFORE renaming. The bare-stem ambiguity
+        //    check in `rewrite_wikilink_targets` needs old_path still
+        //    present in the tree; after the rename, old_path is gone and
+        //    the stem count would undercount. This is the rewrite-time
+        //    index; step 5 builds a second (post-rename) one for reindex.
+        let pre_stem_index = self.build_stem_index();
+
+        // 1. Rename on disk + read the moved file's content under the fs lock.
         let new_content = {
             let fs = self.fs.write();
             fs.rename_path(old_path, new_path)?;
             fs.read_path(new_path).ok()
         };
+
+        // 2. Snapshot the set of files that link to old_path BEFORE we
+        //    tear down the index entry. Done under a read lock; the
+        //    actual rewrites happen outside the lock to keep the critical
+        //    section short.
+        let sources: HashSet<String> = {
+            let backlinks = self.backlinks.read();
+            backlinks.sources_for(old_path)
+        };
+
+        // 3. Rewrite self-references in the moved note (a note can link
+        //    to itself by its old name). This is what gets indexed and
+        //    persisted.
+        let indexed_content = match &new_content {
+            Some(c) => {
+                let (md_done, _) = rewrite_link_targets(c, old_path, new_path);
+                let (wiki_done, _) =
+                    rewrite_wikilink_targets(&md_done, old_path, new_path, Some(&pre_stem_index));
+                if &wiki_done != c {
+                    // Persist the self-reference fix.
+                    let _ = self.fs.write().write_path(new_path, &wiki_done);
+                }
+                wiki_done
+            }
+            None => String::new(),
+        };
+
+        // 4. Rewrite references in every other note that linked to the
+        //    old path. Collect (path, new_content) pairs to write + reindex.
+        let mut touched: Vec<(String, String)> = Vec::with_capacity(sources.len());
+        for src in &sources {
+            if src == old_path || src == new_path {
+                // Self-links already handled above; skip the moved file.
+                continue;
+            }
+            if let Ok(content) = self.fs.read().read_path(src) {
+                let (md_done, n_md) = rewrite_link_targets(&content, old_path, new_path);
+                let (final_done, n_wiki) =
+                    rewrite_wikilink_targets(&md_done, old_path, new_path, Some(&pre_stem_index));
+                if (n_md > 0 || n_wiki > 0) && final_done != content {
+                    touched.push((src.clone(), final_done));
+                }
+            }
+        }
+
+        // 5. Apply reindex: drop old, index new (with rewritten content),
+        //    and reindex every touched source. Build the post-rename stem
+        //    index so wikilinks in the reindexed notes re-resolve against
+        //    the now-current tree.
+        let post_stem_index = self.build_stem_index();
         {
             let mut backlinks = self.backlinks.write();
             backlinks.remove_file(old_path);
-            if let Some(content) = new_content {
-                backlinks.index_file(new_path, &content);
+            if !indexed_content.is_empty() {
+                backlinks.index_file_with(new_path, &indexed_content, &post_stem_index);
+            }
+            for (src, content) in &touched {
+                backlinks.index_file_with(src, content, &post_stem_index);
             }
         }
+
+        // 6. Persist the rewritten sources. Done AFTER reindexing so a
+        //    crash between write and reindex leaves the index pointing at
+        //    the on-disk content (idempotent on next scan).
+        if !touched.is_empty() {
+            let fs = self.fs.write();
+            for (src, content) in &touched {
+                let _ = fs.write_path(src, content);
+            }
+        }
+
         self.notify_change(
             old_path,
             FileChange::Moved {
@@ -383,29 +494,44 @@ impl KnowledgeBase {
 
     /// Index all markdown files in the knowledge base.
     ///
-    /// Walks the entire directory tree and builds the backlink index.
-    /// Returns the number of files indexed.
+    /// Walks the entire directory tree (at any depth) and builds the
+    /// backlink index, including wikilink targets resolved against a
+    /// stem index built from the same walk. Returns the number of files
+    /// indexed.
     pub fn index_all(&self) -> Result<usize> {
-        let fs = self.fs.read();
-        let entries = fs.files_and_dirs(DIR_USER_ROOT)?;
-        let mut count = 0;
-
-        for entry in &entries {
-            if entry.is_dir {
-                let sub = fs.files_and_dirs(&entry.name)?;
-                for sub_entry in &sub {
-                    if !sub_entry.is_dir && sub_entry.name.ends_with(".md") {
-                        let path = format!("{}/{}", entry.name, sub_entry.name);
-                        if let Ok(content) = fs.read_path(&path) {
-                            self.backlinks.write().index_file(&path, &content);
-                            count += 1;
-                        }
-                    }
+        // Read every file's content under the fs read lock first; we need
+        // the contents anyway and this avoids re-acquiring per file.
+        let (paths_contents, stem_index) = {
+            let fs = self.fs.read();
+            let all = fs.all_md_files()?;
+            let stem_index = {
+                let mut idx: StemIndex = StemIndex::new();
+                for (path, _size) in &all {
+                    let stem = path
+                        .rsplit('/')
+                        .next()
+                        .unwrap_or(path.as_str())
+                        .trim_end_matches(".md")
+                        .to_lowercase();
+                    idx.entry(stem).or_default().push(path.clone());
                 }
-            } else if entry.name.ends_with(".md")
-                && let Ok(content) = fs.read_path(&entry.name)
-            {
-                self.backlinks.write().index_file(&entry.name, &content);
+                idx
+            };
+            let mut paths_contents: Vec<(String, String)> = Vec::with_capacity(all.len());
+            for (path, _size) in &all {
+                if let Ok(content) = fs.read_path(path) {
+                    paths_contents.push((path.clone(), content));
+                }
+            }
+            (paths_contents, stem_index)
+        };
+
+        let mut count = 0;
+        {
+            let mut backlinks = self.backlinks.write();
+            backlinks.clear();
+            for (path, content) in &paths_contents {
+                backlinks.index_file_with(path, content, &stem_index);
                 count += 1;
             }
         }
@@ -796,6 +922,130 @@ mod tests {
         kb.note_move("old.md", "new.md").unwrap();
         assert_eq!(kb.note_read("old.md").unwrap(), None);
         assert_eq!(kb.note_read("new.md").unwrap(), Some("content".to_string()));
+    }
+
+    #[test]
+    fn test_note_move_rewrites_inbound_links() {
+        let kb = make_test_kb();
+        // Two notes link to the target by its old name.
+        kb.note_write("a.md", "See [target](target.md) and [again](target.md).")
+            .unwrap();
+        kb.note_write("b.md", "Ref [target](target.md).").unwrap();
+        kb.note_write("target.md", "# Target\n\nbody").unwrap();
+        // Re-resolve: a.md/b.md were indexed before target.md existed, so
+        // the markdown links are exact-path matches (work regardless), but
+        // a fresh index keeps the test self-consistent.
+        kb.index_all().unwrap();
+
+        kb.note_move("target.md", "renamed.md").unwrap();
+
+        // Moved file content preserved.
+        assert_eq!(kb.note_read("target.md").unwrap(), None);
+        assert_eq!(
+            kb.note_read("renamed.md").unwrap(),
+            Some("# Target\n\nbody".to_string())
+        );
+
+        // Inbound links rewritten on disk.
+        assert_eq!(
+            kb.note_read("a.md").unwrap().as_deref(),
+            Some("See [target](renamed.md) and [again](renamed.md).")
+        );
+        assert_eq!(
+            kb.note_read("b.md").unwrap().as_deref(),
+            Some("Ref [target](renamed.md).")
+        );
+
+        // Backlink index resolves links under the new name.
+        let bl: HashSet<String> = kb
+            .backlinks_for("renamed.md")
+            .into_iter()
+            .map(|b| b.source_path)
+            .collect();
+        assert_eq!(bl, HashSet::from(["a.md".to_string(), "b.md".to_string()]));
+        assert_eq!(kb.backlinks_for("target.md").len(), 0);
+    }
+
+    #[test]
+    fn test_note_move_rewrites_wikilinks() {
+        let kb = make_test_kb();
+        // Source references the target via every supported wikilink form.
+        kb.note_write(
+            "src.md",
+            "Bare [[Target]] path [[dir/Target]] full [[dir/Target.md]] alias [[Target|T]].",
+        )
+        .unwrap();
+        kb.note_write("dir/Target.md", "# Target\n\nbody").unwrap();
+        // src.md was indexed before dir/Target.md existed; rebuild so its
+        // wikilinks resolve against the now-complete tree.
+        kb.index_all().unwrap();
+
+        kb.note_move("dir/Target.md", "dir/Renamed.md").unwrap();
+
+        // Every form rewrites to the new path; alias is preserved.
+        assert_eq!(
+            kb.note_read("src.md").unwrap().as_deref(),
+            Some(
+                "Bare [[Renamed]] path [[dir/Renamed]] full [[dir/Renamed.md]] alias [[Renamed|T]]."
+            ),
+        );
+        // Backlinks now resolve under the new canonical path.
+        assert_eq!(kb.backlinks_for("dir/Renamed.md").len(), 1);
+        assert_eq!(kb.backlinks_for("dir/Target.md").len(), 0);
+    }
+
+    #[test]
+    fn test_note_move_skips_ambiguous_bare_wikilink() {
+        // Two files share the stem "Dup": the bare [[Dup]] in src is
+        // ambiguous and must NOT be indexed → not rewritten when EITHER
+        // Dup renames. The path-style [[a/Dup]] IS unambiguous and rewrites.
+        let kb = make_test_kb();
+        kb.note_write("src.md", "ambig [[Dup]] explicit [[a/Dup]]")
+            .unwrap();
+        kb.note_write("a/Dup.md", "# A").unwrap();
+        kb.note_write("b/Dup.md", "# B").unwrap();
+        // src.md was indexed before both Dups existed — rebuild so the
+        // bare stem is now (correctly) ambiguous and dropped from the index.
+        kb.index_all().unwrap();
+
+        kb.note_move("a/Dup.md", "a/Moved.md").unwrap();
+
+        let src = kb.note_read("src.md").unwrap().unwrap_or_default();
+        // Bare link untouched (ambiguous); path-style link rewritten.
+        assert!(
+            src.contains("[[Dup]]"),
+            "ambiguous bare link must be left alone: {src}"
+        );
+        assert!(
+            src.contains("[[a/Moved]]"),
+            "explicit path link must be rewritten: {src}"
+        );
+    }
+
+    #[test]
+    fn test_backlinks_track_wikilinks() {
+        let kb = make_test_kb();
+        kb.note_write("brain/Rust.md", "See [[Ownership]] and [[brain/Go]]")
+            .unwrap();
+        kb.note_write("brain/Ownership.md", "# Ownership").unwrap();
+        kb.note_write("brain/Go.md", "# Go").unwrap();
+        // Rust.md was indexed before Ownership/Go existed; rebuild so its
+        // wikilinks resolve against the now-complete tree.
+        kb.index_all().unwrap();
+
+        // Both wikilinks resolve and appear as backlinks on their targets.
+        let owners_of_ownership: HashSet<String> = kb
+            .backlinks_for("brain/Ownership.md")
+            .into_iter()
+            .map(|b| b.source_path)
+            .collect();
+        assert!(owners_of_ownership.contains("brain/Rust.md"));
+        let owners_of_go: HashSet<String> = kb
+            .backlinks_for("brain/Go.md")
+            .into_iter()
+            .map(|b| b.source_path)
+            .collect();
+        assert!(owners_of_go.contains("brain/Rust.md"));
     }
 
     #[test]
