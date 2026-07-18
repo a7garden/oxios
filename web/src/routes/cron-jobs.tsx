@@ -9,6 +9,7 @@ import { EditCronDialog } from '@/components/cron/edit-cron-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -79,46 +80,46 @@ function CronJobsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('cronJobs.title')}</h1>
-          <p className="text-muted-foreground">{t('cronJobs.subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="inline-flex gap-0.5 rounded-lg border bg-muted/50 p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                viewMode === 'list'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <List className="h-3.5 w-3.5" />
-              {t('cronJobs.timeline.viewList')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('timeline')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                viewMode === 'timeline'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <CalendarClock className="h-3.5 w-3.5" />
-              {t('cronJobs.timeline.viewTimeline')}
-            </button>
-          </div>
-          <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-          <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4 mr-1" /> {t('cronJobs.newJob')}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title={t('cronJobs.title')}
+        subtitle={t('cronJobs.subtitle')}
+        actions={
+          <>
+            <div className="inline-flex gap-0.5 rounded-lg border bg-muted/50 p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  viewMode === 'list'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <List className="h-3.5 w-3.5" />
+                {t('cronJobs.timeline.viewList')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('timeline')}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                  viewMode === 'timeline'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <CalendarClock className="h-3.5 w-3.5" />
+                {t('cronJobs.timeline.viewTimeline')}
+              </button>
+            </div>
+            <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4" /> {t('cronJobs.newJob')}
+            </Button>
+          </>
+        }
+      />
 
       {showCreate && (
         <Card>

@@ -22,6 +22,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -177,47 +178,38 @@ function EmailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('email.title')}</h1>
-          <p className="text-muted-foreground">{t('email.subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {status?.configured && (
-            <Badge variant="outline" className="gap-1">
-              <MailCheck className="h-3 w-3 text-success" />
-              {t('email.configured')}
-            </Badge>
-          )}
-          {!status?.configured && (
-            <Badge variant="outline" className="gap-1 text-muted-foreground">
-              <MailWarning className="h-3 w-3" />
-              {t('email.notConfigured')}
-            </Badge>
-          )}
-          <Button variant="ghost" size="icon" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title={t('email.title')}
+        subtitle={t('email.subtitle')}
+        actions={
+          <>
+            {status?.configured && (
+              <Badge variant="outline" className="gap-1">
+                <MailCheck className="h-3 w-3 text-success" />
+                {t('email.configured')}
+              </Badge>
+            )}
+            {!status?.configured && (
+              <Badge variant="outline" className="gap-1 text-muted-foreground">
+                <MailWarning className="h-3 w-3" />
+                {t('email.notConfigured')}
+              </Badge>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </>
+        }
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="overview">
-            <Mail className="h-4 w-4 mr-2" />
-            {t('email.overviewTab')}
-          </TabsTrigger>
+          <TabsTrigger value="overview">{t('email.overviewTab')}</TabsTrigger>
           <TabsTrigger value="setup" data-testid="email-setup-tab">
-            <Settings className="h-4 w-4 mr-2" />
             {t('email.setupTab')}
           </TabsTrigger>
-          <TabsTrigger value="history">
-            <History className="h-4 w-4 mr-2" />
-            {t('email.historyTab')}
-          </TabsTrigger>
+          <TabsTrigger value="history">{t('email.historyTab')}</TabsTrigger>
           <TabsTrigger value="templates">
-            <LayoutTemplate className="h-4 w-4 mr-2" />
             {t('email.templatesTab')}
             {status?.template_count ? (
               <span className="ml-1 text-xs text-muted-foreground">{status.template_count}</span>
@@ -318,7 +310,7 @@ function OverviewPanel({ status, onGoSetup }: { status?: EmailStatus; onGoSetup:
             </div>
             <Button onClick={onGoSetup}>
               {t('email.setupTab')}
-              <ArrowRight className="h-4 w-4 ml-1" />
+              <ArrowRight className="h-4 w-4" />
             </Button>
           </CardContent>
         </Card>
@@ -423,15 +415,15 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleTest} disabled={isPending}>
               {isPending ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Send className="h-4 w-4 mr-1" />
+                <Send className="h-4 w-4" />
               )}
               {t('email.sendTest')}
             </Button>
             {dashUrl && dashLabel && (
               <Button variant="outline" size="sm" onClick={() => window.open(dashUrl, '_blank')}>
-                <ExternalLink className="h-4 w-4 mr-1" />
+                <ExternalLink className="h-4 w-4" />
                 {dashLabel}
               </Button>
             )}
@@ -615,9 +607,9 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
           <div className="flex gap-2 pt-2">
             <Button type="submit" disabled={!myEmail || !password || isPending}>
               {isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Settings className="h-4 w-4 mr-2" />
+                <Settings className="h-4 w-4" />
               )}
               {isPending ? t('email.saving') : t('email.saveAndTest')}
             </Button>

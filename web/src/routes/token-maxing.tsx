@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { PageHeader } from '@/components/shared/page-header'
 import { TokenMaxingControls } from '@/components/token-maxing/controls'
 import { TokenMaxingProviderCards } from '@/components/token-maxing/provider-cards'
 import { TokenMaxingSessions } from '@/components/token-maxing/sessions'
@@ -17,13 +18,11 @@ function TokenMaxingPage() {
   const { t } = useTranslation()
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('tokenMaxing.title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('tokenMaxing.subtitle')}</p>
-        </div>
-        <span className="text-xs text-muted-foreground">RFC-031</span>
-      </div>
+      <PageHeader
+        title={t('tokenMaxing.title')}
+        subtitle={t('tokenMaxing.subtitle')}
+        titleMeta={<span className="text-xs text-muted-foreground">RFC-031</span>}
+      />
 
       <TokenMaxingStatusHeader />
       <TokenMaxingControls />

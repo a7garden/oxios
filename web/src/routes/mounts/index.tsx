@@ -8,6 +8,7 @@ import { EditMountDialog } from '@/components/mount/edit-mount-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import {
@@ -55,18 +56,17 @@ function MountsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('mounts.title')}</h1>
-          <p className="text-muted-foreground text-sm">{t('mounts.desc')}</p>
-        </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <FolderPlus className="h-4 w-4 mr-2" />
-          {t('mounts.create')}
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t('mounts.title')}
+        subtitle={t('mounts.desc')}
+        actions={
+          <Button onClick={() => setShowCreate(true)}>
+            <FolderPlus className="h-4 w-4" />
+            {t('mounts.create')}
+          </Button>
+        }
+      />
 
       {/* Search */}
       <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ function MountsPage() {
           description={t('mounts.emptyDesc')}
           action={
             <Button onClick={() => setShowCreate(true)}>
-              <FolderPlus className="h-4 w-4 mr-2" />
+              <FolderPlus className="h-4 w-4" />
               {t('mounts.create')}
             </Button>
           }

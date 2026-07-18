@@ -1,13 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Plus, Server, Terminal, Wrench } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AddServerDialog } from '@/components/mcp/add-server-dialog'
 import { ServerList } from '@/components/mcp/server-list'
 import { ToolList } from '@/components/mcp/tool-list'
 import { ToolTester } from '@/components/mcp/tool-tester'
+import { PageHeader } from '@/components/shared/page-header'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export const Route = createFileRoute('/mcp')({
@@ -26,17 +26,17 @@ function McpPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('mcp.title')}</h1>
-          <p className="text-muted-foreground">{t('mcp.subtitle')}</p>
-        </div>
-        {tab === 'servers' && (
-          <Button onClick={() => setAddDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> {t('mcp.addServer')}
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title={t('mcp.title')}
+        subtitle={t('mcp.subtitle')}
+        actions={
+          tab === 'servers' ? (
+            <Button onClick={() => setAddDialogOpen(true)}>
+              <Plus className="h-4 w-4" /> {t('mcp.addServer')}
+            </Button>
+          ) : undefined
+        }
+      />
 
       <Tabs
         value={tab}
@@ -48,39 +48,21 @@ function McpPage() {
         }
       >
         <TabsList>
-          <TabsTrigger value="servers" className="flex items-center gap-1.5">
-            <Server className="h-4 w-4" /> {t('mcp.servers')}
-          </TabsTrigger>
-          <TabsTrigger value="tools" className="flex items-center gap-1.5">
-            <Wrench className="h-4 w-4" /> {t('mcp.tools')}
-          </TabsTrigger>
-          <TabsTrigger value="test" className="flex items-center gap-1.5">
-            <Terminal className="h-4 w-4" /> {t('mcp.test')}
-          </TabsTrigger>
+          <TabsTrigger value="servers">{t('mcp.servers')}</TabsTrigger>
+          <TabsTrigger value="tools">{t('mcp.tools')}</TabsTrigger>
+          <TabsTrigger value="test">{t('mcp.test')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="servers">
-          <Card>
-            <CardContent className="pt-6">
-              <ServerList />
-            </CardContent>
-          </Card>
+          <ServerList />
         </TabsContent>
 
         <TabsContent value="tools">
-          <Card>
-            <CardContent className="pt-6">
-              <ToolList />
-            </CardContent>
-          </Card>
+          <ToolList />
         </TabsContent>
 
         <TabsContent value="test">
-          <Card>
-            <CardContent className="pt-6">
-              <ToolTester />
-            </CardContent>
-          </Card>
+          <ToolTester />
         </TabsContent>
       </Tabs>
 

@@ -26,11 +26,11 @@ function sevColor(pct: number): string {
 
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
 import type { ResourceSnapshot } from '@/types'
-
 export const Route = createFileRoute('/resources')({ component: ResourcesPage })
 
 function ResourcesPage() {
@@ -62,13 +62,11 @@ function ResourcesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('resources.title')}</h1>
-          <p className="text-muted-foreground">{t('resources.subtitle')}</p>
-        </div>
-        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-      </div>
+      <PageHeader
+        title={t('resources.title')}
+        subtitle={t('resources.subtitle')}
+        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
+      />
 
       {/* Current Stats */}
       {latest && (

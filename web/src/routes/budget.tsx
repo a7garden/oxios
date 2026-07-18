@@ -8,6 +8,7 @@ import { CostChart } from '@/components/cost/cost-chart'
 import { CostSummaryCards } from '@/components/cost/cost-summary'
 import { ProviderQuotaCards } from '@/components/cost/provider-quota-cards'
 import { SpendLimitCard } from '@/components/cost/spend-limit-card'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useCostSummary } from '@/hooks/use-costs'
@@ -24,16 +25,11 @@ function CostPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('cost.pageTitle')}</h1>
-          <p className="text-sm text-muted-foreground">{t('cost.subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-        </div>
-      </div>
+      <PageHeader
+        title={t('cost.pageTitle')}
+        subtitle={t('cost.subtitle')}
+        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
+      />
 
       {/* Spend limit + period selector */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

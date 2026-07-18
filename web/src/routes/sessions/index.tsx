@@ -6,6 +6,7 @@ import { type Column, DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
@@ -92,15 +93,11 @@ function SessionsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('sessions.title')}</h1>
-          <p className="text-muted-foreground">
-            {t('sessions.registered', { count: data?.total ?? 0 })}
-          </p>
-        </div>
-        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-      </div>
+      <PageHeader
+        title={t('sessions.title')}
+        subtitle={t('sessions.registered', { count: data?.total ?? 0 })}
+        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
+      />
 
       {sessions.length === 0 ? (
         <EmptyState

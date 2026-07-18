@@ -12,6 +12,7 @@ import {
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -110,19 +111,18 @@ function PersonasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('personas.title')}</h1>
-          <p className="text-muted-foreground">{t('personas.subtitle')}</p>
-          <p className="text-xs text-muted-foreground">{t('personas.singleActiveHint')}</p>
-        </div>
-        <div className="flex gap-2">
-          <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-          <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4 mr-1" /> {t('common.create')}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title={t('personas.title')}
+        subtitle={`${t('personas.subtitle')} · ${t('personas.singleActiveHint')}`}
+        actions={
+          <div className="flex gap-2">
+            <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4" /> {t('common.create')}
+            </Button>
+          </div>
+        }
+      />
 
       <Dialog
         open={showCreate}

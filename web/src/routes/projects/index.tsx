@@ -9,6 +9,7 @@ import { ProjectCard } from '@/components/project/project-card'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,21 +30,20 @@ function ProjectsPage() {
   const projects = Array.isArray(data?.items) ? data.items : []
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('projects.title')}</h1>
-          <p className="text-muted-foreground text-sm">{t('projects.desc')}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setShowCreate(true)} size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            {t('projects.new')}
-          </Button>
-          <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t('projects.title')}
+        subtitle={t('projects.desc')}
+        actions={
+          <>
+            <Button onClick={() => setShowCreate(true)} size="sm">
+              <Plus className="h-4 w-4" />
+              {t('projects.new')}
+            </Button>
+            <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
+          </>
+        }
+      />
 
       {/* Search */}
       <div className="flex items-center gap-2">
@@ -73,7 +73,7 @@ function ProjectsPage() {
           action={
             !search ? (
               <Button onClick={() => setShowCreate(true)}>
-                <Plus className="h-4 w-4 mr-1" />
+                <Plus className="h-4 w-4" />
                 {t('projects.new')}
               </Button>
             ) : undefined

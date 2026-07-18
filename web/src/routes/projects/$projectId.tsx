@@ -205,7 +205,7 @@ function ProjectDetailPage() {
   if (!project) return <p className="text-muted-foreground">{t('projects.notFound')}</p>
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Back + Header */}
       <div className="flex items-center gap-4">
         <Button
@@ -222,11 +222,11 @@ function ProjectDetailPage() {
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
-            <Edit className="h-3 w-3 mr-1" />
+            <Edit className="h-3 w-3" />
             {t('common.edit')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowDelete(true)}>
-            <Trash2 className="h-3 w-3 mr-1" />
+            <Trash2 className="h-3 w-3" />
             {t('common.delete')}
           </Button>
         </div>

@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -272,28 +273,33 @@ function WorkspacePage() {
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold">{t('workspace.title')}</h1>
-          <p className="text-muted-foreground">{t('workspace.description')}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-1" /> {t('common.create')}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowUpload(!showUpload)}
-            aria-label={t('workspace.uploadFile')}
-          >
-            <Upload className="h-4 w-4 mr-1" /> {t('workspace.uploadFile')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => refetchRoot()} disabled={rootFetching}>
-            <RefreshCw className={`h-4 w-4 ${rootFetching ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title={t('workspace.title')}
+        subtitle={t('workspace.description')}
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" /> {t('common.create')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUpload(!showUpload)}
+              aria-label={t('workspace.uploadFile')}
+            >
+              <Upload className="h-4 w-4" /> {t('workspace.uploadFile')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchRoot()}
+              disabled={rootFetching}
+            >
+              <RefreshCw className={`h-4 w-4 ${rootFetching ? 'animate-spin' : ''}`} />
+            </Button>
+          </>
+        }
+      />
 
       {/* Split layout */}
       <div className="flex flex-1 gap-4 min-h-0">

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Clock, FolderKanban, MessageSquare } from 'lucide-react'
+import { ArrowLeft, FolderKanban, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -98,9 +98,7 @@ function SessionDetailPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Clock className="h-6 w-6" /> {t('sessions.sessionDetail')}
-          </h1>
+          <h1 className="text-2xl font-bold">{t('sessions.sessionDetail')}</h1>
           <p className="text-muted-foreground font-mono text-xs">{sessionId}</p>
         </div>
       </div>

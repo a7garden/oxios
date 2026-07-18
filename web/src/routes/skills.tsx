@@ -29,6 +29,7 @@ import { toast } from 'sonner'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { ImportDialog } from '@/components/skills/import-dialog'
 import { MarketplaceDetail } from '@/components/skills/marketplace-detail'
 import { SkillDetail } from '@/components/skills/skill-detail'
@@ -264,16 +265,11 @@ function SkillsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Zap className="h-6 w-6" /> {t('skills.title')}
-          </h1>
-          <p className="text-muted-foreground">{t('skills.subtitle')}</p>
-        </div>
-        {/* F5: summary pill replaces the manual refresh button; also filters. */}
-        <SkillSummaryPill counts={counts} filter={filter} onFilterChange={setFilter} />
-      </div>
+      <PageHeader
+        title={t('skills.title')}
+        subtitle={t('skills.subtitle')}
+        actions={<SkillSummaryPill counts={counts} filter={filter} onFilterChange={setFilter} />}
+      />
 
       {/* F1/F2: primary actions — create & import are always-visible entry points */}
       <div className="flex items-center gap-2">

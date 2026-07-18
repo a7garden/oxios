@@ -1,7 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Activity,
-  Bell,
   BookOpen,
   Bot,
   Brain,
@@ -19,6 +18,8 @@ import {
   PanelLeft,
   PanelLeftClose,
   Settings,
+  ShieldCheck,
+  Sparkles,
   Theater,
   Timer,
   Trash2,
@@ -94,7 +95,7 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: 'common.agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
       { labelKey: 'common.personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
-      { labelKey: 'common.skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
+      { labelKey: 'common.skills', href: '/skills', icon: <Sparkles className="h-4 w-4" /> },
     ],
   },
   {
@@ -143,7 +144,7 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     labelKey: 'common.system',
     items: [
       { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
-      { labelKey: 'common.security', href: '/security', icon: <Bell className="h-4 w-4" /> },
+      { labelKey: 'common.security', href: '/security', icon: <ShieldCheck className="h-4 w-4" /> },
       { labelKey: 'common.settings', href: '/settings', icon: <Settings className="h-4 w-4" /> },
     ],
   },

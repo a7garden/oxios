@@ -9,6 +9,7 @@ import { type Column, DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Badge } from '@/components/ui/badge'
@@ -313,102 +314,101 @@ function AgentsListPage() {
   ]
 
   return (
-    <div className="space-y-4 animate-fade-in-up">
-      {/* Header + view toggle */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bot className="h-6 w-6" /> {t('agents.title')}
-          </h1>
-          {view === 'table' ? (
-            <StatsBar response={tableQuery.data} />
-          ) : (
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              {monitor.stats.running > 0 && (
-                <span className="text-success">
-                  {monitor.stats.running} {t('agents.running')}
-                </span>
-              )}
-              {monitor.stats.totalCost > 0 && <span>${monitor.stats.totalCost.toFixed(4)}</span>}
-              {monitor.stats.totalTokens > 0 && (
-                <span>{monitor.stats.totalTokens.toLocaleString()} tokens</span>
-              )}
-              {monitor.edges.length > 0 && <span>{monitor.edges.length} A2A</span>}
-              {countsQuery.data && (
-                <span className="text-xs">
-                  {t('agents.all')} {countsQuery.data.total}
-                  {countsQuery.data.stats.count_completed ? (
-                    <>
-                      {' · '}
-                      {t('agents.completed')} {countsQuery.data.stats.count_completed}
-                    </>
-                  ) : null}
-                  {countsQuery.data.stats.count_failed ? (
-                    <>
-                      {' · '}
-                      <span className="text-destructive">
-                        {t('agents.failed')} {countsQuery.data.stats.count_failed}
-                      </span>
-                    </>
-                  ) : null}
-                </span>
-              )}
+    <div className="space-y-6 animate-fade-in-up">
+      <PageHeader
+        title={t('agents.title')}
+        actions={
+          <div className="flex items-center gap-2">
+            {/* View toggle */}
+            <div className="flex rounded-lg border bg-muted/50 p-0.5">
+              <button
+                type="button"
+                onClick={() => setView('canvas')}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                  view === 'canvas'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                {t('agentMonitor.canvas')}
+              </button>
               <button
                 type="button"
                 onClick={() => setView('table')}
-                className="text-xs text-primary underline-offset-2 hover:underline"
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                  view === 'table'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
               >
-                {t('agentMonitor.table')} →
+                <TableIcon className="h-3.5 w-3.5" />
+                {t('agentMonitor.table')}
               </button>
             </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="flex rounded-lg border bg-muted/50 p-0.5">
-            <button
-              type="button"
-              onClick={() => setView('canvas')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                view === 'canvas'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              {t('agentMonitor.canvas')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('table')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                view === 'table'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <TableIcon className="h-3.5 w-3.5" />
-              {t('agentMonitor.table')}
-            </button>
-          </div>
-          {view === 'table' && (
-            <SortSelect
-              value={sortBy}
-              dir={sortDir}
-              onChange={(by, dir) => {
-                setParam('sort_by', by)
-                setParam('sort_dir', dir)
-              }}
+            {view === 'table' && (
+              <SortSelect
+                value={sortBy}
+                dir={sortDir}
+                onChange={(by, dir) => {
+                  setParam('sort_by', by)
+                  setParam('sort_dir', dir)
+                }}
+              />
+            )}
+            <RefreshButton
+              onClick={() => (view === 'canvas' ? monitor.refetch() : tableQuery.refetch())}
+              isFetching={view === 'canvas' ? monitor.isFetching : tableQuery.isFetching}
             />
+          </div>
+        }
+      />
+
+      {/* Dynamic stats row (table = StatsBar; canvas = inline stats w/ table link) */}
+      {view === 'table' ? (
+        <StatsBar response={tableQuery.data} />
+      ) : (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          {monitor.stats.running > 0 && (
+            <span className="text-success">
+              {monitor.stats.running} {t('agents.running')}
+            </span>
           )}
-          <RefreshButton
-            onClick={() => (view === 'canvas' ? monitor.refetch() : tableQuery.refetch())}
-            isFetching={view === 'canvas' ? monitor.isFetching : tableQuery.isFetching}
-          />
+          {monitor.stats.totalCost > 0 && <span>${monitor.stats.totalCost.toFixed(4)}</span>}
+          {monitor.stats.totalTokens > 0 && (
+            <span>{monitor.stats.totalTokens.toLocaleString()} tokens</span>
+          )}
+          {monitor.edges.length > 0 && <span>{monitor.edges.length} A2A</span>}
+          {countsQuery.data && (
+            <span className="text-xs">
+              {t('agents.all')} {countsQuery.data.total}
+              {countsQuery.data.stats.count_completed ? (
+                <>
+                  {' · '}
+                  {t('agents.completed')} {countsQuery.data.stats.count_completed}
+                </>
+              ) : null}
+              {countsQuery.data.stats.count_failed ? (
+                <>
+                  {' · '}
+                  <span className="text-destructive">
+                    {t('agents.failed')} {countsQuery.data.stats.count_failed}
+                  </span>
+                </>
+              ) : null}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setView('table')}
+            className="text-xs text-primary underline-offset-2 hover:underline"
+          >
+            {t('agentMonitor.table')} →
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Canvas view */}
       {view === 'canvas' && (

@@ -13,6 +13,7 @@ import { StatCard } from '@/components/dashboard/stat-card'
 import { SystemHealthCard } from '@/components/dashboard/system-health-card'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingStatCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { useAgentCountHistory } from '@/hooks/use-agent-count-history'
 import { useApprovals } from '@/hooks/use-approvals'
 import { useMemoryStats } from '@/hooks/use-memory'
@@ -100,26 +101,25 @@ function DashboardPage() {
   if (statusError) return <ErrorState onRetry={() => refetchStatus()} />
 
   return (
-    <div className="space-y-4 animate-fade-in-up">
-      {/* Title + version */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('dashboard.title')}</h1>
-          <p className="text-muted-foreground">{t('dashboard.subtitle')}</p>
-        </div>
-        {status && (
-          <div className="flex items-center gap-1.5 pb-1">
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-mono font-medium text-primary whitespace-nowrap">
-              {t('dashboard.binaryVersion', { version: status.version })}
-            </span>
-            {status.web_version && (
-              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-2xs font-mono font-medium text-muted-foreground whitespace-nowrap">
-                {t('dashboard.webVersion', { version: status.web_version })}
+    <div className="space-y-6 animate-fade-in-up">
+      <PageHeader
+        title={t('dashboard.title')}
+        subtitle={t('dashboard.subtitle')}
+        actions={
+          status && (
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-mono font-medium text-primary whitespace-nowrap">
+                {t('dashboard.binaryVersion', { version: status.version })}
               </span>
-            )}
-          </div>
-        )}
-      </div>
+              {status.web_version && (
+                <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-2xs font-mono font-medium text-muted-foreground whitespace-nowrap">
+                  {t('dashboard.webVersion', { version: status.web_version })}
+                </span>
+              )}
+            </div>
+          )
+        }
+      />
 
       {/* Row 1: KPI — 6 cards */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 animate-stagger">

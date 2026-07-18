@@ -7,6 +7,7 @@ import { ApprovalsQueue } from '@/components/dashboard/approvals-queue'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -95,13 +96,11 @@ function SecurityPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('security.title')}</h1>
-          <p className="text-muted-foreground">{t('security.subtitle')}</p>
-        </div>
-        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-      </div>
+      <PageHeader
+        title={t('security.title')}
+        subtitle={t('security.subtitle')}
+        actions={<RefreshButton onClick={() => refetch()} isFetching={isFetching} />}
+      />
       <ApprovalsQueue />
 
       {/* Permissions */}

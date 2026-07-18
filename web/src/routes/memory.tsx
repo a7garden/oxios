@@ -7,6 +7,7 @@ import { MemoryDetail } from '@/components/memory/memory-detail'
 import { MemoryMap } from '@/components/memory/memory-map'
 import { MemoryOverview } from '@/components/memory/memory-overview'
 import { MemorySearch } from '@/components/memory/memory-search'
+import { PageHeader } from '@/components/shared/page-header'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { MemoryDetail as MemDetail } from '@/types/memory'
 
@@ -24,12 +25,7 @@ function MemoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('memory.title')}</h1>
-          <p className="text-muted-foreground">{t('memory.subtitle')}</p>
-        </div>
-      </div>
+      <PageHeader title={t('memory.title')} subtitle={t('memory.subtitle')} />
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">{t('memory.overview')}</TabsTrigger>
