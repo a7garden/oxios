@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Oxios Web UI — 디자인 일관성 감사</title>
+<style>
+/* =========================================================================
+   Oxios Web UI 일관성 감사 — 글로벌 스타일 (리포트 크롬 + 공유 단편 클래스)
+   편집 디자인 리뷰 문서 미학: 여백 넉넉, 잉크 절제, 심각도 액센트 하나.
+   ========================================================================= */
+
+:root{
+  --doc-bg:#f7f7f5;
+  --doc-surface:#ffffff;
+  --doc-ink:#1a1a1f;
+  --doc-ink-2:#3d3d45;
+  --doc-muted:#6b6b73;
+  --doc-muted-2:#8a8a92;
+  --doc-rule:#e4e4e2;
+  --doc-rule-2:#ededeb;
+  --hi:#c0392b;        /* high severity */
+  --md:#b07d10;        /* med severity */
+  --lo:#566573;        /* low severity */
+  --accent:#2a2d3f;    /* primary ink accent */
+
+  /* 앱 토큰 유도값 (목형 재현용 — light 기준) */
+  --app-bg:#fafafa;
+  --app-card:#ffffff;
+  --app-muted:#f4f4f5;
+  --app-muted-2:#e9e9ec;
+  --app-fg:#1a1a1f;
+  --app-fg-2:#3f3f46;
+  --app-muted-fg:#71717a;
+  --app-border:#e4e4e7;
+  --app-primary:#2a2d3f;
+  --app-primary-fg:#fafafa;
+  --app-success:#2f9e6b;
+  --app-warning:#c79a3e;
+  --app-error:#d44a2b;
+  --app-info:#3b6fd4;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--doc-bg);
+  color:var(--doc-ink);
+  font-family:'Helvetica Neue',Helvetica,Arial,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+.wrap{max-width:1180px;margin:0 auto;padding:56px 40px 120px}
+
+/* ── 리포트 헤더 ─────────────────────────────────────────── */
+.report-head{margin-bottom:64px;padding-bottom:36px;border-bottom:1px solid var(--doc-rule)}
+.report-kicker{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--doc-muted);margin-bottom:14px}
+.report-title{font-family:'Iowan Old Style','Palatino Linotype',Georgia,serif;font-size:42px;line-height:1.1;font-weight:600;letter-spacing:-.01em;margin:0 0 14px;color:var(--doc-ink)}
+.report-sub{font-size:16px;color:var(--doc-muted);max-width:62ch;margin:0 0 28px}
+.report-meta{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:13px;color:var(--doc-ink-2)}
+.report-meta b{font-weight:600}
+.report-meta .mono{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--doc-muted)}
+
+/* ── 집계 카드 (상단 요약) ──────────────────────────────── */
+.tally{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--doc-rule);border:1px solid var(--doc-rule);border-radius:10px;overflow:hidden;margin:36px 0 0}
+.tally-cell{background:var(--doc-surface);padding:20px 22px}
+.tally-cell .n{font-family:'Iowan Old Style',Georgia,serif;font-size:34px;font-weight:600;line-height:1;color:var(--doc-ink)}
+.tally-cell .l{font-size:12px;color:var(--doc-muted);margin-top:6px;letter-spacing:.02em}
+.tally-cell.hi .n{color:var(--hi)}
+.tally-cell.md .n{color:var(--md)}
+
+/* ── 섹션 공유 클래스 (모든 단편이 사용) ───────────────── */
+.screen{padding:48px 0;border-bottom:1px solid var(--doc-rule)}
+.screen:first-of-type{border-top:none}
+.screen-head{display:flex;flex-direction:column;gap:14px;margin-bottom:28px}
+.screen-title{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.screen-title .num{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--doc-muted-2);background:var(--doc-muted);border-radius:4px;padding:2px 7px;letter-spacing:.04em}
+.screen-title h2{font-size:26px;font-weight:600;margin:0;letter-spacing:-.005em;color:var(--doc-ink)}
+.screen-title .route{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:13px;color:var(--doc-muted);background:var(--doc-surface);border:1px solid var(--doc-rule);padding:2px 8px;border-radius:5px}
+.screen-title .score{margin-left:auto;font-size:13px;color:var(--doc-muted)}
+.screen-title .score b{color:var(--doc-ink);font-weight:600}
+
+/* 루브릭 바 */
+.rubric{display:flex;flex-wrap:wrap;gap:6px}
+.rubric .bar{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;letter-spacing:.02em;cursor:help;border:1px solid transparent}
+.rubric .bar.c5{background:#e8f3ef;color:#2f7a52;border-color:#cfe6dc}
+.rubric .bar.c4{background:#e9eff5;color:#3a6694;border-color:#d2dff0}
+.rubric .bar.c3{background:#f5efe0;color:#8a6c1e;border-color:#ebe0c4}
+.rubric .bar.c2{background:#f5e7d8;color:#a56a1e;border-color:#ecd6b8}
+.rubric .bar.c1{background:#f4dcda;color:#a83a2c;border-color:#ecc4c0}
+
+/* 비교 패널 */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 26px}
+.compare.single{grid-template-columns:1fr}
+@media(max-width:860px){.compare{grid-template-columns:1fr}}
+.panel{background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:10px;padding:18px 18px 14px;position:relative}
+.panel-label{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--doc-muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel-label .dot{width:7px;height:7px;border-radius:50%;background:var(--hi)}
+.panel.cur .panel-label .dot{background:var(--hi)}
+.panel.prop .panel-label .dot{background:var(--app-success)}
+
+/* 핀 (번호 매긴 문제 표시) */
+.pin{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--hi);color:#fff;font-size:11px;font-weight:700;font-family:ui-monospace,Menlo,monospace;box-shadow:0 0 0 3px rgba(192,57,43,.18);vertical-align:middle;margin:0 2px}
+
+/* 발견 목록 */
+.findings{margin-top:4px}
+.findings .flist{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.findings li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;padding:11px 13px;background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:8px}
+.findings li .badge{flex-shrink:0;font-family:ui-monospace,Menlo,monospace;font-size:10px;font-weight:700;letter-spacing:.06em;padding:3px 7px;border-radius:4px;color:#fff;margin-top:1px}
+.findings li.high .badge{background:var(--hi)}
+.findings li.med .badge{background:var(--md)}
+.findings li.low .badge{background:var(--lo)}
+.findings li .body{flex:1;color:var(--doc-ink-2)}
+.findings li .body b{color:var(--doc-ink);font-weight:600}
+.findings li .dim{font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--doc-muted-2);background:var(--app-muted);padding:1px 5px;border-radius:3px;margin:0 4px;white-space:nowrap}
+.findings li code{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--app-info);background:#eef3fb;padding:1px 5px;border-radius:3px}
+
+/* ── 목형(Mockup) 프리미티브 — 앱 토큰 유도값으로 재현 ──── */
+.mk-frame{background:var(--app-bg);border:1px solid var(--app-border);border-radius:8px;padding:14px;overflow:hidden}
+.mk-h1{font-size:18px;font-weight:700;color:var(--app-fg);margin:0}
+.mk-h1.semibold{font-weight:600;letter-spacing:-.01em}
+.mk-sub{font-size:12px;color:var(--app-muted-fg);margin:2px 0 0}
+.mk-sub.nosize{font-size:13px}
+.mk-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.mk-header.end{align-items:flex-end}
+.mk-acts{display:flex;align-items:center;gap:6px}
+.mk-btn{display:inline-flex;align-items:center;gap:5px;background:var(--app-primary);color:var(--app-primary-fg);font-size:12px;font-weight:600;padding:6px 11px;border-radius:7px;border:none}
+.mk-btn.outline{background:transparent;color:var(--app-fg);border:1px solid var(--app-border)}
+.mk-btn.ghost{background:transparent;color:var(--app-muted-fg);border:none}
+.mk-btn .ic{width:13px;height:13px;display:inline-block}
+.mk-mr{margin-right:3px}
+.mk-card{background:var(--app-card);border:1px solid var(--app-border);border-radius:9px;padding:14px}
+.mk-card.pt6{padding-top:20px}
+.mk-tabs{display:flex;gap:3px;background:var(--app-muted);border-radius:8px;padding:3px;margin-bottom:12px}
+.mk-tab{font-size:11px;font-weight:500;color:var(--app-muted-fg);padding:5px 11px;border-radius:6px;display:inline-flex;align-items:center;gap:5px}
+.mk-tab.active{background:var(--app-card);color:var(--app-fg);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.mk-tab .ic{width:12px;height:12px;display:inline-block}
+.mk-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--app-muted-2);font-size:12px;color:var(--app-fg-2)}
+.mk-row:last-child{border-bottom:none}
+.mk-dot{width:8px;height:8px;border-radius:50%;background:var(--app-success);flex-shrink:0}
+.mk-dot.warn{background:var(--app-warning)}
+.mk-dot.err{background:var(--app-error)}
+.mk-srv-name{font-weight:600;color:var(--app-fg)}
+.mk-tag{font-size:10px;font-family:ui-monospace,Menlo,monospace;background:var(--app-muted);color:var(--app-muted-fg);padding:1px 6px;border-radius:4px}
+.mk-grid{display:grid;gap:8px}
+.mk-ellipsis{text-align:center;color:var(--app-muted-fg);font-size:11px;padding:4px 0;letter-spacing:.3em}
+
+/* 호출문(callout) */
+.callout{border-left:3px solid var(--accent);background:var(--doc-surface);padding:14px 18px;border-radius:0 8px 8px 0;margin:18px 0;font-size:14px;color:var(--doc-ink-2)}
+.callout b{color:var(--doc-ink)}
+
+/* ── 합성/사양 섹션 ─────────────────────────────────────── */
+.syn-pattern{padding:22px 0;border-bottom:1px solid var(--doc-rule-2)}
+.syn-pattern:last-child{border-bottom:none}
+.syn-pattern .ptag{display:inline-flex;align-items:center;gap:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;color:#fff;background:var(--accent);padding:3px 9px;border-radius:5px;margin-bottom:10px}
+.syn-pattern h3{font-size:19px;font-weight:600;margin:0 0 8px;color:var(--doc-ink)}
+.syn-pattern p{margin:0 0 8px;color:var(--doc-ink-2);font-size:14px}
+.syn-evidence{font-size:13px;color:var(--doc-muted);margin-top:8px;font-family:ui-monospace,Menlo,monospace;line-height:1.7}
+.syn-evidence code{color:var(--app-info);background:#eef3fb;padding:1px 4px;border-radius:3px}
+
+.spec-block{margin:26px 0;padding:22px;background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:10px}
+.spec-block h4{font-size:14px;font-weight:700;margin:0 0 4px;color:var(--accent);font-family:ui-monospace,Menlo,monospace;letter-spacing:.02em}
+.spec-block .desc{font-size:13px;color:var(--doc-muted);margin:0 0 14px}
+
+/* 인덱스(스티키) */
+.index-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+.index-tbl th,.index-tbl td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--doc-rule-2)}
+.index-tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--doc-muted);font-weight:600}
+.index-tbl td .r{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--doc-muted)}
+.index-tbl td .ct{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.index-tbl td .ct .h{color:var(--hi);font-weight:700}
+.index-tbl td .ct .m{color:var(--md);font-weight:700}
+.index-tbl td .ct .l{color:var(--lo);font-weight:700}
+.index-tbl tr:hover td{background:#fbfbfa}
+
+.section-divider{height:1px;background:var(--doc-rule);margin:64px 0}
+.sec-heading{font-family:'Iowan Old Style',Georgia,serif;font-size:30px;font-weight:600;margin:0 0 6px;letter-spacing:-.005em}
+.sec-intro{color:var(--doc-muted);font-size:14px;margin:0 0 28px;max-width:70ch}
+
+.report-foot{margin-top:80px;padding-top:28px;border-top:1px solid var(--doc-rule);font-size:12px;color:var(--doc-muted-2);font-family:ui-monospace,Menlo,monospace}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ══════════ 리포트 헤더 ══════════ -->
+<header class="report-head">
+  <div class="report-kicker">UI Design Consistency Audit · 2026-07-18</div>
+  <h1 class="report-title">Oxios Web UI — 디자인 일관성 감사</h1>
+  <p class="report-sub">Console · Knowledge · Chat 3개 모드, 19개 탭·패널을 8차원 일관성 루브릭으로 검사. 각 화면의 현재(문제 핀) ↔ 정규형 제안 비교와, 전 탭에 걸친 전신적 분열 패턴 8종을 정리한다. 모든 주장은 실제 소스 <code style="font-family:ui-monospace,Menlo,monospace;font-size:13px;background:#eef3fb;padding:1px 5px;border-radius:3px">file:line</code>에 근거한다.</p>
+  <div class="report-meta">
+    <div><b>대상</b> <span class="mono">web/ (React + TanStack Router)</span></div>
+    <div><b>프론트엔드 루트</b> <span class="mono">web/src/</span></div>
+    <div><b>디자인 시스템</b> <span class="mono">Geist · OKLCH · semantic status tokens</span></div>
+    <div><b>화면 수</b> <span class="mono">19 + 1 셸 + 1 사양</span></div>
+  </div>
+  <div class="tally">
+    <div class="tally-cell"><div class="n" id="t-screens">19</div><div class="l">감사 화면</div></div>
+    <div class="tally-cell hi"><div class="n" id="t-hi">11</div><div class="l">HIGH 발견</div></div>
+    <div class="tally-cell md"><div class="n" id="t-md">49</div><div class="l">MED 발견</div></div>
+    <div class="tally-cell"><div class="n" id="t-lo">24</div><div class="l">LOW 발견</div></div>
+  </div>
+</header>
+
+<!-- ══════════ 전신적 일관성 패턴 (상단 합성) ══════════ -->
+<section id="screen-summary" class="screen" style="border-top:none;padding-top:0">
+  <div class="screen-head">
+    <h2 class="sec-heading">전신적 일관성 패턴 — 상위 8종</h2>
+    <p class="sec-intro">개별 화면을 넘어 <b>2개 이상의 탭에서 반복</b>되는 분열의 뿌리. 이 패턴들이 일관성 점수를 갉아먹는 주원인이며, 가장 높은 수정 우선순위를 갖는다. 각 패턴은 발생 지점(<code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">file:line</code>)과 한 줄 해결 방향을 포함한다.</p>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P1 · HIGH</span>
+    <h3>페이지 헤더 파편화 (전 탭 반복)</h3>
+    <p>같은 역할의 헤더가 탭마다 5가지 축(제목 굵기·정렬·부제 크기·앞아이콘·액션 갭)에서 분화. 가장 큰 시각적 분열원. <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">&lt;PageHeader&gt;</code> 공유 컴포넌트 하나로 전부 흡수 가능.</p>
+    <div class="syn-evidence">
+      <b>제목 굵기:</b> Dashboard만 <code>font-semibold tracking-tight</code> <code>routes/index.tsx:107</code> vs 전 탭 <code>font-bold</code><br>
+      <b>헤더 정렬:</b> Dashboard만 <code>items-end</code> <code>routes/index.tsx:105</code><br>
+      <b>부제 크기:</b> 10면 <code>text-muted-foreground</code>(크기 미지정) vs 4면 <code>text-sm</code> — mcp/memory/cron/email/git/personas/resources/security/skills/workspace vs budget/token-maxing/mounts/projects<br>
+      <b>제목 앞 아이콘:</b> skills/agents/sessions만 부분 적용 (<code>routes/skills.tsx:269</code>, <code>routes/agents/index.tsx:320</code>, <code>routes/sessions/$sessionId.tsx:101</code>)<br>
+      <b>액션 클러스터 갭:</b> <code>gap-2</code> vs <code>gap-3</code> vs <code>flex gap-2</code>
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P2 · HIGH</span>
+    <h3>표면 간격 리듬 이중화</h3>
+    <p>페이지 루트 간격이 <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">space-y-6</code>과 <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">space-y-4</code>로 갈라짐. 의도적 밀도 구분의 근거 없음 → 시각적 리듬이 탭마다 흔들린다.</p>
+    <div class="syn-evidence">
+      <b>space-y-6 (12면):</b> budget·cron·email·git·mcp·memory·personas·resources·security·skills·sessions·agents-detail<br>
+      <b>space-y-4 (5면):</b> <code>routes/index.tsx:103</code> · <code>routes/agents/index.tsx:316</code> · <code>routes/mounts/index.tsx:57</code> · <code>routes/projects/index.tsx:31</code> · <code>routes/projects/$projectId.tsx:207</code><br>
+      → <code>space-y-6</code> 단일화 권장
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P3 · MED</span>
+    <h3>버튼 아이콘 간격 — margin vs flex gap</h3>
+    <p>생성 버튼의 <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">Plus</code> 아이콘을 <code>mr-1</code>(margin)로 띄우는 경우와 flex <code>gap</code>으로 띄우는 경우가 혼재. Button이 gap를 내장하므로 margin는 불필요.</p>
+    <div class="syn-evidence">
+      <code>routes/mcp.tsx:36</code> · <code>routes/personas.tsx:122</code> (mr-1) vs Button 내장 gap 기반 페이지들
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P4 · HIGH</span>
+    <h3>사이드바 내비게이션 아이콘 — 중복 + 의미 오정합</h3>
+    <p>탐색 아이콘이 기능과 매치되지 않거나 중복되어 웨이파인딩을 해친다. 단일 행 변경으로 즉각 수정 가능한 대비 효과.</p>
+    <div class="syn-evidence">
+      <b>중복:</b> <code>Zap</code>가 Skills(<code>sidebar.tsx:97</code>) + MCP(<code>sidebar.tsx:137</code>) 양쪽 — 같은 아이콘 = 다른 기능<br>
+      <b>의미 오정합:</b> Security = <code>Bell</code>(<code>sidebar.tsx:146</code>) — Bell은 알림 관례, Security는 <code>ShieldCheck</code>가 정합. 알림은 Header의 MenuClock→NotificationCenter가 이미 담당.
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P5 · MED</span>
+    <h3>탭 패턴 — 트리거 아이콘·콘텐츠 래핑 불일치</h3>
+    <p>다중 탭 페이지(MCP·Memory·Budget·Skills)가 트리거 아이콘 유무와 콘텐츠 Card 래핑 유무를 각자 다르게 결정. "모두 또는 아무것도" 원칙 위반.</p>
+    <div class="syn-evidence">
+      <b>트리거 아이콘:</b> MCP(<code>routes/mcp.tsx:51-59</code>)만 있음; Memory/Budget/Skills 무아이콘<br>
+      <b>콘텐츠 Card 래핑:</b> MCP는 <code>&lt;Card&gt;&lt;CardContent className="pt-6"&gt;</code>로 래핑(<code>routes/mcp.tsx:62-84</code>); Memory는 비래핑
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P6 · LOW</span>
+    <h3>입장 애니메이션 부분 적용</h3>
+    <p><code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">animate-fade-in-up</code>가 일부 페이지에만. 전 탭 또는 무적용으로 통일.</p>
+    <div class="syn-evidence">
+      적용: <code>routes/index.tsx:103</code> · <code>routes/agents/index.tsx:316</code> · 미적용: mcp·memory·budget·skills 등
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P7 · MED</span>
+    <h3>Settings 패러다임 단절</h3>
+    <p><code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">/settings</code>가 3-zone <code>SettingsShell</code>(레일+본문+리뷰)로 헤더·간격·탭 패턴이 전 탭과 단절. 복잡 설정에는 적절하나 <b>경계 명시 없이</b> 다른 탭과 나란히 놓여 일관성으로 인지됨.</p>
+    <div class="syn-evidence">
+      <code>components/settings/settings-shell.tsx:65</code> (SettingsShell) · <code>routes/settings.tsx:838</code> (renderActiveSection)
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P8 · LOW</span>
+    <h3>Persona 헤더 3줄 (고유 예외)</h3>
+    <p>유일하게 헤더가 title+subtitle+hint 3줄. 고유하지만 비일관 — hint는 부제에 통합 또는 본문으로 이동.</p>
+    <div class="syn-evidence">
+      <code>routes/personas.tsx:115-117</code> (singleActiveHint, text-xs 3째 줄)
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:24px"><b>종합.</b> 전 탭에 공통으로 반복되는 분열(P1·P2·P3)은 <b>PageHeader 공유 컴포넌트 + 간격·버튼 규칙 단일화</b> 한 방으로 대부분 흡수된다. 사이드바 아이콘 정정(P4)은 두 줄 변경이지만 발견성 향상이 즉각적이므로 최우선. 아래 "개선 설계" 사양 섹션에 통일 시스템을, 각 화면 섹션에 현재↔제안 비교를 제시한다.</div>
+</section>
+
+<!-- ══════════ 인덱스 ══════════ -->
+<section class="screen" style="border-top:none">
+  <div class="screen-head">
+    <h2 class="sec-heading" style="font-size:22px">화면 색인</h2>
+    <p class="sec-intro">전체 화면과 일관성 집계. ★ = 개선 설계 사양 섹션, ⇄ = 크로스모드 셸 섹션. H/M/L = 심각도별 발견 수.</p>
+  </div>
+  <table class="index-tbl" id="index-tbl">
+    <thead><tr><th>#</th><th>화면</th><th>라우트</th><th>점수</th><th class="ct"><span class="h">H</span>/<span class="m">M</span>/<span class="l">L</span></th></tr></thead>
+    <tbody id="index-body">
+            <tr><td class="ct">spec</td><td>★ 개선 설계 (정규형 사양)</td><td><span class="r">PageHeader·간격·버튼·아이콘맵·탭·상태</span></td><td class="ct">—</td><td class="ct"><span class="h">0</span> / <span class="m">0</span> / <span class="l">0</span></td></tr>
+            <tr><td class="ct">01</td><td>Dashboard</td><td><span class="r">/</span></td><td class="ct">3.1</td><td class="ct"><span class="h">2</span> / <span class="m">2</span> / <span class="l">1</span></td></tr>
+            <tr><td class="ct">02</td><td>Agents</td><td><span class="r">/agents</span></td><td class="ct">3.5</td><td class="ct"><span class="h">1</span> / <span class="m">4</span> / <span class="l">0</span></td></tr>
+            <tr><td class="ct">03</td><td>Personas</td><td><span class="r">/personas</span></td><td class="ct">3.6</td><td class="ct"><span class="h">0</span> / <span class="m">2</span> / <span class="l">2</span></td></tr>
+            <tr><td class="ct">04</td><td>Skills</td><td><span class="r">/skills</span></td><td class="ct">3.8</td><td class="ct"><span class="h">2</span> / <span class="m">4</span> / <span class="l">0</span></td></tr>
+            <tr><td class="ct">05</td><td>Projects</td><td><span class="r">/projects</span></td><td class="ct">3.6</td><td class="ct"><span class="h">0</span> / <span class="m">2</span> / <span class="l">2</span></td></tr>
+            <tr><td class="ct">06</td><td>Mounts</td><td><span class="r">/mounts</span></td><td class="ct">3.5</td><td class="ct"><span class="h">0</span> / <span class="m">4</span> / <span class="l">1</span></td></tr>
+            <tr><td class="ct">07</td><td>Memory</td><td><span class="r">/memory</span></td><td class="ct">3.1</td><td class="ct"><span class="h">2</span> / <span class="m">3</span> / <span class="l">0</span></td></tr>
+            <tr><td class="ct">08</td><td>Workspace</td><td><span class="r">/workspace</span></td><td class="ct">3.2</td><td class="ct"><span class="h">0</span> / <span class="m">4</span> / <span class="l">0</span></td></tr>
+            <tr><td class="ct">09</td><td>Cron Jobs</td><td><span class="r">/cron-jobs</span></td><td class="ct">4.5</td><td class="ct"><span class="h">0</span> / <span class="m">2</span> / <span class="l">2</span></td></tr>
+            <tr><td class="ct">10</td><td>Cost</td><td><span class="r">/budget</span></td><td class="ct">4.2</td><td class="ct"><span class="h">0</span> / <span class="m">2</span> / <span class="l">2</span></td></tr>
+            <tr><td class="ct">11</td><td>Token Maxing</td><td><span class="r">/token-maxing</span></td><td class="ct">4.4</td><td class="ct"><span class="h">0</span> / <span class="m">1</span> / <span class="l">1</span></td></tr>
+            <tr><td class="ct">12</td><td>MCP 서버</td><td><span class="r">/mcp</span></td><td class="ct">3.8</td><td class="ct"><span class="h">0</span> / <span class="m">4</span> / <span class="l">0</span></td></tr>
+            <tr><td class="ct">13</td><td>Email</td><td><span class="r">/email</span></td><td class="ct">4.2</td><td class="ct"><span class="h">0</span> / <span class="m">3</span> / <span class="l">1</span></td></tr>
+            <tr><td class="ct">14</td><td>Git</td><td><span class="r">/git</span></td><td class="ct">4.5</td><td class="ct"><span class="h">0</span> / <span class="m">1</span> / <span class="l">3</span></td></tr>
+            <tr><td class="ct">15</td><td>Resources</td><td><span class="r">/resources</span></td><td class="ct">4.2</td><td class="ct"><span class="h">0</span> / <span class="m">2</span> / <span class="l">2</span></td></tr>
+            <tr><td class="ct">16</td><td>Security</td><td><span class="r">/security</span></td><td class="ct">4.4</td><td class="ct"><span class="h">0</span> / <span class="m">2</span> / <span class="l">1</span></td></tr>
+            <tr><td class="ct">17</td><td>Settings</td><td><span class="r">/settings</span></td><td class="ct">3.2</td><td class="ct"><span class="h">2</span> / <span class="m">3</span> / <span class="l">1</span></td></tr>
+            <tr><td class="ct">18</td><td>Chat</td><td><span class="r">/chat</span></td><td class="ct">4.2</td><td class="ct"><span class="h">0</span> / <span class="m">1</span> / <span class="l">2</span></td></tr>
+            <tr><td class="ct">19</td><td>Knowledge</td><td><span class="r">/knowledge</span></td><td class="ct">3.1</td><td class="ct"><span class="h">0</span> / <span class="m">2</span> / <span class="l">2</span></td></tr>
+            <tr><td class="ct">shell</td><td>⇄ 크로스모드 셸</td><td><span class="r">sidebar·mode-tabs·header·bottom-nav</span></td><td class="ct">4.1</td><td class="ct"><span class="h">2</span> / <span class="m">1</span> / <span class="l">1</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="section-divider"></div>
+<h2 class="sec-heading">개선 설계 · 정규형</h2>
+<p class="sec-intro">먼저 통일 시스템 사양을 제시하고, 이어 각 화면의 현재(핀) ↔ 제안 비교를 따른다.</p>
+
+<section id="screen-spec" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num" style="background:var(--accent);color:#fff">★</span>
+      <h2>개선 설계 — 통일 디자인 사양</h2>
+      <span class="route">PageHeader · 간격 · 버튼 · 아이콘맵 · 탭 · 상태</span>
+    </div>
+    <p style="color:var(--doc-muted);font-size:14px;margin:0;max-width:72ch">각 탭의 "제안" 패널이 수렴하는 정규형(canonical)을 단일 사양으로 고정한다. 이 사양은 기존 다수 패턴을 근거로 삼되, 분열된 지점(헤더·간격·버튼 아이콘)은 하나로 좁힌다. 구현 시 공유 컴포넌트(<code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;color:var(--app-info);padding:1px 5px;border-radius:3px">&lt;PageHeader&gt;</code>)로 캡슐화해 분산 변형을 원천 차단한다.</p>
+  </div>
+
+  <!-- 사양 1: PageHeader -->
+  <div class="spec-block">
+    <h4>1. PageHeader (공유 컴포넌트화)</h4>
+    <p class="desc">모든 Console 탭의 헤더를 단일 컴포넌트로. 제목·부제·우측 액션 슬롯. Dashboard의 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">font-semibold tracking-tight</code>·<code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">items-end</code> 변형을 제거하고 전 탭 동일 적용.</p>
+    <div class="compare single">
+      <div class="panel prop">
+        <div class="panel-label"><span class="dot"></span>정규 PageHeader</div>
+        <div class="mk-frame">
+          <div class="mk-header">
+            <div>
+              <div class="mk-h1">페이지 제목</div>
+              <div class="mk-sub">text-sm text-muted-foreground — 항상 명시</div>
+            </div>
+            <div class="mk-acts">
+              <button class="mk-btn outline">↻ 새로고침</button>
+              <button class="mk-btn"><span class="ic">✚</span>생성</button>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--doc-muted);margin-top:12px;font-family:ui-monospace,Menlo,monospace;line-height:1.7">
+          &lt;div class="space-y-6"&gt;<br>
+          &nbsp;&nbsp;&lt;PageHeader title=… subtitle=…&gt;<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&lt;RefreshButton/&gt; &lt;Button&gt;&lt;Plus/&gt; 생성&lt;/Button&gt;<br>
+          &nbsp;&nbsp;&lt;/PageHeader&gt;<br>
+          규칙: h1=<b>text-2xl font-bold</b> · 부제=<b>text-sm</b> · 정렬=<b>items-center</b> · 액션 갭=<b>gap-2</b>
+        </div>
+      </div>
+    </div>
+    <div class="callout">제목 앞 아이콘은 <b>전 탭 동일하게 적용 또는 전 탭 미적용</b> — 현재 Skills·Agents·Sessions만 부분 적용 중(Dashboard로 통일 시 미적용 권장, 제목이 스스로 말하게). 버전/상태 뱃지는 우측 액션 슬롯으로.</div>
+  </div>
+
+  <!-- 사양 2: 간격 리듬 -->
+  <div class="spec-block">
+    <h4>2. 간격 리듬 — space-y-6 단일화</h4>
+    <p class="desc">현재 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">space-y-6</code>(12면) vs <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">space-y-4</code>(5면: Dashboard·Agents·Mounts·Projects·ProjectDetail) 분할. 구분 근거 없음 → <b>space-y-6으로 단일화</b>. 카드 그리드 내부는 기존대로 gap-3(KPI)/gap-4(일반) 유지.</p>
+  </div>
+
+  <!-- 사양 3: 버튼 아이콘 -->
+  <div class="spec-block">
+    <h4>3. 버튼 아이콘 간격 — gap 단일화</h4>
+    <p class="desc">현재 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">mr-1</code>(margin) vs flex gap 분할. Button 컴포넌트가 gap를 내장하므로 <b>margin 클래스(mr-1/ml-1) 전면 폐지, 아이콘은 자식으로</b>.</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:center">
+      <span style="font-size:12px;color:var(--hi);font-family:ui-monospace,Menlo,monospace">✗ &lt;Plus className="h-4 w-4 mr-1"/&gt;</span>
+      <span style="font-size:12px;color:var(--app-success);font-family:ui-monospace,Menlo,monospace">✓ &lt;Button&gt;&lt;Plus className="h-4 w-4"/&gt; 라벨&lt;/Button&gt;</span>
+    </div>
+  </div>
+
+  <!-- 사양 4: 사이드바 아이콘맵 -->
+  <div class="spec-block">
+    <h4>4. 사이드바 아이콘 맵 — 중복·의미 정정</h4>
+    <p class="desc">두 가지 정정: (a) Skills와 MCP가 같은 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">Zap</code> 사용 → Skills를 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">Sparkles</code> 또는 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">Wand2</code>로. (b) Security = <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">Bell</code>(알림 관례) → <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">ShieldCheck</code>로. 알림은 Header의 MenuClock→NotificationCenter가 담당.</p>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;font-size:13px">
+      <div style="padding:10px 12px;background:#fbecea;border:1px solid #f0d3cf;border-radius:7px"><b style="color:var(--hi)">현재</b><br><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--doc-ink-2)">Skills: Zap · MCP: Zap (중복)<br>Security: Bell</span></div>
+      <div style="padding:10px 12px;background:#e9f3ee;border:1px solid #c4dfce;border-radius:7px"><b style="color:var(--app-success)">정정</b><br><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--doc-ink-2)">Skills: Sparkles · MCP: Zap<br>Security: ShieldCheck</span></div>
+    </div>
+  </div>
+
+  <!-- 사양 5: 탭 패턴 -->
+  <div class="spec-block">
+    <h4>5. 탭 패턴 — 무아이콘 + 비래핑 단일화</h4>
+    <p class="desc">트리거 아이콘: 다수가 무아이콘이므로 <b>정규 = 무아이콘</b>(MCP만 아이콘 제거). 탭 콘텐츠: 외부 Card로 감싸지 않음(MCP 래핑 제거), 내부 행 카드만. 다중 탭 페이지 간 동일 규칙 적용.</p>
+  </div>
+
+  <!-- 사양 6: 상태 컴포넌트 -->
+  <div class="spec-block">
+    <h4>6. 상태(빈/로딩/에러) — 공유 컴포넌트 의무화</h4>
+    <p class="desc">EmptyState·ErrorState·loading.tsx 패밀리는 이미 일관적(장점). 규칙을 명시: <b>인라인 자체 마크업 금지</b>, 색은 success/warning/error/info 시맨틱 토큰 변종만. Dashboard의 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">if(loading) return</code> early-return도 인라인 조건부로 통일(레이아웃 시프트 감소).</p>
+  </div>
+
+  <div class="callout"><b>우선순위.</b> 1·2·4가 가장 큰 시각적 분열을 만든다(전 탭 반복). PageHeader 컴포넌트화 하나로 P1·P3·P6 상당부가 사라진다. 사이드바 아이콘 정정(P4)은 한 줄 변경이지만 발견성 향상이 즉각적.</div>
+</section>
+
+<section id="screen-01" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">01</span>
+      <h2>Dashboard</h2>
+      <span class="route">/</span>
+      <span class="score">일관성 점수 <b>2.6 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c2" title="C1 헤더: 제목 font-semibold tracking-tight + items-end + 부제 text-sm 누락 — 3중 편차">C1·2</span>
+      <span class="bar c2" title="C2 간격: space-y-4(다른 탭은 space-y-6), 6-col KPI 그리드 고유 밀도">C2·2</span>
+      <span class="bar c4" title="C3 버튼: 액션 클러스터 부재(헤더에 RefreshButton/CTA 없음)">C3·4</span>
+      <span class="bar c3" title="C4 카드: StatCard 그리드는 일관적이나 Row 3 카드는 헤더 정렬·padding 불일치">C4·3</span>
+      <span class="bar c5" title="C5 탭: 탭 자체 없음(단일 표면)">C5·5</span>
+      <span class="bar c2" title="C6 상태: animate-fade-in-up 적용 — agents/index 외 대다수 탭은 미적용">C6·2</span>
+      <span class="bar c4" title="C7 내비: 사이드바 활성 정상, 빈 데이터 안내는 양호">C7·4</span>
+      <span class="bar c3" title="C8 타이포: h1 굵기 편차 + 부제 base 상속">C8·3</span>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- 현재 -->
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 5</div>
+      <div class="mk-frame">
+        <!-- 헤더: items-end + h1 font-semibold tracking-tight + 부제 base 상속 + 2뱃지 클러스터 -->
+        <div class="mk-header end" style="position:relative">
+          <span class="pin" style="position:absolute;left:-6px;top:-6px">1</span>
+          <span class="pin" style="position:absolute;left:120px;top:18px">3</span>
+          <div>
+            <div class="mk-h1 semibold">Dashboard<span class="pin">2</span></div>
+            <div class="mk-sub nosize">에이전트 · 시스템 · 자원의 실시간 상태</div>
+          </div>
+          <div class="mk-acts" style="position:relative">
+            <span class="mk-tag" style="background:color-mix(in oklch,var(--app-primary) 10%,transparent);color:var(--app-primary)">binary 0.51.0</span>
+            <span class="mk-tag">web 0.51.0</span>
+          </div>
+        </div>
+
+        <!-- Row 1: KPI 6-col (고유 밀도) -->
+        <div class="mk-grid" style="grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:8px">
+          <div class="mk-card" style="padding:10px">
+            <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">Agents</div>
+            <div style="font-size:18px;font-weight:700;color:var(--app-fg);margin-top:4px">3<span style="color:var(--app-muted-fg);font-weight:500"> / 12</span></div>
+          </div>
+          <div class="mk-card" style="padding:10px">
+            <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">Tokens/min</div>
+            <div style="font-size:18px;font-weight:700;color:var(--app-fg);margin-top:4px">2.4k</div>
+          </div>
+          <div class="mk-card" style="padding:10px">
+            <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">CPU</div>
+            <div style="font-size:18px;font-weight:700;color:var(--app-info);margin-top:4px">38%</div>
+          </div>
+          <div class="mk-card" style="padding:10px">
+            <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">RAM</div>
+            <div style="font-size:18px;font-weight:700;color:var(--app-info);margin-top:4px">62%</div>
+          </div>
+          <div class="mk-card" style="padding:10px">
+            <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">Memory</div>
+            <div style="font-size:18px;font-weight:700;color:var(--app-fg);margin-top:4px">1,248</div>
+          </div>
+          <div class="mk-card" style="padding:10px">
+            <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">Pending</div>
+            <div style="font-size:18px;font-weight:700;color:var(--app-error);margin-top:4px">2</div>
+          </div>
+        </div>
+
+        <!-- Row 2: 5-col split (Agents 3 + System Health 2) — 6-col KPI와의 시각 불일치 -->
+        <div class="mk-grid" style="grid-template-columns:3fr 2fr;gap:8px;margin-bottom:8px">
+          <div class="mk-card pt6" style="min-height:170px;position:relative">
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-bottom:8px">▦ Agents &amp; Activity</div>
+            <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">research-agent-1</span><span class="mk-tag">running</span></div>
+            <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">writer-agent</span><span class="mk-tag">running</span></div>
+            <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">scout</span><span class="mk-tag">running</span></div>
+            <span class="pin" style="position:absolute;right:-6px;top:-6px">4</span>
+          </div>
+          <div class="mk-card" style="min-height:170px;padding-top:14px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-bottom:8px">◈ System Health</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;color:var(--app-muted-fg)">
+              <div>state_store <span style="color:var(--app-success)">●</span></div>
+              <div>event_bus <span style="color:var(--app-success)">●</span></div>
+              <div>memory <span style="color:var(--app-success)">●</span></div>
+              <div>⏱ 4d 12h</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: 4 cards (MCP / Budget / Dream / Skills-Cron) -->
+        <div class="mk-grid" style="grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+          <div class="mk-card pt6" style="position:relative"><div style="font-size:13px;font-weight:600;margin-bottom:6px">▤ MCP</div><div style="font-size:11px;color:var(--app-muted-fg)">6/7 active · 28 tools</div><span class="pin" style="position:absolute;right:-6px;top:-6px">5</span></div>
+          <div class="mk-card pt6"><div style="font-size:13px;font-weight:600;margin-bottom:6px">◈ Budget</div><div style="font-size:11px;color:var(--app-muted-fg)">$0.0042 this month</div></div>
+          <div class="mk-card pt6"><div style="font-size:13px;font-weight:600;margin-bottom:6px">◇ Dream</div><div style="font-size:11px;color:var(--app-muted-fg)">2 cycles pending</div></div>
+          <div class="mk-card pt6"><div style="font-size:13px;font-weight:600;margin-bottom:6px">✦ Skills/Cron</div><div style="font-size:11px;color:var(--app-muted-fg)">8 skills · 3 jobs</div></div>
+        </div>
+
+        <!-- Row 4: Approvals (조건부, 1행만) -->
+        <div class="mk-card" style="padding:10px;border-left:3px solid var(--app-error)">
+          <div style="font-size:12px;font-weight:600;color:var(--app-error)">⚠ 승인 대기 2건</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--doc-muted);margin-top:10px;font-family:ui-monospace,Menlo,monospace">헤더 <code>items-end</code> + h1 <code>font-semibold tracking-tight</code> + 부제 base 상속 · 페이지 루트 <code>space-y-4 animate-fade-in-up</code></div>
+    </div>
+
+    <!-- 제안 -->
+    <div class="panel prop">
+      <div class="panel-label"><span class="dot"></span>제안 · 정규형 적용</div>
+      <div class="mk-frame">
+        <!-- 헤더 정규형: items-center + h1 font-bold + 부제 text-sm 명시 + RefreshButton + "새 에이전트" CTA -->
+        <div class="mk-header" style="position:relative">
+          <div>
+            <div class="mk-h1">Dashboard</div>
+            <div class="mk-sub">에이전트 · 시스템 · 자원의 실시간 상태</div>
+          </div>
+          <div class="mk-acts">
+            <button class="mk-btn outline"><span class="ic">↻</span>새로고침</button>
+            <button class="mk-btn"><span class="ic">＋</span>새 에이전트</button>
+          </div>
+        </div>
+
+        <!-- Row 1: 6-col KPI 유지(데이터 페이지 특성상 밀도 정당) -->
+        <div class="mk-grid" style="grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:12px">
+          <div class="mk-card" style="padding:10px"><div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">Agents</div><div style="font-size:18px;font-weight:700;color:var(--app-fg);margin-top:4px">3<span style="color:var(--app-muted-fg);font-weight:500"> / 12</span></div></div>
+          <div class="mk-card" style="padding:10px"><div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">Tokens/min</div><div style="font-size:18px;font-weight:700;color:var(--app-fg);margin-top:4px">2.4k</div></div>
+          <div class="mk-card" style="padding:10px"><div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">CPU</div><div style="font-size:18px;font-weight:700;color:var(--app-info);margin-top:4px">38%</div></div>
+          <div class="mk-card" style="padding:10px"><div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">RAM</div><div style="font-size:18px;font-weight:700;color:var(--app-info);margin-top:4px">62%</div></div>
+          <div class="mk-card" style="padding:10px"><div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">Memory</div><div style="font-size:18px;font-weight:700;color:var(--app-fg);margin-top:4px">1,248</div></div>
+          <div class="mk-card" style="padding:10px"><div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--app-muted-fg)">Pending</div><div style="font-size:18px;font-weight:700;color:var(--app-error);margin-top:4px">2</div></div>
+        </div>
+
+        <!-- Row 2: 동일 5-col (의도적, KPI 6-col과 시각 분절 인지) -->
+        <div class="mk-grid" style="grid-template-columns:3fr 2fr;gap:10px;margin-bottom:12px">
+          <div class="mk-card" style="min-height:170px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-bottom:8px">▦ Agents &amp; Activity</div>
+            <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">research-agent-1</span><span class="mk-tag">running</span></div>
+            <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">writer-agent</span><span class="mk-tag">running</span></div>
+            <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">scout</span><span class="mk-tag">running</span></div>
+          </div>
+          <div class="mk-card" style="min-height:170px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;margin-bottom:8px">◈ System Health</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;color:var(--app-muted-fg)">
+              <div>state_store <span style="color:var(--app-success)">●</span></div>
+              <div>event_bus <span style="color:var(--app-success)">●</span></div>
+              <div>memory <span style="color:var(--app-success)">●</span></div>
+              <div>⏱ 4d 12h</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: 동일 4-col, pt-6 제거(헤더 내부 패딩 일치) -->
+        <div class="mk-grid" style="grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+          <div class="mk-card"><div style="font-size:13px;font-weight:600;margin-bottom:6px">▤ MCP</div><div style="font-size:11px;color:var(--app-muted-fg)">6/7 active · 28 tools</div></div>
+          <div class="mk-card"><div style="font-size:13px;font-weight:600;margin-bottom:6px">◈ Budget</div><div style="font-size:11px;color:var(--app-muted-fg)">$0.0042 this month</div></div>
+          <div class="mk-card"><div style="font-size:13px;font-weight:600;margin-bottom:6px">◇ Dream</div><div style="font-size:11px;color:var(--app-muted-fg)">2 cycles pending</div></div>
+          <div class="mk-card"><div style="font-size:13px;font-weight:600;margin-bottom:6px">✦ Skills/Cron</div><div style="font-size:11px;color:var(--app-muted-fg)">8 skills · 3 jobs</div></div>
+        </div>
+
+        <div class="mk-card" style="padding:10px;border-left:3px solid var(--app-error)">
+          <div style="font-size:12px;font-weight:600;color:var(--app-error)">⚠ 승인 대기 2건</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--app-success);margin-top:10px;font-family:ui-monospace,Menlo,monospace">헤더 <code>items-center</code> + h1 <code>font-bold</code> + 부제 <code>text-sm text-muted-foreground</code> · 루트 <code>space-y-6</code> + <code>animate-fade-in-up</code></div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>헤더 정렬·제목 굵기·부제 크기 — 3중 편차</b> <span class="dim">C1</span> — `<code>flex items-end justify-between</code>` (routes/index.tsx:105, 정규는 <code>items-center</code>), h1 <code>text-2xl font-semibold tracking-tight</code> (:107, 정규는 <code>font-bold</code>), 부제 <code>text-muted-foreground</code>만 (:108, 정규는 <code>text-sm text-muted-foreground</code>). Dashboard는 3가지 모두에서 동시 이탈 — 다른 탭이 1–2곳인 것과 다른 강도. <code>routes/index.tsx:105-109</code></span></li>
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>페이지 루트가 <code>space-y-4 animate-fade-in-up</code> — 2중 편차</b> <span class="dim">C2 · C6</span> — 정규형은 <code>space-y-6</code> (budget/cron-jobs/email/git/mcp/memory/personas/resources/security/skills/agents/$agentId/agents/trace/sessions 모두). Dashboard만 <code>space-y-4</code> (routes/index.tsx:103). 또한 <code>animate-fade-in-up</code>이 적용된 페이지는 index(dashboard) + agents/index 뿐(P6, agents/index.tsx:316). "모두 또는 아무것도" 위반. 의도적이라면 페이지 진입이 두 곳에서만 일관되게 부드러워져 시각 단절.</span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>헤더 우측 액션 클러스터 부재 — RefreshButton/CTA 없음</b> <span class="dim">C3</span> — 정규형은 우측 <code>RefreshButton</code> + 주 액션(예: "새 에이전트"). Dashboard는 두 버전 뱃지(binary/web)로 대체되어 갱신·생성 CTA가 어디에도 없다. 빈/오래된 데이터에 대한 사용자 통제권 부재. <code>routes/index.tsx:110-121</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>Row 2/3 카드의 헤더 패딩 불일치</b> <span class="dim">C4</span> — Row 1 StatCard 그리드는 <code>CardContent</code> 기본 패딩 사용, Row 2의 <code>AgentsActivityCard</code>/<code>SystemHealthCard</code>는 <code>CardContent className="pt-0"</code> (dashboard/agents-activity-card.tsx:76, dashboard/system-health-card.tsx:40), Row 3 카드는 모두 <code>CardContent className="pt-0"</code> (dashboard/mcp-status-card.tsx:38, dashboard/budget-card.tsx:38). 동일 카드 그리드 안에서 위 6장은 패딩이 다르고 아래 4장은 또 다름. <code>agents-activity-card.tsx:41</code> + <code>mcp-status-card.tsx:25</code> 비교</span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body"><b>KPI 그리드 6-col 밀도 — 의도이나 정당화 부재</b> <span class="dim">C2</span> — <code>grid-cols-2 sm:grid-cols-3 xl:grid-cols-6</code> (routes/index.tsx:125). 다른 탭의 KPI 그리드(KnowledgeHome)는 4-col까지. 6-col은 좁아서 정보 밀도는 높지만, 라벨(<code>text-xs uppercase tracking-wide</code>, stat-card.tsx:106)과 값(<code>text-2xl font-bold</code>, :116)이 줄바꿈 없이 들어가 시인성이 떨어질 수 있음. 데이터 페이지의 합리적 결정이나, 일관성 차원에서는 다른 화면과 다른 그 리드 시스템.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-02" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">02</span>
+      <h2>에이전트</h2>
+      <span class="route">/agents · routes/agents/index.tsx</span>
+      <span class="score">일관성 점수 <b>2.9 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c4" title="C1 헤더: Bot h-6 w-6 아이콘만 부착(P1 위반), 부제 text-sm 미명시">C1·4</span>
+      <span class="bar c3" title="C2 간격: space-y-4(P2 위반), 대다수 space-y-6">C2·3</span>
+      <span class="bar c3" title="C3 버튼: 캔버스/테이블 토글을 인라인 마크업으로 직접 작성">C3·3</span>
+      <span class="bar c4" title="C4 카드: Card/CardHeader/CardContent 정규 일치">C4·4</span>
+      <span class="bar c3" title="C5 탭: 탭 추상화 없이 view state로만 전환, 캔버스엔 필터/탭 없음">C5·3</span>
+      <span class="bar c3" title="C6 상태: text-error/text-success raw span(시맨틱은 맞으나 raw 사용), animate-fade-in-up 비대칭(P6)">C6·3</span>
+      <span class="bar c5" title="C7 내비: 사이드바 아이콘/활성 상태 정상">C7·5</span>
+      <span class="bar c3" title="C8 타이포: 통계 본문이 base 상속·캔버스/테이블 두 형태">C8·3</span>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- 현재 -->
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 5</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <div class="mk-h1"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1.5px solid var(--app-fg);border-radius:5px;font-size:13px">▥</span><span class="mk-mr"></span>에이전트<span class="pin">1</span></div>
+            <div class="mk-sub nosize">캔버스 모니터링 · 테이블 통계 뷰 (text-sm 미명시 → base 상속)<span class="pin">2</span></div>
+            <!-- 핀3: 통계가 뷰별로 두 형태 (StatsBar / 인라인) -->
+            <div style="margin-top:8px;font-size:13px;color:var(--app-muted-fg);display:flex;flex-wrap:wrap;gap:10px">
+              <span style="color:var(--app-success)">3 실행</span>
+              <span>$0.0042 활동 비용</span>
+              <span>12,480 토큰</span>
+              <span>3 A2A</span>
+              <span style="font-size:11px">전체 42 · 완료 36 · <span style="color:var(--app-error)">실패 3</span></span>
+              <span class="pin">3</span>
+            </div>
+          </div>
+          <div class="mk-acts">
+            <!-- 핀4: 인라인 hand-rolled 뷰 토글 (공유 SegmentedControl 부재) -->
+            <div style="display:inline-flex;border:1px solid var(--app-border);background:var(--app-muted);border-radius:8px;padding:2px"><span style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:6px;background:var(--app-card);box-shadow:0 1px 2px rgba(0,0,0,.06);font-size:12px;font-weight:600;color:var(--app-fg)">▦ 캔버스</span><span style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;font-size:12px;color:var(--app-muted-fg)">▥ 테이블</span><span class="pin">4</span></div>
+            <button class="mk-btn outline">↻</button>
+          </div>
+        </div>
+
+        <!-- 핀5: text-error/text-success raw span, base size 상속, StatsBar 본문 -->
+        <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:14px;color:var(--app-muted-fg);padding-top:6px">
+          <span style="font-weight:600;color:var(--app-fg)">42 agents</span>
+          <span style="color:var(--app-success)">3 running</span>
+          <span style="color:var(--app-error)">3 failed</span>
+          <span>$0.42 total</span>
+          <span>12,480 tokens</span>
+          <span>avg 4.2s</span>
+          <span class="pin">5</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--doc-muted);margin-top:10px;font-family:ui-monospace,Menlo,monospace">space-y-4 적용(다른 정규 탭은 space-y-6) · animate-fade-in-up 적용(대다수 탭은 미적용)</div>
+    </div>
+
+    <!-- 제안 -->
+    <div class="panel prop">
+      <div class="panel-label"><span class="dot"></span>제안 · 정규형 적용</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <!-- 1 해소: 앞 아이콘 제거 → "모두 또는 아무것도" 정규 -->
+            <div class="mk-h1">에이전트</div>
+            <!-- 2 해소: text-sm 명시 (P1 부제 크기 통일) -->
+            <div class="mk-sub">캔버스 모니터링 · 테이블 통계 뷰</div>
+            <!-- 3 해소: StatsBar 단일 컴포넌트, 두 뷰에서 동일 표현 -->
+            <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;font-size:11px">
+              <span class="mk-tag" style="background:var(--app-success);color:#fff">3 실행</span>
+              <span class="mk-tag">$0.0042 활동 비용</span>
+              <span class="mk-tag">12,480 토큰</span>
+              <span class="mk-tag">3 A2A 연결</span>
+              <span class="mk-tag">전체 42</span>
+              <span class="mk-tag" style="background:var(--app-error);color:#fff">실패 3</span>
+            </div>
+          </div>
+          <div class="mk-acts">
+            <!-- 4 해소: 공유 SegmentedControl 추출 후 사용, items-center, gap-2 -->
+            <div class="mk-tabs" style="margin:0"><span class="mk-tab active"><span class="ic">▦</span>캔버스</span><span class="mk-tab"><span class="ic">▥</span>테이블</span></div>
+            <button class="mk-btn outline">↻</button>
+          </div>
+        </div>
+        <!-- 5 해소: 시맨틱 뱃지 사용, text-sm -->
+        <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--app-muted-fg);padding-top:6px">
+          <span style="font-weight:600;color:var(--app-fg)">42 agents</span>
+          <span class="mk-tag" style="background:color-mix(in oklch,var(--app-success) 14%,transparent);color:var(--app-success);border:1px solid color-mix(in oklch,var(--app-success) 30%,transparent)">3 running</span>
+          <span class="mk-tag" style="background:color-mix(in oklch,var(--app-error) 14%,transparent);color:var(--app-error);border:1px solid color-mix(in oklch,var(--app-error) 30%,transparent)">3 failed</span>
+          <span class="mk-tag">$0.42 total</span>
+          <span class="mk-tag">12,480 tokens</span>
+          <span class="mk-tag">avg 4.2s</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--app-success);margin-top:10px;font-family:ui-monospace,Menlo,monospace">space-y-6 정규 통일, 시맨틱 뱃지 사용, 공유 SegmentedControl 추출</div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>제목 앞 아이콘 (Bot h-6 w-6)</b> <span class="dim">C1</span> — 다른 정규 탭은 아이콘 없음 → "모두 또는 아무것도" 위반 (P1). 정규형: 아이콘 제거. <code>routes/agents/index.tsx:320-322</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>부제 크기 미명시</b> <span class="dim">C1</span> — <code>text-muted-foreground</code>만 있고 <code>text-sm</code> 누락 (P1). 정규형: <code>text-sm text-muted-foreground</code>. <code>routes/agents/index.tsx:326-364</code>(캔버스 인라인 통계가 base 상속)</span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>표면 간격 리듬 분할</b> <span class="dim">C2</span> — <code>space-y-4</code>(대다수 정규형은 <code>space-y-6</code>) (P2). 정규형: <code>space-y-6</code> 통일 또는 의도적 구분 근거 명시. <code>routes/agents/index.tsx:316</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>캔버스/테이블 토글 인라인 마크업</b> <span class="dim">C3 / C5</span> — <code>flex rounded-lg border bg-muted/50 p-0.5</code>를 매번 직접 작성 (공유 <code>SegmentedControl</code> 부재, Skills도 동일 패턴). 정규형: <code>components/ui/segmented-control</code>(신규) 추출 후 양 페이지 사용. <code>routes/agents/index.tsx:368-395</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>통계 표현이 뷰별로 갈라짐</b> <span class="dim">C8</span> — 같은 정보를 <code>&lt;StatsBar&gt;</code>(테이블)와 인라인 텍스트(캔버스, 8줄)로 두 번 표현. 정규형: <code>StatsBar</code> 단일화하거나 캔버스에선 보조 메타만. <code>routes/agents/index.tsx:61-78 (StatsBar) · :323-364 (캔버스 인라인 통계)</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-03" class="screen">
+  <div class="screen-head">
+    <div class="screen-title"><span class="num">03</span><h2>Personas</h2><span class="route">/personas</span><span class="score">일관성 점수 <b>3.5 / 5</b></span></div>
+    <div class="rubric">
+      <span class="bar c2" title="C1 헤더: 2/5 — base 부제 + 3줄 구조">C1·2</span>
+      <span class="bar c5" title="C2 간격: 5/5 — space-y-6">C2·5</span>
+      <span class="bar c3" title="C3 버튼&amp;액션: 3/5 — 생성 아이콘 mr-1">C3·3</span>
+      <span class="bar c5" title="C4 카드&amp;표면: 5/5 — Card 프리미티브">C4·5</span>
+      <span class="bar c5" title="C5 탭: 5/5 — 해당 없음">C5·5</span>
+      <span class="bar c2" title="C6 상태: 2/5 — 로딩/오류 early return">C6·2</span>
+      <span class="bar c5" title="C7 내비: 5/5 — 표준 콘솔 내비">C7·5</span>
+      <span class="bar c2" title="C8 타이포: 2/5 — 헤더가 3단계 설명 위계">C8·2</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame">
+        <div class="mk-header"><div style="position:relative"><div class="mk-h1">Personas</div><div class="mk-sub nosize">에이전트의 역할과 성격을 관리합니다<span class="pin">2</span></div><div class="mk-sub">한 번에 하나의 Persona만 활성화할 수 있습니다</div><span class="pin">1</span></div><div class="mk-acts"><button class="mk-btn outline">↻ 갱신</button><button class="mk-btn"><span class="ic">✚</span><span class="mk-mr"></span>생성<span class="pin">3</span></button></div></div>
+        <div class="mk-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px"><div class="mk-card"><div class="mk-row"><span class="mk-srv-name">★ Architect</span><span class="mk-tag" style="color:var(--app-warning)">활성</span></div><div class="mk-sub">시스템 설계와 기술 의사결정</div></div><div class="mk-card"><span class="mk-srv-name">Reviewer</span><div class="mk-sub">변경사항 검토와 위험 분석</div></div><div class="mk-card"><span class="mk-srv-name">Researcher</span><div class="mk-sub">근거 수집과 문서 분석</div></div></div>
+        <div class="mk-row" style="position:relative;border:1px dashed var(--app-border);padding:8px">로딩/오류 시 페이지 헤더와 생성·갱신 액션이 사라짐<span class="pin">4</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body">Personas만 제목 아래 설명을 3줄로 쌓는다 <span class="dim">C1·C8</span> — title + subtitle + <code>singleActiveHint text-xs</code>가 고유 헤더 위계를 만들어, 활성 제약이 페이지 설명인지 상태인지 구분하기 어렵다. 제약은 정보 배지/도움말 등 별도 패턴으로 분리해야 한다. <code>web/src/routes/personas.tsx:113-118</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">기본 부제에 text-sm이 없다 <span class="dim">C1·C8</span> — 첫 설명 줄이 base 크기를 상속해 정규 부제보다 크게 보인다. <code>web/src/routes/personas.tsx:115-117</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">생성 버튼 아이콘이 Button gap 대신 mr-1을 쓴다 <span class="dim">C3</span> — Button 자체의 <code>gap-2</code>에 margin을 더해 다른 생성 액션과 간격 규칙이 다르다. <code>web/src/routes/personas.tsx:119-123</code> · <code>web/src/components/ui/button.tsx:6-8</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">로딩·오류가 헤더와 액션을 함께 제거한다 <span class="dim">C6·C7</span> — <code>LoadingCards</code>/<code>ErrorState</code> 자체는 공유 컴포넌트지만 early return이라 화면 제목과 생성·갱신 컨텍스트가 사라진다. 정규 인라인 상태 배치와 다르다. <code>web/src/routes/personas.tsx:106-112</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-04" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">04</span>
+      <h2>스킬 · 마켓플레이스</h2>
+      <span class="route">/skills · routes/skills.tsx</span>
+      <span class="score">일관성 점수 <b>3.1 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c3" title="C1 헤더: Zap h-6 w-6 아이콘(P1), sm:items-end 헤더 정렬, 부제 text-sm 미명시">C1·3</span>
+      <span class="bar c4" title="C2 간격: space-y-6 정규 일치">C2·4</span>
+      <span class="bar c4" title="C3 버튼: 생성/가져오기 gap 기반 OK">C3·4</span>
+      <span class="bar c5" title="C4 카드: Card 래핑 + FormatBadge 토큰 정합">C4·5</span>
+      <span class="bar c2" title="C5 탭: Tabs 미사용, 두 단계 모두 인라인 버튼 그룹">C5·2</span>
+      <span class="bar c5" title="C6 상태: EmptyState/LoadingCards/ErrorState 정규">C6·5</span>
+      <span class="bar c4" title="C7 내비: 사이드바 Zap 아이콘이 MCP와 중복(P4)">C7·4</span>
+      <span class="bar c3" title="C8 타이포: 부제 미명시 + 카드 뱃지 4–5개 적재">C8·3</span>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- 현재 -->
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 6</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <!-- 핀1: Zap h-6 w-6 (P1 아이콘 비대칭) -->
+            <div class="mk-h1"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;font-size:18px;color:var(--app-warning)">⚡</span><span class="mk-mr"></span>스킬<span class="pin">1</span></div>
+            <!-- 핀2: 부제 크기 미명시 (P1) -->
+            <div class="mk-sub nosize">SKILL.md 기반 통합 스킬 시스템<span class="pin">2</span></div>
+          </div>
+          <div class="mk-acts">
+            <span class="mk-tag">전체 8 · 준비 6 · 설정필요 2</span>
+          </div>
+        </div>
+        <!-- 핀3: sm:items-end 헤더 정렬 (정규 items-center 위반) -->
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;font-size:11px;color:var(--app-muted-fg);padding:4px 0"><span>↑ 큰 화면에서 <code>sm:items-end</code> 정렬 (정규: <code>items-center</code>)<span class="pin">3</span></span></div>
+
+        <div style="display:flex;gap:6px;padding-bottom:8px">
+          <button class="mk-btn"><span class="ic">＋</span><span class="mk-mr"></span>생성</button>
+          <button class="mk-btn outline"><span class="ic">⬇</span>가져오기 ▾</button>
+        </div>
+
+        <!-- 핀4+5: hand-rolled 탭 스위처 (Tabs 미사용) -->
+        <div class="mk-tabs">
+          <span class="mk-tab active"><span class="ic">⚡</span>설치됨 <span style="font-size:10px;color:var(--app-muted-fg)">8</span><span class="pin">4</span></span>
+          <span class="mk-tab"><span class="ic">🏪</span>마켓플레이스<span class="pin">5</span></span>
+        </div>
+        <!-- 마켓플레이스 소스 토글 (clawhub/skills-sh)도 같은 인라인 패턴 -->
+        <div style="margin-top:6px;display:inline-flex;gap:3px;background:var(--app-muted);padding:3px;border-radius:7px">
+          <span style="font-size:11px;font-weight:500;color:var(--app-fg);padding:3px 9px;border-radius:5px;background:var(--app-card);box-shadow:0 1px 2px rgba(0,0,0,.06)">ClawHub</span>
+          <span style="font-size:11px;font-weight:500;color:var(--app-muted-fg);padding:3px 9px">Skills.sh <span style="font-size:9px;color:var(--app-muted-fg)">npx</span></span>
+        </div>
+
+        <!-- 핀6: 카드 헤더 뱃지 4–5개 적재 -->
+        <div class="mk-card" style="margin-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+            <div>
+              <div style="font-weight:600;font-size:13px">code-audit</div>
+              <div style="font-size:11px;color:var(--app-muted-fg);margin-top:2px">전체 코드베이스 포렌식 감사</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:60%">
+              <span class="mk-tag" style="border:1px solid color-mix(in oklch,var(--app-warning) 30%,transparent);color:var(--app-warning)">↑ 업데이트</span>
+              <span class="mk-tag">Oxios</span>
+              <span class="mk-tag" style="background:var(--app-muted-2)">always</span>
+              <span class="mk-tag" style="background:color-mix(in oklch,var(--app-success) 14%,transparent);color:var(--app-success)">● 준비</span>
+              <span class="pin">6</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--app-muted-fg);margin-top:6px;font-family:ui-monospace,Menlo,monospace">v2.1.0 · managed · by oxios</div>
+        </div>
+        <div class="mk-card">
+          <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+            <div>
+              <div style="font-weight:600;font-size:13px">web-perf</div>
+              <div style="font-size:11px;color:var(--app-muted-fg);margin-top:2px">Chrome DevTools MCP 기반 웹 성능 분석</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:60%">
+              <span class="mk-tag" style="border:1px solid color-mix(in oklch,var(--app-warning) 30%,transparent);color:var(--app-warning)">Claude</span>
+              <span class="mk-tag" style="background:color-mix(in oklch,var(--app-warning) 14%,transparent);color:var(--app-warning)">● 설정필요</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--doc-muted);margin-top:10px;font-family:ui-monospace,Menlo,monospace">설치됨/마켓플레이스 · clawhub/skills.sh 두 단계 모두 hand-rolled 인라인 탭</div>
+    </div>
+
+    <!-- 제안 -->
+    <div class="panel prop">
+      <div class="panel-label"><span class="dot"></span>제안 · 정규형 적용</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <!-- 1 해소: Zap 아이콘 제거 (P1) -->
+            <div class="mk-h1">스킬</div>
+            <!-- 2 해소: text-sm 명시 -->
+            <div class="mk-sub">SKILL.md 기반 통합 스킬 시스템</div>
+          </div>
+          <div class="mk-acts">
+            <button class="mk-btn outline">↻</button>
+            <button class="mk-btn"><span class="ic">＋</span>생성</button>
+            <button class="mk-btn outline"><span class="ic">⬇</span>가져오기 ▾</button>
+          </div>
+        </div>
+        <!-- 3 해소: items-center 정규 (헤더 정렬) -->
+
+        <!-- 4+5 해소: 공유 <Tabs> 사용, installed/marketplace -->
+        <div class="mk-tabs">
+          <span class="mk-tab active">설치됨 <span style="font-size:10px;color:var(--app-muted-fg);background:var(--app-muted-2);padding:1px 5px;border-radius:3px;margin-left:3px">8</span></span>
+          <span class="mk-tab">마켓플레이스</span>
+        </div>
+        <!-- 마켓플레이스 소스 토글은 같은 Tabs의 variant=line으로 흡수 -->
+        <div class="mk-tabs" style="background:transparent;margin-top:4px">
+          <span class="mk-tab active" style="background:var(--app-card);box-shadow:0 1px 2px rgba(0,0,0,.06)">ClawHub</span>
+          <span class="mk-tab">Skills.sh <span class="mk-tag" style="font-size:9px;margin-left:3px">npx</span></span>
+        </div>
+
+        <!-- 6 해소: 뱃지 4–5 → 핵심 2개로 압축, 메타데이터는 보조 줄로 -->
+        <div class="mk-card" style="margin-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+            <div>
+              <div style="font-weight:600;font-size:13px">code-audit</div>
+              <div style="font-size:11px;color:var(--app-muted-fg);margin-top:2px">전체 코드베이스 포렌식 감사</div>
+            </div>
+            <div style="display:flex;gap:4px">
+              <span class="mk-tag" style="background:var(--app-info);color:#fff">↑ 업데이트</span>
+              <span class="mk-tag" style="background:color-mix(in oklch,var(--app-success) 14%,transparent);color:var(--app-success);border:1px solid color-mix(in oklch,var(--app-success) 30%,transparent)">● 준비</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--app-muted-fg);margin-top:6px">v2.1.0 · <span class="mk-tag" style="font-size:9px">Oxios</span> · <span class="mk-tag" style="font-size:9px">always</span> · by oxios</div>
+        </div>
+        <div class="mk-card">
+          <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+            <div>
+              <div style="font-weight:600;font-size:13px">web-perf</div>
+              <div style="font-size:11px;color:var(--app-muted-fg);margin-top:2px">Chrome DevTools MCP 기반 웹 성능 분석</div>
+            </div>
+            <div style="display:flex;gap:4px">
+              <span class="mk-tag">Claude</span>
+              <span class="mk-tag" style="background:color-mix(in oklch,var(--app-warning) 14%,transparent);color:var(--app-warning);border:1px solid color-mix(in oklch,var(--app-warning) 30%,transparent)">● 설정필요</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--app-success);margin-top:10px;font-family:ui-monospace,Menlo,monospace">공유 <code>&lt;Tabs&gt;</code>로 통합 · 헤더 정렬 items-center · 부제 text-sm · 카드 뱃지 압축</div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>제목 앞 아이콘 (Zap h-6 w-6)</b> <span class="dim">C1</span> — 다른 정규 탭은 아이콘 없음 → "모두 또는 아무것도" 위반 (P1). 정규형: 아이콘 제거. <code>routes/skills.tsx:269-270</code></span></li>
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>탭 미사용 (인라인 버튼 그룹)</b> <span class="dim">C5</span> — <code>installed/marketplace</code>와 <code>clawhub/skills-sh</code> 두 단계 모두 hand-rolled <code>inline-flex bg-muted</code> 버튼 그룹. 공유 <code>&lt;Tabs&gt;</code>(components/ui/tabs) 미사용 (MCP :51-60와 갈라짐). 정규형: 공유 <code>&lt;Tabs&gt;</code>(installed/marketplace) + <code>variant=line</code>(clawhub/skills-sh 소스 토글). <code>routes/skills.tsx:310-336 (메인 탭) · :654-680 (소스 토글)</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>헤더 정렬 (sm:items-end)</b> <span class="dim">C1</span> — <code>flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between</code>의 <code>sm:items-end</code> (정규 <code>items-center</code> 위반). 정규형: <code>items-center</code> 통일. <code>routes/skills.tsx:267</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>부제 크기 미명시</b> <span class="dim">C1</span> — <code>text-muted-foreground</code> 크기 미명시 (P1). 정규형: <code>text-sm text-muted-foreground</code>. <code>routes/skills.tsx:272</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>카드 헤더 뱃지 적재</b> <span class="dim">C8</span> — 한 카드에 update/format/always/status/source 뱃지 4–5개 적재 시 시각 노이즈. 정규형: 핵심 2개(상태 + 업데이트) 카드 우측, 나머지는 메타 줄로 분리. <code>routes/skills.tsx:812-826</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>액션 영역 분리</b> <span class="dim">C3</span> — 헤더 우측 액션이 <code>SkillSummaryPill</code> 하나로 흡수되어 새로고침/생성 액션이 별도 행(:279-307)에 위치. 정규 헤더 우측 액션 클러스터 패턴과 어긋남. 정규형: 헤더 우측 통합 또는 의도적 분리 근거 명시. <code>routes/skills.tsx:275 (SkillSummaryPill) · :279-307 (액션 행)</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-05" class="screen">
+  <div class="screen-head">
+    <div class="screen-title"><span class="num">05</span><h2>Projects</h2><span class="route">/projects · /projects/:projectId</span><span class="score">일관성 점수 <b>3.9 / 5</b></span></div>
+    <div class="rubric">
+      <span class="bar c4" title="C1 헤더: 4/5 — 목록은 정규, 상세는 emoji 선행">C1·4</span>
+      <span class="bar c2" title="C2 간격: 2/5 — 목록·상세 모두 space-y-4">C2·2</span>
+      <span class="bar c2" title="C3 버튼&amp;액션: 2/5 — raw button, mr-1, h-3 아이콘 혼재">C3·2</span>
+      <span class="bar c3" title="C4 카드&amp;표면: 3/5 — ProjectCard가 Card 프리미티브 밖">C4·3</span>
+      <span class="bar c5" title="C5 탭: 5/5 — 상세 Tabs 프리미티브 사용">C5·5</span>
+      <span class="bar c5" title="C6 상태: 5/5 — Loading/Error/Empty 공유 컴포넌트">C6·5</span>
+      <span class="bar c4" title="C7 내비: 4/5 — 상세 뒤로가기 제공">C7·4</span>
+      <span class="bar c4" title="C8 타이포: 4/5 — 목록 부제 text-sm">C8·4</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame" style="position:relative"><span class="pin">1</span>
+        <div class="mk-header"><div><div class="mk-h1">Projects</div><div class="mk-sub">프로젝트를 만들고 작업 경로를 관리합니다</div></div><div class="mk-acts"><button class="mk-btn"><span class="ic">✚</span><span class="mk-mr"></span>새 프로젝트<span class="pin">3</span></button><button class="mk-btn outline">↻</button></div></div>
+        <div class="mk-tag" style="margin-bottom:10px">프로젝트 검색</div>
+        <div class="mk-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+          <div class="mk-card" style="position:relative"><div class="mk-row"><span class="mk-srv-name">📦 Oxios</span><span class="mk-tag" style="color:var(--app-success)">MANUAL</span></div><div class="mk-sub">에이전트 런타임 프로젝트</div><div class="mk-tag">/PROJECTS/oxios</div><span class="pin">2</span></div>
+          <div class="mk-card"><div class="mk-srv-name">◆ Web</div><div class="mk-sub">프론트엔드 작업</div><div class="mk-tag">/workspace/web</div></div>
+          <div class="mk-card"><div class="mk-srv-name">● Research</div><div class="mk-sub">지식 저장소</div><div class="mk-tag">/knowledge</div></div>
+        </div>
+        <div class="mk-card"><div class="mk-row"><button class="mk-btn ghost">←</button><span style="font-size:18px">📦</span><span class="pin">4</span><span class="mk-h1">Oxios</span><span style="flex:1"></span><button class="mk-btn outline">✎ 편집</button><button class="mk-btn outline">× 삭제</button></div><div class="mk-tabs"><span class="mk-tab active">상세</span><span class="mk-tab">경로</span><span class="mk-tab">메모리</span><span class="mk-tab">활동</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body">목록과 상세 모두 4단위 페이지 리듬에 고정됐다 <span class="dim">C2</span> — 개요와 상세라는 서로 다른 화면에서도 동일하게 <code>space-y-4</code>를 써 정규 <code>space-y-6</code> 페이지군과 분리된다. <code>web/src/routes/projects/index.tsx:31-32</code> · <code>web/src/routes/projects/$projectId.tsx:207-208</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">ProjectCard만 Card/Button 프리미티브 밖에서 표면과 액션을 재구현한다 <span class="dim">C3·C4</span> — 카드가 raw <code>div</code>이고 편집·삭제도 raw <code>button</code>이라 공용 variant/size 변경이 전파되지 않는다. <code>web/src/components/project/project-card.tsx:23-24</code> · <code>web/src/components/project/project-card.tsx:44-60</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">목록·상세 액션 아이콘이 margin 간격과 작은 크기를 반복한다 <span class="dim">C3</span> — 생성 버튼은 <code>h-4 w-4 mr-1</code>, 상세 편집·삭제는 <code>h-3 w-3 mr-1</code>로 Button의 내장 <code>gap-2</code> 및 정규 16px 아이콘과 어긋난다. <code>web/src/routes/projects/index.tsx:39-44</code> · <code>web/src/routes/projects/$projectId.tsx:223-230</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">상세 h1 앞 표식만 raw emoji 텍스트다 <span class="dim">C1·C8</span> — <code>text-2xl</code> emoji는 다른 페이지의 선택적 <code>h-6 w-6</code> lucide 규칙과 크기·베이스라인이 달라 제목군의 시각 톤을 흔든다. <code>web/src/routes/projects/$projectId.tsx:219-222</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-06" class="screen">
+  <div class="screen-head">
+    <div class="screen-title"><span class="num">06</span><h2>Mounts</h2><span class="route">/mounts</span><span class="score">일관성 점수 <b>3.6 / 5</b></span></div>
+    <div class="rubric">
+      <span class="bar c5" title="C1 헤더: 5/5 — 제목·부제 정규형">C1·5</span>
+      <span class="bar c2" title="C2 간격: 2/5 — 루트 space-y-4">C2·2</span>
+      <span class="bar c3" title="C3 버튼&amp;액션: 3/5 — 갱신 위치·mr-2 편차">C3·3</span>
+      <span class="bar c2" title="C4 카드&amp;표면: 2/5 — inline div 카드">C4·2</span>
+      <span class="bar c5" title="C5 탭: 5/5 — 해당 없음">C5·5</span>
+      <span class="bar c2" title="C6 상태: 2/5 — raw violet/amber 상태색">C6·2</span>
+      <span class="bar c5" title="C7 내비: 5/5 — 표준 콘솔 내비">C7·5</span>
+      <span class="bar c4" title="C8 타이포: 4/5 — 부제 text-sm, 카드 메타 적절">C8·4</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 5</div>
+      <div class="mk-frame" style="position:relative"><span class="pin">1</span>
+        <div class="mk-header"><div><div class="mk-h1">Mounts</div><div class="mk-sub">프로젝트 경로와 자동 메타데이터를 관리합니다</div></div><button class="mk-btn"><span class="ic">▣</span><span class="mk-mr"></span>Mount 생성<span class="pin">5</span></button></div>
+        <div class="mk-acts" style="position:relative;margin-bottom:10px"><span class="mk-tag">Mount 검색</span><button class="mk-btn outline">↻ 갱신</button><span class="pin">2</span></div>
+        <div class="mk-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="mk-card" style="position:relative"><span class="pin">3</span><div class="mk-row"><span class="mk-srv-name">✦ oxios</span><span class="mk-tag" style="color:var(--app-info)">자동 승격<span class="pin">4</span></span></div><div class="mk-tag">/PROJECTS/oxios</div><div class="mk-sub">Rust · TypeScript 프로젝트</div></div>
+          <div class="mk-card"><div class="mk-row"><span class="mk-srv-name">◇ docs</span><span class="mk-tag" style="color:var(--app-warning)">갱신 필요 ↻</span></div><div class="mk-tag">/PROJECTS/docs</div></div>
+          <div class="mk-card"><div class="mk-srv-name">◇ tools</div><div class="mk-tag">/PROJECTS/tools</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body">페이지 루트가 4단위 리듬을 사용한다 <span class="dim">C2</span> — 헤더·검색·카드 그리드가 <code>space-y-4</code>로 붙어 정규 운영 탭의 <code>space-y-6</code>보다 촘촘하다. <code>web/src/routes/mounts/index.tsx:57-58</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">갱신이 헤더 액션 클러스터가 아니라 검색 행에 분리돼 있다 <span class="dim">C3</span> — 생성은 헤더, 갱신은 검색 입력 옆에 배치되어 같은 페이지 수준 액션의 위치가 갈린다. <code>web/src/routes/mounts/index.tsx:60-80</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">Mount 카드가 공용 Card 대신 inline 표면을 재구현한다 <span class="dim">C4</span> — <code>rounded-lg border bg-card p-4</code> raw div가 Card의 구조·상태 스타일과 별도로 유지된다. <code>web/src/routes/mounts/index.tsx:100-105</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">출처·갱신 상태가 시맨틱 토큰 대신 raw violet/amber를 쓴다 <span class="dim">C6</span> — <code>auto_promoted</code>와 <code>enrichment_pending</code>이 <code>text-violet-*</code>/<code>bg-amber-*</code>로 표현되어 info/warning 상태 팔레트와 연결되지 않는다. <code>web/src/routes/mounts/index.tsx:138-159</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">생성 아이콘 간격이 두 경로 모두 margin 기반이다 <span class="dim">C3</span> — 헤더와 EmptyState 액션 모두 <code>mr-2</code>를 추가해 Button 내장 gap 규칙과 중복된다. <code>web/src/routes/mounts/index.tsx:65-68</code> · <code>web/src/routes/mounts/index.tsx:92-96</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-07" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">07</span>
+      <h2>메모리</h2>
+      <span class="route">/memory · routes/memory.tsx + components/memory/</span>
+      <span class="score">일관성 점수 <b>2.6 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c3" title="C1 헤더: 부제 text-sm 미명시, 앞 아이콘 없음(정규 일치)">C1·3</span>
+      <span class="bar c4" title="C2 간격: space-y-6 정규 일치, 내부 space-y-3/4 혼재">C2·4</span>
+      <span class="bar c4" title="C3 버튼: Card 내 액션 위계 일관">C3·4</span>
+      <span class="bar c2" title="C4 카드: 탭 콘텐츠 비래핑, 메모리 내부만 Card 사용">C4·2</span>
+      <span class="bar c2" title="C5 탭: 트리거 아이콘 0 + 콘텐츠 비래핑 (MCP와 정반대, P5)">C5·2</span>
+      <span class="bar c3" title="C6 상태: LoadingCards/ErrorState OK, 색 토큰 위반 (TIER_COLORS raw hex)">C6·3</span>
+      <span class="bar c3" title="C7 내비: 탭 URL 미동기화, dream 탭 권한 가드 미흡">C7·3</span>
+      <span class="bar c4" title="C8 타이포: 탭 라벨 text-sm 정상, StatCard 본문 2xl/font-bold OK">C8·4</span>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- 현재 -->
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 5</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <!-- 핀1: 부제 text-sm 미명시 -->
+            <div class="mk-h1">메모리</div>
+            <div class="mk-sub nosize">에이전트 메모리 검색 · 통계 · 임베딩 맵<span class="pin">1</span></div>
+          </div>
+        </div>
+
+        <!-- 핀2+3: 트리거 아이콘 0 + 콘텐츠 비래핑 -->
+        <div class="mk-tabs">
+          <span class="mk-tab active">개요<span class="pin">2</span></span>
+          <span class="mk-tab">탐색</span>
+          <span class="mk-tab">검색</span>
+          <span class="mk-tab">맵</span>
+          <span class="mk-tab">드림</span>
+        </div>
+        <!-- 탭 콘텐츠: 비래핑 (MCP와 정반대) -->
+        <div class="mk-card" style="margin-top:10px"><span class="pin" style="position:absolute;right:14px;top:14px">3</span>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div class="mk-card" style="padding:10px">
+              <div style="font-size:11px;color:var(--app-muted-fg)">총 메모리</div>
+              <div style="font-size:18px;font-weight:700">1,284</div>
+            </div>
+            <div class="mk-card" style="padding:10px">
+              <div style="font-size:11px;color:var(--app-muted-fg)">활성 (7d)</div>
+              <div style="font-size:18px;font-weight:700">342</div>
+            </div>
+            <div class="mk-card" style="padding:10px">
+              <div style="font-size:11px;color:var(--app-muted-fg)">보호됨</div>
+              <div style="font-size:18px;font-weight:700">68</div>
+            </div>
+          </div>
+          <!-- 핀4+5: raw hex 차트 색 (TIER_COLORS / #8884d8) -->
+          <div style="margin-top:10px;font-size:12px;position:relative">
+            <div style="display:flex;align-items:center;gap:6px;margin:4px 0">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ef4444"></span>
+              <span>hot</span>
+              <div style="flex:1;height:6px;background:var(--app-muted-2);border-radius:3px;overflow:hidden"><div style="width:65%;height:100%;background:#ef4444"></div></div>
+              <span style="color:var(--app-muted-fg)">128</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin:4px 0">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#eab308"></span>
+              <span>warm</span>
+              <div style="flex:1;height:6px;background:var(--app-muted-2);border-radius:3px;overflow:hidden"><div style="width:80%;height:100%;background:#eab308"></div></div>
+              <span style="color:var(--app-muted-fg)">512</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin:4px 0">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6"></span>
+              <span>cold</span>
+              <div style="flex:1;height:6px;background:var(--app-muted-2);border-radius:3px;overflow:hidden"><div style="width:40%;height:100%;background:#3b82f6"></div></div>
+              <span style="color:var(--app-muted-fg)">644</span>
+              <span class="pin" style="position:static;margin-left:4px">4</span>
+            </div>
+            <div style="font-size:11px;color:var(--app-muted-fg);margin-top:6px">타입 분포 폴백: <code>#8884d8</code>, <code>#888</code><span class="pin">5</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--doc-muted);margin-top:10px;font-family:ui-monospace,Menlo,monospace">탭 콘텐츠 비래핑 · 5개 트리거 모두 아이콘 없음 · TIER_COLORS raw hex · 탭 URL 미동기화</div>
+    </div>
+
+    <!-- 제안 -->
+    <div class="panel prop">
+      <div class="panel-label"><span class="dot"></span>제안 · 정규형 적용</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <div class="mk-h1">메모리</div>
+            <!-- 1 해소: text-sm 명시 -->
+            <div class="mk-sub">에이전트 메모리 검색 · 통계 · 임베딩 맵</div>
+          </div>
+        </div>
+
+        <!-- 2 해소: 트리거 아이콘 부여 (MCP 정규 일치) -->
+        <div class="mk-tabs">
+          <span class="mk-tab active"><span class="ic">▦</span>개요</span>
+          <span class="mk-tab"><span class="ic">▤</span>탐색</span>
+          <span class="mk-tab"><span class="ic">⌕</span>검색</span>
+          <span class="mk-tab"><span class="ic">⌖</span>맵</span>
+          <span class="mk-tab"><span class="ic">☾</span>드림</span>
+        </div>
+
+        <!-- 3 해소: 탭 콘텐츠 Card 래핑 + pt-6 (MCP 정규 일치) -->
+        <div class="mk-card pt6">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div class="mk-card" style="padding:10px">
+              <div style="font-size:11px;color:var(--app-muted-fg)">총 메모리</div>
+              <div style="font-size:18px;font-weight:700">1,284</div>
+            </div>
+            <div class="mk-card" style="padding:10px">
+              <div style="font-size:11px;color:var(--app-muted-fg)">활성 (7d)</div>
+              <div style="font-size:18px;font-weight:700">342</div>
+            </div>
+            <div class="mk-card" style="padding:10px">
+              <div style="font-size:11px;color:var(--app-muted-fg)">보호됨</div>
+              <div style="font-size:18px;font-weight:700">68</div>
+            </div>
+          </div>
+          <!-- 4+5 해소: TIER_COLORS를 시맨틱 토큰으로 (error/warning/info) -->
+          <div style="margin-top:10px;font-size:12px">
+            <div style="display:flex;align-items:center;gap:6px;margin:4px 0">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--app-error)"></span>
+              <span>hot</span>
+              <div style="flex:1;height:6px;background:var(--app-muted-2);border-radius:3px;overflow:hidden"><div style="width:65%;height:100%;background:var(--app-error)"></div></div>
+              <span style="color:var(--app-muted-fg)">128</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin:4px 0">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--app-warning)"></span>
+              <span>warm</span>
+              <div style="flex:1;height:6px;background:var(--app-muted-2);border-radius:3px;overflow:hidden"><div style="width:80%;height:100%;background:var(--app-warning)"></div></div>
+              <span style="color:var(--app-muted-fg)">512</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin:4px 0">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--app-info)"></span>
+              <span>cold</span>
+              <div style="flex:1;height:6px;background:var(--app-muted-2);border-radius:3px;overflow:hidden"><div style="width:40%;height:100%;background:var(--app-info)"></div></div>
+              <span style="color:var(--app-muted-fg)">644</span>
+            </div>
+            <div style="font-size:11px;color:var(--app-success);margin-top:6px">타입 분포: <code>--chart-3</code> 등 토큰 매핑</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--app-success);margin-top:10px;font-family:ui-monospace,Menlo,monospace">탭 트리거 아이콘 부여 · 탭 콘텐츠 Card 래핑 · 시맨틱 색 토큰 사용 · <code>?tab=</code> URL 동기화 추가</div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>탭 트리거 아이콘 부재</b> <span class="dim">C5</span> — 5개 트리거 모두 아이콘 없음. MCP 정규형은 Server/Wrench/Terminal 아이콘 부여. "모두 또는 아무것도" 위반 (P5). 정규형: <code>LayoutGrid / Library / Search / Map / Sparkles</code> 등 의미 아이콘 부여. <code>routes/memory.tsx:35-41</code></span></li>
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>탭 콘텐츠 Card 비래핑</b> <span class="dim">C4 / C5</span> — 각 <code>TabsContent</code>를 <code>&lt;Card&gt;&lt;CardContent className="pt-6"&gt;</code>로 감싸야 하나 memory는 그냥 컴포넌트 직접 렌더 (P5). 정규형: MCP(:62-84)와 동일하게 Card 래핑. <code>routes/memory.tsx:43-57</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>부제 크기 미명시</b> <span class="dim">C1</span> — <code>text-muted-foreground</code> 크기 미명시 (P1). 정규형: <code>text-sm text-muted-foreground</code>. <code>routes/memory.tsx:30</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>시맨틱 색 토큰 위반</b> <span class="dim">C6</span> — <code>TIER_COLORS = {hot:'#ef4444', warm:'#eab308', cold:'#3b82f6'}</code> raw hex. 동일 색이 <code>--error/--warning/--info</code> 시맨틱 토큰에 이미 존재. 정규형: 토큰 매핑. <code>web/src/components/memory/memory-overview.tsx:8-12</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>차트 폴백 hex</b> <span class="dim">C6</span> — recharts 기본값 <code>#8884d8</code>와 회색 <code>#888</code> 폴백이 그대로 남음. 토큰 체계 밖. 정규형: <code>--chart-3</code> 등 사용. <code>web/src/components/memory/memory-overview.tsx:110, 133</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-08" class="screen">
+  <div class="screen-head">
+    <div class="screen-title"><span class="num">08</span><h2>Workspace</h2><span class="route">/workspace</span><span class="score">일관성 점수 <b>3.3 / 5</b></span></div>
+    <div class="rubric">
+      <span class="bar c3" title="C1 헤더: 3/5 — 부제 크기 미지정">C1·3</span>
+      <span class="bar c2" title="C2 간격: 2/5 — flex h-full gap-4 고유 리듬">C2·2</span>
+      <span class="bar c2" title="C3 버튼&amp;액션: 2/5 — mr-1 및 raw refresh">C3·2</span>
+      <span class="bar c4" title="C4 카드&amp;표면: 4/5 — 분할 패널 표면은 일관">C4·4</span>
+      <span class="bar c5" title="C5 탭: 5/5 — 해당 없음">C5·5</span>
+      <span class="bar c2" title="C6 상태: 2/5 — 로딩/오류 early return">C6·2</span>
+      <span class="bar c5" title="C7 내비: 5/5 — 트리·브레드크럼 제공">C7·5</span>
+      <span class="bar c3" title="C8 타이포: 3/5 — 부제 base 크기">C8·3</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame" style="position:relative"><span class="pin">2</span>
+        <div class="mk-header"><div><div class="mk-h1">Workspace</div><div class="mk-sub nosize">워크스페이스 파일을 탐색하고 편집합니다<span class="pin">1</span></div></div><div class="mk-acts"><button class="mk-btn outline"><span class="ic">✚</span><span class="mk-mr"></span>생성</button><button class="mk-btn outline"><span class="ic">⇧</span><span class="mk-mr"></span>업로드</button><button class="mk-btn outline">↻</button><span class="pin">3</span></div></div>
+        <div class="mk-grid" style="grid-template-columns:220px 1fr;margin-bottom:10px"><div class="mk-card"><span class="mk-srv-name">▣ 파일</span><div class="mk-row">⌄ ▣ src</div><div class="mk-row" style="color:var(--app-info)">　◇ app.tsx</div><div class="mk-row" style="color:var(--app-warning)">　◇ README.md</div></div><div class="mk-card"><div class="mk-row"><span class="mk-tag">workspace / src / app.tsx</span><span style="flex:1"></span><span class="mk-tag">보기 · 편집 · 삭제</span></div><div class="mk-row">export function App() { … }</div></div></div>
+        <div class="mk-row" style="position:relative;border:1px dashed var(--app-border);padding:8px">초기 로딩/오류에서는 헤더와 분할 패널 전체가 교체됨<span class="pin">4</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body">Workspace 부제만 base 크기를 상속한다 <span class="dim">C1·C8</span> — 제목 구조는 정규형이지만 <code>text-sm</code>이 없어 주변 콘솔 탭보다 부제가 한 단계 크게 보인다. <code>web/src/routes/workspace/index.tsx:275-279</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">페이지 루트가 정규 surface rhythm 대신 고유 full-height gap을 쓴다 <span class="dim">C2</span> — <code>flex flex-col h-full gap-4</code>가 헤더와 분할 패널 간격까지 담당한다. 전체 높이 요구는 유지하되 페이지 수준 간격 토큰은 정규형과 맞출 수 있다. <code>web/src/routes/workspace/index.tsx:272-299</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">액션 아이콘 간격과 갱신 구현이 공용 체계 밖이다 <span class="dim">C3</span> — 생성·업로드는 <code>mr-1</code>, 갱신은 직접 만든 Button+<code>RefreshCw</code>로 구성되어 공용 <code>RefreshButton</code>의 variant와 상태 처리를 우회한다. <code>web/src/routes/workspace/index.tsx:280-295</code> · <code>web/src/components/shared/refresh-button.tsx:20-46</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">로딩·오류가 헤더를 포함한 화면 전체를 early-return으로 교체한다 <span class="dim">C6·C7</span> — 진입 중이거나 실패했을 때 현재 위치와 액션이 모두 사라져 정규 인라인 상태 패턴과 다르다. <code>web/src/routes/workspace/index.tsx:267-273</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-09" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">09</span><h2>Cron 작업</h2><span class="route">/cron-jobs</span><span class="score">일관성 점수 <b>4.1 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c4" title="C1 헤더: 부제 text-sm 누락">C1·4</span>
+      <span class="bar c5" title="C2 간격: 루트 space-y-6 정규 일치">C2·5</span>
+      <span class="bar c3" title="C3 버튼: 액션 gap-3, 생성 아이콘 mr-1">C3·3</span>
+      <span class="bar c5" title="C4 카드: 공유 Card 사용">C4·5</span>
+      <span class="bar c5" title="C5 탭: 보기/범위 전환이 동일 muted·background 토큰 사용">C5·5</span>
+      <span class="bar c5" title="C6 상태: LoadingCards·ErrorState·EmptyState 공유형 사용">C6·5</span>
+      <span class="bar c5" title="C7 내비: Timer 아이콘 의미 정합">C7·5</span>
+      <span class="bar c4" title="C8 타이포: 부제 크기만 편차">C8·4</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div><div class="mk-h1">Cron 작업</div><div class="mk-sub nosize">예약 작업 관리 <span class="pin">1</span></div></div>
+          <div class="mk-acts" style="gap:9px;position:relative">
+            <span class="pin" style="position:absolute;left:-9px;top:-9px">2</span>
+            <div class="mk-tabs" style="margin:0"><span class="mk-tab">≡ 목록</span><span class="mk-tab active">◷ 타임라인</span></div>
+            <button class="mk-btn outline">↻ 새로고침</button>
+            <button class="mk-btn"><span class="ic">✚</span><span class="mk-mr"></span>새 작업 <span class="pin">3</span></button>
+          </div>
+        </div>
+        <div class="mk-tabs" style="width:max-content"><span class="mk-tab active">24시간</span><span class="mk-tab">48시간</span><span class="mk-tab">7일</span></div>
+        <div class="mk-card" style="padding:0;overflow:hidden">
+          <div class="mk-row" style="padding:8px 12px;background:var(--app-muted)"><span class="mk-tag">지금</span><span style="color:var(--app-muted-fg);font-family:ui-monospace,Menlo,monospace">10:00　　　14:00　　　18:00　　　22:00</span></div>
+          <div class="mk-row" style="padding:10px 12px"><span class="mk-srv-name" style="width:128px">daily-summary</span><span class="mk-tag">0 9 * * *</span><span class="mk-dot" style="margin-left:auto;background:var(--app-info)"></span></div>
+          <div class="mk-row" style="padding:10px 12px"><span class="mk-srv-name" style="width:128px">sync-memory</span><span class="mk-tag">*/30 * * * *</span><span style="margin-left:auto;width:36%;height:5px;border-radius:5px;background:var(--app-success)"></span></div>
+          <div class="mk-row" style="padding:10px 12px"><span class="mk-srv-name" style="width:128px;color:var(--app-muted-fg)">weekly-report</span><span class="mk-tag">0 8 * * 1</span><span style="margin-left:auto;color:var(--app-muted-fg);font-size:11px">실행 없음</span></div>
+        </div>
+        <div style="margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--app-muted-fg)">페이지 루트: space-y-6 · 입장 모션 없음 <span class="pin">4</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><ul class="flist">
+    <li class="med"><span class="badge">MED</span><span class="body"><b>부제 크기가 명시되지 않음</b> <span class="dim">C1·C8</span> — <code>text-muted-foreground</code>만 있어 정규 헤더의 <code>text-sm</code>보다 크게 상속된다. <code>text-sm text-muted-foreground</code>로 고정한다. <code>web/src/routes/cron-jobs.tsx:82-85</code></span></li>
+    <li class="med"><span class="badge">MED</span><span class="body"><b>우측 액션 클러스터만 gap-3</b> <span class="dim">C3</span> — 보기 전환·새로고침·생성 사이가 형제 탭의 정규 <code>gap-2</code>보다 벌어진다. <code>flex items-center gap-2</code>로 통일한다. <code>web/src/routes/cron-jobs.tsx:87-120</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>생성 아이콘 간격이 margin 기반</b> <span class="dim">C3</span> — Plus의 <code>mr-1</code>을 제거하고 Button 내장 gap만 사용한다. <code>web/src/routes/cron-jobs.tsx:117-119</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>페이지 입장 애니메이션 미적용</b> <span class="dim">C2</span> — 정규 <code>space-y-6</code>는 지키지만 루트에 <code>animate-fade-in-up</code>이 없다. 전 탭 모션 정책에 맞춰 일괄 적용한다. <code>web/src/routes/cron-jobs.tsx:80-81</code></span></li>
+  </ul></div>
+</section>
+
+<section id="screen-10" class="screen">
+  <div class="screen-head">
+    <div class="screen-title"><span class="num">10</span><h2>Cost</h2><span class="route">/budget</span><span class="score">일관성 점수 <b>4.5 / 5</b></span></div>
+    <div class="rubric">
+      <span class="bar c5" title="C1 헤더: 5/5 — 정규 헤더">C1·5</span>
+      <span class="bar c5" title="C2 간격: 5/5 — space-y-6와 gap-4">C2·5</span>
+      <span class="bar c4" title="C3 버튼&amp;액션: 4/5 — SpendLimit 내부 mr-1">C3·4</span>
+      <span class="bar c4" title="C4 카드&amp;표면: 4/5 — Card 기반 구성">C4·4</span>
+      <span class="bar c3" title="C5 탭: 3/5 — 글로벌 탭 아이콘 규칙과 편차">C5·3</span>
+      <span class="bar c3" title="C6 상태: 3/5 — 근접 상태 배지와 바 색 불일치">C6·3</span>
+      <span class="bar c5" title="C7 내비: 5/5 — 표준 콘솔 내비">C7·5</span>
+      <span class="bar c5" title="C8 타이포: 5/5 — h1·부제·h2 위계 명확">C8·5</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame" style="position:relative"><span class="pin">4</span>
+        <div class="mk-header"><div><div class="mk-h1">Cost</div><div class="mk-sub">사용량과 비용을 추적합니다</div></div><button class="mk-btn outline">↻ 갱신</button></div>
+        <div class="mk-grid" style="grid-template-columns:1fr 3fr;margin-bottom:10px"><div class="mk-card"><div class="mk-row"><span class="mk-srv-name">월간 지출 한도</span><span class="mk-tag" style="background:var(--app-primary);color:var(--app-primary-fg)">82%<span class="pin">2</span></span></div><div class="mk-h1">$41.00</div><div class="mk-row" style="color:var(--app-warning)">━━━━━━━━ 82%</div><div class="mk-sub">✎ 한도 편집<span class="pin">3</span></div></div><div><div class="mk-tabs" style="position:relative"><span class="mk-tab active">오늘</span><span class="mk-tab">주</span><span class="mk-tab">월</span><span class="mk-tab">전체</span><span class="pin">1</span></div></div></div>
+        <div class="mk-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:10px"><div class="mk-card"><span class="mk-tag">TOTAL COST</span><div class="mk-h1">$41.00</div></div><div class="mk-card"><span class="mk-tag">TOKENS</span><div class="mk-h1">8.2M</div></div><div class="mk-card"><span class="mk-tag">CALLS</span><div class="mk-h1">1,284</div></div><div class="mk-card"><span class="mk-tag">AVG / CALL</span><div class="mk-h1">$0.03</div></div></div>
+        <div class="mk-grid" style="grid-template-columns:1fr 1fr"><div class="mk-card"><span class="mk-srv-name">모델별 비용</span></div><div class="mk-card"><span class="mk-srv-name">프로젝트별 비용</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body">기간 Tabs가 다른 콘솔 탭과 아이콘 문법을 공유하지 않는다 <span class="dim">C5</span> — 네 Trigger가 모두 텍스트 전용이라 화면 내부 일관성은 있지만, 아이콘을 쓰는 MCP 등과 제품 전체 탭 문법이 갈린다. 모든 탭의 아이콘 정책을 하나로 결정해야 한다. <code>web/src/routes/budget.tsx:42-50</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">“한도 근접” 상태가 배지와 진행 막대에서 서로 다른 색을 낸다 <span class="dim">C6</span> — 근접 시 막대·문구는 warning이지만 배지는 <code>variant="default"</code>라 primary로 렌더링된다. 같은 상태는 하나의 warning 토큰군으로 통일해야 한다. <code>web/src/components/cost/spend-limit-card.tsx:32-49</code> · <code>web/src/components/cost/spend-limit-card.tsx:65-81</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">한도 편집/설정 아이콘이 작고 margin 기반이다 <span class="dim">C3</span> — <code>h-3 w-3 mr-1</code>은 Button의 공용 16px 아이콘·gap 규칙과 다르다. <code>web/src/components/cost/spend-limit-card.tsx:84-104</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">정규 헤더·간격을 갖췄지만 입장 애니메이션은 빠져 있다 <span class="dim">C2</span> — 루트가 <code>space-y-6</code>만 사용해 Dashboard/Agents의 <code>animate-fade-in-up</code> 적용 범위와 갈린다. 전 페이지 적용 또는 제거 중 하나로 정리해야 한다. <code>web/src/routes/budget.tsx:25-27</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-11" class="screen">
+  <div class="screen-head">
+    <div class="screen-title"><span class="num">11</span><h2>Token Maxing</h2><span class="route">/token-maxing</span><span class="score">일관성 점수 <b>4.5 / 5</b></span></div>
+    <div class="rubric">
+      <span class="bar c5" title="C1 헤더: 5/5 — 제목·부제·정렬은 정규형과 일치">C1·5</span>
+      <span class="bar c5" title="C2 간격: 5/5 — 루트 space-y-6">C2·5</span>
+      <span class="bar c3" title="C3 버튼&amp;액션: 3/5 — RFC 텍스트만 있고 갱신 액션 없음">C3·3</span>
+      <span class="bar c5" title="C4 카드&amp;표면: 5/5 — Card 프리미티브 사용">C4·5</span>
+      <span class="bar c5" title="C5 탭: 5/5 — 해당 없음">C5·5</span>
+      <span class="bar c3" title="C6 상태: 3/5 — 카드 로딩이 인라인 문장">C6·3</span>
+      <span class="bar c4" title="C7 내비: 4/5 — 사이드바 진입은 명확">C7·4</span>
+      <span class="bar c5" title="C8 타이포: 5/5 — 정규 제목·부제 크기">C8·5</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 2</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div><div class="mk-h1">Token Maxing</div><div class="mk-sub">남은 토큰 할당량을 활용합니다</div></div>
+          <div class="mk-acts"><span class="mk-tag">RFC-031</span><span class="pin">1</span></div>
+        </div>
+        <div class="mk-card" style="margin-bottom:10px">
+          <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">상태</span><span class="mk-tag">유휴</span></div>
+          <div class="mk-grid" style="grid-template-columns:repeat(3,1fr);margin-top:8px"><div class="mk-tag">제공자 · 없음</div><div class="mk-tag">세션 토큰 · 0</div><div class="mk-tag">윈도우 · 없음</div></div>
+          <div class="mk-row" style="position:relative;color:var(--app-muted-fg)">로딩 시 “불러오는 중” 문장만 표시<span class="pin">2</span></div>
+        </div>
+        <div class="mk-card"><div class="mk-srv-name" style="margin-bottom:8px">제어</div><div class="mk-grid" style="grid-template-columns:1fr 1fr;margin-bottom:8px"><span class="mk-tag">시작 시각</span><span class="mk-tag">종료 시각</span></div><div class="mk-acts"><button class="mk-btn">▷ 윈도우 시작</button><button class="mk-btn outline">수동 시작</button></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body">정적 RFC 텍스트가 헤더 액션 자리를 대체한다 <span class="dim">C3·C6</span> — 우측에는 <code>text-xs</code> 문구만 있고 페이지 어디에도 사용자가 서버 상태를 즉시 다시 조회할 <code>RefreshButton</code>이 없다. RFC 메타데이터와 갱신 액션을 같은 클러스터에서 분리해야 한다. <code>web/src/routes/token-maxing.tsx:20-31</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">상태 카드의 로딩 표현이 공유 로딩군 밖에 있다 <span class="dim">C6</span> — <code>LoadingCards</code>/<code>LoadingStatCards</code> 대신 카드 안에 단일 <code>p</code>만 렌더링해 다른 운영 화면의 로딩 밀도와 다르다. <code>web/src/components/token-maxing/status-header.tsx:25-28</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-12" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">12</span>
+      <h2>MCP 서버</h2>
+      <span class="route">/mcp</span>
+      <span class="score">일관성 점수 <b>3.4 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c3" title="C1 헤더: 부제 text-sm 누락">C1·3</span>
+      <span class="bar c5" title="C2 간격: space-y-6 정규 일치">C2·5</span>
+      <span class="bar c3" title="C3 버튼: Plus 아이콘 mr-1(margin) 사용">C3·3</span>
+      <span class="bar c3" title="C4 카드: 탭 콘텐츠를 Card로 래핑(형제 탭과 불일치)">C4·3</span>
+      <span class="bar c2" title="C5 탭: 트리거 아이콘이 있어 Memory/Budget과 불일치">C5·2</span>
+      <span class="bar c5" title="C6 상태: 공유 컴포넌트 사용">C6·5</span>
+      <span class="bar c5" title="C7 내비: 활성 상태 정상">C7·5</span>
+      <span class="bar c4" title="C8 타이포: 부제 크기만 편차">C8·4</span>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- 현재 -->
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <div class="mk-h1">MCP 서버</div>
+            <div class="mk-sub nosize">모델 컨텍스트 프로토콜 서버를 관리합니다<span class="pin">1</span></div>
+          </div>
+          <div class="mk-acts">
+            <button class="mk-btn"><span class="ic">✚</span><span class="mk-mr"></span>서버 추가<span class="pin">2</span></button>
+          </div>
+        </div>
+        <div class="mk-tabs">
+          <span class="mk-tab active"><span class="ic">▣</span>서버<span class="pin">3</span></span>
+          <span class="mk-tab"><span class="ic">⚙</span>도구</span>
+          <span class="mk-tab"><span class="ic">›_</span>테스트</span>
+        </div>
+        <div class="mk-card pt6">
+          <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">filesystem</span><span class="mk-tag">stdio</span></div>
+          <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">github</span><span class="mk-tag">stdio</span></div>
+          <div class="mk-row"><span class="mk-dot warn"></span><span class="mk-srv-name">postgres</span><span class="mk-tag">sse</span></div>
+          <div style="position:relative"><span class="pin" style="position:absolute;right:-6px;top:-2px">4</span></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--doc-muted);margin-top:10px;font-family:ui-monospace,Menlo,monospace">패널 전체가 외부 Card로 감싸짐 (CardContent pt-6)</div>
+    </div>
+
+    <!-- 제안 -->
+    <div class="panel prop">
+      <div class="panel-label"><span class="dot"></span>제안 · 정규형 적용</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <div class="mk-h1">MCP 서버</div>
+            <div class="mk-sub" style="color:var(--app-success)">모델 컨텍스트 프로토콜 서버를 관리합니다</div>
+          </div>
+          <div class="mk-acts">
+            <button class="mk-btn"><span class="ic">✚</span>서버 추가</button>
+          </div>
+        </div>
+        <div class="mk-tabs">
+          <span class="mk-tab active">서버</span>
+          <span class="mk-tab">도구</span>
+          <span class="mk-tab">테스트</span>
+        </div>
+        <div>
+          <div class="mk-row" style="padding:9px 12px;background:var(--app-card);border:1px solid var(--app-border);border-radius:8px;margin-bottom:6px"><span class="mk-dot"></span><span class="mk-srv-name">filesystem</span><span class="mk-tag">stdio</span></div>
+          <div class="mk-row" style="padding:9px 12px;background:var(--app-card);border:1px solid var(--app-border);border-radius:8px;margin-bottom:6px"><span class="mk-dot"></span><span class="mk-srv-name">github</span><span class="mk-tag">stdio</span></div>
+          <div class="mk-row" style="padding:9px 12px;background:var(--app-card);border:1px solid var(--app-border);border-radius:8px"><span class="mk-dot warn"></span><span class="mk-srv-name">postgres</span><span class="mk-tag">sse</span></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--app-success);margin-top:10px;font-family:ui-monospace,Menlo,monospace">외부 Card 제거 → 행 카드만 (Memory 탭과 동일 패턴)</div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body"><b>부제 텍스트 크기 미지정</b> <span class="dim">C1</span> — `<code>text-muted-foreground</code>`만 있고 `text-sm` 누락. 다른 탭(budget·token-maxing·mounts·projects)은 `text-sm` 명시. 정규형은 부제 = `text-sm text-muted-foreground`. <code>routes/mcp.tsx:32</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>버튼 아이콘 간격이 margin 기반</b> <span class="dim">C3</span> — `<Plus className="h-4 w-4 mr-1" />`는 margin으로 띄움. 정규형은 flex `gap`(Button이 내장 gap 활용). <code>routes/mcp.tsx:36</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>탭 트리거 아이콘이 형제 페이지와 불일치</b> <span class="dim">C5</span> — MCP는 Servers/Tools/Test 모두 아이콘(`routes/mcp.tsx:51-59`), Memory(`routes/memory.tsx:35-41`)·Budget(`routes/budget.tsx:45`)은 아이콘 없음. "모두 또는 아무것도" 위반. 다수 페이지가 무아이콘이므로 정규 = 무아이콘.</span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>탭 콘텐츠를 외부 Card로 래핑</b> <span class="dim">C4</span> — 각 `TabsContent`를 `<Card><CardContent className="pt-6">`로 감쌈(`routes/mcp.tsx:62-84`). Memory는 비래핑. 탭 스트립 자체가 그룹핑을 제공하므로 이중 카드는 시각적으로 무거움. 정규 = 외부 Card 제거, 필요시 행 카드만.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-13" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">13</span><h2>이메일</h2><span class="route">/email</span><span class="score">일관성 점수 <b>4.0 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c4" title="C1 헤더: 부제 text-sm 누락">C1·4</span>
+      <span class="bar c5" title="C2 간격: 루트 space-y-6, 개요 내부 space-y-4 계층 정상">C2·5</span>
+      <span class="bar c3" title="C3 버튼: 공유 RefreshButton 대신 로컬 아이콘 버튼 반복">C3·3</span>
+      <span class="bar c5" title="C4 카드: 상태 카드가 공유 Card 사용">C4·5</span>
+      <span class="bar c5" title="C5 탭: 공유 Tabs와 URL search 동기화">C5·5</span>
+      <span class="bar c3" title="C6 상태: 로딩·에러는 공유형, 빈 상태는 인라인">C6·3</span>
+      <span class="bar c5" title="C7 내비: Mail 아이콘 의미 정합">C7·5</span>
+      <span class="bar c4" title="C8 타이포: 부제 크기 편차">C8·4</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div><div class="mk-h1">이메일</div><div class="mk-sub nosize">이메일 발송 설정 및 관리 <span class="pin">1</span></div></div>
+          <div class="mk-acts"><span class="mk-tag" style="color:var(--app-success)">● 설정됨</span><button class="mk-btn ghost">↻ <span class="pin">2</span></button></div>
+        </div>
+        <div class="mk-tabs">
+          <span class="mk-tab active"><span class="ic">✉</span>개요</span><span class="mk-tab"><span class="ic">⚙</span>설정</span><span class="mk-tab"><span class="ic">◷</span>발송 기록</span><span class="mk-tab"><span class="ic">▤</span>템플릿 <span class="mk-tag">4</span></span>
+        </div>
+        <div class="mk-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">
+          <div class="mk-card"><span style="font-size:11px;color:var(--app-muted-fg)">상태</span><div style="margin-top:8px;font-weight:600;color:var(--app-fg)"><span style="color:var(--app-success)">●</span> 준비됨</div></div>
+          <div class="mk-card"><span style="font-size:11px;color:var(--app-muted-fg)">발신자</span><div style="margin-top:8px;font-weight:600;color:var(--app-fg)">ops@example.com</div><span style="font-size:10px;color:var(--app-muted-fg)">resend</span></div>
+          <div class="mk-card"><span style="font-size:11px;color:var(--app-muted-fg)">활동</span><div style="margin-top:5px;font-size:20px;font-weight:700;color:var(--app-fg)">128</div><span style="font-size:10px;color:var(--app-muted-fg)">총 발송 · 템플릿 4</span></div>
+        </div>
+        <div class="mk-card" style="position:relative">
+          <div class="mk-row" style="padding-top:0"><span class="mk-srv-name">발송 기록</span><button class="mk-btn ghost" style="margin-left:auto">↻</button></div>
+          <div style="padding:22px;text-align:center;color:var(--app-muted-fg);font-size:12px">아직 발송된 이메일이 없습니다. <span class="pin">3</span></div>
+        </div>
+        <div style="margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--app-muted-fg)">페이지 루트: space-y-6 · 입장 모션 없음 <span class="pin">4</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><ul class="flist">
+    <li class="med"><span class="badge">MED</span><span class="body"><b>부제 크기가 명시되지 않음</b> <span class="dim">C1·C8</span> — <code>text-muted-foreground</code>에 <code>text-sm</code>을 더해 인프라 탭의 제목·부제 비율을 고정한다. <code>web/src/routes/email.tsx:181-186</code></span></li>
+    <li class="med"><span class="badge">MED</span><span class="body"><b>새로고침이 공유 컴포넌트 대신 로컬 버튼으로 세 번 반복</b> <span class="dim">C3</span> — 헤더·발송 기록·템플릿이 각각 <code>Button + RefreshCw</code>를 직접 만든다. 헤더는 공유 button형, 카드 헤더는 공유 icon형 <code>RefreshButton</code>으로 통일한다. <code>web/src/routes/email.tsx:199-201,669-671,791-793</code></span></li>
+    <li class="med"><span class="badge">MED</span><span class="body"><b>발송 기록·템플릿 빈 상태가 인라인 텍스트</b> <span class="dim">C6</span> — 페이지 로딩·에러는 공유형인데 두 빈 탭만 자체 중앙 <code>div</code>다. 아이콘·설명·액션을 가진 공유 <code>EmptyState</code>로 바꾼다. <code>web/src/routes/email.tsx:674-679,796-801</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>페이지 입장 애니메이션 미적용</b> <span class="dim">C2</span> — <code>space-y-6</code> 루트에 전 탭 공통 <code>animate-fade-in-up</code>을 적용한다. <code>web/src/routes/email.tsx:178-179</code></span></li>
+  </ul></div>
+</section>
+
+<section id="screen-14" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">14</span><h2>Git</h2><span class="route">/git</span><span class="score">일관성 점수 <b>4.1 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c4" title="C1 헤더: 부제 크기·액션 수직 정렬 편차">C1·4</span>
+      <span class="bar c5" title="C2 간격: 루트 space-y-6 정규 일치">C2·5</span>
+      <span class="bar c3" title="C3 버튼: items-center 누락, ShieldCheck mr-1">C3·3</span>
+      <span class="bar c5" title="C4 카드: 태그·복원·로그가 같은 Card 계층">C4·5</span>
+      <span class="bar c5" title="C5 탭: 탭 없는 단일 흐름">C5·5</span>
+      <span class="bar c5" title="C6 상태: LoadingCards·ErrorState·EmptyState 공유형 사용">C6·5</span>
+      <span class="bar c5" title="C7 내비: GitBranch 아이콘 의미 정합">C7·5</span>
+      <span class="bar c4" title="C8 타이포: 부제 크기만 편차">C8·4</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div><div class="mk-h1">Git</div><div class="mk-sub nosize">프로세스 내 버전 제어 <span class="pin">1</span></div></div>
+          <div class="mk-acts" style="align-items:stretch;position:relative"><span class="pin" style="position:absolute;left:-10px;top:-9px">2</span><button class="mk-btn outline">↻ 새로고침</button><button class="mk-btn outline"><span class="ic">◇</span><span class="mk-mr"></span>확인 <span class="pin">3</span></button></div>
+        </div>
+        <div class="mk-grid">
+          <div class="mk-card"><div class="mk-row" style="padding-top:0"><span class="mk-srv-name">◇ 태그</span></div><div style="display:flex;gap:6px"><span style="flex:1;border:1px solid var(--app-border);border-radius:6px;padding:6px 8px;color:var(--app-muted-fg);font-size:11px">태그 이름...</span><button class="mk-btn">태그 만들기</button></div><div style="margin-top:8px"><span class="mk-tag">v1.2.0</span> <span class="mk-tag">release-2026-07</span></div></div>
+          <div class="mk-card"><div class="mk-row" style="padding-top:0"><span class="mk-srv-name">↶ 복원</span></div><div style="display:flex;gap:6px"><span style="flex:1;border:1px solid var(--app-border);border-radius:6px;padding:6px 8px;color:var(--app-muted-fg);font-size:11px;font-family:ui-monospace,Menlo,monospace">복원할 커밋 해시...</span><button class="mk-btn" style="background:var(--app-error)">복원</button></div></div>
+          <div class="mk-card"><div class="mk-row" style="padding-top:0"><span class="mk-srv-name">⑂ 커밋 로그</span></div><div class="mk-row"><span class="mk-tag">8b41fe2</span><span>fix: resource chart tokens</span><span style="margin-left:auto;color:var(--app-muted-fg);font-size:10px">10:42</span></div><div class="mk-row"><span class="mk-tag">4dd63a1</span><span>feat: email templates</span><span style="margin-left:auto;color:var(--app-muted-fg);font-size:10px">어제</span></div></div>
+        </div>
+        <div style="margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--app-muted-fg)">페이지 루트: space-y-6 · 입장 모션 없음 <span class="pin">4</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><ul class="flist">
+    <li class="med"><span class="badge">MED</span><span class="body"><b>부제에 text-sm이 없어 헤더 타이포가 갈림</b> <span class="dim">C1·C8</span> — 정규값 <code>text-sm text-muted-foreground</code>로 명시한다. <code>web/src/routes/git.tsx:104-107</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>우측 액션 컨테이너에 items-center가 없음</b> <span class="dim">C1·C3</span> — <code>flex gap-2</code>만 있어 자식 높이가 달라질 때 수직축을 Button 구현에 맡긴다. <code>flex items-center gap-2</code>로 고정한다. <code>web/src/routes/git.tsx:109-119</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>검증 아이콘이 로컬 mr-1 사용</b> <span class="dim">C3</span> — ShieldCheck의 margin을 제거하고 Button 내장 gap만 사용한다. <code>web/src/routes/git.tsx:111-118</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>페이지 입장 애니메이션 미적용</b> <span class="dim">C2</span> — <code>space-y-6</code> 루트에 공통 <code>animate-fade-in-up</code>을 적용한다. <code>web/src/routes/git.tsx:102-103</code></span></li>
+  </ul></div>
+</section>
+
+<section id="screen-15" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">15</span><h2>리소스</h2><span class="route">/resources</span><span class="score">일관성 점수 <b>4.0 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c4" title="C1 헤더: 구조·RefreshButton 위치 정상, 부제 text-sm 누락">C1·4</span>
+      <span class="bar c5" title="C2 간격: 루트 space-y-6, KPI grid gap-4">C2·5</span>
+      <span class="bar c5" title="C3 버튼: 공유 RefreshButton을 정규 위치에 사용">C3·5</span>
+      <span class="bar c3" title="C4 카드: 동일 KPI가 Dashboard StatCard와 다른 표면 언어">C4·3</span>
+      <span class="bar c5" title="C5 탭: 탭 없는 단일 모니터링 흐름">C5·5</span>
+      <span class="bar c4" title="C6 상태: 로딩·에러 공유형, 데이터 부족은 인라인">C6·4</span>
+      <span class="bar c5" title="C7 내비: Activity 아이콘 의미 정합">C7·5</span>
+      <span class="bar c3" title="C8 타이포: 부제와 KPI 라벨이 정규 스케일과 다름">C8·3</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame">
+        <div class="mk-header"><div><div class="mk-h1">리소스</div><div class="mk-sub nosize">시스템 리소스 모니터링 <span class="pin">1</span></div></div><button class="mk-btn outline">↻ 새로고침</button></div>
+        <div class="mk-grid" style="grid-template-columns:repeat(3,1fr);position:relative;margin-bottom:10px"><span class="pin" style="position:absolute;right:-5px;top:-6px">2</span>
+          <div class="mk-card"><span style="font-size:12px;color:var(--app-muted-fg)">CPU</span><div style="font-size:22px;font-weight:700;color:var(--app-fg);margin:6px 0">38.4%</div><div style="height:7px;background:var(--app-muted);border-radius:7px"><div style="width:38.4%;height:100%;background:var(--app-info);border-radius:7px"></div></div></div>
+          <div class="mk-card"><span style="font-size:12px;color:var(--app-muted-fg)">메모리</span><div style="font-size:22px;font-weight:700;color:var(--app-fg);margin:6px 0">76.1%</div><div style="height:7px;background:var(--app-muted);border-radius:7px"><div style="width:76.1%;height:100%;background:var(--app-warning);border-radius:7px"></div></div></div>
+          <div class="mk-card"><span style="font-size:12px;color:var(--app-muted-fg)">디스크</span><div style="font-size:22px;font-weight:700;color:var(--app-fg);margin:6px 0">54.8%</div><div style="height:7px;background:var(--app-muted);border-radius:7px"><div style="width:54.8%;height:100%;background:var(--app-info);border-radius:7px"></div></div></div>
+        </div>
+        <div class="mk-card"><div class="mk-row" style="padding-top:0"><span class="mk-srv-name">⌁ 리소스 기록</span></div><div style="height:94px;border-left:1px solid var(--app-border);border-bottom:1px solid var(--app-border);display:flex;align-items:center;justify-content:center;color:var(--app-muted-fg);font-size:11px">차트를 표시할 데이터가 부족합니다. 시간이 지나면 데이터가 수집됩니다. <span class="pin">3</span></div></div>
+        <div style="margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--app-muted-fg)">페이지 루트: space-y-6 · 입장 모션 없음 <span class="pin">4</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><ul class="flist">
+    <li class="med"><span class="badge">MED</span><span class="body"><b>부제 크기가 base 상속</b> <span class="dim">C1·C8</span> — 단독 RefreshButton 배치는 정규형과 맞지만 부제는 <code>text-sm</code>이 없다. <code>text-sm text-muted-foreground</code>로 고정한다. <code>web/src/routes/resources.tsx:65-70</code></span></li>
+    <li class="med"><span class="badge">MED</span><span class="body"><b>같은 CPU·RAM KPI가 Dashboard와 별도 카드 언어 사용</b> <span class="dim">C4·C8</span> — Resources는 text-sm 라벨+막대, Dashboard StatCard는 <code>text-xs uppercase tracking-wide</code> 라벨+sparkline/delta다. 상세 게이지는 유지하되 StatCard의 라벨·값·padding을 재사용 가능한 슬롯으로 통합한다. <code>web/src/routes/resources.tsx:75-129 · web/src/components/dashboard/stat-card.tsx:105-169</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>기록 부족 상태가 인라인 문단</b> <span class="dim">C6</span> — 로딩·에러는 공유형인데 샘플 1개 이하는 자체 중앙 문단이다. 축소형 <code>EmptyState</code>로 아이콘·설명·status role을 통일한다. <code>web/src/routes/resources.tsx:50-51,140-207</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>페이지 입장 애니메이션 미적용</b> <span class="dim">C2</span> — <code>space-y-6</code> 루트에 공통 <code>animate-fade-in-up</code>을 적용한다. <code>web/src/routes/resources.tsx:63-64</code></span></li>
+  </ul></div>
+</section>
+
+<section id="screen-16" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">16</span><h2>보안</h2><span class="route">/security</span><span class="score">일관성 점수 <b>4.4 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c4" title="C1 헤더: 부제 text-sm 누락">C1·4</span>
+      <span class="bar c5" title="C2 간격: 루트 space-y-6 정규 일치">C2·5</span>
+      <span class="bar c5" title="C3 버튼: 공유 RefreshButton과 gap 기반 필터 사용">C3·5</span>
+      <span class="bar c5" title="C4 카드: 권한·감사 행이 Card/Badge 공유 표면 사용">C4·5</span>
+      <span class="bar c5" title="C5 탭: 탭 없는 연속 보안 흐름">C5·5</span>
+      <span class="bar c5" title="C6 상태: LoadingCards·ErrorState·EmptyState와 의미 Badge 사용">C6·5</span>
+      <span class="bar c2" title="C7 내비: Security에 Bell 아이콘 사용으로 의미 오정합">C7·2</span>
+      <span class="bar c4" title="C8 타이포: 부제 크기만 편차">C8·4</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 3</div>
+      <div class="mk-frame" style="display:grid;grid-template-columns:122px 1fr;gap:12px">
+        <div style="background:var(--app-muted);border:1px solid var(--app-border);border-radius:8px;padding:10px">
+          <div style="font-size:10px;color:var(--app-muted-fg);margin-bottom:7px">시스템</div>
+          <div style="font-size:12px;color:var(--app-muted-fg);padding:6px">⌁ 리소스</div>
+          <div style="position:relative;font-size:12px;font-weight:600;color:var(--app-fg);background:var(--app-card);border-radius:6px;padding:6px">◉ 보안 <span class="pin">1</span></div>
+          <div style="font-size:12px;color:var(--app-muted-fg);padding:6px">⚙ 설정</div>
+        </div>
+        <div>
+          <div class="mk-header"><div><div class="mk-h1">보안</div><div class="mk-sub nosize">감사 로그 및 접근 제어 <span class="pin">2</span></div></div><button class="mk-btn outline">↻ 새로고침</button></div>
+          <div class="mk-card" style="margin-bottom:8px"><div class="mk-row" style="padding-top:0"><span class="mk-srv-name">승인 대기열</span><span class="mk-tag" style="margin-left:auto">0 대기</span></div><span style="font-size:11px;color:var(--app-muted-fg)">검토가 필요한 도구 실행이 없습니다.</span></div>
+          <div class="mk-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:8px"><div class="mk-card"><span class="mk-srv-name">operator</span><div style="margin-top:7px"><span class="mk-tag">agents:read</span> <span class="mk-tag">tools:execute</span></div></div><div class="mk-card"><span class="mk-srv-name">observer</span><div style="margin-top:7px"><span class="mk-tag">agents:read</span> <span class="mk-tag">audit:read</span></div></div></div>
+          <div class="mk-card"><div class="mk-row" style="padding-top:0"><span class="mk-srv-name">△ 감사 기록</span><span class="mk-tag" style="margin-left:auto">거부된 것만</span></div><div class="mk-row"><span class="mk-dot"></span><span>workspace.read</span><span style="margin-left:auto;color:var(--app-muted-fg);font-size:10px">10:42</span></div><div class="mk-row"><span class="mk-dot err"></span><span>shell.execute</span><span style="margin-left:auto;color:var(--app-warning);font-size:10px">정책 차단</span></div></div>
+          <div style="margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--app-muted-fg)">페이지 루트: space-y-6 · 입장 모션 없음 <span class="pin">3</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><ul class="flist">
+    <li class="med"><span class="badge">MED</span><span class="body"><b>Security 내비게이션이 알림 의미의 Bell 아이콘 사용</b> <span class="dim">C7</span> — 실제 화면은 권한·승인·감사 기록이고 본문도 Shield를 쓴다. 사이드바를 <code>Shield</code>/<code>ShieldCheck</code>로 바꿔 기능 기대와 맞춘다. <code>web/src/components/layout/sidebar.tsx:143-147 · web/src/routes/security.tsx:3,107-154</code></span></li>
+    <li class="med"><span class="badge">MED</span><span class="body"><b>부제에 text-sm이 빠짐</b> <span class="dim">C1·C8</span> — <code>text-sm text-muted-foreground</code>로 명시해 시스템 탭의 헤더 리듬을 고정한다. <code>web/src/routes/security.tsx:98-103</code></span></li>
+    <li class="low"><span class="badge">LOW</span><span class="body"><b>페이지 입장 애니메이션 미적용</b> <span class="dim">C2</span> — <code>space-y-6</code> 루트에 공통 <code>animate-fade-in-up</code>을 적용한다. <code>web/src/routes/security.tsx:96-97</code></span></li>
+  </ul></div>
+</section>
+
+<section id="screen-17" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">17</span>
+      <h2>Settings</h2>
+      <span class="route">/settings</span>
+      <span class="score">일관성 점수 <b>2.8 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c4" title="C1 헤더: h1 font-bold tracking-tight + text-sm 부제 명시 — 정규 일치">C1·4</span>
+      <span class="bar c2" title="C2 간격: 페이지 루트 space-y 없음(SettingsShell이 gap-6 분담), pb-24(미저장시) 시각 단절">C2·2</span>
+      <span class="bar c2" title="C3 버튼: SaveDock Button이 mr-1.5(margin) 사용 + ghost outline 혼재">C3·2</span>
+      <span class="bar c3" title="C4 카드: SectionCard가 bg-surface-section(전용 토큰) — 다른 탭의 bg-card와 시각 단절">C4·3</span>
+      <span class="bar c5" title="C5 탭: 탭 대신 SettingsRail — 일관된 단일 패턴">C5·5</span>
+      <span class="bar c3" title="C6 상태: SaveStatusPill은 토큰 정합, 그러나 미저장시 ring-1 modified-accent 표현이 시각 잡음">C6·3</span>
+      <span class="bar c4" title="C7 내비: SettingsRail 활성/수정표시는 양호">C7·4</span>
+      <span class="bar c3" title="C8 타이포: SettingsHeader 추적 tight + 섹션 h2 font-semibold tight — 다른 탭 h1과 분리">C8·3</span>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- 현재 -->
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 5</div>
+      <div class="mk-frame">
+        <!-- SettingsHeader: items-end + h1 font-bold tracking-tight + SaveStatusPill -->
+        <div class="mk-header end" style="position:relative">
+          <span class="pin" style="position:absolute;left:-6px;top:-6px">1</span>
+          <div>
+            <div class="mk-h1">Settings<span class="pin">2</span></div>
+            <div class="mk-sub">에이전트 · 채널 · 시스템 동작을 구성합니다</div>
+          </div>
+          <div class="mk-acts" style="position:relative">
+            <span class="mk-tag" style="background:color-mix(in oklch,var(--app-primary) 5%,transparent);color:var(--app-primary);border:1px solid color-mix(in oklch,var(--app-primary) 30%,transparent)"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--app-primary);margin-right:4px"></span>저장 안 됨 · 4</span>
+            <span class="pin" style="position:absolute;left:-6px;top:-6px">5</span>
+          </div>
+        </div>
+
+        <!-- 3-zone SettingsShell: rail(200-280px) + body(gap-6) -->
+        <div class="mk-grid" style="grid-template-columns:240px 1fr;gap:14px;margin-top:8px">
+          <!-- Rail -->
+          <div class="mk-card" style="padding:10px;font-size:11px">
+            <div style="position:relative">
+              <input placeholder="⌕ 설정 검색" style="width:100%;padding:5px 8px;font-size:11px;border:1px solid var(--app-border);border-radius:6px;background:var(--app-bg);color:var(--app-fg);margin-bottom:8px" />
+            </div>
+            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--app-muted-fg);padding:4px 6px">AI &amp; 엔진</div>
+            <div style="padding:5px 8px;border-radius:6px;background:color-mix(in oklch,var(--app-primary) 10%,transparent);color:var(--app-primary);font-weight:500;border-left:2px solid var(--app-primary)">Engine</div>
+            <div style="padding:5px 8px;color:var(--app-fg-2);position:relative">
+              Kernel
+              <span style="position:absolute;left:6px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:var(--app-primary)"></span>
+            </div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">Execution</div>
+            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--app-muted-fg);padding:8px 6px 4px">Security</div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">Allowed Tools</div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">OAuth</div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">Secrets</div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">⚙ 고급 ▸</div>
+          </div>
+
+          <!-- Body: 1+ SectionCard (bg-surface-section, modified ring) -->
+          <div class="mk-card" style="background:color-mix(in oklch,var(--app-muted) 30%,var(--app-bg));border-color:var(--app-border);padding:0;position:relative">
+            <span class="pin" style="position:absolute;left:-6px;top:-6px">3</span>
+            <span class="pin" style="position:absolute;right:-6px;top:-6px">4</span>
+            <!-- 헤더 -->
+            <div style="padding:14px 18px;border-bottom:1px solid var(--app-border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="display:inline-flex;width:28px;height:28px;background:color-mix(in oklch,var(--app-primary) 10%,transparent);color:var(--app-primary);border-radius:6px;align-items:center;justify-content:center;font-size:13px;font-weight:600">◈</span>
+                  <h2 style="font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--app-fg);margin:0">Engine</h2>
+                  <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--app-primary)"></span>
+                </div>
+                <div style="font-size:11px;color:var(--app-muted-fg);margin-top:6px;line-height:1.5">에이전트 추론·실행 엔진 동작을 정의합니다</div>
+                <div style="font-size:10px;color:var(--app-muted-fg);margin-top:8px;font-family:ui-monospace,Menlo,monospace">12 fields</div>
+              </div>
+              <button class="mk-btn ghost" style="font-size:11px;padding:4px 8px;color:var(--app-muted-fg)"><span class="ic">↺</span><span class="mk-mr"></span>초기화</button>
+            </div>
+            <!-- 필드 행 -->
+            <div style="padding:12px 18px">
+              <div class="mk-row" style="grid-column:1/-1;display:grid;grid-template-columns:2fr 3fr;gap:12px;padding:10px 0;border-bottom:1px solid color-mix(in oklch,var(--app-border) 40%,transparent)">
+                <div><div style="font-size:12px;font-weight:500">Default Mode</div><div style="font-size:11px;color:var(--app-muted-fg);margin-top:2px">structured 셸은 안전, shell 모드는 명시적 옵트인 필요</div></div>
+                <div><select style="width:100%;padding:5px 8px;font-size:12px;border:1px solid var(--app-border);border-radius:6px;background:var(--app-card);color:var(--app-fg)"><option>structured</option><option>shell</option></select></div>
+              </div>
+              <div class="mk-row" style="grid-column:1/-1;display:grid;grid-template-columns:2fr 3fr;gap:12px;padding:10px 0;border-bottom:1px solid color-mix(in oklch,var(--app-border) 40%,transparent)">
+                <div><div style="font-size:12px;font-weight:500">Session Timeout</div><div style="font-size:11px;color:var(--app-muted-fg);margin-top:2px">분 단위 유휴 만료</div></div>
+                <div><input value="30" style="width:100%;padding:5px 8px;font-size:12px;border:1px solid var(--app-border);border-radius:6px;background:var(--app-card);color:var(--app-fg)" /></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SaveDock (floating, fixed) -->
+        <div style="margin-top:14px;display:flex;justify-content:flex-end;position:relative">
+          <span class="pin" style="position:absolute;left:-6px;top:-6px">5</span>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:color-mix(in oklch,var(--app-card) 90%,transparent);border:1px solid var(--app-border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.08);backdrop-filter:blur(6px);font-size:12px">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--app-primary)"></span>
+            <b>4</b> 변경
+            <span style="color:var(--app-warning)">⚠ 2</span>
+            <span style="color:var(--app-success)">✓ 2</span>
+            <span style="width:1px;height:18px;background:var(--app-border)"></span>
+            <button class="mk-btn ghost" style="font-size:11px;padding:3px 8px;color:var(--app-muted-fg)"><span class="ic">✕</span><span class="mk-mr"></span>폐기</button>
+            <button class="mk-btn" style="font-size:11px;padding:3px 8px"><span class="ic">▸</span><span class="mk-mr"></span>검토</button>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--doc-muted);margin-top:10px;font-family:ui-monospace,Menlo,monospace">3-zone SettingsShell — rail + 본문 + SaveDock. <code>pb-24</code> 적용(미저장시). SectionCard <code>bg-surface-section</code> 전용 토큰.</div>
+    </div>
+
+    <!-- 제안 -->
+    <div class="panel prop">
+      <div class="panel-label"><span class="dot"></span>제안 · 정규형 적용</div>
+      <div class="mk-frame">
+        <!-- 정규형 헤더: items-center + gap-2 액션 클러스터 + SaveStatusPill -->
+        <div class="mk-header">
+          <div>
+            <div class="mk-h1">Settings</div>
+            <div class="mk-sub">에이전트 · 채널 · 시스템 동작을 구성합니다</div>
+          </div>
+          <div class="mk-acts">
+            <!-- SaveStatusPill 토큰 정합 그대로 유지, 위치만 items-center 기준 -->
+            <span class="mk-tag" style="background:color-mix(in oklch,var(--app-primary) 5%,transparent);color:var(--app-primary);border:1px solid color-mix(in oklch,var(--app-primary) 30%,transparent)"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--app-primary);margin-right:4px"></span>저장 안 됨 · 4</span>
+            <!-- 추가: 키보드 단축키 ⌘K 안내 -->
+            <button class="mk-btn outline"><span class="ic">⌕</span>검색 <span style="font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--app-muted-fg);border:1px solid var(--app-border);padding:0 4px;border-radius:3px;margin-left:4px">⌘K</span></button>
+          </div>
+        </div>
+
+        <!-- 3-zone: 시각적 경계 명시(상단 "shell indicator" 배너) -->
+        <div style="margin:6px 0 10px;padding:6px 10px;background:color-mix(in oklch,var(--app-info) 6%,transparent);border:1px solid color-mix(in oklch,var(--app-info) 20%,transparent);border-radius:7px;font-size:11px;color:var(--app-info);display:flex;align-items:center;gap:8px">
+          <span>◐</span> <b style="font-weight:600">3-zone 설정 셸</b> · 좌측 레일로 섹션 이동 · 우측 카드로 변경 → 하단 도크에서 검토
+        </div>
+
+        <div class="mk-grid" style="grid-template-columns:240px 1fr;gap:14px">
+          <!-- Rail: 활성 표시 정규형 -->
+          <div class="mk-card" style="padding:10px;font-size:11px">
+            <input placeholder="⌕ 설정 검색" style="width:100%;padding:5px 8px;font-size:11px;border:1px solid var(--app-border);border-radius:6px;background:var(--app-bg);color:var(--app-fg);margin-bottom:8px" />
+            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--app-muted-fg);padding:4px 6px">AI &amp; 엔진</div>
+            <div style="padding:5px 8px;border-radius:6px;background:color-mix(in oklch,var(--app-primary) 10%,transparent);color:var(--app-primary);font-weight:500;border-left:2px solid var(--app-primary);display:flex;justify-content:space-between"><span>Engine</span><span style="background:var(--app-primary);color:var(--app-primary-fg);font-size:9px;padding:1px 5px;border-radius:99px;font-weight:600">3</span></div>
+            <div style="padding:5px 8px;color:var(--app-fg-2);position:relative">
+              <span style="position:absolute;left:6px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:var(--app-primary)"></span>
+              <span style="padding-left:8px">Kernel</span>
+            </div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">Execution</div>
+            <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--app-muted-fg);padding:8px 6px 4px">Security</div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">Allowed Tools</div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">OAuth</div>
+            <div style="padding:5px 8px;color:var(--app-fg-2)">Secrets</div>
+            <div style="padding:5px 8px;color:var(--app-muted-fg)">⚙ 고급 ▸</div>
+          </div>
+
+          <!-- Body: SectionCard → 카드 표면을 표준 카드(--app-card)로 통일 + 헤더는 같은 표면 -->
+          <div class="mk-card" style="padding:0;position:relative">
+            <div style="padding:14px 18px;border-bottom:1px solid var(--app-border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="display:inline-flex;width:28px;height:28px;background:color-mix(in oklch,var(--app-primary) 10%,transparent);color:var(--app-primary);border-radius:6px;align-items:center;justify-content:center;font-size:13px;font-weight:600">◈</span>
+                  <h2 style="font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--app-fg);margin:0">Engine</h2>
+                </div>
+                <div style="font-size:11px;color:var(--app-muted-fg);margin-top:6px;line-height:1.5">에이전트 추론·실행 엔진 동작을 정의합니다</div>
+                <div style="font-size:10px;color:var(--app-muted-fg);margin-top:8px;font-family:ui-monospace,Menlo,monospace">12 fields · <span style="color:var(--app-primary)">● 3 변경됨</span></div>
+              </div>
+              <!-- mr-1.5 제거, gap 기반 -->
+              <button class="mk-btn outline" style="font-size:11px;padding:4px 8px;color:var(--app-muted-fg)"><span class="ic">↺</span>초기화</button>
+            </div>
+            <div style="padding:12px 18px">
+              <div class="mk-row" style="grid-column:1/-1;display:grid;grid-template-columns:2fr 3fr;gap:12px;padding:10px 0;border-bottom:1px solid color-mix(in oklch,var(--app-border) 40%,transparent)">
+                <div><div style="font-size:12px;font-weight:500">Default Mode</div><div style="font-size:11px;color:var(--app-muted-fg);margin-top:2px">structured 셸은 안전, shell 모드는 명시적 옵트인 필요</div></div>
+                <div><select style="width:100%;padding:5px 8px;font-size:12px;border:1px solid var(--app-border);border-radius:6px;background:var(--app-card);color:var(--app-fg)"><option>structured</option><option>shell</option></select></div>
+              </div>
+              <div class="mk-row" style="grid-column:1/-1;display:grid;grid-template-columns:2fr 3fr;gap:12px;padding:10px 0;border-bottom:1px solid color-mix(in oklch,var(--app-border) 40%,transparent)">
+                <div><div style="font-size:12px;font-weight:500">Session Timeout</div><div style="font-size:11px;color:var(--app-muted-fg);margin-top:2px">분 단위 유휴 만료</div></div>
+                <div><input value="30" style="width:100%;padding:5px 8px;font-size:12px;border:1px solid var(--app-border);border-radius:6px;background:var(--app-card);color:var(--app-fg)" /></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SaveDock: 위치를 셸 하단 sticky 영역으로 옮기고 mr-1.5 제거 -->
+        <div style="margin-top:14px;display:flex;justify-content:flex-end;align-items:center">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--app-card);border:1px solid var(--app-border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.06);font-size:12px">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--app-primary)"></span>
+            <b>4</b> 변경
+            <span style="color:var(--app-warning)">⚠ 2</span>
+            <span style="color:var(--app-success)">✓ 2</span>
+            <span style="width:1px;height:18px;background:var(--app-border)"></span>
+            <button class="mk-btn ghost" style="font-size:11px;padding:4px 10px;color:var(--app-muted-fg)"><span class="ic">✕</span>폐기</button>
+            <button class="mk-btn" style="font-size:11px;padding:4px 10px"><span class="ic">▸</span>검토</button>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--app-success);margin-top:10px;font-family:ui-monospace,Menlo,monospace">헤더 <code>items-center</code> + 부제 <code>text-sm</code> 명시 · SectionCard 표면 토큰 통일(<code>bg-card</code>) · SaveDock <code>mr-1.5</code> 제거(Button <code>gap</code> 내장) · 상단 셸 인디케이터 배너로 경계 명시</div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>버튼 아이콘 간격이 margin 기반 — <code>mr-1.5</code> 2곳</b> <span class="dim">C3</span> — SaveDock의 폐기(<code>web/src/components/settings/save-dock.tsx:95</code>)·검토(<code>save-dock.tsx:105</code>) 버튼이 모두 <code>&lt;X className="h-3.5 w-3.5 mr-1.5" /&gt;</code> 패턴. SectionCard의 초기화 버튼도 <code>&lt;RotateCcw className="h-3.5 w-3.5 mr-1.5" /&gt;</code> (<code>section-card.tsx:122</code>). 정규형은 Button 내장 flex <code>gap</code> 활용 — mcp/personas의 <code>mr-1</code>와 같은 위반 계열.</span></li>
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>패러다임 단절: 경계 명시 부족</b> <span class="dim">C2 · C7</span> — 3-zone SettingsShell은 의도적(P7)이나, 다른 탭과 시각적으로 구분되는 표식(헤더 배너·섹션 표면 토큰)이 약함. <code>SettingsHeader</code>는 items-end(<code>settings-header.tsx:30</code>)이고, <code>SettingsShell</code>은 <code>flex flex-col md:flex-row gap-6</code> (<code>settings-shell.tsx:190</code>)로 페이지 루트 <code>space-y-6</code> 리듬에 참가하지 않음. <code>routes/settings.tsx:771</code> <code>pb-24</code>(미저장시)도 시각 단절. 진입 즉시 "이 화면은 다르다"는 표식이 없으면 사용자가 표준 탭과 동일한 탐색 패턴(<code>Cmd+F</code>·<code>?</code>)을 시도해 헤매게 됨.</span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>SectionCard가 전용 토큰 <code>bg-surface-section</code> 사용</b> <span class="dim">C4</span> — <code>section-card.tsx:65</code> <code>bg-surface-section</code>(<code>--surface-section: color-mix(in oklch, var(--muted) 30%, var(--background))</code>)는 Settings 전용 토큰. 다른 탭의 카드는 <code>bg-card</code>(<code>--card</code>)를 쓰므로, Settings의 섹션 카드는 다른 탭의 카드와 약간 회색조가 강해 보임. "single-tone inset panel" 의도 자체는 합리적이나, 다른 화면에서 같은 카드 표면 토큰(<code>--surface-section</code>)이 발견되지 않아 <strong>시각 어휘가 한 화면에 격리됨</strong>. <code>index.css:151,221</code> 선언만 있고 사용처는 settings뿐.</span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>수정상태 <code>--modified-accent</code> 표현이 시각 잡음</b> <span class="dim">C6</span> — 수정된 섹션에 <code>ring-1 ring-modified-accent/30</code>(<code>section-card.tsx:67</code>)·헤더 <code>●</code> 점(<code>section-card.tsx:91</code>)·레일 <code>●</code> 점(<code>settings-rail.tsx:151</code>)·레일 카운트 배지(<code>settings-rail.tsx:158</code>)·헤더 SaveStatusPill(<code>settings-header.tsx:66</code>)·SaveDock 카운트(<code>save-dock.tsx:62</code>)가 동시에 활성화되어 한 변경에 대해 6곳에서 시각 신호. 토큰 정합은 좋으나 "수정됨"의 표현이 여러 표면으로 분산.</span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body"><b>SettingsHeader h1이 <code>font-bold tracking-tight</code>(정규)이나 헤더 자체가 <code>items-end</code></b> <span class="dim">C1</span> — <code>settings-header.tsx:30</code> <code>flex items-end justify-between gap-4 pb-2</code>. 다른 탭은 <code>items-center</code>이지만, SaveStatusPill(작은 도트 + 텍스트) baseline 정렬을 위한 <code>items-end</code> 사용은 인지적으로 정당. 다만 <code>space-y-6</code> 리듬 대신 <code>pb-2</code> 단독이라 페이지 진입 시 헤더↔레일 사이 여백이 다른 탭보다 좁게 느껴질 수 있음. 의도적 — 기록용.</span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>SaveDock가 <code>position: fixed</code> 플로팅 패러다임</b> <span class="dim">C2 · C7</span> — <code>fixed bottom-5 right-5 z-50</code> (<code>save-dock.tsx:48</code>)은 의도적(스크롤과 무관하게 도달 가능)이지만 다른 탭에 존재하지 않는 단일 표면. 사용자가 다른 탭과 동일한 CTA 위치(<code>space-y-6</code> 하단 인라인 액션) 패턴을 기대하면 발견이 늦어짐. 진입 즉시 셸 인디케이터 배너나 첫 방문 시 토스트로 "저장 액션은 우측 하단 도크"라는 표식이 필요. <code>routes/settings.tsx:813-821</code>의 <code>SaveDock</code> 마운트.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-18" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">18</span>
+      <h2>Chat</h2>
+      <span class="route">/chat</span>
+      <span class="score">일관성 점수 <b>3.8 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c5" title="C1 헤더: 페이지 헤더 의도적 미사용(채팅 표면, 정상)">C1·5</span>
+      <span class="bar c4" title="C2 간격: 고유 리듬이나 내부 일관">C2·4</span>
+      <span class="bar c4" title="C3 버튼: 입력바·전송 버튼이 Button 체계 참여">C3·4</span>
+      <span class="bar c4" title="C4 카드: 역할별 메시지 표현 일관(user/tool/assistant)">C4·4</span>
+      <span class="bar c5" title="C5 탭: 해당 없음">C5·5</span>
+      <span class="bar c3" title="C6 상태: EmptyChatState가 공유 EmptyState 미사용">C6·3</span>
+      <span class="bar c5" title="C7 내비: ChatSessionNav가 공유 itemBase 프리미티브 사용">C7·5</span>
+      <span class="bar c4" title="C8 타이포: 토큰 양호, 활동 점만 중성">C8·4</span>
+    </div>
+  </div>
+
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 채팅 표면 (핀 3)</div>
+      <div class="mk-frame" style="padding:16px">
+        <!-- LiveActivityBar -->
+        <div style="display:flex;margin-bottom:8px">
+          <div style="max-width:80%">
+            <div style="border-radius:8px;padding:10px 16px;background:var(--app-muted)">
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--app-muted-fg)">
+                <span style="width:8px;height:8px;border-radius:50%;background:#9a9aa0;display:inline-block"></span><span class="pin" style="margin-left:-4px">2</span>
+                <span>도구 실행 중 · 파일 읽는 중</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Assistant message (배경 없는 prose) -->
+        <div style="margin:12px 0;font-size:13px;color:var(--app-fg);line-height:1.55">
+          <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--app-muted-fg);margin-bottom:3px">oxios</div>
+          oxios는 에이전트 운영체제로, fork/exec/wait/kill…<br>
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--app-muted-fg)">claude-sonnet · 14:32</span>
+        </div>
+
+        <!-- User message (muted card, 좌측) -->
+        <div style="border-radius:9px;background:var(--app-muted);padding:9px 12px;margin:8px 0;font-size:13px;color:var(--app-fg-2)">
+          <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--app-muted-fg);margin-bottom:2px">user</div>
+          oxios가 뭐야?
+        </div>
+
+        <!-- EmptyChatState (최초 진입) — 별도 레이아웃 -->
+        <div style="margin-top:14px;border-top:1px dashed var(--app-border);padding-top:14px">
+          <div style="font-size:10px;color:var(--app-muted);font-family:ui-monospace,Menlo,monospace;margin-bottom:8px">[최초 진입 시 표시되는 EmptyChatState]</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0">
+            <div style="font-size:16px;font-weight:600;color:var(--app-fg)">무엇을 도와드릴까요?<span class="pin" style="margin-left:4px">1</span></div>
+            <div style="width:100%;max-width:280px">
+              <div style="font-size:11px;font-weight:500;color:var(--app-muted-fg);margin-bottom:6px">최근 세션</div>
+              <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--app-border);background:var(--app-card);border-radius:8px;padding:8px 10px;font-size:12px">
+                <div style="width:28px;height:28px;border-radius:50%;background:var(--app-muted);display:flex;align-items:center;justify-content:center;color:var(--app-muted-fg);font-size:11px">▢</div>
+                <div>세션 제목… <span style="font-size:10px;color:var(--app-muted-fg)">3m ago</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ChatInput -->
+        <div style="margin-top:14px;border:1px solid var(--app-border);border-radius:14px;background:var(--app-card);padding:10px 12px;position:relative">
+          <div style="font-size:13px;color:var(--app-muted-fg)">메시지 입력…</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+            <div style="display:flex;gap:6px"><span class="mk-tag">역할</span><span class="mk-tag">모델</span></div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--app-muted-fg)"><span style="width:7px;height:7px;border-radius:50%;background:var(--app-success)"></span>연결됨</span>
+              <button class="mk-btn" style="padding:5px 9px">↑</button>
+            </div>
+          </div>
+          <div style="position:absolute;left:-6px;top:40%"><span class="pin">3</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body"><b>EmptyChatState가 공유 EmptyState를 무시</b> <span class="dim">C6</span> — 앱 전체에 <code>components/shared/empty-state.tsx</code> 공유 컴포넌트가 있음에도 Chat는 자체 중앙정렬 레이아웃 + 인사말 + 최근 세션 리스트를 인라인으로 구축. 빈 상태 표현이 탭마다 갈라지는 원천. <code>components/chat/empty-chat-state.tsx:27-65</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body"><b>LiveActivityBar "생각 중" 표시가 중성색</b> <span class="dim">C6</span> — 활동 중임을 나타내는 점이 <code>bg-muted-foreground/60</code>(중성 회색). 활성 상태는 info/primary 액센트가 의미론적으로 더 적절. 단, ConnectionStatus(<code>bg-success</code>/<code>bg-warning</code>)와 ActivityTimeline(<code>text-2xs</code>)은 토큰을 올바르게 사용 — 양호. <code>components/chat/live-activity-bar.tsx:58</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body"><b>Chat 표면이 PageHeader 시스템에 미참여</b> <span class="dim">C1</span> — 의도적(중앙 정렬 Claude형 채팅)이나, Console/Knowledge와 시각적 연속성이 단절. 채팅 입력바 상단에 최소한의 컨텍스트 라벨(세션명·모델)이 있으면 모드 경계가 부드러움. <code>routes/chat.tsx</code></span></li>
+    </ul>
+  </div>
+  <div class="callout" style="margin-top:14px"><b>긍정 신호.</b> 역할별 메시지 표현(user=muted 카드 / assistant=배경 없는 prose / tool=ToolCallCard)은 내부적으로 일관되고, <code>ConnectionStatus</code>·<code>ActivityTimeline</code>·<code>ModelPicker</code>는 시맨틱 토큰을 정확히 사용. 분열은 EmptyChatState 한 곳에 집중.</div>
+</section>
+
+<section id="screen-19" class="screen">
+  <div class="screen-head">
+    <div class="screen-title"><span class="num">19</span><h2>Knowledge</h2><span class="route">/knowledge · /knowledge/graph</span><span class="score">일관성 점수 <b>3.0 / 5</b></span></div>
+    <div class="rubric">
+      <span class="bar c2" title="C1 헤더: 2/5 — 전역 헤더와 Home h1이 서로 다른 규칙">C1·2</span>
+      <span class="bar c3" title="C2 간격: 3/5 — Home space-y-5">C2·3</span>
+      <span class="bar c3" title="C3 버튼&amp;액션: 3/5 — 빠른 액션 아이콘 mr-1.5">C3·3</span>
+      <span class="bar c3" title="C4 카드&amp;표면: 3/5 — KPI 전용 StatTile 밀도">C4·3</span>
+      <span class="bar c5" title="C5 탭: 5/5 — InfoPanel이 Tabs 프리미티브 사용">C5·5</span>
+      <span class="bar c4" title="C6 상태: 4/5 — 시맨틱 아이콘 색 사용">C6·4</span>
+      <span class="bar c2" title="C7 내비: 2/5 — 브레드크럼 계약과 실제 Header가 불일치">C7·2</span>
+      <span class="bar c3" title="C8 타이포: 3/5 — Home 제목·부제와 KPI 값 굵기 편차">C8·3</span>
+    </div>
+  </div>
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame">
+        <div class="mk-row" style="position:relative;background:var(--app-card);padding:8px"><span class="mk-tag">검색 또는 명령… ⌘K</span><span style="flex:1"></span><button class="mk-btn outline">Quick Ask</button><span class="pin">1</span></div>
+        <div class="mk-header" style="margin-top:14px"><div><div class="mk-h1 semibold">Knowledge</div><div class="mk-sub nosize">노트와 연결을 한곳에서 관리합니다<span class="pin">2</span></div></div></div>
+        <div class="mk-btn" style="display:flex;margin-bottom:10px">ϟ 빠른 캡처 <span style="margin-left:auto">⌘K</span></div>
+        <div class="mk-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:10px">
+          <div class="mk-card" style="position:relative"><span class="mk-tag">INBOX</span><div class="mk-h1 semibold" style="margin-top:8px">3</div><div class="mk-sub">처리 대기</div><span class="pin">3</span></div>
+          <div class="mk-card"><span class="mk-tag">DONE TODAY</span><div class="mk-h1 semibold" style="margin-top:8px">8</div><div class="mk-sub">오늘 완료</div></div>
+          <div class="mk-card"><span class="mk-tag">GRAPH</span><div class="mk-h1 semibold" style="margin-top:8px">42</div><div class="mk-sub">연결 노드</div></div>
+          <div class="mk-card"><span class="mk-tag">JOURNAL</span><div class="mk-h1 semibold" style="margin-top:8px">준비</div><div class="mk-sub">오늘 저널</div></div>
+        </div>
+        <div class="mk-acts" style="position:relative;margin-bottom:10px"><button class="mk-btn outline"><span class="ic">✚</span><span class="mk-mr"></span>새 파일</button><button class="mk-btn outline"><span class="ic">▣</span><span class="mk-mr"></span>Chat</button><span class="pin">4</span></div>
+        <div class="mk-card"><div class="mk-row"><button class="mk-btn ghost">←</button><button class="mk-btn ghost">→</button><span class="mk-srv-name">note</span><span style="flex:1"></span><span class="mk-tag">저장 · 분할 · 정보</span></div><div class="mk-row">에디터 툴바는 Button ghost/icon 체계 참여</div><div class="mk-tag">단어 120 · 문자 684 · Ln 12, Col 8</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body">Knowledge 브레드크럼 계약이 실제 전역 헤더에서 사라졌다 <span class="dim">C1·C7</span> — <code>KnowledgeLayout</code>은 AppLayout이 브레드크럼을 제공한다고 명시하지만, AppLayout은 공용 <code>Header</code>만 렌더링하고 현재 Header는 검색·Quick Ask·시계만 제공한다. 현재 위치/파일 경로를 셸 수준에서 안내한다는 계약을 구현과 맞춰야 한다. <code>web/src/components/knowledge/knowledge-layout.tsx:8-16</code> · <code>web/src/components/layout/app-layout.tsx:132-140</code> · <code>web/src/components/layout/header.tsx:34-68</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body">Home이 콘솔 헤더 정규형과 다른 타이포·리듬을 한꺼번에 쓴다 <span class="dim">C1·C2·C8</span> — 컨테이너는 <code>space-y-5</code>, 제목은 <code>font-semibold tracking-tight</code>, 부제는 크기 미지정이다. 모드 경계가 필요해도 동일 역할의 h1/부제 스케일은 정규형과 정렬해야 한다. <code>web/src/components/knowledge/knowledge-home.tsx:121-127</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">StatTile이 Console StatCard와 값 굵기·내부 구획이 다르다 <span class="dim">C4·C8</span> — 라벨은 같은 uppercase 체계를 쓰지만 Knowledge는 단일 <code>CardContent p-4</code>와 <code>font-semibold</code> 값을, Console은 <code>CardHeader</code>/<code>CardContent</code>와 <code>font-bold</code> 값을 쓴다. KPI 역할의 공통 밀도 토큰을 공유할 여지가 있다. <code>web/src/components/knowledge/knowledge-home.tsx:58-80</code> · <code>web/src/components/dashboard/stat-card.tsx:95-116</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body">Home 빠른 액션이 Button 내장 gap 대신 아이콘 margin을 덧붙인다 <span class="dim">C3</span> — 세 버튼 모두 <code>mr-1.5</code>를 사용해 정규 생성/액션 버튼 간격과 다른 규칙을 만든다. <code>web/src/components/knowledge/knowledge-home.tsx:194-207</code> · <code>web/src/components/ui/button.tsx:6-8</code></span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="screen-shell" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num" style="background:var(--accent);color:#fff">⇄</span>
+      <h2>크로스모드 셸 — 3모드 공유 표면</h2>
+      <span class="route">sidebar · mode-tabs · header · bottom-nav</span>
+      <span class="score">일관성 점수 <b>3.2 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c5" title="C1 헤더: Header 토큰 일관">C1·5</span>
+      <span class="bar c5" title="C2 간격: itemBase/itemDense 프리미티브 정합">C2·5</span>
+      <span class="bar c4" title="C3 버튼: QuickAsk/kbd 토큰 양호">C3·4</span>
+      <span class="bar c4" title="C4 카드: 해당 없음">C4·4</span>
+      <span class="bar c5" title="C5 탭: ModeTabs 단일 진실 원천">C5·5</span>
+      <span class="bar c4" title="C6 상태: 해당 없음">C6·4</span>
+      <span class="bar c2" title="C7 내비: 아이콘 중복(Zap) + 의미 오정합(Bell)">C7·2</span>
+      <span class="bar c4" title="C8 타이포: 양호">C8·4</span>
+    </div>
+  </div>
+
+  <div class="compare single">
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 사이드바 + 모드 탭 (핀 4)</div>
+      <div class="mk-frame" style="padding:0;display:flex">
+        <!-- 사이드바 축약 -->
+        <div style="width:170px;border-right:1px solid var(--app-border);padding:10px;background:var(--app-muted);font-size:11px">
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px 10px">
+            <span style="color:var(--app-primary);font-weight:700">⚡</span><b style="font-size:13px">Oxios</b>
+          </div>
+          <!-- Mode tabs -->
+          <div style="display:flex;gap:4px;background:var(--app-card);border-radius:7px;padding:3px;margin-bottom:10px">
+            <span style="flex:1;text-align:center;font-size:10px;font-weight:600;padding:4px;background:var(--app-card);border-radius:5px;box-shadow:0 1px 2px rgba(0,0,0,.06)">콘솔</span><span class="pin" style="margin-left:2px">3</span>
+            <span style="flex:1;text-align:center;font-size:10px;color:var(--app-muted-fg);padding:4px">지식</span>
+            <span style="flex:1;text-align:center;font-size:10px;color:var(--app-muted-fg);padding:4px">채팅</span>
+          </div>
+          <div style="color:var(--app-muted-fg);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;margin-bottom:3px">에이전트</div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg)"><span style="color:var(--app-primary)">🤖</span>에이전트<span class="pin" style="margin-left:auto">4</span></div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg)"><span>🎭</span>페르소나</div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg)"><span style="color:var(--app-primary)">⚡</span>스킬 <span style="font-size:9px;color:var(--app-muted-fg)">≡ MCP와 동일 아이콘</span></div>
+          <div style="color:var(--app-muted-fg);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:4px 6px 2px;margin-top:6px">인프라</div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg);background:var(--app-muted-2);border-radius:6px;font-weight:600;position:relative"><span style="color:var(--app-primary)">⚡</span>MCP 서버 <span class="pin" style="position:absolute;left:132px;background:var(--hi)">1</span></div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg)"><span>✉</span>이메일</div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg)"><span>🌿</span>Git</div>
+          <div style="color:var(--app-muted-fg);font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:4px 6px 2px;margin-top:6px">시스템</div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg)"><span>📊</span>리소스</div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg);position:relative"><span>🔔</span>보안 <span class="pin" style="position:absolute;left:132px">2</span></div>
+          <div style="display:flex;align-items:center;gap:7px;padding:6px;color:var(--app-muted-fg)"><span>⚙</span>설정</div>
+        </div>
+        <!-- 본문 (헤더) -->
+        <div style="flex:1;padding:12px">
+          <div style="display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--app-border);padding-bottom:10px;margin-bottom:10px">
+            <div style="flex:1;border:1px solid var(--app-border);background:var(--app-muted);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--app-muted-fg)">검색 / 명령… <span style="float:right;border:1px solid var(--app-border);background:var(--app-card);border-radius:3px;padding:0 4px;font-size:9px">⌘K</span></div>
+            <button class="mk-btn outline" style="padding:4px 8px"><span style="color:var(--app-primary)">⚡</span><span style="border:1px solid var(--app-border);background:var(--app-muted);border-radius:3px;padding:0 4px;font-size:9px">⌘J</span></button>
+            <span style="font-size:11px;color:var(--app-muted-fg)">🕘 14:32</span>
+          </div>
+          <div style="font-size:11px;color:var(--app-muted-fg)">활성: <b style="color:var(--app-fg)">MCP 서버</b> — <span style="color:var(--app-success)">●</span> 운영 중</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>탐색 아이콘 중복 — Skills와 MCP가 같은 Zap</b> <span class="dim">C7</span> — 같은 번개 아이콘이 두 기능에 사용되어 한눈에 구분되지 않음. Skills를 <code>Sparkles</code>(또는 <code>Wand2</code>)로 변경해 단일화. <code>sidebar.tsx:97</code> (Skills) · <code>sidebar.tsx:137</code> (MCP)</span></li>
+      <li class="high"><span class="badge">HIGH</span><span class="body"><b>Security 아이콘이 Bell — 의미 오정합</b> <span class="dim">C7</span> — Bell은 알림 관례이나 보안 항목에 사용. 실제 알림은 Header의 MenuClock→NotificationCenter가 담당하므로 이중 의미. <code>ShieldCheck</code>가 정합. <code>sidebar.tsx:146</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>데스크톱 ModeTabs와 모바일 BottomNav 활성 표현 상이</b> <span class="dim">C7</span> — 모바일 BottomNav는 활성 시 <code>text-primary</code> + <code>scale-110</code> 변형(<code>bottom-nav.tsx:53,56</code>), 데스크톱 ModeTabs는 다른 처리. 같은 <code>SIDEBAR_MODES</code>를 소비하므로 활성 문법 통일 권장. <code>mode-tabs.tsx:12</code></span></li>
+      <li class="low"><span class="badge">LOW</span><span class="body"><b>3모드 내비가 itemBase 프리미티브를 공유 (긍정)</b> <span class="dim">C2</span> — ConsoleNav·KnowledgeNav·ChatSessionNav 모두 <code>sidebar.tsx:54-73</code>의 <code>itemBase</code>/<code>itemActive</code>/<code>sectionHeader</code>를 재사용. 밀도(itemBase vs itemDense)만 의도적 차이. 일관성의 모범 사례. <code>sidebar.tsx:56-71</code></span></li>
+    </ul>
+  </div>
+  <div class="callout" style="margin-top:14px"><b>긍정 신호.</b> <code>SIDEBAR_MODES</code> 단일 진실 원천, Header의 ⌘K/⌘J/kbd 토큰, 사이드바 공유 프리미티브는 잘 설계됨. 수정은 사실상 아이콘 두 줄 교체(Zap→Sparkles, Bell→ShieldCheck)로 끝 — 대비 효과가 매우 큰 저비용 고수익 항목.</div>
+</section>
+
+
+
+<div class="report-foot">
+Oxios Web UI 일관성 감사 · 2026-07-18 · evidence-grounded (모든 발견은 file:line 인용)
+</div>
+
+</div>
+</body>
+</html>
