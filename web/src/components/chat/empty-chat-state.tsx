@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { EmptyState } from '@/components/shared/empty-state'
 import { api } from '@/lib/api-client'
 import { useChatStore } from '@/stores/chat'
 import type { Session } from '@/types'
@@ -25,16 +26,13 @@ export function EmptyChatState() {
     : []
 
   return (
-    <div className="flex flex-col items-center gap-8 py-12 px-4">
-      <div className="text-center space-y-3">
-        <p className="text-lg font-semibold text-foreground">{t('chat.greeting')}</p>
-        {sessions.length > 0 ? (
-          <p className="text-xs text-muted-foreground">{t('chat.emptyHint')}</p>
-        ) : null}
-      </div>
-
+    <EmptyState
+      title={t('chat.greeting')}
+      description={sessions.length > 0 ? t('chat.emptyHint') : undefined}
+      className="px-4"
+    >
       {sessions.length > 0 ? (
-        <div className="w-full max-w-md space-y-1">
+        <div className="mt-8 w-full max-w-md space-y-1 text-left">
           <p className="text-xs font-medium text-muted-foreground mb-2">
             {t('chat.recentSessions')}
           </p>
@@ -62,7 +60,7 @@ export function EmptyChatState() {
           </div>
         </div>
       ) : null}
-    </div>
+    </EmptyState>
   )
 }
 

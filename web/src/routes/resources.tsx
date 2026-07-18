@@ -19,13 +19,9 @@ function getChartColor(token: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || '#888'
 }
 
-/** Severity color for a 0–100 utilization metric: neutral under 75%, warning 75–90%, error 90%+. */
-function sevColor(pct: number): string {
-  return getChartColor(pct >= 90 ? '--error' : pct >= 75 ? '--warning' : '--info')
-}
-
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { MetricGaugeCard } from '@/components/shared/metric-gauge-card'
 import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -71,59 +67,9 @@ function ResourcesPage() {
       {/* Current Stats */}
       {latest && (
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">{t('resources.cpu')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{latest.cpu_percent.toFixed(1)}%</div>
-              <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${latest.cpu_percent}%`,
-                    backgroundColor: sevColor(latest.cpu_percent),
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">
-                {t('resources.memory')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{latest.memory_percent.toFixed(1)}%</div>
-              <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${latest.memory_percent}%`,
-                    backgroundColor: sevColor(latest.memory_percent),
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">{t('resources.disk')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{latest.disk_percent.toFixed(1)}%</div>
-              <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${latest.disk_percent}%`,
-                    backgroundColor: sevColor(latest.disk_percent),
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <MetricGaugeCard label={t('resources.cpu')} value={latest.cpu_percent} />
+          <MetricGaugeCard label={t('resources.memory')} value={latest.memory_percent} />
+          <MetricGaugeCard label={t('resources.disk')} value={latest.disk_percent} />
         </div>
       )}
 

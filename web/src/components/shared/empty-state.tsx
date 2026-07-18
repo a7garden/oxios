@@ -5,10 +5,19 @@ interface EmptyStateProps {
   title: string
   description?: string
   action?: React.ReactNode
+  /** 여분 콘텐츠 슬롯(예: 최근 목록). action 아래, 중앙 정렬 컨테이너 안에 렌더. */
+  children?: React.ReactNode
   className?: string
 }
 
-export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  children,
+  className,
+}: EmptyStateProps) {
   return (
     <div
       className={cn(
@@ -25,6 +34,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
       <h3 className="text-lg font-semibold">{title}</h3>
       {description && <p className="mt-1 text-sm text-muted-foreground max-w-md">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
+      {children}
     </div>
   )
 }
