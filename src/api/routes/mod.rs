@@ -92,11 +92,13 @@ pub(crate) use email_routes::{
     handle_email_template_get, handle_email_templates, handle_email_test,
 };
 pub(crate) use engine_routes::{
-    handle_engine_config, handle_engine_delete_api_key, handle_engine_models,
-    handle_engine_providers, handle_engine_roles, handle_engine_routing_fallbacks,
-    handle_engine_routing_stats, handle_engine_set_api_key, handle_engine_set_model,
-    handle_engine_set_provider_options, handle_engine_set_quick_ask_model, handle_engine_set_roles,
-    handle_engine_set_routing, handle_engine_validate_key,
+    handle_add_custom_provider, handle_check_provider_connection, handle_engine_config,
+    handle_engine_delete_api_key, handle_engine_models, handle_engine_providers,
+    handle_engine_roles, handle_engine_routing_fallbacks, handle_engine_routing_stats,
+    handle_engine_set_api_key, handle_engine_set_model, handle_engine_set_provider_options,
+    handle_engine_set_quick_ask_model, handle_engine_set_roles, handle_engine_set_routing,
+    handle_engine_validate_key, handle_get_provider_config, handle_remove_custom_provider,
+    handle_set_model_list, handle_set_provider_config,
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
@@ -312,6 +314,27 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/api/engine/routing/fallbacks",
             get(handle_engine_routing_fallbacks),
+        )
+        .route(
+            "/api/engine/providers/{id}/config",
+            get(handle_get_provider_config)
+                .put(handle_set_provider_config),
+        )
+        .route(
+            "/api/engine/providers/{id}/check",
+            post(handle_check_provider_connection),
+        )
+        .route(
+            "/api/engine/providers/{id}/models",
+            put(handle_set_model_list),
+        )
+        .route(
+            "/api/engine/custom-providers",
+            post(handle_add_custom_provider),
+        )
+        .route(
+            "/api/engine/custom-providers/{id}",
+            delete(handle_remove_custom_provider),
         )
         // Secrets management (RFC-028 SP-2b)
         .route("/api/secrets", get(secrets_routes::handle_secrets_list))

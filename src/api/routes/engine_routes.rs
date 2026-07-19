@@ -5,11 +5,15 @@
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 
 use crate::api::error::AppError;
 use crate::api::server::AppState;
+use oxios_kernel::kernel_handle::engine_api::{
+    ConnectionCheckResult, CustomProviderDef, ModelListSettings, ProviderConfigResponse,
+    ProviderInfo, ProviderSettings,
+};
 
 // ── Request types ───────────────────────────────────────────────────────────
 
@@ -365,4 +369,62 @@ pub(crate) async fn handle_engine_routing_fallbacks(
         "events": events,
         "total_count": events.len(),
     })))
+}
+
+/// GET /api/engine/providers/:id/config
+pub(crate) async fn handle_get_provider_config(
+    State(state): State<Arc<AppState>>,
+    Path(provider_id): Path<String>,
+) -> Result<Json<ProviderConfigResponse>, AppError> {
+    let config = state.kernel.engine.get_provider_config(&provider_id)?;
+    Ok(Json(config))
+}
+
+/// PUT /api/engine/providers/:id/config
+pub(crate) async fn handle_set_provider_config(
+    State(state): State<Arc<AppState>>,
+    Path(provider_id): Path<String>,
+    Json(settings): Json<ProviderSettings>,
+) -> Result<Json<ProviderConfigResponse>, AppError> {
+    let config = state.kernel.engine.set_provider_config(&provider_id, settings)?;
+    Ok(Json(config))
+}
+
+/// POST /api/engine/providers/:id/check
+pub(crate) async fn handle_check_provider_connection(
+    State(state): State<Arc<AppState>>,
+    Path(provider_id): Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<ConnectionCheckResult>, AppError> {
+    let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("default");
+    let result = state.kernel.engine.check_provider_connection(&provider_id, model)?;
+    Ok(Json(result))
+}
+
+/// PUT /api/engine/providers/:id/models
+pub(crate) async fn handle_set_model_list(
+    State(state): State<Arc<AppState>>,
+    Path(provider_id): Path<String>,
+    Json(config): Json<ModelListSettings>,
+) -> Result<Json<ProviderConfigResponse>, AppError> {
+    let result = state.kernel.engine.set_model_list(&provider_id, config)?;
+    Ok(Json(result))
+}
+
+/// POST /api/engine/custom-providers
+pub(crate) async fn handle_add_custom_provider(
+    State(state): State<Arc<AppState>>,
+    Json(def): Json<CustomProviderDef>,
+) -> Result<Json<ProviderInfo>, AppError> {
+    let meta = state.kernel.engine.add_custom_provider(def)?;
+    Ok(Json(meta))
+}
+
+/// DELETE /api/engine/custom-providers/:id
+pub(crate) async fn handle_remove_custom_provider(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    state.kernel.engine.remove_custom_provider(&id)?;
+    Ok(Json(serde_json::json!({"deleted": true})))
 }
