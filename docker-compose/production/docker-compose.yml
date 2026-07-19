@@ -1,0 +1,96 @@
+# Oxios Docker Compose — Production Self-Hosting
+#
+# Start:  docker compose up -d
+# Stop:   docker compose down
+# Logs:   docker compose logs -f oxios
+#
+# Oxios is a single-binary Rust daemon. This compose wraps it with
+# optional services for persistence, caching, and monitoring.
+# Everything except `oxios` is optional — the daemon works standalone.
+
+name: oxios
+
+services:
+  # ── Oxios daemon ──────────────────────────────────────────────
+  oxios:
+    image: ghcr.io/a7garden/oxios:latest
+    container_name: oxios
+    restart: unless-stopped
+    ports:
+      - '${OXIOS_PORT:-9876}:9876'
+    volumes:
+      # Persistent state: sessions, skills, config, knowledge base
+      - oxios_data:/root/.oxios
+      # Optional: mount host workspace for agent file access
+      - ${OXIOS_WORKSPACE:-~/oxios-workspace}:/workspace:ro
+    environment:
+      # ── Provider API keys ──
+      - OXIOS_ANTHROPIC_API_KEY=${OXIOS_ANTHROPIC_API_KEY:-}
+      - OXIOS_OPENAI_API_KEY=${OXIOS_OPENAI_API_KEY:-}
+      - OXIOS_GOOGLE_API_KEY=${OXIOS_GOOGLE_API_KEY:-}
+      - OXIOS_DEEPSEEK_API_KEY=${OXIOS_DEEPSEEK_API_KEY:-}
+      - OXIOS_GROQ_API_KEY=${OXIOS_GROQ_API_KEY:-}
+      - OXIOS_OPENROUTER_API_KEY=${OXIOS_OPENROUTER_API_KEY:-}
+      - OXIOS_MISTRAL_API_KEY=${OXIOS_MISTRAL_API_KEY:-}
+      # ── Optional: database backend ──
+      # Uncomment and set POSTGRES_URL to enable PostgreSQL persistence.
+      # When unset, Oxios uses filesystem storage (~/.oxios).
+      # - DATABASE_URL=${POSTGRES_URL:-}
+      # ── Optional: Redis cache ──
+      # - REDIS_URL=${REDIS_URL:-}
+      # ── Runtime options ──
+      - RUST_LOG=${OXIOS_LOG_LEVEL:-info}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9876/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Uncomment if using PostgreSQL:
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+
+  # ── Optional: PostgreSQL ──────────────────────────────────────
+  # Uncomment to enable durable persistence for sessions, agent state,
+  # and chat history. Without it, Oxios uses filesystem storage.
+  #
+  # postgres:
+  #   image: postgres:17-alpine
+  #   container_name: oxios-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_USER=oxios
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oxios}
+  #     - POSTGRES_DB=oxios
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ['CMD-SHELL', 'pg_isready -U oxios']
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # ── Optional: Redis ───────────────────────────────────────────
+  # Uncomment for caching and pub/sub. Improves performance for
+  # multi-session workloads.
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: oxios-redis
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ['CMD', 'redis-cli', 'ping']
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 5
+
+volumes:
+  oxios_data:
+    driver: local
+  # postgres_data:
+  #   driver: local
+  # redis_data:
+  #   driver: local
