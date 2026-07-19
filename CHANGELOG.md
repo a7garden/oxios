@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.24.1] - 2026-07-19
+
+### Fixed
+- **Daemon startup panic** — `TaskStore::init_schema` called
+  `tokio::sync::Mutex::blocking_lock()` from inside the runtime
+  (`WebSurface::start`), panicking at every `oxios restart` with
+  *"Cannot block the current thread from within a runtime."* Schema
+  initialization now runs on the raw `Connection` before the async
+  mutex wraps it; `init_schema` is a free function and `new()` takes
+  `Connection` directly.
+- **`POST /api/tasks` deadlock** — `create_task` held the connection
+  lock across `self.get_task_by_id().await`, re-entering the same
+  non-reentrant `tokio::sync::Mutex`. The lock is now scoped to the
+  INSERT so it releases before the read.
+- **OAuth test assertion** — `host_tools::oauth::tests` asserted
+  `json.contains("user_code")` but `DeviceCodeResponse` serializes
+  under `#[serde(rename_all = "camelCase")]` as `userCode`. This was
+  a deterministic pre-existing failure on clean main that would have
+  blocked the release CI gate.
+
+
 ## [1.24.0] - 2026-07-19
 
 ### Added
