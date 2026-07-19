@@ -9,6 +9,7 @@ import { MarkdownMessage } from './markdown-message'
 import { SearchGrounding } from './search-grounding'
 import { Thinking } from './thinking'
 import { ToolCallCard } from './tool-call-card'
+import { FollowUpChips } from './follow-up-chips'
 
 interface MessageBubbleProps {
   message: ChatMessage
@@ -115,6 +116,16 @@ export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: M
         )}
         {hasSearch && message.search && <SearchGrounding search={message.search} />}
         {hasContent && <MarkdownMessage>{message.content}</MarkdownMessage>}
+
+        {/* Follow-up suggestion chips */}
+        {hasContent && !message.metadata?.isError && (
+          <FollowUpChips
+            sessionId={sessionId}
+            messageId={message.id}
+            content={message.content}
+            onSelect={() => {}}
+          />
+        )}
       </div>
     </ChatItem>
   )
