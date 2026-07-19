@@ -2,9 +2,8 @@
 // Ported from LobeHub's RecommendTaskTemplates pattern.
 // Shows cards for each template with "Add Task" button.
 
-'use client'
-
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Palette, Users, Video, Newspaper, CheckCircle, Radar,
   Search, BarChart, PenTool, Clock, Plus,
@@ -36,6 +35,7 @@ interface TaskTemplateGalleryProps {
 
 export function TaskTemplateGallery({ onSelectTemplate, className }: TaskTemplateGalleryProps) {
   const [activeCategory, setActiveCategory] = useState<TaskTemplateCategory | 'all'>('all')
+  const { t } = useTranslation()
 
   const filtered = useMemo(() => {
     if (activeCategory === 'all') return TASK_TEMPLATES
@@ -47,7 +47,7 @@ export function TaskTemplateGallery({ onSelectTemplate, className }: TaskTemplat
       {/* Category filter */}
       <div className="flex items-center gap-1 mb-4 overflow-x-auto pb-1">
         <CategoryChip
-          label="All"
+          label={t('cronJobs.templates.all')}
           count={TASK_TEMPLATES.length}
           active={activeCategory === 'all'}
           onClick={() => setActiveCategory('all')}
@@ -130,6 +130,7 @@ function TaskTemplateCard({
   template: TaskTemplate
   onSelect: () => void
 }) {
+  const { t } = useTranslation()
   const Icon = ICONS[template.icon] ?? CheckCircle
 
   return (
@@ -176,7 +177,7 @@ function TaskTemplateCard({
         className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
       >
         <Plus className="w-3.5 h-3.5" />
-        Add Task
+        {t('cronJobs.templates.addTask')}
       </button>
     </div>
   )

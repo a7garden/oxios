@@ -2,8 +2,6 @@
 // Ported from LobeHub's FollowUpChips pattern.
 // When enabled in system agent config, generates 3 clickable suggestions.
 
-'use client'
-
 import { useQuery } from '@tanstack/react-query'
 import { Lightbulb } from 'lucide-react'
 import { api } from '@/lib/api-client'

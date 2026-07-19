@@ -5,8 +5,6 @@
 //   antd-style (createStaticStyles, cssVar)
 // Replaced with: shadcn/ui Accordion, ScrollArea + Tailwind
 
-'use client'
-
 import {
   Accordion,
   AccordionContent,

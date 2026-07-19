@@ -1,11 +1,11 @@
 // StatsDashboard — unified usage statistics dashboard (LobeHub-inspired)
 
-'use client'
-
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { Bot, TrendingUp, DollarSign, Coins } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { CostByModel } from '@/components/cost/cost-by-model'
 import { CostChart } from '@/components/cost/cost-chart'
 import { ProviderQuotaCards } from '@/components/cost/provider-quota-cards'
@@ -21,6 +21,7 @@ interface StatsOverview {
 }
 
 export function StatsDashboard({ className }: { className?: string }) {
+  const { t } = useTranslation()
   const { data: overview } = useQuery({
     queryKey: ['stats-overview'],
     queryFn: () => api.get<StatsOverview>('/api/costs/summary?period=all'),
@@ -35,35 +36,35 @@ export function StatsDashboard({ className }: { className?: string }) {
     <div className={cn('space-y-6', className)}>
       {/* Overview cards */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">Overview</h2>
+        <h2 className="text-lg font-semibold mb-3">{t('dashboard.statsOverview')}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard
             icon={<DollarSign className="w-4 h-4" />}
-            label="Total Spend"
+            iconClassName="text-emerald-500"
+            label={t('dashboard.totalSpend')}
             value={overview ? formatCost(overview.total_cost_usd) : '—'}
-            sublabel={overview ? `${overview.agent_count} agents` : ''}
-            color="text-emerald-500"
+            hint={overview ? t('dashboard.agentsCount', { count: overview.agent_count }) : undefined}
           />
           <StatCard
             icon={<TrendingUp className="w-4 h-4" />}
-            label="Today"
+            iconClassName="text-blue-500"
+            label={t('dashboard.today')}
             value={todayStats ? formatCost(todayStats.total_cost_usd) : '—'}
-            sublabel={todayStats ? formatTokens(todayStats.total_tokens) : ''}
-            color="text-blue-500"
+            hint={todayStats ? formatTokens(todayStats.total_tokens) : undefined}
           />
           <StatCard
             icon={<Coins className="w-4 h-4" />}
-            label="Total Tokens"
+            iconClassName="text-amber-500"
+            label={t('dashboard.totalTokens')}
             value={overview ? formatTokens(overview.total_tokens) : '—'}
-            sublabel="all time"
-            color="text-amber-500"
+            hint={t('dashboard.allTime')}
           />
           <StatCard
             icon={<Bot className="w-4 h-4" />}
-            label="Sessions"
+            iconClassName="text-purple-500"
+            label={t('dashboard.sessionsLabel')}
             value={overview ? String(overview.total_sessions ?? 0) : '—'}
-            sublabel="total"
-            color="text-purple-500"
+            hint={t('dashboard.totalLabel')}
           />
         </div>
       </section>
@@ -75,7 +76,7 @@ export function StatsDashboard({ className }: { className?: string }) {
 
       {/* Usage trends */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">Usage Trends (30 days)</h2>
+        <h2 className="text-lg font-semibold mb-3">{t('dashboard.usageTrends')}</h2>
         <div className="rounded-xl border bg-card p-4">
           <CostChart days={30} />
         </div>
@@ -83,40 +84,15 @@ export function StatsDashboard({ className }: { className?: string }) {
 
       {/* Cost by model */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">Cost by Model</h2>
+        <h2 className="text-lg font-semibold mb-3">{t('dashboard.costByModelSection')}</h2>
         <CostByModel period="all" />
       </section>
 
       {/* Provider quotas */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">Provider Quotas</h2>
+        <h2 className="text-lg font-semibold mb-3">{t('dashboard.providerQuotas')}</h2>
         <ProviderQuotaCards />
       </section>
-    </div>
-  )
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  sublabel,
-  color,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  sublabel?: string
-  color?: string
-}) {
-  return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <div className={cn('shrink-0', color)}>{icon}</div>
-        <span className="text-xs text-muted-foreground font-medium">{label}</span>
-      </div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-      {sublabel && <p className="text-xs text-muted-foreground mt-0.5">{sublabel}</p>}
     </div>
   )
 }

@@ -2,8 +2,6 @@
 // Global keyboard shortcut that opens a command-palette-style search over
 // settings sections, provider configs, and engine options.
 
-'use client'
-
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Search, CornerDownLeft } from 'lucide-react'

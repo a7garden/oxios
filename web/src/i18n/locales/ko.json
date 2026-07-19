@@ -602,7 +602,8 @@
     "wed": "수",
     "thu": "목",
     "fri": "금",
-    "sat": "토"
+    "sat": "토",
+    "tasks": "작업"
   },
   "cost": {
     "title": "비용 및 지출",
@@ -717,7 +718,13 @@
     "descHourly_one": "매시간 :{{minute}}분에",
     "goal": "목표",
     "name": "이름",
-    "everyNHours": "매시간"
+    "everyNHours": "매시간",
+    "templates": {
+      "all": "전체",
+      "galleryTitle": "작업 템플릿",
+      "galleryDescription": "사전 구축된 템플릿으로 빠르게 시작하세요",
+      "addTask": "작업 추가"
+    }
   },
   "dashboard": {
     "title": "대시보드",
@@ -820,7 +827,18 @@
       "knowledgeDesc": "마크다운 노트와 일기를 관리하세요",
       "memory": "메모리 탐색",
       "memoryDesc": "에이전트 메모리 저장소를 살펴보세요"
-    }
+    },
+    "statsOverview": "개요",
+    "usageTrends": "사용 추세 (30일)",
+    "costByModelSection": "모델별 비용",
+    "providerQuotas": "제공자 할당량",
+    "totalSpend": "총 지출",
+    "today": "오늘",
+    "totalTokens": "전체 토큰",
+    "sessionsLabel": "세션",
+    "allTime": "전체 기간",
+    "totalLabel": "총계",
+    "agentsCount": "에이전트 {{count}}개"
   },
   "dataTable": {
     "clearFilters": "필터 초기화",
@@ -1015,6 +1033,7 @@
     "untitled": "제목 없음",
     "enterFolderName": "폴더 이름 입력:",
     "unsavedChanges": "저장되지 않은 변경 사항",
+    "renameCollision": "같은 이름의 노트가 이미 있어 파일 이름을 유지했어요.",
     "general": "일반",
     "language": "언어",
     "timezone": "시간대",
@@ -1297,7 +1316,12 @@
     "updated": "수정일",
     "lastAccessed": "마지막 접근",
     "summary": "요약",
-    "searchFailed": "검색에 실패했습니다. 다시 시도해 주세요."
+    "searchFailed": "검색에 실패했습니다. 다시 시도해 주세요.",
+    "allCategories": "전체",
+    "noMemoriesYet": "메모리가 없습니다",
+    "noCategoryMemories": "{{category}} 메모리가 없습니다",
+    "addMemory": "메모리 추가",
+    "addCategoryMemory": "{{category}} 추가"
   },
   "mounts": {
     "title": "마운트",
@@ -1832,7 +1856,11 @@
     "integrationsConnect": "연결",
     "integrationsConnected": "연결됨",
     "integrationsNone": "등록된 통합이 없습니다",
+    "integrationsKindPackageManagers": "패키지 매니저",
+    "integrationsKindCliTools": "CLI 도구",
+    "integrationsKindCredentials": "자격 증명",
     "integrationsInstall": "설치",
+    "integrationsInstalling": "설치 중…",
     "integrationsInstallConfirm": "{{name}}을(를) 이 호스트에 설치하시겠습니까?",
     "integrationsInstallDone": "설치 완료",
     "integrationsInstallFailed": "설치 실패",
@@ -1893,7 +1921,21 @@
     "secretInvalid": "시크릿이 유효하지 않습니다",
     "secretValid": "시크릿이 유효합니다",
     "secretValidateFailed": "시크릿 검증 실패",
-    "verify": "검증"
+    "verify": "검증",
+    "imageGeneration": {
+      "title": "AI 이미지 생성",
+      "description": "이미지 생성 작업의 기본 설정",
+      "defaultCount": "기본 이미지 수",
+      "countHint": "작업당 기본 생성 이미지 수 (범위: {{min}}-{{max}})",
+      "model": "이미지 생성 모델",
+      "modelHint": "이미지 생성에 사용할 모델 (DALL-E, Stable Diffusion 등)",
+      "noImageModels": "이미지 전용 모델이 감지되지 않았습니다. 전체 모델을 표시합니다."
+    },
+    "systemAgents": {
+      "system": "시스템 에이전트",
+      "memory": "메모리 모델",
+      "optional": "선택 기능"
+    }
   },
   "sidebar": {
     "console": "콘솔",
@@ -1926,6 +1968,8 @@
     "config": "설정",
     "requiresIntegrations": "통합",
     "configureInSettings": "구성 →",
+    "integrationNotInstalled": "설치 안 됨",
+    "integrationNotConfigured": "구성 안 됨",
     "always": "항상",
     "claudeCompatible": "핵심 명령은 Oxios와 호환됩니다. Claude 전용 기능(allowed-tools, arguments, hooks)은 유지되지만 활성화되지 않습니다.",
     "missing": "(누락)",
@@ -2143,5 +2187,27 @@
     "deleteConfirmTitle": "파일을 삭제하시겠습니까?",
     "deleteConfirmDesc": "{{path}} 파일이 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
     "uploadFile": "파일 업로드"
+  },
+  "tasks": {
+    "title": "작업",
+    "subtitle": "에이전트 작업 수명주기 관리",
+    "newTask": "새 작업",
+    "all": "전체",
+    "noTasks": "작업이 없습니다",
+    "noTasksDescription": "반복되는 에이전트 작업을 예약하려면 작업을 생성하세요",
+    "createTask": "작업 생성",
+    "createDialogTitle": "작업 생성",
+    "nameLabel": "이름",
+    "namePlaceholder": "주간 폰트 추천",
+    "descriptionLabel": "설명 (선택)",
+    "descriptionPlaceholder": "매주 수요일, 폰트 페어링 3개 받기",
+    "instructionLabel": "지시문",
+    "instructionPlaceholder": "당신은 디자인 큐레이터입니다. 폰트 페어링 3개를 제공하세요...",
+    "cancel": "취소",
+    "creating": "생성 중...",
+    "run": "실행",
+    "complete": "완료",
+    "runs": "{{count}}회 실행",
+    "every": "{{secs}}초마다"
   }
 }

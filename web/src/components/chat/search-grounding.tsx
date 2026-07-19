@@ -4,8 +4,6 @@
 // Dependencies removed: @lobehub/ui (SearchResultCards, Flexbox), antd-style
 // Replaced with: Tailwind utility classes
 
-'use client'
-
 import { cn } from '@/lib/utils'
 import { Globe, Image, ChevronDown } from 'lucide-react'
 import { useState } from 'react'

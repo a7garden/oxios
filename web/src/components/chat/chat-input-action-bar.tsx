@@ -2,8 +2,6 @@
 // Ported from LobeHub's ChatInput ActionBar pattern.
 // Controls: web search toggle, knowledge base toggle, file upload
 
-'use client'
-
 import { Globe, GlobeOff, Paperclip, BookOpen, X } from 'lucide-react'
 import { type ChangeEvent, useRef } from 'react'
 import { cn } from '@/lib/utils'

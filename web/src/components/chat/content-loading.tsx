@@ -4,8 +4,6 @@
 // Shows operation descriptor + elapsed time while the agent is working.
 // Hides for 'reasoning' operations (Thinking component handles that).
 
-'use client'
-
 import { Loader2 } from 'lucide-react'
 
 import { memo } from 'react'

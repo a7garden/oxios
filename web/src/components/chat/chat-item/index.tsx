@@ -7,8 +7,6 @@
 // Dependencies removed: @lobehub/ui (Flexbox), antd-style (createStaticStyles, cx)
 // Replaced with: Tailwind utility classes, cn() from clsx/tailwind-merge
 
-'use client'
-
 import { cn } from '@/lib/utils'
 import type { ChatError, ChatItemAvatar, ChatItemProps as _ChatItemProps } from '@/types/chat'
 import { Loader2 } from 'lucide-react'

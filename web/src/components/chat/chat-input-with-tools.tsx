@@ -2,8 +2,6 @@
 // Wraps the existing ChatInput with LobeHub-inspired action bar
 // (web search, knowledge base, file upload) rendered below the textarea.
 
-'use client'
-
 import { useState, useCallback } from 'react'
 import { ChatInputActionBar } from './chat-input-action-bar'
 import type { AttachedFile } from './chat-input-action-bar'

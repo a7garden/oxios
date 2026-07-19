@@ -1,8 +1,6 @@
 // SystemAgentSettings — model assignment UI for system tasks
 // Ported from LobeHub's ModelAssignmentsForm pattern.
 
-'use client'
-
 import { Brain, Bot, Tag, Image, Languages, Archive, MessageCircle, Sparkles, Wand2, Box, UserCircle, type LucideIcon } from 'lucide-react'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -43,9 +41,9 @@ export function SystemAgentSettings({
   const { t } = useTranslation()
 
   const groups = [
-    { id: 'system' as const, title: t('settings.systemAgents.system', 'System Agents'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'system') },
-    { id: 'memory' as const, title: t('settings.systemAgents.memory', 'Memory Models'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'memory') },
-    { id: 'optional' as const, title: t('settings.systemAgents.optional', 'Optional Features'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'optional') },
+    { id: 'system' as const, title: t('settings.systemAgents.system'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'system') },
+    { id: 'memory' as const, title: t('settings.systemAgents.memory'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'memory') },
+    { id: 'optional' as const, title: t('settings.systemAgents.optional'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'optional') },
   ]
 
   return (

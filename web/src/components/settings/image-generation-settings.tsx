@@ -1,10 +1,9 @@
 // AI Image Generation Settings (ported from LobeHub)
 // Default image count slider + image model configuration.
 
-'use client'
-
 import { Image as ImageIcon, Loader2 } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Slider } from '@/components/ui/slider'
 import { ModelSelect } from '@/components/engine/model-select'
 import { useModels } from '@/hooks/use-engine'
@@ -35,6 +34,7 @@ export function ImageGenerationSettings({
   onImageModelChange,
   className,
 }: ImageGenerationSettingsProps) {
+  const { t } = useTranslation()
   const [isUpdating, setIsUpdating] = useState(false)
   const { data: models = [] } = useModels(null)
   // Filter to image-capable models (heuristic: name contains dall-e, stable, image, etc.)
@@ -50,8 +50,8 @@ export function ImageGenerationSettings({
           <ImageIcon className="w-4 h-4 text-muted-foreground" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold">AI Image Generation</h3>
-          <p className="text-xs text-muted-foreground">Default settings for image generation tasks</p>
+          <h3 className="text-sm font-semibold">{t('settings.imageGeneration.title')}</h3>
+          <p className="text-xs text-muted-foreground">{t('settings.imageGeneration.description')}</p>
         </div>
       </div>
 
@@ -59,12 +59,12 @@ export function ImageGenerationSettings({
       <div className="rounded-lg border bg-card p-4">
         <div className="flex items-center justify-between mb-2">
           <Label htmlFor="default-image-num" className="text-sm font-medium">
-            Default image count
+            {t('settings.imageGeneration.defaultCount')}
           </Label>
           {isUpdating && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          Number of images generated per task by default (range: {MIN_DEFAULT_IMAGE_NUM}-{MAX_DEFAULT_IMAGE_NUM})
+          {t('settings.imageGeneration.countHint', { min: MIN_DEFAULT_IMAGE_NUM, max: MAX_DEFAULT_IMAGE_NUM })}
         </p>
         <div className="flex items-center gap-4">
           <Slider
@@ -90,9 +90,9 @@ export function ImageGenerationSettings({
       {/* Image model */}
       {onImageModelChange && (
         <div className="rounded-lg border bg-card p-4">
-          <Label className="text-sm font-medium mb-2 block">Image generation model</Label>
+          <Label className="text-sm font-medium mb-2 block">{t('settings.imageGeneration.model')}</Label>
           <p className="text-xs text-muted-foreground mb-3">
-            Model used when generating images (DALL-E, Stable Diffusion, etc.)
+            {t('settings.imageGeneration.modelHint')}
           </p>
           <ModelSelect
             models={imageModels.length > 0 ? imageModels : models}
@@ -101,7 +101,7 @@ export function ImageGenerationSettings({
           />
           {imageModels.length === 0 && (
             <p className="text-xs text-amber-500 mt-2">
-              No image-specific models detected. Showing all models.
+              {t('settings.imageGeneration.noImageModels')}
             </p>
           )}
         </div>

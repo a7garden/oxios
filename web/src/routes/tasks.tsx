@@ -2,6 +2,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useTasks, useCreateTask, useDeleteTask, useUpdateTaskStatus, useRunTask } from '@/hooks/use-tasks'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils'
 export const Route = createFileRoute('/tasks')({ component: TasksPage })
 
 function TasksPage() {
+  const { t } = useTranslation()
   const { data, isLoading, isError, refetch } = useTasks()
   const [showCreate, setShowCreate] = useState(false)
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all')
@@ -31,14 +33,14 @@ function TasksPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Tasks"
-        subtitle="Agent task lifecycle management"
+        title={t('tasks.title')}
+        subtitle={t('tasks.subtitle')}
         actions={
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
-                New Task
+                {t('tasks.newTask')}
               </Button>
             </DialogTrigger>
             <CreateTaskDialog onClose={() => setShowCreate(false)} />
@@ -48,9 +50,9 @@ function TasksPage() {
 
       {/* Status filter chips */}
       <div className="flex items-center gap-1 overflow-x-auto pb-1">
-        <StatusChip label="All" count={allTasks.length} active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} />
+        <StatusChip label={t('tasks.all')} count={allTasks.length} active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} />
         {TASK_STATUSES.map((status) => {
-          const count = allTasks.filter((t) => t.status === status).length
+          const count = allTasks.filter((tk) => tk.status === status).length
           if (count === 0) return null
           const meta = TASK_STATUS_META[status]
           return (
@@ -70,9 +72,9 @@ function TasksPage() {
       {tasks.length === 0 ? (
         <EmptyState
           icon={<Plus className="h-8 w-8" />}
-          title="No tasks yet"
-          description="Create a task to schedule recurring agent work"
-          action={<Button size="sm" onClick={() => setShowCreate(true)}>Create Task</Button>}
+          title={t('tasks.noTasks')}
+          description={t('tasks.noTasksDescription')}
+          action={<Button size="sm" onClick={() => setShowCreate(true)}>{t('tasks.createTask')}</Button>}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -123,6 +125,7 @@ function StatusChip({
 // ── Task card ──
 
 function TaskCard({ task }: { task: Task }) {
+  const { t } = useTranslation()
   const deleteMutation = useDeleteTask()
   const statusMutation = useUpdateTaskStatus()
   const runMutation = useRunTask()
@@ -157,11 +160,11 @@ function TaskCard({ task }: { task: Task }) {
           <span>
             {task.automationMode === 'schedule'
               ? task.schedulePattern ?? 'cron'
-              : `every ${task.heartbeatIntervalSecs ?? 0}s`}
+              : t('tasks.every', { secs: task.heartbeatIntervalSecs ?? 0 })}
           </span>
           {task.executionCount > 0 && (
             <span className="text-muted-foreground/60 ml-auto">
-              {task.executionCount} runs
+              {t('tasks.runs', { count: task.executionCount })}
             </span>
           )}
         </div>
@@ -172,12 +175,12 @@ function TaskCard({ task }: { task: Task }) {
         {task.status !== 'completed' && task.status !== 'running' && (
           <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={handleRun} disabled={runMutation.isPending}>
             <Play className="h-3 w-3" />
-            Run
+            {t('tasks.run')}
           </Button>
         )}
         {task.status === 'running' && (
           <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={handleComplete}>
-            Complete
+            {t('tasks.complete')}
           </Button>
         )}
         <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-destructive ml-auto" onClick={handleDelete} disabled={deleteMutation.isPending}>
@@ -191,6 +194,7 @@ function TaskCard({ task }: { task: Task }) {
 // ── Create dialog ──
 
 function CreateTaskDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
   const createMutation = useCreateTask()
   const [name, setName] = useState('')
   const [instruction, setInstruction] = useState('')
@@ -207,30 +211,30 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
   return (
     <DialogContent className="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>Create Task</DialogTitle>
+        <DialogTitle>{t('tasks.createDialogTitle')}</DialogTitle>
       </DialogHeader>
       <div className="space-y-3">
         <div>
-          <label className="text-sm font-medium mb-1 block">Name</label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Weekly Font Recommendations" />
+          <label className="text-sm font-medium mb-1 block">{t('tasks.nameLabel')}</label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('tasks.namePlaceholder')} />
         </div>
         <div>
-          <label className="text-sm font-medium mb-1 block">Description (optional)</label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Every Wednesday, get 3 font pairings" />
+          <label className="text-sm font-medium mb-1 block">{t('tasks.descriptionLabel')}</label>
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('tasks.descriptionPlaceholder')} />
         </div>
         <div>
-          <label className="text-sm font-medium mb-1 block">Instruction</label>
+          <label className="text-sm font-medium mb-1 block">{t('tasks.instructionLabel')}</label>
           <Textarea
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
-            placeholder="You are a design curator. Provide 3 font pairings..."
+            placeholder={t('tasks.instructionPlaceholder')}
             rows={4}
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>{t('tasks.cancel')}</Button>
           <Button size="sm" onClick={handleSubmit} disabled={!name.trim() || !instruction.trim() || createMutation.isPending}>
-            {createMutation.isPending ? 'Creating...' : 'Create Task'}
+            {createMutation.isPending ? t('tasks.creating') : t('tasks.createTask')}
           </Button>
         </div>
       </div>

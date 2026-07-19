@@ -1,8 +1,6 @@
 // ModelDetail — compact info card for a model's capabilities + pricing
 // Shown on click of an info icon in the model picker.
 
-'use client'
-
 import { Brain, Eye, Zap, Maximize, DollarSign } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ModelInfo } from '@/types/engine'

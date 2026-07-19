@@ -1,7 +1,5 @@
 // MarkdownMessage — enhanced markdown renderer with syntax highlighting + copy button
 
-'use client'
-
 import { Check, Copy } from 'lucide-react'
 import { type ComponentPropsWithoutRef, memo, useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'

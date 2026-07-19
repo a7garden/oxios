@@ -602,7 +602,8 @@
     "wed": "Wed",
     "thu": "Thu",
     "fri": "Fri",
-    "sat": "Sat"
+    "sat": "Sat",
+    "tasks": "Tasks"
   },
   "cost": {
     "title": "Cost & Spend",
@@ -717,7 +718,13 @@
     "goal": "Goal",
     "name": "Name",
     "everyNMinutes": "Every minute",
-    "everyNHours": "Every hour"
+    "everyNHours": "Every hour",
+    "templates": {
+      "all": "All",
+      "galleryTitle": "Task Templates",
+      "galleryDescription": "Get started quickly with a pre-built template",
+      "addTask": "Add Task"
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -820,7 +827,18 @@
       "knowledgeDesc": "Manage markdown notes and journal",
       "memory": "Explore Memory",
       "memoryDesc": "Browse the agent memory store"
-    }
+    },
+    "statsOverview": "Overview",
+    "usageTrends": "Usage Trends (30 days)",
+    "costByModelSection": "Cost by Model",
+    "providerQuotas": "Provider Quotas",
+    "totalSpend": "Total Spend",
+    "today": "Today",
+    "totalTokens": "Total Tokens",
+    "sessionsLabel": "Sessions",
+    "allTime": "all time",
+    "totalLabel": "total",
+    "agentsCount": "{{count}} agents"
   },
   "dataTable": {
     "clearFilters": "Clear filters",
@@ -1015,6 +1033,7 @@
     "untitled": "Untitled",
     "enterFolderName": "Enter folder name:",
     "unsavedChanges": "Unsaved changes",
+    "renameCollision": "A note with that name already exists — filename kept.",
     "general": "General",
     "language": "Language",
     "timezone": "Timezone",
@@ -1299,7 +1318,12 @@
     "updated": "Updated",
     "lastAccessed": "Last accessed",
     "summary": "Summary",
-    "searchFailed": "Search failed. Please try again."
+    "searchFailed": "Search failed. Please try again.",
+    "allCategories": "All",
+    "noMemoriesYet": "No memories yet",
+    "noCategoryMemories": "No {{category}} memories yet",
+    "addMemory": "Add memory",
+    "addCategoryMemory": "Add {{category}}"
   },
   "mounts": {
     "title": "Mounts",
@@ -1834,7 +1858,11 @@
     "integrationsConnect": "Connect",
     "integrationsConnected": "Connected",
     "integrationsNone": "No integrations registered",
+    "integrationsKindPackageManagers": "Package managers",
+    "integrationsKindCliTools": "CLI tools",
+    "integrationsKindCredentials": "Credentials",
     "integrationsInstall": "Install",
+    "integrationsInstalling": "Installing…",
     "integrationsInstallConfirm": "Install {{name}} on this host?",
     "integrationsInstallDone": "Install completed",
     "integrationsInstallFailed": "Install failed",
@@ -1895,7 +1923,21 @@
     "secretInvalid": "Secret is invalid",
     "secretValid": "Secret is valid",
     "secretValidateFailed": "Failed to validate secret",
-    "verify": "Verify"
+    "verify": "Verify",
+    "imageGeneration": {
+      "title": "AI Image Generation",
+      "description": "Default settings for image generation tasks",
+      "defaultCount": "Default image count",
+      "countHint": "Number of images generated per task by default (range: {{min}}-{{max}})",
+      "model": "Image generation model",
+      "modelHint": "Model used when generating images (DALL-E, Stable Diffusion, etc.)",
+      "noImageModels": "No image-specific models detected. Showing all models."
+    },
+    "systemAgents": {
+      "system": "System Agents",
+      "memory": "Memory Models",
+      "optional": "Optional Features"
+    }
   },
   "sidebar": {
     "console": "Console",
@@ -1928,6 +1970,8 @@
     "config": "config",
     "requiresIntegrations": "integrations",
     "configureInSettings": "Configure →",
+    "integrationNotInstalled": "not installed",
+    "integrationNotConfigured": "not configured",
     "always": "always",
     "claudeCompatible": "Core instructions are compatible with Oxios. Claude-specific features (allowed-tools, arguments, hooks) are preserved but not active.",
     "missing": "(missing)",
@@ -2145,5 +2189,27 @@
     "deleteConfirmTitle": "Delete this file?",
     "deleteConfirmDesc": "{{path}} will be permanently deleted. This cannot be undone.",
     "uploadFile": "Upload file"
+  },
+  "tasks": {
+    "title": "Tasks",
+    "subtitle": "Agent task lifecycle management",
+    "newTask": "New Task",
+    "all": "All",
+    "noTasks": "No tasks yet",
+    "noTasksDescription": "Create a task to schedule recurring agent work",
+    "createTask": "Create Task",
+    "createDialogTitle": "Create Task",
+    "nameLabel": "Name",
+    "namePlaceholder": "Weekly Font Recommendations",
+    "descriptionLabel": "Description (optional)",
+    "descriptionPlaceholder": "Every Wednesday, get 3 font pairings",
+    "instructionLabel": "Instruction",
+    "instructionPlaceholder": "You are a design curator. Provide 3 font pairings...",
+    "cancel": "Cancel",
+    "creating": "Creating...",
+    "run": "Run",
+    "complete": "Complete",
+    "runs": "{{count}} runs",
+    "every": "every {{secs}}s"
   }
 }

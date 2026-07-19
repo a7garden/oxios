@@ -2,14 +2,14 @@
 // Ported from LobeHub's memory categorization system.
 // Tabs: Identity | Activity | Context | Experience | Preference
 
-'use client'
-
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   UserCircle, Activity, Compass, GraduationCap, Heart,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { EmptyState } from '@/components/shared/empty-state'
 import {
   MEMORY_CATEGORY_METADATA,
   type CategorizedMemory,
@@ -39,6 +39,7 @@ export function CategorizedMemoryBrowser({
   onCreateMemory,
   className,
 }: CategorizedMemoryBrowserProps) {
+  const { t } = useTranslation()
   const [activeCategory, setActiveCategory] = useState<MemoryCategory | 'all'>('all')
 
   const filtered = useMemo(() => {
@@ -53,13 +54,17 @@ export function CategorizedMemoryBrowser({
     }
     return c
   }, [memories])
+  const emptyMeta = activeCategory !== 'all'
+    ? MEMORY_CATEGORY_METADATA.find((m) => m.key === activeCategory)
+    : null
+  const EmptyIcon = emptyMeta ? (ICONS[emptyMeta.icon] ?? UserCircle) : null
 
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Category tabs */}
       <div className="flex items-center gap-1 border-b px-2 overflow-x-auto">
         <CategoryTab
-          label="All"
+          label={t('memory.allCategories')}
           count={memories.length}
           active={activeCategory === 'all'}
           onClick={() => setActiveCategory('all')}
@@ -83,8 +88,18 @@ export function CategorizedMemoryBrowser({
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {filtered.length === 0 ? (
           <EmptyState
-            category={activeCategory}
-            onCreate={onCreateMemory ? () => onCreateMemory(activeCategory === 'all' ? 'identity' : activeCategory) : undefined}
+            icon={EmptyIcon && <EmptyIcon className={cn('h-8 w-8', emptyMeta?.color)} />}
+            title={emptyMeta ? t('memory.noCategoryMemories', { category: emptyMeta.label.toLowerCase() }) : t('memory.noMemoriesYet')}
+            description={emptyMeta?.description}
+            action={onCreateMemory ? (
+              <button
+                type="button"
+                onClick={() => onCreateMemory(activeCategory === 'all' ? 'identity' : activeCategory)}
+                className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs hover:bg-primary/90 transition-colors"
+              >
+                {emptyMeta ? t('memory.addCategoryMemory', { category: emptyMeta.label.toLowerCase() }) : t('memory.addMemory')}
+              </button>
+            ) : undefined}
           />
         ) : (
           filtered.map((memory) => (
@@ -197,43 +212,3 @@ function MemoryCard({
     </button>
   )
 }
-
-// ── Empty state ──
-
-function EmptyState({
-  category,
-  onCreate,
-}: {
-  category: MemoryCategory | 'all'
-  onCreate?: () => void
-}) {
-  const meta = category !== 'all'
-    ? MEMORY_CATEGORY_METADATA.find((m) => m.key === category)
-    : null
-
-  return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-      {meta && (
-        (() => {
-          const Icon = ICONS[meta.icon] ?? UserCircle
-          return <Icon className={cn('w-8 h-8 mb-2', meta.color)} />
-        })()
-      )}
-      <p className="text-sm text-muted-foreground">
-        {meta ? `No ${meta.label.toLowerCase()} memories yet` : 'No memories yet'}
-      </p>
-      {meta && <p className="text-xs text-muted-foreground/60 mt-1">{meta.description}</p>}
-      {onCreate && (
-        <button
-          type="button"
-          onClick={onCreate}
-          className="mt-3 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs hover:bg-primary/90 transition-colors"
-        >
-          Add {meta?.label.toLowerCase() ?? 'memory'}
-        </button>
-      )}
-    </div>
-  )
-}
-
-// Need useMemo import

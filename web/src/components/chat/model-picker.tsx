@@ -17,6 +17,7 @@ import { useEngineConfig, useModels, useSetModel } from '@/hooks/use-engine'
 import { cn } from '@/lib/utils'
 import type { ModelInfo } from '@/types/engine'
 import { ModelDetail } from '@/components/engine/model-detail'
+import { EmptyState } from '@/components/shared/empty-state'
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -339,12 +340,14 @@ export function ModelPicker({
         <div ref={listRef} className="max-h-[60vh] overflow-y-auto py-1">
           {hasNoModels ? (
             <EmptyState
+              size="compact"
               icon={<Cpu className="h-5 w-5" />}
               title={t('chat.modelPicker.noModels')}
-              hint={t('chat.modelPicker.noModelsHint')}
+              description={t('chat.modelPicker.noModelsHint')}
             />
           ) : hasNoMatches ? (
             <EmptyState
+              size="compact"
               icon={<Search className="h-5 w-5" />}
               title={t('chat.modelPicker.noResults', { query }) as string}
             />
@@ -724,24 +727,6 @@ function RoleRow({
       )}
       {selected && <Check className="h-3.5 w-3.5 text-primary shrink-0 ml-auto" />}
     </RowButton>
-  )
-}
-
-function EmptyState({
-  icon,
-  title,
-  hint,
-}: {
-  icon: React.ReactNode
-  title: string
-  hint?: string
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1 px-4 py-8 text-center text-muted-foreground">
-      <div className="opacity-50">{icon}</div>
-      <p className="text-xs font-medium text-foreground/80">{title}</p>
-      {hint && <p className="text-2xs text-muted-foreground/70 max-w-[18rem]">{hint}</p>}
-    </div>
   )
 }
 
