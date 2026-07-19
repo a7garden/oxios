@@ -4,7 +4,29 @@ All notable changes to this project are documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+
+## [1.24.0] - 2026-07-19
+
+### Added
+- **Dynamic model catalog (oxi-sdk 0.56.0)** — Models.dev-powered catalog with
+  live price/limit refresh and user overrides. Provider resolution fixes for
+  previously broken providers.
+- **Task management (RFC-043)** — SQLite-backed task lifecycle with CRUD,
+  scheduling (cron + heartbeat), verify pipeline, and REST API.
+- **Appearance settings** — New Web UI component for theme/layout preferences.
+- **ETag caching** — Conditional request support (`If-None-Match` / `304`)
+  for non-immutable static assets in the web dashboard.
+
+### Changed
+- **Cron schedule croner → cron** — Switched cron parser for better
+  compatibility with standard cron expressions.
+
+### Fixed
+- **WebSurface struct** — Restored missing struct definition in `plugin.rs`
+  that prevented compilation with `web` feature.
+- **Clippy** — All warnings resolved across kernel (derivable_impls,
+  if_same_then_else, collapsible_if, useless_format) and binary
+  (collapsible_if, await_holding_lock, print_literal, dead_code).
 
 ## [1.23.3] - 2026-07-15
 
