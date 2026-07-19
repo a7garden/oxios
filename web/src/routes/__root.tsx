@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { createRootRouteWithContext } from '@tanstack/react-router'
 import { AppLayout } from '@/components/layout/app-layout'
 import { ErrorBoundary } from '@/components/shared/error-boundary'
+import { SettingsSearch } from '@/components/layout/settings-search'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
@@ -19,6 +20,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           <ErrorBoundary>
             <AppLayout />
           </ErrorBoundary>
+          <SettingsSearch />
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>

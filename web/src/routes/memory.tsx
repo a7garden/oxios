@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DreamPanel } from '@/components/memory/dream-panel'
 import { MemoryBrowser } from '@/components/memory/memory-browser'
+import { CategorizedMemoryBrowser } from '@/components/memory/categorized-memory-browser'
 import { MemoryDetail } from '@/components/memory/memory-detail'
 import { MemoryMap } from '@/components/memory/memory-map'
 import { MemoryOverview } from '@/components/memory/memory-overview'
@@ -35,6 +36,7 @@ function MemoryPage() {
             {t('memory.map')}
           </TabsTrigger>
           <TabsTrigger value="dream">{t('memory.dream')}</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <MemoryOverview />
@@ -50,6 +52,9 @@ function MemoryPage() {
         </TabsContent>
         <TabsContent value="dream">
           <DreamPanel />
+        </TabsContent>
+        <TabsContent value="categories">
+          <CategorizedMemoryBrowser memories={[]} />
         </TabsContent>
       </Tabs>
       <MemoryDetail memory={selected} open={detailOpen} onClose={() => setDetailOpen(false)} />

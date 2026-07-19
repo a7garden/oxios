@@ -19,6 +19,7 @@ import {
   Sparkles,
   SlidersHorizontal,
   BarChart3,
+  Image as ImageIcon,
   Terminal,
   Wallet,
   Wrench,
@@ -50,6 +51,7 @@ const ICON_MAP: Record<SectionIconKey, React.ComponentType<{ className?: string 
   notifications: Bell,
   systemAgents: SlidersHorizontal,
   stats: BarChart3,
+  image: ImageIcon,
   hostTools: Wrench,
 }
 

@@ -480,6 +480,7 @@ import { Bot, ChevronRight } from 'lucide-react'
 import { AllowedToolsPicker } from '@/components/settings/allowed-tools-picker'
 import { SystemAgentSettings } from '@/components/settings/system-agent-settings'
 import { StatsDashboard } from '@/components/dashboard/stats-dashboard'
+import { ImageGenerationSettings } from '@/components/settings/image-generation-settings'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 // ─── Settings Page ─────────────────────────────────────────────
@@ -855,6 +856,16 @@ function renderActiveSection(
           systemAgents={{}}
           memoryModels={{}}
           onChange={() => {}}
+        />
+      </SectionCard>
+    )
+  }
+  if (sectionId === 'image') {
+    return (
+      <SectionCard sectionId="image" title={t('settings.sectionImage')}>
+        <ImageGenerationSettings
+          defaultImageNum={4}
+          onDefaultImageNumChange={() => {}}
         />
       </SectionCard>
     )

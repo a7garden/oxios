@@ -807,6 +807,7 @@ export type SectionIconKey =
   | 'hostTools'
   | 'systemAgents'
   | 'stats'
+  | 'image'
 
 export interface SectionMeta {
   /** Section key, e.g. `engine`, `exec`, `memory`. */
@@ -833,6 +834,15 @@ export const SECTION_META: SectionMeta[] = [
     descriptionKey: 'settings.systemAgentsDescription',
     groupId: 'ai',
     iconKey: 'systemAgents',
+    custom: true,
+  },
+  // AI Image generation
+  {
+    id: 'image',
+    labelKey: 'settings.sectionImage',
+    descriptionKey: 'settings.imageDescription',
+    groupId: 'ai',
+    iconKey: 'image',
     custom: true,
   },
   // Stats dashboard
