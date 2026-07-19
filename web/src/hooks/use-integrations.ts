@@ -147,7 +147,7 @@ export function useInstallJobStatus(jobId: string | null): InstallJobStatus {
       typeof t === 'string' &&
       t.startsWith('integration_install_') &&
       'jobId' in e &&
-      (e as { jobId: unknown }).jobId === jobId
+      (e as unknown as { jobId: unknown }).jobId === jobId
     )
   })
   const last = matching[matching.length - 1]
