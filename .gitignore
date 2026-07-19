@@ -45,3 +45,4 @@ report-*.json
 # Local benchmark and browser-automation artifacts
 /.oxios-bench/
 /.playwright-cli/
+.worktrees/
