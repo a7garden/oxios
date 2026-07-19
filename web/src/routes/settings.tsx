@@ -478,6 +478,8 @@ function EnginePanel() {
 // the other legacy form code that uses the same primitives.
 import { Bot, ChevronRight } from 'lucide-react'
 import { AllowedToolsPicker } from '@/components/settings/allowed-tools-picker'
+import { SystemAgentSettings } from '@/components/settings/system-agent-settings'
+import { StatsDashboard } from '@/components/dashboard/stats-dashboard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 // ─── Settings Page ─────────────────────────────────────────────
@@ -846,6 +848,24 @@ function renderActiveSection(
   onDiscardAll: () => void,
 ) {
   // Engine: render the dedicated engine panel.
+  if (sectionId === 'system-agents') {
+    return (
+      <SectionCard sectionId="system-agents" title={t('settings.sectionSystemAgents')}>
+        <SystemAgentSettings
+          systemAgents={{}}
+          memoryModels={{}}
+          onChange={() => {}}
+        />
+      </SectionCard>
+    )
+  }
+  if (sectionId === 'stats') {
+    return (
+      <SectionCard sectionId="stats" title={t('settings.sectionStats')}>
+        <StatsDashboard />
+      </SectionCard>
+    )
+  }
   if (sectionId === 'engine') {
     return <EnginePanel />
   }

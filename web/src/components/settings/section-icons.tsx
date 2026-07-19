@@ -17,6 +17,8 @@ import {
   Server,
   Shield,
   Sparkles,
+  SlidersHorizontal,
+  BarChart3,
   Terminal,
   Wallet,
   Wrench,
@@ -46,6 +48,8 @@ const ICON_MAP: Record<SectionIconKey, React.ComponentType<{ className?: string 
   budget: Wallet,
   secrets: KeyRound,
   notifications: Bell,
+  systemAgents: SlidersHorizontal,
+  stats: BarChart3,
   hostTools: Wrench,
 }
 

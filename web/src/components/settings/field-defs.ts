@@ -805,6 +805,8 @@ export type SectionIconKey =
   | 'secrets'
   | 'notifications'
   | 'hostTools'
+  | 'systemAgents'
+  | 'stats'
 
 export interface SectionMeta {
   /** Section key, e.g. `engine`, `exec`, `memory`. */
@@ -824,6 +826,24 @@ export interface SectionMeta {
 }
 
 export const SECTION_META: SectionMeta[] = [
+  // System Agents (LobeHub-inspired model assignment)
+  {
+    id: 'system-agents',
+    labelKey: 'settings.sectionSystemAgents',
+    descriptionKey: 'settings.systemAgentsDescription',
+    groupId: 'ai',
+    iconKey: 'systemAgents',
+    custom: true,
+  },
+  // Stats dashboard
+  {
+    id: 'stats',
+    labelKey: 'settings.sectionStats',
+    descriptionKey: 'settings.statsDescription',
+    groupId: 'ai',
+    iconKey: 'stats',
+    custom: true,
+  },
   // AI
   {
     id: 'engine',
