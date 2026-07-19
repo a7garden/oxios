@@ -899,6 +899,63 @@ impl Default for TelegramSessionConfig {
 }
 
 /// Top-level Oxios configuration.
+/// A single system agent model assignment.
+/// Lets users pick a different model for each system task.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct SystemAgentItem {
+    /// Model id in "provider/model" format. Empty = inherit default.
+    #[serde(default)]
+    pub model: String,
+    /// Whether this system task is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Token cap for this task.
+    #[serde(default)]
+    pub context_limit: Option<u32>,
+    /// Override system prompt.
+    #[serde(default)]
+    pub custom_prompt: Option<String>,
+}
+
+/// System agent model assignments (ported from LobeHub).
+/// Each field controls which model is used for a specific background task.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct SystemAgentsConfig {
+    /// Auto topic naming.
+    #[serde(default)]
+    pub topic: SystemAgentItem,
+    /// AI image topic naming.
+    #[serde(default)]
+    pub generation_topic: SystemAgentItem,
+    /// Message translation.
+    #[serde(default)]
+    pub translation: SystemAgentItem,
+    /// Conversation history compression.
+    #[serde(default)]
+    pub history_compress: SystemAgentItem,
+    /// Agent metadata generation (name, description, avatar, tags).
+    #[serde(default)]
+    pub agent_meta: SystemAgentItem,
+    /// Follow-up suggestion chips.
+    #[serde(default)]
+    pub follow_up_action: SystemAgentItem,
+    /// Input auto-complete (ghost text).
+    #[serde(default)]
+    pub input_completion: SystemAgentItem,
+    /// Prompt rewriting.
+    #[serde(default)]
+    pub prompt_rewrite: SystemAgentItem,
+    /// Memory analysis — extract identity, preferences, context, etc.
+    #[serde(default)]
+    pub memory_analysis: SystemAgentItem,
+    /// Memory embedding model.
+    #[serde(default)]
+    pub memory_embedding: SystemAgentItem,
+    /// Memory persona summary writer.
+    #[serde(default)]
+    pub memory_persona_writer: SystemAgentItem,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct OxiosConfig {
     /// Kernel settings.
@@ -915,6 +972,9 @@ pub struct OxiosConfig {
     /// Orchestrator settings (Ouroboros protocol execution).
     #[serde(default)]
     pub orchestrator: OrchestratorConfig,
+    /// System agent model assignments (LobeHub-inspired).
+    #[serde(default)]
+    pub system_agents: SystemAgentsConfig,
     /// Context manager settings (LLM context window management).
     #[serde(default)]
     pub context: ContextConfig,

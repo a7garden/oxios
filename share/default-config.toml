@@ -297,3 +297,27 @@ preset = "balanced"
 # reset_window_secs = 18000             # 5h — drain window + reset cadence
 # min_remaining_percent = 5             # floor for this provider (optional)
 # models = ["zai/glm-4.6", "zai/glm-4.5-air"]  # REQUIRED non-empty: models to round-robin
+
+# ── System Agents (LobeHub-inspired) ───────────────────────────────────────
+# Assign different models to different background system tasks.
+# Each task has: model (empty = inherit default), enabled, context_limit, custom_prompt.
+# This enables cost optimization — use cheap models for simple tasks like topic naming.
+#
+# [system_agents.topic]
+# model = ""  # empty = inherit engine default_model
+# enabled = true
+#
+# [system_agents.history_compress]
+# model = "anthropic/claude-3-5-haiku-20241022"  # cheap model for compression
+# enabled = true
+# context_limit = 8000
+#
+# [system_agents.memory_analysis]
+# model = ""  # use default for high-quality extraction
+# enabled = true
+#
+# [system_agents.follow_up_action]
+# enabled = false  # disabled by default — opt in
+#
+# [system_agents.input_completion]
+# enabled = false  # disabled by default — opt in
