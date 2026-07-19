@@ -70,7 +70,8 @@ pub use oxi_sdk::{
 use std::sync::Arc;
 
 /// Global Tracer instance.
-static TRACER: std::sync::OnceLock<Tracer> = std::sync::OnceLock::new();
+/// Stored as `Arc<Tracer>` because `Tracer::start` takes `self: &Arc<Self>` (oxi-sdk 0.56.0+).
+static TRACER: std::sync::OnceLock<Arc<Tracer>> = std::sync::OnceLock::new();
 
 /// Global CostTracker instance.
 static COST_TRACKER: std::sync::OnceLock<CostTracker> = std::sync::OnceLock::new();
@@ -82,8 +83,8 @@ static AUDIT_LOG: std::sync::OnceLock<AuditLog> = std::sync::OnceLock::new();
 ///
 /// The tracer is lazily initialized on first access.
 /// Used for distributed tracing of agent executions, tool calls, and kernel operations.
-pub fn tracer() -> &'static Tracer {
-    TRACER.get_or_init(Tracer::new)
+pub fn tracer() -> &'static Arc<Tracer> {
+    TRACER.get_or_init(|| Arc::new(Tracer::new()))
 }
 
 /// Get the global CostTracker.

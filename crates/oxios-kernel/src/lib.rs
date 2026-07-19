@@ -83,8 +83,8 @@ pub mod mount;
 pub mod project;
 pub mod resource_monitor;
 pub mod session_context;
-pub mod task;
 pub mod state_store;
+pub mod task;
 
 // ─── Infrastructure ─────────────────────────────────────────────────
 // 엔진, 에러, 타입, 메트릭, 텔레메트리, 옵저버빌리티.

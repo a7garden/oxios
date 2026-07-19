@@ -909,15 +909,9 @@ async fn run_agent(
         compaction_strategy: CompactionStrategy::Threshold(0.8),
         compaction_instruction: None,
         context_window: 128_000,
-        api_key: config.api_key.clone(),
         workspace_dir: Some(workspace.clone()),
         output_mode: None,
         provider_options: config.provider_options.clone(),
-        // oxi-sdk 0.37.0+: ownership identity for oxi's built-in ownership-gated
-        // tools (e.g. the `issue` tool's flock). `None` preserves the pre-0.37.1
-        // behavior (ToolContext.session_id == None). Oxios runs its own tool
-        // set, so no ownership identity is needed here; set `Some(...)` only if
-        // oxios agents start using oxi ownership-gated tools.
         session_id: None,
         // RFC-035 Phase B/C: pass through gap 1/3 config to oxi-sdk 0.54.0+.
         max_tool_result_bytes: config.max_tool_result_bytes,

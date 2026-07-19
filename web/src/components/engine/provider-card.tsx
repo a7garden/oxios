@@ -197,18 +197,23 @@ export function ProviderCard({ provider, onChangeKey, onRemove, isPending }: Pro
       {!showKeyInput && (
         <div className="flex items-center gap-1 mt-3 -mr-1">
           <Button
-            size="icon"
+            size="sm"
             variant="ghost"
-            className={cn('h-8 w-8', validateState === 'valid' && 'text-emerald-500')}
+            className={cn('h-8 gap-1.5 text-xs', validateState === 'valid' && 'text-emerald-500')}
             onClick={handleValidate}
             disabled={validateState === 'validating' || isPending}
             title={t('engine.verify')}
           >
             {validateState === 'validating' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : validateState === 'valid' ? (
+              <Check className="h-3.5 w-3.5" />
             ) : (
-              <ShieldCheck className="h-4 w-4" />
+              <ShieldCheck className="h-3.5 w-3.5" />
             )}
+            <span className="hidden sm:inline">
+              {validateState === 'validating' ? t('engine.verifying') : t('engine.verify')}
+            </span>
           </Button>
           <Button
             size="icon"

@@ -7,9 +7,10 @@ use std::collections::HashMap;
 
 // ── Enums ──
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
+    #[default]
     Backlog,
     Scheduled,
     Running,
@@ -17,12 +18,6 @@ pub enum TaskStatus {
     Completed,
     Failed,
     Canceled,
-}
-
-impl Default for TaskStatus {
-    fn default() -> Self {
-        Self::Backlog
-    }
 }
 
 impl std::fmt::Display for TaskStatus {
@@ -280,15 +275,7 @@ impl Task {
         let slug: String = name
             .to_lowercase()
             .chars()
-            .map(|c| {
-                if c.is_alphanumeric() {
-                    c
-                } else if c == ' ' || c == '-' || c == '_' {
-                    '-'
-                } else {
-                    '-'
-                }
-            })
+            .map(|c| if c.is_alphanumeric() { c } else { '-' })
             .collect();
         let slug = slug.trim_matches('-').to_string();
         let shortened = if slug.len() > 48 { &slug[..48] } else { &slug };
@@ -302,14 +289,13 @@ impl Task {
         if self.automation_mode.is_none() {
             return false;
         }
-        if let Some(ref next) = self.next_run_at {
-            if let Ok(next_dt) = chrono::DateTime::parse_from_rfc3339(next) {
-                return next_dt.with_timezone(&Utc) <= Utc::now();
-            }
+        if let Some(ref next) = self.next_run_at
+            && let Ok(next_dt) = chrono::DateTime::parse_from_rfc3339(next)
+        {
+            return next_dt.with_timezone(&Utc) <= Utc::now();
         }
         false
     }
-
     /// Check if the task has hit max_executions.
     pub fn is_exhausted(&self) -> bool {
         self.max_executions

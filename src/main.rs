@@ -2373,7 +2373,7 @@ async fn run(cli: Cli) -> Result<()> {
                         println!("  No active agents.");
                         println!("  Run `oxios run \"<prompt>\"` to start one.");
                     } else {
-                        println!("  {:<38} {:<14} {}", "AGENT ID", "STATUS", "TOKENS LEFT");
+                        println!("  {:<38} {:<14} TOKENS LEFT", "AGENT ID", "STATUS");
                         println!("  {}", "─".repeat(60));
                         for agent in &agents {
                             let budget = handle.agents.check_budget(&agent.id);
@@ -2853,13 +2853,14 @@ async fn run(cli: Cli) -> Result<()> {
                     cmd_email_setup(&kernel).await;
                 }
                 EmailAction::Test => {
-                    let api = handle.email.read();
-                    if let Some(api) = api.as_ref() {
+                    let api = handle.email.read().clone();
+                    if let Some(api) = api {
+                        let default_to = api.default_to().to_string();
                         match api.test_connection().await {
                             Ok(()) => println!(
                                 "{} Test email sent to {}",
                                 style("✓").green().bold(),
-                                api.default_to()
+                                default_to
                             ),
                             Err(e) => {
                                 eprintln!("{} SMTP test failed: {}", style("✗").red().bold(), e)

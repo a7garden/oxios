@@ -386,7 +386,10 @@ pub(crate) async fn handle_set_provider_config(
     Path(provider_id): Path<String>,
     Json(settings): Json<ProviderSettings>,
 ) -> Result<Json<ProviderConfigResponse>, AppError> {
-    let config = state.kernel.engine.set_provider_config(&provider_id, settings)?;
+    let config = state
+        .kernel
+        .engine
+        .set_provider_config(&provider_id, settings)?;
     Ok(Json(config))
 }
 
@@ -396,8 +399,14 @@ pub(crate) async fn handle_check_provider_connection(
     Path(provider_id): Path<String>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<ConnectionCheckResult>, AppError> {
-    let model = body.get("model").and_then(|v| v.as_str()).unwrap_or("default");
-    let result = state.kernel.engine.check_provider_connection(&provider_id, model)?;
+    let model = body
+        .get("model")
+        .and_then(|v| v.as_str())
+        .unwrap_or("default");
+    let result = state
+        .kernel
+        .engine
+        .check_provider_connection(&provider_id, model)?;
     Ok(Json(result))
 }
 

@@ -1,15 +1,15 @@
 // StatsDashboard — unified usage statistics dashboard (LobeHub-inspired)
 
 import { useQuery } from '@tanstack/react-query'
+import { Bot, Coins, DollarSign, TrendingUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Bot, TrendingUp, DollarSign, Coins } from 'lucide-react'
-import { api } from '@/lib/api-client'
-import { cn } from '@/lib/utils'
-import { StatCard } from '@/components/dashboard/stat-card'
 import { CostByModel } from '@/components/cost/cost-by-model'
 import { CostChart } from '@/components/cost/cost-chart'
 import { ProviderQuotaCards } from '@/components/cost/provider-quota-cards'
 import { SpendLimitCard } from '@/components/cost/spend-limit-card'
+import { StatCard } from '@/components/dashboard/stat-card'
+import { api } from '@/lib/api-client'
+import { cn } from '@/lib/utils'
 
 interface StatsOverview {
   total_cost_usd: number
@@ -43,7 +43,9 @@ export function StatsDashboard({ className }: { className?: string }) {
             iconClassName="text-emerald-500"
             label={t('dashboard.totalSpend')}
             value={overview ? formatCost(overview.total_cost_usd) : '—'}
-            hint={overview ? t('dashboard.agentsCount', { count: overview.agent_count }) : undefined}
+            hint={
+              overview ? t('dashboard.agentsCount', { count: overview.agent_count }) : undefined
+            }
           />
           <StatCard
             icon={<TrendingUp className="w-4 h-4" />}
@@ -93,6 +95,63 @@ export function StatsDashboard({ className }: { className?: string }) {
         <h2 className="text-lg font-semibold mb-3">{t('dashboard.providerQuotas')}</h2>
         <ProviderQuotaCards />
       </section>
+
+      {/* Top Models */}
+      <section>
+        <h2 className="text-lg font-semibold mb-3">Top Models</h2>
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <TopModelsTable />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+// ── Top Models mini-table ──
+
+function TopModelsTable() {
+  const { data } = useQuery({
+    queryKey: ['cost-by-model'],
+    queryFn: () =>
+      api.get<Array<{ model: string; cost: number; tokens: number }>>(
+        '/api/costs/by-model?period=30d',
+      ),
+  })
+
+  if (!data || data.length === 0) {
+    return <div className="p-6 text-center text-sm text-muted-foreground">No data yet</div>
+  }
+
+  const top5 = [...data].sort((a, b) => b.cost - a.cost).slice(0, 5)
+  const maxCost = top5[0]?.cost ?? 1
+
+  return (
+    <div className="divide-y">
+      {top5.map((row, i) => {
+        const pct = (row.cost / maxCost) * 100
+        return (
+          <div key={row.model} className="flex items-center gap-3 px-4 py-3">
+            <span className="text-xs font-mono text-muted-foreground w-5">{i + 1}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium truncate">{row.model}</span>
+                <span className="text-xs text-muted-foreground tabular-nums ml-2 shrink-0">
+                  ${row.cost.toFixed(2)}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div className="text-2xs text-muted-foreground mt-0.5 tabular-nums">
+                {formatTokens(row.tokens)} tokens
+              </div>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

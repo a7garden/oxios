@@ -733,6 +733,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       'budget',
       'notifications',
       'host-tools',
+      'appearance',
     ],
   },
   {
@@ -803,16 +804,15 @@ export type SectionIconKey =
   | 'browser'
   | 'budget'
   | 'secrets'
-  | 'notifications'
-  | 'hostTools'
   | 'systemAgents'
   | 'stats'
   | 'image'
+  | 'hostTools'
+  | 'notifications'
+  | 'appearance'
 
 export interface SectionMeta {
-  /** Section key, e.g. `engine`, `exec`, `memory`. */
   id: string
-  /** i18n key for the section title. */
   labelKey: string
   /** i18n key for the section description (used by the rail/section card). */
   descriptionKey: string
@@ -1042,6 +1042,14 @@ export const SECTION_META: SectionMeta[] = [
     iconKey: 'resourceMonitor',
     tier: 'advanced',
     custom: false,
+  },
+  {
+    id: 'appearance',
+    labelKey: 'settings.sectionAppearance',
+    descriptionKey: 'settings.appearanceDescription',
+    groupId: 'system',
+    iconKey: 'appearance',
+    custom: true,
   },
 ]
 

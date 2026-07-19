@@ -78,11 +78,6 @@ pub(crate) use cost_routes::{
     handle_cost_by_model, handle_cost_by_project, handle_cost_daily, handle_cost_providers,
     handle_cost_spend_limit_get, handle_cost_spend_limit_set, handle_cost_summary,
 };
-pub(crate) use task_routes::{
-    handle_task_create, handle_task_delete, handle_task_get, handle_task_run,
-    handle_task_set_schedule, handle_task_set_verify, handle_task_update_status,
-    handle_tasks_list,
-};
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
     handle_cron_jobs_list, update_cron_job,
@@ -149,6 +144,10 @@ pub(crate) use system::{
     handle_config_meta, handle_config_patch, handle_config_put, handle_doctor, handle_health,
     handle_log, handle_readiness, handle_status, handle_update_changelog, handle_update_check,
     handle_update_run,
+};
+pub(crate) use task_routes::{
+    handle_task_create, handle_task_delete, handle_task_get, handle_task_run,
+    handle_task_set_schedule, handle_task_set_verify, handle_task_update_status, handle_tasks_list,
 };
 pub(crate) use token_maxing_routes::{
     handle_token_maxing_providers, handle_token_maxing_session, handle_token_maxing_sessions,
@@ -317,8 +316,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         .route(
             "/api/engine/providers/{id}/config",
-            get(handle_get_provider_config)
-                .put(handle_set_provider_config),
+            get(handle_get_provider_config).put(handle_set_provider_config),
         )
         .route(
             "/api/engine/providers/{id}/check",

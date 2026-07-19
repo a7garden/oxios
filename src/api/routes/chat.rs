@@ -935,19 +935,19 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             .map(String::from);
                         // Validate model override early — reject unknown IDs
                         // before the orchestrator wastes time on assess/crystallize.
-                        if let Some(ref m) = incoming_model {
-                            if let Err(e) = state.kernel.engine.validate_model(m) {
-                                let err_json = serde_json::json!({
-                                    "type": "error",
-                                    "message": e
-                                });
-                                let _ = ws_tx
-                                    .lock()
-                                    .await
-                                    .send(Message::Text(err_json.to_string().into()))
-                                    .await;
-                                continue;
-                            }
+                        if let Some(ref m) = incoming_model
+                            && let Err(e) = state.kernel.engine.validate_model(m)
+                        {
+                            let err_json = serde_json::json!({
+                                "type": "error",
+                                "message": e
+                            });
+                            let _ = ws_tx
+                                .lock()
+                                .await
+                                .send(Message::Text(err_json.to_string().into()))
+                                .await;
+                            continue;
                         }
                         // One-shot (QuickAsk) requests set `ephemeral: true`.
                         // The recv task skips the pending-message insert so

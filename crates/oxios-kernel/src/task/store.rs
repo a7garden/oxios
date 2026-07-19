@@ -1,7 +1,7 @@
 // Task store — SQLite-backed CRUD for tasks (RFC-043)
 use anyhow::{Context, Result};
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -183,7 +183,8 @@ impl TaskStore {
                FROM tasks WHERE 1=1"#,
         );
 
-        let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(limit), Box::new(offset)];
+        let mut param_values: Vec<Box<dyn rusqlite::ToSql>> =
+            vec![Box::new(limit), Box::new(offset)];
 
         if let Some(statuses) = &list_params.statuses {
             let placeholders: Vec<String> = statuses
@@ -197,17 +198,24 @@ impl TaskStore {
             }
         }
         if let Some(ref assignee) = list_params.assignee_agent_id {
-            sql.push_str(&format!(" AND assignee_agent_id = ?{}", param_values.len() + 1));
+            sql.push_str(&format!(
+                " AND assignee_agent_id = ?{}",
+                param_values.len() + 1
+            ));
             param_values.push(Box::new(assignee.clone()));
         }
         if let Some(ref parent) = list_params.parent_task_id {
-            sql.push_str(&format!(" AND parent_task_id = ?{}", param_values.len() + 1));
+            sql.push_str(&format!(
+                " AND parent_task_id = ?{}",
+                param_values.len() + 1
+            ));
             param_values.push(Box::new(parent.clone()));
         }
 
-        sql.push_str(&format!(" ORDER BY sort_order, created_at DESC LIMIT ?1 OFFSET ?2"));
+        sql.push_str(" ORDER BY sort_order, created_at DESC LIMIT ?1 OFFSET ?2");
 
-        let param_refs: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::ToSql> =
+            param_values.iter().map(|p| p.as_ref()).collect();
         let mut stmt = conn.prepare(&sql)?;
         let tasks = stmt
             .query_map(param_refs.as_slice(), map_task_row)?
@@ -282,9 +290,7 @@ impl TaskStore {
 
 fn map_task_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
     let automation_mode_str: Option<String> = row.get(12)?;
-    let automation_mode = automation_mode_str
-        .as_deref()
-        .and_then(|s| s.parse().ok());
+    let automation_mode = automation_mode_str.as_deref().and_then(|s| s.parse().ok());
 
     let status_str: String = row.get(5)?;
     let status = status_str.parse().unwrap_or(TaskStatus::Backlog);

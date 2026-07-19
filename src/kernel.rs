@@ -175,24 +175,23 @@ impl Kernel {
                     // content matches HEAD, so this only creates commits for
                     // genuinely diverged files.
                     let reconcile_git = self.git_layer.clone();
-                    if reconcile_git.is_enabled() {
-                        if let Ok(files) = knowledge.list_all_md_files() {
-                            let mut count = 0;
-                            for (path, _) in &files {
-                                let rel = format!("{reconcile_prefix}/{path}");
-                                if let Ok(info) = reconcile_git
-                                    .commit_file(&rel, "knowledge: post-crash reconcile")
-                                {
-                                    if info.hash != "(disabled)" {
-                                        count += 1;
-                                    }
-                                }
+                    if reconcile_git.is_enabled()
+                        && let Ok(files) = knowledge.list_all_md_files()
+                    {
+                        let mut count = 0;
+                        for (path, _) in &files {
+                            let rel = format!("{reconcile_prefix}/{path}");
+                            if let Ok(info) = reconcile_git
+                                .commit_file(&rel, "knowledge: post-crash reconcile")
+                                && info.hash != "(disabled)"
+                            {
+                                count += 1;
                             }
-                            if count > 0 {
-                                tracing::info!(
-                                    "Post-crash git reconcile: {count} diverged files re-committed"
-                                );
-                            }
+                        }
+                        if count > 0 {
+                            tracing::info!(
+                                "Post-crash git reconcile: {count} diverged files re-committed"
+                            );
                         }
                     }
                 }
@@ -432,8 +431,8 @@ impl Kernel {
         &self.orchestrator
     }
 
-    /// Flush audit trail entries to persistent storage.
     /// Call during graceful shutdown to ensure no entries are lost.
+    #[allow(dead_code)]
     pub fn flush_audit(&self) -> anyhow::Result<()> {
         self.audit_trail
             .flush_to(&*self.state_store)

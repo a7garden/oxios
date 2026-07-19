@@ -1933,6 +1933,9 @@
       "modelHint": "Model used when generating images (DALL-E, Stable Diffusion, etc.)",
       "noImageModels": "No image-specific models detected. Showing all models."
     },
+    "sectionAppearance": "Appearance",
+    "appearanceDescription": "Theme mode and accent color customization",
+
     "systemAgents": {
       "system": "System Agents",
       "memory": "Memory Models",

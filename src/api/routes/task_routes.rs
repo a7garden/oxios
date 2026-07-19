@@ -8,7 +8,9 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 
-use oxios_kernel::task::{CreateTaskParams, ListTasksParams, SetScheduleParams, SetVerifyParams, TaskStatus};
+use oxios_kernel::task::{
+    CreateTaskParams, ListTasksParams, SetScheduleParams, SetVerifyParams, TaskStatus,
+};
 
 use crate::api::error::AppError;
 use crate::api::server::AppState;
@@ -43,7 +45,9 @@ pub(crate) async fn handle_tasks_list(
 
     let store = state.task_store.lock().await;
     match store.list_tasks(params).await {
-        Ok(tasks) => Ok(Json(serde_json::json!({ "tasks": tasks, "count": tasks.len() }))),
+        Ok(tasks) => Ok(Json(
+            serde_json::json!({ "tasks": tasks, "count": tasks.len() }),
+        )),
         Err(e) => {
             tracing::error!(error = %e, "Failed to list tasks");
             Err(AppError::Internal(format!("Failed to list tasks: {e}")))
@@ -59,7 +63,9 @@ pub(crate) async fn handle_task_create(
     Json(params): Json<CreateTaskParams>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     if params.name.trim().is_empty() || params.instruction.trim().is_empty() {
-        return Err(AppError::BadRequest("name and instruction are required".into()));
+        return Err(AppError::BadRequest(
+            "name and instruction are required".into(),
+        ));
     }
 
     let store = state.task_store.lock().await;
@@ -126,7 +132,9 @@ pub(crate) async fn handle_task_update_status(
 
     let store = state.task_store.lock().await;
     match store.update_status(&id, &status).await {
-        Ok(()) => Ok(Json(serde_json::json!({ "id": id, "status": status.to_string() }))),
+        Ok(()) => Ok(Json(
+            serde_json::json!({ "id": id, "status": status.to_string() }),
+        )),
         Err(e) => {
             tracing::error!(error = %e, id = %id, "Failed to update task status");
             Err(AppError::Internal(format!("Failed to update status: {e}")))
@@ -147,26 +155,16 @@ pub(crate) async fn handle_task_set_schedule(
 
     let automation_str = params.automation_mode.as_ref().map(|m| m.to_string());
 
-    // Calculate next_run_at for schedule mode
-    let next_run = if let Some(ref pattern) = params.schedule_pattern {
-        // Simple next-run: parse cron and compute next occurrence
-        // For now, just set to now + interval as placeholder
-        Some(now.clone())
-    } else {
-        None
-    };
+    let next_run = params.schedule_pattern.as_ref().map(|_| now.clone());
 
-    let conn_result = store
-        .set_next_run(&id, next_run.as_deref())
-        .await;
+    let conn_result = store.set_next_run(&id, next_run.as_deref()).await;
 
     // Also update automation fields
     {
-        let store2 = state.task_store.lock().await;
+        let _store2 = state.task_store.lock().await;
         // We'd need a separate update method here, but for now the model
         // supports it through set_next_run
     }
-
     match conn_result {
         Ok(()) => Ok(Json(serde_json::json!({
             "id": id,
@@ -180,9 +178,8 @@ pub(crate) async fn handle_task_set_schedule(
 
 // ── Set verify ────────────────────────────────────────────────────
 
-/// PUT /api/tasks/:id/verify
 pub(crate) async fn handle_task_set_verify(
-    state: State<Arc<AppState>>,
+    _state: State<Arc<AppState>>,
     Path(id): Path<String>,
     Json(params): Json<SetVerifyParams>,
 ) -> Result<Json<serde_json::Value>, AppError> {
@@ -198,6 +195,7 @@ pub(crate) async fn handle_task_set_verify(
 #[derive(Debug, Deserialize)]
 pub struct RunTaskRequest {
     #[serde(default)]
+    #[allow(dead_code)]
     pub prompt: Option<String>,
 }
 

@@ -1,5 +1,6 @@
 import {
   Activity,
+  BarChart3,
   Bell,
   Bot,
   Brain,
@@ -9,17 +10,17 @@ import {
   Eye,
   Gauge,
   Globe,
+  Image as ImageIcon,
   KeyRound,
   ListOrdered,
   MessageSquare,
   Monitor,
+  Palette,
   Send,
   Server,
   Shield,
-  Sparkles,
   SlidersHorizontal,
-  BarChart3,
-  Image as ImageIcon,
+  Sparkles,
   Terminal,
   Wallet,
   Wrench,
@@ -51,8 +52,9 @@ const ICON_MAP: Record<SectionIconKey, React.ComponentType<{ className?: string 
   notifications: Bell,
   systemAgents: SlidersHorizontal,
   stats: BarChart3,
-  image: ImageIcon,
   hostTools: Wrench,
+  image: ImageIcon,
+  appearance: Palette,
 }
 
 /** Generic fallback used when an id is unknown. */

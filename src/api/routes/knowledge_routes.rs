@@ -782,14 +782,14 @@ pub(crate) async fn handle_knowledge_file_or_sub(
             // S-2: Optimistic concurrency — if the client sends If-Match,
             // verify it matches the current content hash. A mismatch means
             // another channel (CLI, Telegram, agent) modified the file.
-            if let Some(if_match) = headers.get(axum::http::header::IF_MATCH) {
-                if let Ok(Some(current_content)) = state.kernel.knowledge.note_read(path) {
-                    let current_etag = content_etag(&current_content);
-                    if if_match.to_str().unwrap_or("") != current_etag {
-                        return Err(AppError::Conflict(
-                            "File was modified by another client. Please reload.".into(),
-                        ));
-                    }
+            if let Some(if_match) = headers.get(axum::http::header::IF_MATCH)
+                && let Ok(Some(current_content)) = state.kernel.knowledge.note_read(path)
+            {
+                let current_etag = content_etag(&current_content);
+                if if_match.to_str().unwrap_or("") != current_etag {
+                    return Err(AppError::Conflict(
+                        "File was modified by another client. Please reload.".into(),
+                    ));
                 }
             }
             state

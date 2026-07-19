@@ -197,7 +197,7 @@ export function QuickAskDialog() {
           <ChatInput
             value={input}
             onChange={setInput}
-            onSend={(content) => send(content)}
+            onSend={(content, _ctx, _files) => send(content)}
             onCancel={cancel}
             isStreaming={isStreaming}
             connected={true}

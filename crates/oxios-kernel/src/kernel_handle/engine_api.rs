@@ -13,9 +13,9 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::fs;
 
 // ── Provider config persistence types ────────────────────────────────────────
 
@@ -45,7 +45,11 @@ pub struct ModelListSettings {
 
 impl Default for ModelListSettings {
     fn default() -> Self {
-        Self { mode: ModelListMode::All, allow: vec![], deny: vec![] }
+        Self {
+            mode: ModelListMode::All,
+            allow: vec![],
+            deny: vec![],
+        }
     }
 }
 
@@ -1313,12 +1317,21 @@ impl EngineApi {
 
     /// Get provider configuration and model list.
     pub fn get_provider_config(&self, provider_id: &str) -> anyhow::Result<ProviderConfigResponse> {
-        let ps = self.provider_configs.read().get(provider_id).cloned().unwrap_or_default();
+        let ps = self
+            .provider_configs
+            .read()
+            .get(provider_id)
+            .cloned()
+            .unwrap_or_default();
 
         let models: Vec<String> = self.list_model_names(provider_id);
 
         let provider = self.build_provider_info(provider_id);
-        Ok(ProviderConfigResponse { provider, settings: ps, models })
+        Ok(ProviderConfigResponse {
+            provider,
+            settings: ps,
+            models,
+        })
     }
 
     /// Save provider settings and apply to RoutingControl.
@@ -1561,7 +1574,8 @@ impl EngineApi {
             .as_ref()
             .map(|(_, src)| match src {
                 crate::credential::CredentialSource::EnvVar => "env",
-                crate::credential::CredentialSource::Config | crate::credential::CredentialSource::OxiAuthStore => "auth_store",
+                crate::credential::CredentialSource::Config
+                | crate::credential::CredentialSource::OxiAuthStore => "auth_store",
             })
             .unwrap_or("none")
             .to_string();

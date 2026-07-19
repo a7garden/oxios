@@ -386,14 +386,19 @@ function EnginePanel() {
         </CardTitle>
         <p className="text-sm text-muted-foreground">{t('settings.engineDescription')}</p>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* ── Connected Providers ── */}
+      <CardContent className="space-y-8">
+        {/* ── Enabled Providers ── */}
         <div>
-          <div className="mb-3">
-            <label className="text-sm font-medium">{t('engine.connectedProviders')}</label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t('engine.connectedProvidersDesc')}
-            </p>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium">{t('engine.connectedProviders')}</label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t('engine.connectedProvidersDesc')}
+              </p>
+            </div>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {connected.length}
+            </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-fr">
             {connected.map((p) => (
@@ -405,20 +410,20 @@ function EnginePanel() {
                 isPending={isMutating}
               />
             ))}
-            {connected.length === 0 && (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center min-h-[124px]">
-                <p className="text-sm text-muted-foreground">{t('engine.noProvidersConnected')}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t('engine.noProvidersConnectedDesc')}
-                </p>
-              </div>
-            )}
             <AddProviderCard
               availableProviders={available}
               onAdd={handleAdd}
               isPending={setApiKey.isPending}
             />
           </div>
+          {connected.length === 0 && available.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
+              <p className="text-sm text-muted-foreground">{t('engine.noProvidersConnected')}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('engine.noProvidersConnectedDesc')}
+              </p>
+            </div>
+          )}
         </div>
 
         <Separator />
@@ -477,10 +482,11 @@ function EnginePanel() {
 // We import them lazily at the bottom to keep the engine panel close to
 // the other legacy form code that uses the same primitives.
 import { Bot, ChevronRight } from 'lucide-react'
-import { AllowedToolsPicker } from '@/components/settings/allowed-tools-picker'
-import { SystemAgentSettings } from '@/components/settings/system-agent-settings'
 import { StatsDashboard } from '@/components/dashboard/stats-dashboard'
+import { AllowedToolsPicker } from '@/components/settings/allowed-tools-picker'
+import { AppearanceSettings } from '@/components/settings/appearance-settings'
 import { ImageGenerationSettings } from '@/components/settings/image-generation-settings'
+import { SystemAgentSettings } from '@/components/settings/system-agent-settings'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 // ─── Settings Page ─────────────────────────────────────────────
@@ -852,21 +858,14 @@ function renderActiveSection(
   if (sectionId === 'system-agents') {
     return (
       <SectionCard sectionId="system-agents" title={t('settings.sectionSystemAgents')}>
-        <SystemAgentSettings
-          systemAgents={{}}
-          memoryModels={{}}
-          onChange={() => {}}
-        />
+        <SystemAgentSettings systemAgents={{}} memoryModels={{}} onChange={() => {}} />
       </SectionCard>
     )
   }
   if (sectionId === 'image') {
     return (
       <SectionCard sectionId="image" title={t('settings.sectionImage')}>
-        <ImageGenerationSettings
-          defaultImageNum={4}
-          onDefaultImageNumChange={() => {}}
-        />
+        <ImageGenerationSettings defaultImageNum={4} onDefaultImageNumChange={() => {}} />
       </SectionCard>
     )
   }
@@ -901,6 +900,14 @@ function renderActiveSection(
     return <IntegrationsSectionCard />
   }
 
+  // Appearance: theme + accent color
+  if (sectionId === 'appearance') {
+    return (
+      <SectionCard sectionId="appearance" title={t('settings.sectionAppearance')}>
+        <AppearanceSettings />
+      </SectionCard>
+    )
+  }
   // Notifications: client-side prefs card (RFC-028 SP-1e).
   if (sectionId === 'notifications') {
     return <NotificationSectionCard />

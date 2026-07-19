@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { type ContextAttachment } from '@/components/chat/chat-input'
+import type { AttachedFile, ContextAttachment } from '@/components/chat/chat-input'
 import { ChatInputWithTools } from '@/components/chat/chat-input-with-tools'
 import { EmptyChatState } from '@/components/chat/empty-chat-state'
 import { InterviewWizard } from '@/components/chat/interview-wizard'
@@ -106,23 +106,41 @@ function ChatPage() {
     setUserScrolledUp(!atBottom)
   }
 
-  const handleSend = (content: string, contextItems: ContextAttachment[]) => {
+  const handleSend = (
+    content: string,
+    contextItems: ContextAttachment[],
+    files: AttachedFile[],
+  ) => {
     if (!content.trim()) return
 
-    // Build message with context references
     let enrichedContent = content
 
-    // If there are context attachments, append them as structured references
+    // Append context references
     if (contextItems.length > 0) {
       const contextRefs = contextItems
         .map((ctx) => {
-          if (ctx.type === 'knowledge') {
-            return `[context:knowledge:${ctx.id}]`
-          }
+          if (ctx.type === 'knowledge') return `[context:knowledge:${ctx.id}]`
+          if (ctx.type === 'file') return `[context:file:${ctx.id}]`
           return `[context:memory:${ctx.id}]`
         })
         .join(' ')
       enrichedContent = `${content}\n${contextRefs}`
+    }
+
+    // Append file contents
+    if (files.length > 0) {
+      const fileContents = files
+        .map((f) => {
+          if (f.content) {
+            return `[file:${f.name}]\n${f.content}\n[/file]`
+          }
+          if (f.dataUrl) {
+            return `[image:${f.name}](${f.dataUrl})`
+          }
+          return `[file:${f.name}]`
+        })
+        .join('\n')
+      enrichedContent = `${enrichedContent}\n${fileContents}`
     }
 
     sendMessage(enrichedContent)
@@ -148,7 +166,7 @@ function ChatPage() {
     const { removeMessage } = useChatStore.getState()
     removeMessage?.(errorMessageId)
     removeMessage?.(precedingUser.id)
-    handleSend(precedingUser.content, [])
+    handleSend(precedingUser.content, [], [])
     setUserScrolledUp(false)
   }
 

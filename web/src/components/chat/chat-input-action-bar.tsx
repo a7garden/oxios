@@ -1,21 +1,9 @@
-// ChatInputActionBar — compact toolbar between textarea and send button
-// Ported from LobeHub's ChatInput ActionBar pattern.
-// Controls: web search toggle, knowledge base toggle, file upload
-
-import { Globe, GlobeOff, Paperclip, BookOpen, X } from 'lucide-react'
+import { BookOpen, Globe, GlobeOff, Paperclip, X } from 'lucide-react'
 import { type ChangeEvent, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import type { AttachedFile } from './chat-input'
 
-// ── Types ──
-
-export interface AttachedFile {
-  name: string
-  size: number
-  type: string
-  /** Base64 data URL for preview, or file path. */
-  dataUrl?: string
-}
-
+export type { AttachedFile }
 export interface ChatInputActionBarProps {
   /** Whether web search is enabled for this message. */
   searchEnabled?: boolean

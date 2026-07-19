@@ -15,6 +15,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use axum::{Router, body::Body, response::Response, routing::get};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use oxios_gateway::surface::{Surface, SurfaceContext, SurfaceHandle};
@@ -25,6 +27,7 @@ use crate::api::middleware::RateLimiter;
 use crate::api::routes;
 use crate::api::server::AppState;
 use oxios_gateway::ReliabilityLayer;
+use tower_http::compression::CompressionLayer;
 
 // RFC-026: removed rust-embed. The web UI is now served exclusively from the
 // filesystem (`ActiveWebDist`), downloaded at runtime from GitHub Releases by
@@ -80,6 +83,17 @@ fn is_immutable_asset(path: &str) -> bool {
     clean.starts_with("assets/")
 }
 
+/// Compute a weak ETag from file content using SipHash-1-3.
+///
+/// Not cryptographically strong, but deterministic within a process
+/// lifetime — sufficient for cache validation (browser re-requests
+/// after restart get a full response, which is fine).
+fn compute_etag(data: &[u8]) -> String {
+    let mut hasher = DefaultHasher::new();
+    data.hash(&mut hasher);
+    format!("\"{:x}\"", hasher.finish())
+}
+
 /// Read the active web version from `<dist>/version.json` (for the
 /// `X-Web-Version` header). Returns `"dev"` when not present.
 fn read_active_version(dist: &std::path::Path) -> String {
@@ -126,7 +140,11 @@ fn is_loopback_host(host: &str) -> bool {
 /// (`Some`), we serve *only* from it and never fall back to embedded assets.
 /// This guarantees a request never mixes two build hashes. Embedded assets
 /// are used only when no active dist exists (startup download failure, etc.).
-fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
+///
+/// When `if_none_match` is provided and matches the computed ETag, returns
+/// `304 Not Modified` instead of re-sending the body. Immutable (hashed)
+/// assets skip ETag computation — their URL is the cache key.
+fn serve_file(dist: Option<&std::path::Path>, path: &str, if_none_match: Option<&str>) -> Response {
     let clean = path.trim_start_matches('/');
 
     // ── Active dist path ──
@@ -143,11 +161,41 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
         } else {
             format!("assets/{clean}")
         };
-        let cache = if is_immutable_asset(&lookup) {
+        let immutable = is_immutable_asset(&lookup);
+        let cache = if immutable {
             "public, max-age=31536000, immutable"
         } else {
             "no-cache"
         };
+
+        // ETag + conditional request for non-immutable assets.
+        // Immutable (hashed) assets don't need ETag — their URL changes
+        // when content changes, and the Cache-Control: immutable directive
+        // tells the browser never to revalidate.
+        if !immutable {
+            let etag = compute_etag(&data);
+            if let Some(client_etag) = if_none_match {
+                // Accept both weak and strong comparison (RFC 7232 §2.3.2).
+                let client_etag = client_etag.trim().trim_start_matches("W/");
+                let our_etag = etag.trim_matches('"');
+                if client_etag.trim_matches('"') == our_etag {
+                    return Response::builder()
+                        .status(304)
+                        .header("Cache-Control", cache)
+                        .header("ETag", &etag)
+                        .body(Body::empty())
+                        .unwrap();
+                }
+            }
+            return Response::builder()
+                .status(200)
+                .header("Content-Type", mime_type(&lookup))
+                .header("Cache-Control", cache)
+                .header("ETag", &etag)
+                .body(Body::from(data))
+                .unwrap();
+        }
+
         return Response::builder()
             .status(200)
             .header("Content-Type", mime_type(&lookup))
@@ -167,22 +215,25 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
         .unwrap()
 }
 
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
-
 /// Static asset handler.
 async fn static_handler(
     path: axum::extract::Path<String>,
+    headers: axum::http::HeaderMap,
     state: axum::extract::State<Arc<AppState>>,
 ) -> Response {
     // RFC-024 SP3: load the atomic pointer per request (O(1)).
     let dist = state.web_dist.path();
-    serve_file(dist.as_deref(), &path)
+    let if_none_match = headers
+        .get(axum::http::header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok());
+    serve_file(dist.as_deref(), &path, if_none_match)
 }
 
 /// SPA fallback — serves index.html for client-side routing.
-async fn spa_handler(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
+async fn spa_handler(
+    headers: axum::http::HeaderMap,
+    state: axum::extract::State<Arc<AppState>>,
+) -> Response {
     // RFC-024 SP3: load the atomic pointer per request.
     let dist = state.web_dist.path();
 
@@ -193,10 +244,30 @@ async fn spa_handler(axum::extract::State(state): axum::extract::State<Arc<AppSt
         && let Some(data) = fs_read(d, "index.html")
     {
         let version = read_active_version(d);
+        let etag = compute_etag(&data);
+
+        // Check If-None-Match for conditional request.
+        if let Some(client_etag) = headers
+            .get(axum::http::header::IF_NONE_MATCH)
+            .and_then(|v| v.to_str().ok())
+        {
+            let client_etag = client_etag.trim().trim_start_matches("W/");
+            if client_etag.trim_matches('"') == etag.trim_matches('"') {
+                return Response::builder()
+                    .status(304)
+                    .header("Cache-Control", "no-cache")
+                    .header("ETag", &etag)
+                    .header("X-Web-Version", version)
+                    .body(Body::empty())
+                    .unwrap();
+            }
+        }
+
         return Response::builder()
             .status(200)
             .header("Content-Type", "text/html; charset=utf-8")
             .header("Cache-Control", "no-cache")
+            .header("ETag", &etag)
             .header("X-Web-Version", version)
             .body(Body::from(data))
             .unwrap();
@@ -210,6 +281,7 @@ async fn spa_handler(axum::extract::State(state): axum::extract::State<Arc<AppSt
         .body(Body::from("Web UI dist not available yet — retry shortly"))
         .unwrap()
 }
+
 /// Web surface — kernel-connected control dashboard.
 pub struct WebSurface;
 
@@ -285,7 +357,7 @@ impl Surface for WebSurface {
         let task_db_path = config.kernel.workspace.clone() + "/tasks.db";
         let task_store = std::sync::Arc::new(tokio::sync::Mutex::new(
             oxios_kernel::task::TaskStore::open(&task_db_path)
-                .expect("Failed to initialize task store")
+                .expect("Failed to initialize task store"),
         ));
 
         let state = Arc::new(AppState {
@@ -332,6 +404,7 @@ impl Surface for WebSurface {
         let mut app = Router::new()
             .merge(api_routes)
             .merge(spa_routes)
+            .layer(CompressionLayer::new())
             .layer(cors);
 
         if should_expose_docs {

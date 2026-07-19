@@ -2,16 +2,14 @@
 // Wraps the existing ChatInput with LobeHub-inspired action bar
 // (web search, knowledge base, file upload) rendered below the textarea.
 
-import { useState, useCallback } from 'react'
+import { useCallback, useState } from 'react'
+import { type AttachedFile, ChatInput, type ContextAttachment } from './chat-input'
 import { ChatInputActionBar } from './chat-input-action-bar'
-import type { AttachedFile } from './chat-input-action-bar'
-import { ChatInput } from './chat-input'
-import type { ContextAttachment } from './chat-input'
 
 interface ChatInputWithToolsProps {
   value: string
   onChange: (value: string) => void
-  onSend: (content: string, contextItems: ContextAttachment[]) => void
+  onSend: (content: string, contextItems: ContextAttachment[], files: AttachedFile[]) => void
   onCancel?: () => void
   disabled?: boolean
   isStreaming?: boolean

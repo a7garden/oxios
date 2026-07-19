@@ -973,26 +973,30 @@ impl SystemAgentsConfig {
             "memory_persona_writer" => &self.memory_persona_writer,
             _ => return None,
         };
-        if !item.enabled || item.model.is_empty() { None }
-        else { Some(item.model.clone()) }
+        if !item.enabled || item.model.is_empty() {
+            None
+        } else {
+            Some(item.model.clone())
+        }
     }
 
     /// Check if a system task is enabled.
     pub fn is_enabled(&self, task: &str) -> bool {
-        self.model_for_task(task).is_some() || match task {
-            "topic" => self.topic.enabled,
-            "generation_topic" => self.generation_topic.enabled,
-            "translation" => self.translation.enabled,
-            "history_compress" => self.history_compress.enabled,
-            "agent_meta" => self.agent_meta.enabled,
-            "follow_up_action" => self.follow_up_action.enabled,
-            "input_completion" => self.input_completion.enabled,
-            "prompt_rewrite" => self.prompt_rewrite.enabled,
-            "memory_analysis" => self.memory_analysis.enabled,
-            "memory_embedding" => self.memory_embedding.enabled,
-            "memory_persona_writer" => self.memory_persona_writer.enabled,
-            _ => false,
-        }
+        self.model_for_task(task).is_some()
+            || match task {
+                "topic" => self.topic.enabled,
+                "generation_topic" => self.generation_topic.enabled,
+                "translation" => self.translation.enabled,
+                "history_compress" => self.history_compress.enabled,
+                "agent_meta" => self.agent_meta.enabled,
+                "follow_up_action" => self.follow_up_action.enabled,
+                "input_completion" => self.input_completion.enabled,
+                "prompt_rewrite" => self.prompt_rewrite.enabled,
+                "memory_analysis" => self.memory_analysis.enabled,
+                "memory_embedding" => self.memory_embedding.enabled,
+                "memory_persona_writer" => self.memory_persona_writer.enabled,
+                _ => false,
+            }
     }
 }
 
