@@ -15,6 +15,80 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::fs;
+
+// ── Provider config persistence types ────────────────────────────────────────
+
+/// Provider별 설정 (per-provider model list, sorting, custom endpoint).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ProviderSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub sort_order: i32,
+    #[serde(default)]
+    pub custom_endpoint: Option<String>,
+    #[serde(default)]
+    pub models: ModelListSettings,
+}
+
+/// Model list configuration for a provider.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelListSettings {
+    #[serde(default)]
+    pub mode: ModelListMode,
+    #[serde(default)]
+    pub allow: Vec<String>,
+    #[serde(default)]
+    pub deny: Vec<String>,
+}
+
+impl Default for ModelListSettings {
+    fn default() -> Self {
+        Self { mode: ModelListMode::All, allow: vec![], deny: vec![] }
+    }
+}
+
+/// Model list filtering mode.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ModelListMode {
+    #[default]
+    All,
+    Allowlist,
+    Denylist,
+}
+
+/// Definition for a custom (user-defined) provider.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomProviderDef {
+    pub id: String,
+    pub name: String,
+    pub sdk_type: SdkType,
+    pub base_url: String,
+    #[serde(default)]
+    pub api_key_env: Option<String>,
+}
+
+/// SDK protocol type for custom providers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SdkType {
+    OpenAI,
+    Anthropic,
+    Google,
+    #[serde(rename = "openai-compatible")]
+    OpenAICompatible,
+}
+
+/// Persistent provider state (companion file alongside config.toml).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ProviderStateFile {
+    #[serde(default)]
+    providers: HashMap<String, ProviderSettings>,
+    #[serde(default)]
+    custom_providers: Vec<CustomProviderDef>,
+}
 
 // ── Routing types ─────────────────────────────────────────────────────────────
 
@@ -715,6 +789,24 @@ pub struct ValidateKeyResult {
     pub message: Option<String>,
 }
 
+/// Response for provider config endpoint.
+#[derive(Debug, Clone, Serialize)]
+pub struct ProviderConfigResponse {
+    pub provider: ProviderInfo,
+    pub settings: ProviderSettings,
+    pub models: Vec<String>,
+}
+
+/// Connection test result.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConnectionCheckResult {
+    pub success: bool,
+    pub model: String,
+    pub latency_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 // ── EngineApi ───────────────────────────────────────────────────────────────
 
 /// Engine API facade — model catalog introspection + config writes + routing.
@@ -732,6 +824,10 @@ pub struct EngineApi {
     routing_stats: Arc<RoutingStats>,
     /// Hot-swap handle — config writes rebuild `OxiosEngine` and swap it in.
     engine_handle: Arc<crate::engine::EngineHandle>,
+    /// Per-provider config settings, backed by companion file `config.providers.toml`.
+    provider_configs: parking_lot::RwLock<HashMap<String, ProviderSettings>>,
+    /// Custom user-defined provider definitions.
+    custom_providers: parking_lot::RwLock<Vec<CustomProviderDef>>,
 }
 
 impl EngineApi {
@@ -747,19 +843,21 @@ impl EngineApi {
         routing_stats: Arc<RoutingStats>,
         engine_handle: Arc<crate::engine::EngineHandle>,
     ) -> Self {
-        Self {
+        let api = Self {
             config,
             config_path,
             routing_stats,
             engine_handle,
+            provider_configs: parking_lot::RwLock::new(HashMap::new()),
+            custom_providers: parking_lot::RwLock::new(Vec::new()),
+        };
+        // Load persisted provider state from companion file.
+        if let Ok(state) = api.read_provider_state() {
+            *api.provider_configs.write() = state.providers;
+            *api.custom_providers.write() = state.custom_providers;
         }
+        api
     }
-
-    /// Get the shared `RoutingStats` reference (for `AgentRuntime` wiring).
-    pub fn routing_stats(&self) -> Arc<RoutingStats> {
-        Arc::clone(&self.routing_stats)
-    }
-
     /// Get a reference to the engine handle.
     pub fn engine_handle(&self) -> &Arc<crate::engine::EngineHandle> {
         &self.engine_handle
@@ -1211,6 +1309,132 @@ impl EngineApi {
         }
     }
 
+    // ── Provider Config API ──────────────────────────────────────────────
+
+    /// Get provider configuration and model list.
+    pub fn get_provider_config(&self, provider_id: &str) -> anyhow::Result<ProviderConfigResponse> {
+        let ps = self.provider_configs.read().get(provider_id).cloned().unwrap_or_default();
+
+        let models: Vec<String> = self.list_model_names(provider_id);
+
+        let provider = self.build_provider_info(provider_id);
+        Ok(ProviderConfigResponse { provider, settings: ps, models })
+    }
+
+    /// Save provider settings and apply to RoutingControl.
+    pub fn set_provider_config(
+        &self,
+        provider_id: &str,
+        settings: ProviderSettings,
+    ) -> anyhow::Result<ProviderConfigResponse> {
+        // Update in-memory state
+        {
+            let mut providers = self.provider_configs.write();
+            providers.insert(provider_id.to_string(), settings.clone());
+            self.save_provider_state()?;
+        }
+
+        // Apply to live RoutingControl
+        let engine = self.engine_handle.get();
+        if let Some(routing) = engine.routing_control() {
+            match settings.models.mode {
+                ModelListMode::Denylist => {
+                    for denied in &settings.models.deny {
+                        routing.exclude_model(&format!("{provider_id}/{denied}"));
+                    }
+                }
+                ModelListMode::Allowlist => {
+                    let all_models = self.list_model_names(provider_id);
+                    for model in &all_models {
+                        if !settings.models.allow.contains(model) {
+                            routing.exclude_model(&format!("{provider_id}/{model}"));
+                        }
+                    }
+                }
+                ModelListMode::All => {}
+            }
+        }
+
+        self.get_provider_config(provider_id)
+    }
+
+    /// Test connection to a provider with a specific model.
+    /// oxi-sdk 0.56.0: create_provider consults AuthProvider port live,
+    /// so credential changes are picked up without engine rebuild.
+    pub fn check_provider_connection(
+        &self,
+        provider_id: &str,
+        model_id: &str,
+    ) -> anyhow::Result<ConnectionCheckResult> {
+        let start = std::time::Instant::now();
+        let engine = self.engine_handle.get();
+        match engine.create_provider(provider_id) {
+            Ok(_provider) => {
+                let latency = start.elapsed().as_millis() as u64;
+                Ok(ConnectionCheckResult {
+                    success: true,
+                    model: model_id.to_string(),
+                    latency_ms: latency,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                let latency = start.elapsed().as_millis() as u64;
+                Ok(ConnectionCheckResult {
+                    success: false,
+                    model: model_id.to_string(),
+                    latency_ms: latency,
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    /// Update model list config for a provider.
+    pub fn set_model_list(
+        &self,
+        provider_id: &str,
+        model_config: ModelListSettings,
+    ) -> anyhow::Result<ProviderConfigResponse> {
+        let mut settings = {
+            let providers = self.provider_configs.read();
+            providers.get(provider_id).cloned().unwrap_or_default()
+        };
+        settings.models = model_config;
+        self.set_provider_config(provider_id, settings)
+    }
+
+    /// Register a new custom provider.
+    pub fn add_custom_provider(&self, def: CustomProviderDef) -> anyhow::Result<ProviderInfo> {
+        let provider_id = def.id.clone();
+        {
+            let mut custom = self.custom_providers.write();
+            if custom.iter().any(|cp| cp.id == provider_id) {
+                anyhow::bail!("Custom provider '{}' already exists", provider_id);
+            }
+            custom.push(def);
+            self.save_provider_state()?;
+        }
+        // Trigger engine hot-swap to register the new provider
+        self.rebuild_and_swap();
+        Ok(self.build_provider_info(&provider_id))
+    }
+
+    /// Remove a custom provider.
+    pub fn remove_custom_provider(&self, id: &str) -> anyhow::Result<()> {
+        {
+            let mut custom = self.custom_providers.write();
+            let before = custom.len();
+            custom.retain(|cp| cp.id != id);
+            if custom.len() == before {
+                anyhow::bail!("Custom provider '{}' not found", id);
+            }
+            self.save_provider_state()?;
+        }
+        self.rebuild_and_swap();
+        Ok(())
+    }
+
     /// Make a real minimal API call to verify the key works.
     ///
     /// Sends a "Hi" completion request with a 15-second timeout.
@@ -1294,12 +1518,87 @@ impl EngineApi {
         );
         self.engine_handle.swap(new_engine);
     }
+    /// Path to the provider state companion file.
+    /// Lives alongside config.toml as `<config-root>/config.providers.toml`.
+    fn provider_state_path(&self) -> PathBuf {
+        let mut p = self.config_path.clone();
+        p.set_extension("providers.toml");
+        p
+    }
+
+    /// Read persisted provider state from the companion file.
+    fn read_provider_state(&self) -> anyhow::Result<ProviderStateFile> {
+        let path = self.provider_state_path();
+        if !path.exists() {
+            return Ok(ProviderStateFile {
+                providers: HashMap::new(),
+                custom_providers: Vec::new(),
+            });
+        }
+        let content = fs::read_to_string(&path)?;
+        let state: ProviderStateFile = toml::from_str(&content)
+            .map_err(|e| anyhow::anyhow!("Failed to parse provider state: {e}"))?;
+        Ok(state)
+    }
+
+    /// Persist provider state to the companion file.
+    fn save_provider_state(&self) -> anyhow::Result<()> {
+        let state = ProviderStateFile {
+            providers: self.provider_configs.read().clone(),
+            custom_providers: self.custom_providers.read().clone(),
+        };
+        let content = toml::to_string_pretty(&state)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize provider state: {e}"))?;
+        fs::write(self.provider_state_path(), content)?;
+        Ok(())
+    }
+
+    /// Build a [`ProviderInfo`] for the given provider id.
+    fn build_provider_info(&self, provider_id: &str) -> ProviderInfo {
+        let meta = provider_meta(provider_id);
+        let resolved = CredentialStore::resolve(provider_id, None);
+        let key_source = resolved
+            .as_ref()
+            .map(|(_, src)| match src {
+                crate::credential::CredentialSource::EnvVar => "env",
+                crate::credential::CredentialSource::Config | crate::credential::CredentialSource::OxiAuthStore => "auth_store",
+            })
+            .unwrap_or("none")
+            .to_string();
+        ProviderInfo {
+            id: provider_id.to_string(),
+            name: provider_display_name(provider_id),
+            category: provider_category(provider_id),
+            model_count: 0,
+            has_key: resolved.is_some(),
+            key_source,
+            description: meta.map(|m| m.description.to_string()).unwrap_or_default(),
+            env_key: meta.map(|m| m.env_key.to_string()).unwrap_or_default(),
+        }
+    }
+
+    /// List bare model names (without provider prefix) for a given provider,
+    /// consulting the live catalog first, then the static registry.
+    fn list_model_names(&self, provider_id: &str) -> Vec<String> {
+        let catalog = self.engine_handle.get().oxi().catalog().clone();
+        let live = catalog.list_models_sync(provider_id);
+        if !live.is_empty() {
+            live.iter().map(|m| m.model_id.clone()).collect()
+        } else {
+            oxi_sdk::get_provider_models(provider_id)
+                .iter()
+                .map(|m| m.id.to_string())
+                .collect()
+        }
+    }
 }
 
 impl std::fmt::Debug for EngineApi {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EngineApi")
             .field("config_path", &self.config_path)
+            .field("provider_configs", &self.provider_configs.read().len())
+            .field("custom_providers", &self.custom_providers.read().len())
             .finish()
     }
 }
