@@ -462,7 +462,7 @@ mod tests {
         let resp = broker.start("pending", "pending", &[]).await.unwrap();
         // The response must NOT contain the device_code — only user_code + handle.
         let json = serde_json::to_string(&resp).unwrap();
-        assert!(json.contains("user_code"));
+        assert!(json.contains("userCode"));
         assert!(json.contains("handle"));
         assert!(
             !json.contains("dev-secret"),
