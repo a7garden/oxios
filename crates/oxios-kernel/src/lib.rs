@@ -83,6 +83,7 @@ pub mod mount;
 pub mod project;
 pub mod resource_monitor;
 pub mod session_context;
+pub mod task;
 pub mod state_store;
 
 // ─── Infrastructure ─────────────────────────────────────────────────
