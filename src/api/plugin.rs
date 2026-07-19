@@ -281,6 +281,13 @@ impl Surface for WebSurface {
             WebBridgeHandle::from_bridge(&web_channel).with_response_timeout(response_timeout);
 
         // Build app state — all knowledge access goes through kernel.knowledge
+        // Initialize task store (RFC-043)
+        let task_db_path = config.kernel.workspace.clone() + "/tasks.db";
+        let task_store = std::sync::Arc::new(tokio::sync::Mutex::new(
+            oxios_kernel::task::TaskStore::open(&task_db_path)
+                .expect("Failed to initialize task store")
+        ));
+
         let state = Arc::new(AppState {
             base_url: format!("http://{host}:{port}"),
             kernel: ctx.kernel.clone(),
@@ -292,6 +299,7 @@ impl Surface for WebSurface {
             memory_map_cache: routes::MemoryMapCache::default(),
             web_dist,
             readiness: ctx.kernel.readiness.clone(),
+            task_store,
         });
 
         // Build API routes

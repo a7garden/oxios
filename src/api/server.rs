@@ -41,8 +41,11 @@ pub struct AppState {
     /// pointer atomically so no request ever sees a half-populated dist.
     pub web_dist: ActiveWebDist,
     /// RFC-024 SP4: subsystem readiness gate. The readiness middleware
+    /// RFC-024 SP4: subsystem readiness gate. The readiness middleware
     /// returns 503 (with `Retry-After`) when the gate is not yet open.
     pub readiness: std::sync::Arc<oxios_kernel::ReadinessGate>,
+    /// Task store (RFC-043) — SQLite-backed task lifecycle management.
+    pub task_store: std::sync::Arc<tokio::sync::Mutex<oxios_kernel::task::TaskStore>>,
 }
 
 impl std::fmt::Debug for AppState {

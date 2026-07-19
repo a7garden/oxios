@@ -35,6 +35,7 @@ mod project_routes;
 mod resource_routes;
 mod secrets_routes;
 mod system;
+mod task_routes;
 mod token_maxing_routes;
 mod tools;
 mod workspace;
@@ -76,6 +77,11 @@ pub(crate) use chat::{
 pub(crate) use cost_routes::{
     handle_cost_by_model, handle_cost_by_project, handle_cost_daily, handle_cost_providers,
     handle_cost_spend_limit_get, handle_cost_spend_limit_set, handle_cost_summary,
+};
+pub(crate) use task_routes::{
+    handle_task_create, handle_task_delete, handle_task_get, handle_task_run,
+    handle_task_set_schedule, handle_task_set_verify, handle_task_update_status,
+    handle_tasks_list,
 };
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
@@ -456,6 +462,15 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/cron-jobs/{id}", delete(handle_cron_job_delete))
         .route("/api/cron-jobs/{id}/edit", post(update_cron_job))
         .route("/api/cron-jobs/{id}/trigger", post(handle_cron_job_trigger))
+        // Tasks (RFC-043)
+        .route("/api/tasks", get(handle_tasks_list))
+        .route("/api/tasks", post(handle_task_create))
+        .route("/api/tasks/{id}", get(handle_task_get))
+        .route("/api/tasks/{id}", delete(handle_task_delete))
+        .route("/api/tasks/{id}/status", put(handle_task_update_status))
+        .route("/api/tasks/{id}/schedule", put(handle_task_set_schedule))
+        .route("/api/tasks/{id}/verify", put(handle_task_set_verify))
+        .route("/api/tasks/{id}/run", post(handle_task_run))
         // Calendar
         .route(
             "/api/calendar/events",

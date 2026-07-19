@@ -20,6 +20,20 @@ impl TaskStore {
         Ok(store)
     }
 
+    /// Create a TaskStore from a database file path.
+    pub fn open(path: &str) -> Result<Self> {
+        let conn = Connection::open(path)
+            .with_context(|| format!("Failed to open task database: {path}"))?;
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+        Self::new(Arc::new(Mutex::new(conn)))
+    }
+
+    /// Create an in-memory TaskStore (for tests).
+    pub fn in_memory() -> Result<Self> {
+        let conn = Connection::open_in_memory()?;
+        Self::new(Arc::new(Mutex::new(conn)))
+    }
+
     fn init_schema(&self) -> Result<()> {
         let conn = self.conn.clone();
         // Block on init — called during startup

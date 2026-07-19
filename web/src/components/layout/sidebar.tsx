@@ -3,6 +3,7 @@ import {
   Activity,
   BookOpen,
   Bot,
+  CheckSquare,
   Brain,
   FilePlus,
   Flame,
@@ -96,6 +97,7 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
       { labelKey: 'common.agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
       { labelKey: 'common.personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
       { labelKey: 'common.skills', href: '/skills', icon: <Sparkles className="h-4 w-4" /> },
+      { labelKey: 'common.tasks', href: '/tasks', icon: <CheckSquare className="h-4 w-4" /> },
     ],
   },
   {
@@ -243,7 +245,7 @@ function KnowledgeNav() {
   const { collapsed } = useSidebarStore()
   const router = useRouterState()
   const currentPath = router.location.pathname
-  const { mode, currentFilePath, openFile, openChat, openHome, markFileCreated } =
+  const { mode, currentFilePath, openFile, openChat, openHome, markFileCreated, renameCurrent } =
     useKnowledgeStore()
   const moveFile = useMoveFile()
   const { data: tree, isLoading } = useKnowledgeRecursiveTree()
@@ -252,6 +254,9 @@ function KnowledgeNav() {
   const journalToday = useJournalToday()
 
   // Phase 4: rename via the atomic move API (no more write+delete).
+  // If the renamed file is the one currently open in the editor, swap the
+  // open path in place (via renameCurrent) so subsequent saves land on the
+  // renamed file and the editor doesn't remount.
   const renameFile = useCallback(
     async (oldPath: string, newName: string) => {
       const parentDir = oldPath.includes('/') ? oldPath.split('/').slice(0, -1).join('/') : ''
@@ -259,11 +264,12 @@ function KnowledgeNav() {
       if (target === oldPath) return
       try {
         await moveFile.mutateAsync({ from: oldPath, to: target })
+        if (oldPath === currentFilePath) renameCurrent(target)
       } catch (err) {
         console.error('rename failed', err)
       }
     },
-    [moveFile],
+    [moveFile, currentFilePath, renameCurrent],
   )
 
   const [habitsOpen, setHabitsOpen] = useState(false)
