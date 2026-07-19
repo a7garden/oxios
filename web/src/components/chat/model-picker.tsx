@@ -1,8 +1,8 @@
-import {
-  Check,
+import { Check,
   ChevronDown,
   Cpu,
   Eye,
+  Info,
   Search,
   Settings2,
   Sparkles,
@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useEngineConfig, useModels, useSetModel } from '@/hooks/use-engine'
 import { cn } from '@/lib/utils'
 import type { ModelInfo } from '@/types/engine'
+import { ModelDetail } from '@/components/engine/model-detail'
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -655,6 +656,21 @@ function ModelRow({
           </span>
         )}
         <span className="text-xs font-medium truncate">{model.name}</span>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex shrink-0 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+              title="Model details"
+            >
+              <Info className="h-3 w-3" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="right" align="start" className="w-72 p-4">
+            <ModelDetail model={model} />
+          </PopoverContent>
+        </Popover>
         {isDefault && (
           <span className="text-2xs text-primary/80 font-medium shrink-0">
             · {t('chat.modelPicker.isDefault')}
