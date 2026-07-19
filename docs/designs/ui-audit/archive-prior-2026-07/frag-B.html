@@ -1,0 +1,846 @@
+<section class="screen" id="screen-05">
+  <div class="screen-head">
+    <div class="snum">05</div>
+    <div class="stitle">
+      <h2>프로젝트</h2>
+      <span class="route">/projects · routes/projects/index.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">기능배치</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>Projects</h1><p class="sub">Registered work contexts with paths and associated memories</p></div>
+                <div class="ver"><span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ New Project</span></div>
+              </div>
+              <div class="flex gap2" style="margin:6px 0">
+                <input class="inp" value="" placeholder="Search by name, description, or tag…" style="max-width:240px"/>
+              </div>
+              <div class="g3">
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">1</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> Merc UI Audit</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">Oxios web frontend audit reports and findings</p>
+                    <p class="mono xs mut">📁 /Volumes/MERCURY/PROJECTS/oxios</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="chip">ui</span><span class="chip">audit</span><span class="chip">react</span>
+                    </div>
+                    <div class="flex between xs mut"><span>2시간 전</span><span class="tc-pri">View →</span></div>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">2</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--war)">✦</span> research-bot <span class="pill mut" style="background:var(--war)/.15;color:var(--war)">auto_detected</span></span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">Automated scanner daemon (no manual description)</p>
+                    <p class="mono xs mut">📁 /opt/oxios/scanner</p>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">3</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--info)">🛠</span> ops</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">Internal ops documentation</p>
+                    <p class="mono xs mut">📁 /var/oxios/ops</p>
+                    <div class="xs mut">…</div>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">4</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> inkwell</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">…</p>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">5</span>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> site-rebuild</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="Edit" aria-label="Edit project">✎</button>
+                      <button class="btn-sm" style="color:var(--err)" title="Delete" aria-label="Delete project">🗑</button>
+                    </div>
+                  </div>
+                  <div class="card-body"><div class="xs mut">…</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ New Project</span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>프로젝트</h1><p class="sub">작업 맥락과 경로, 메모리를 함께 관리</p></div>
+                <div class="ver">
+                  <span class="pill mut">5 프로젝트</span>
+                </div>
+              </div>
+              <div class="flex gap2" style="margin:6px 0">
+                <input class="inp" value="" placeholder="이름·설명·태그 검색…" style="max-width:280px"/>
+                <span class="chip pri">전체</span>
+                <span class="chip">manual · 3</span>
+                <span class="chip">auto_detected · 2</span>
+              </div>
+              <!-- 카드 액션이 항상 보이도록 + 라벨이 함께 노출 -->
+              <div class="g3">
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> UI 감시</span>
+                    <span class="pill mut">manual</span>
+                  </div>
+                  <div class="flex gap4">
+                    <button class="btn-sm" title="편집 · E" aria-label="프로젝트 편집">✎ 편집</button>
+                    <button class="btn-sm" title="삭제" aria-label="프로젝트 삭제" style="color:var(--err)">🗑 삭제</button>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">Oxios web frontend 감시 보고서</p>
+                    <p class="mono xs mut">📁 /Volumes/MERCURY/PROJECTS/oxios</p>
+                    <div class="flex gap4" style="margin:4px 0"><span class="chip">ui</span><span class="chip">audit</span><span class="chip">react</span></div>
+                    <div class="flex between xs"><span class="mut">2시간 전</span><span class="tc-pri">열기 →</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--war)">✦</span> research-bot</span>
+                    <span class="pill" style="background:color-mix(in oklch,var(--war) 14%,transparent);color:var(--war)">auto_detected</span>
+                  </div>
+                  <div class="flex gap4">
+                    <button class="btn-sm" title="편집" aria-label="프로젝트 편집">✎ 편집</button>
+                    <button class="btn-sm" title="삭제" aria-label="프로젝트 삭제" style="color:var(--err)">🗑 삭제</button>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">자동 스캐너 데몬 — 설명 없음</p>
+                    <p class="mono xs mut">📁 /opt/oxios/scanner</p>
+                    <div class="flex between xs"><span class="mut">어제</span><span class="tc-pri">열기 →</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:var(--info)">🛠</span> ops</span>
+                    <span class="pill mut">manual</span>
+                  </div>
+                  <div class="flex gap4">
+                    <button class="btn-sm" title="편집" aria-label="프로젝트 편집">✎ 편집</button>
+                    <button class="btn-sm" title="삭제" aria-label="프로젝트 삭제" style="color:var(--err)">🗑 삭제</button>
+                  </div>
+                  <div class="card-body">
+                    <p class="sm mut">내부 운영 문서</p>
+                    <p class="mono xs mut">📁 /var/oxios/ops</p>
+                    <div class="flex between xs"><span class="mut">3일 전</span><span class="tc-pri">열기 →</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> inkwell</span><span class="pill mut">manual</span></div>
+                  <div class="card-body"><p class="sm mut">…</p></div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t"><span class="kpi-ic" style="color:var(--pri)">📦</span> site-rebuild</span><span class="pill mut">manual</span></div>
+                  <div class="card-body"><div class="xs mut">…</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">카드 액션 버튼이 아이콘 전용·32px 미만·반투명 기본값으로 키보드/저시력 사용자에게 노출되지 않음</p>
+        <p class="fd">편집/삭제 버튼이 <code>p-1</code>(≈24×24px) + <code>opacity-70 group-hover:opacity-100</code>로 감춰져, WCAG 2.5.5(타겟 ≥44×44px CSPC)·1.4.13(콘텐츠 간지지) 미달. 키보드 사용자는 <code>focus-within</code>에만 희미하게 보이며 SR 사용자는 <code>title="Edit"</code>만으로 의도를 파악해야 한다. 시각 사용자도 호버 전에는 “정적 카드”로 오인한다.</p>
+        <p class="src">components/project/project-card.tsx:40-59 (opacity-70, p-1, h-3.5 w-3.5 icon)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">검색 인풋 옆에 결과 카운트가 조건부로만 노출</p>
+        <p class="fd"><code>search</code>가 비어 있으면 카운트가 DOM에서 사라진다(<code>{search &amp;&amp; (...)}</code>). 검색 결과 0건·오타 상황에서도 화면이 비어 보여 “왜 결과가 없는지” 시그널이 없다. 빈 상태(<code>EmptyState</code>)로 가야만 메시지가 보인다.</p>
+        <p class="src">routes/projects/index.tsx:58-62 ({`{search && ...}`}) · :70-91 EmptyState 분기</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft"><code>source</code> 배지가 i18n 키 없이 원문 노출</p>
+        <p class="fd">카드는 <code>SOURCE_COLORS</code>로 색만 매핑하고 라벨은 <code>project.source ?? 'manual'</code>을 그대로 표시. 영문 값(manual / auto_detected)이 그대로 노출되어 UI의 다른 한국어 라벨과 어긋난다.</p>
+        <p class="src">components/project/project-card.tsx:14-17, 36-38 (string 그대로)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">헤더의 "New Project"가 시스템 기본 라벨 영어 그대로</p>
+        <p class="fd"><code>projects.title/desc/new</code>가 한국어 key 없이 <code>'Projects' / 'New Project'</code> 기본값을 그대로 가지고 있어 page-h1/sub가 영문으로 노출된다. 하위 카드/검색 placeholder도 동일하게 <code>'No projects found'</code> 등 영문 기본값.</p>
+        <p class="src">routes/projects/index.tsx:36-38, 53, 75-81 (기본값)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft"><code>paths[0]</code>만 표시해 다중 경로 프로젝트의 맥락이 사라짐</p>
+        <p class="fd">프로젝트는 <code>paths: string[]</code>이지만 카드에는 첫 경로만 <code>line-clamp-1 truncate</code>으로 노출. 프로젝트 상세(<code>/projects/$projectId</code>)로 이동하기 전에는 “몇 개의 경로/어느 마운트에 연결돼 있는지” 알 수 없다.</p>
+        <p class="src">components/project/project-card.tsx:68-72 (paths[0]) · types: Project.paths</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>카드 액션을 <code>h-8 w-8</code> 이상으로 키우고 라벨 동반(<code>편집 · 삭제</code>), <code>opacity-70 group-hover</code> 제거하고 항상 노출. 파괴 액션은 hover 시 confirm 모션(예: 라벨이 “삭제하시겠어요?”로 1회 변경) 부여.</li>
+      <li><code>useTranslation</code>로 <code>manual</code>/<code>auto_detected</code>/<code>paths plural</code> 추가. 기본 라벨을 한글로.</li>
+      <li>검색 인풋 옆에 카운트(0 포함)와 “결과 없음” 인라인 메시지 상시 표시. <code>EmptyState</code>의 액션은 그대로.</li>
+      <li><code>paths.length &gt; 1</code>일 때 “+N paths” 칩과 “연결된 마운트 N개” 힌트 노출.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="screen" id="screen-06">
+  <div class="screen-head">
+    <div class="snum">06</div>
+    <div class="stitle">
+      <h2>마운트</h2>
+      <span class="route">/mounts · routes/mounts/index.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">기능배치</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div style="position:relative"><span class="pin" style="top:6px;right:6px">5</span><h1>Mounts</h1><p class="sub">경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.</p></div>
+                <div class="ver">
+                  <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ Mount 만들기</span>
+                </div>
+              </div>
+              <div class="flex gap2" style="margin:6px 0">
+                <input class="inp" value="" placeholder="이름, 설명, 언어로 검색…" style="max-width:220px"/>
+              </div>
+              <div class="g3">
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">1</span>
+                  <div style="position:absolute;right:6px;top:6px;display:flex;gap:2px;opacity:.7">
+                    <button class="btn-sm" title="편집" aria-label="편집">✎</button>
+                    <button class="btn-sm" title="갱신" aria-label="갱신">↻</button>
+                    <button class="btn-sm" style="color:var(--err)" title="삭제" aria-label="삭제">🗑</button>
+                  </div>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> merc-projects</span>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/Volumes/MERCURY/PROJECTS</p>
+                    <p class="sm mut">Oxi 워크스페이스 루트, 다수의 oxios* 프로젝트가 여기에 있다.</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="pill pri">typescript</span>
+                      <span class="pill pri">rust</span>
+                      <span class="pill pri">python</span>
+                      <span class="pill mut">+2</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">2</span>
+                  <div style="position:absolute;right:6px;top:6px;display:flex;gap:2px;opacity:.7">
+                    <button class="btn-sm" title="편집" aria-label="편집">✎</button>
+                    <button class="btn-sm" title="갱신" aria-label="갱신">↻</button>
+                    <button class="btn-sm" style="color:var(--err)" title="삭제" aria-label="삭제">🗑</button>
+                  </div>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:#8b5cf6">✦</span> auto-promoted <span class="pill" style="background:#8b5cf61a;color:#7c3aed">자동 생성</span></span>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/opt/oxios/scanner</p>
+                    <p class="sm mut">에이전트가 자주 참조해 자동 승격됨</p>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">3</span>
+                  <div style="position:absolute;right:6px;top:6px;display:flex;gap:2px;opacity:.7">
+                    <button class="btn-sm" title="편집" aria-label="편집">✎</button>
+                    <button class="btn-sm" title="갱신" aria-label="갱신">↻</button>
+                    <button class="btn-sm" style="color:var(--err)" title="삭제" aria-label="삭제">🗑</button>
+                  </div>
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> legacy-jobs <span class="pill" style="background:#f59e0b1a;color:#b45309">갱신 필요</span></span>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/var/oxios/legacy</p>
+                    <p class="sm mut">경로 이동으로 자동 메타 무효화</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="pill pri">bash</span>
+                      <span class="pill mut">+1</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">4</span>
+                  <div class="card-body"><p class="sm mut">…</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ Mount 만들기</span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>마운트</h1><p class="sub">경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.</p></div>
+                <div class="ver"><span class="pill mut">5 마운트</span></div>
+              </div>
+              <div class="flex gap2" style="margin:6px 0">
+                <input class="inp" value="" placeholder="이름, 설명, 언어로 검색…" style="max-width:260px"/>
+                <span class="chip pri">전체</span>
+                <span class="chip">manual · 3</span>
+                <span class="chip">자동 생성 · 1</span>
+                <span class="chip" style="background:color-mix(in oklch,var(--war) 14%,transparent);color:var(--war)">갱신 필요 · 1</span>
+              </div>
+              <div class="g3">
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> merc-projects</span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="편집" aria-label="마운트 편집">✎ 편집</button>
+                      <button class="btn-sm" title="갱신 (자동 메타 재구성)" aria-label="마운트 갱신">↻ 갱신</button>
+                      <button class="btn-sm" title="삭제" aria-label="마운트 삭제" style="color:var(--err)">🗑 삭제</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/Volumes/MERCURY/PROJECTS</p>
+                    <p class="sm mut">Oxi 워크스페이스 루트 — 다수의 oxios* 프로젝트가 여기에 있다.</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="pill pri">typescript</span>
+                      <span class="pill pri">rust</span>
+                      <span class="pill pri">python</span>
+                      <span class="pill mut">+2</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic" style="color:#8b5cf6">✦</span> auto-promoted <span class="pill" style="background:#8b5cf61a;color:#7c3aed">자동 생성</span></span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="편집" aria-label="마운트 편집">✎ 편집</button>
+                      <button class="btn-sm" title="갱신" aria-label="마운트 갱신">↻ 갱신</button>
+                      <button class="btn-sm" title="삭제" aria-label="마운트 삭제" style="color:var(--err)">🗑 삭제</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/opt/oxios/scanner</p>
+                    <p class="sm mut">에이전트가 자주 참조해 자동 승격됨</p>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> legacy-jobs <span class="pill" style="background:color-mix(in oklch,var(--war) 18%,transparent);color:var(--war)">⚠ 갱신 필요</span></span>
+                    <div class="flex gap4">
+                      <button class="btn-sm" title="편집" aria-label="마운트 편집">✎ 편집</button>
+                      <button class="btn-sm" title="즉시 갱신" aria-label="마운트 갱신" style="background:color-mix(in oklch,var(--war) 12%,transparent);color:var(--war);border-color:color-mix(in oklch,var(--war) 25%,transparent)">↻ 즉시 갱신</button>
+                      <button class="btn-sm" title="삭제" aria-label="마운트 삭제" style="color:var(--err)">🗑 삭제</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="mono xs mut">/var/oxios/legacy</p>
+                    <p class="sm mut">경로 이동으로 자동 메타 무효화</p>
+                    <div class="flex gap4" style="margin:4px 0">
+                      <span class="pill pri">bash</span>
+                      <span class="pill mut">+1</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t"><span class="kpi-ic">🛠</span> inkwell</span>
+                  </div>
+                  <div class="card-body"><p class="sm mut">…</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">카드 액션이 아이콘 전용·32×32px·opacity-70 기본값으로 시각 사용자도 호버 전에 인식 불가</p>
+        <p class="fd">편집/갱신/삭제 버튼이 <code>h-8 w-8</code>(32px, WCAG ≥44px 미달) + <code>opacity-70 group-hover:opacity-100</code> 패턴으로 항상 어둡게 노출. “편집/갱신/삭제”를 가르는 신호가 아이콘 색 뿐이라, 시각 사용자는 호버하거나 <code>focus-within</code>하기 전엔 카드를 “정적 콘텐츠”로 오인한다. 동형(同形) 아이콘(✎/↻)은 색맹 사용자에게 구분 불가.</p>
+        <p class="src">routes/mounts/index.tsx:113-141 (absolute, opacity-70, h-8 w-8)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">“갱신 필요” 배지의 트리거 액션이 카드 위에 명확히 표시되지 않음</p>
+        <p class="fd"><code>enrichment_pending</code> 배지(<code>bg-amber-500/10</code>)는 상태만 알리고, 이를 해소할 1차 액션(“즉시 갱신”)이 일반 카드의 갱신 버튼과 모양이 같아 사용자가 차이를 알기 어렵다. 보색 배지가 같은 호버 시그널 안에 묻혀 사실상 “눈에 띄는” 우선순위를 잃는다.</p>
+        <p class="src">routes/mounts/index.tsx:156-160 (enrichment_pending 배지) · :123-131 (갱신 버튼)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">새로고침 <code>RefreshButton</code>이 검색 인풋 옆이지만 “갱신 필요” 마운트 일괄 재시작과 무관</p>
+        <p class="fd"><code>RefreshButton</code>은 <code>refetch()</code>만 호출(<code>index.tsx:81</code>)하고 카드의 <code>rescanMount</code>(<code>:50</code>)는 아니다. “갱신 필요 N” 칩이 있어도 일괄로 해결할 수 없어 작업이 분절된다.</p>
+        <p class="src">routes/mounts/index.tsx:81 (RefreshButton) · :35 (rescanMount) · 메모리 overview의 EnrichNow과 비대칭</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">헤더 타이틀/CTA가 영문 기본값으로 노출</p>
+        <p class="fd"><code>mounts.title/desc/create/empty/emptyDesc/rescan/rescanned</code>이 영문 폴백을 그대로 가지고 있어 한국어 로케일에서도 “Mounts / New Mount”가 그대로 보인다. 다른 페이지가 한국어인 상태에서 한 화면만 어긋난다.</p>
+        <p class="src">routes/mounts/index.tsx:62-69, 91-100 (t() 기본값)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">카드 그리드가 <code>sm:grid-cols-2 lg:grid-cols-3</code>로 3열 고정, ≥2xl에서 더 늘어나지 않음</p>
+        <p class="fd">콘텐츠 영역이 1200px을 넘어가도 카드는 3열로 고정되어 우측에 큰 여백이 생긴다. 같은 <code>.g3</code>을 쓰는 프로젝트/페르소나 화면과 함께 “콘텐츠가 끝났다”는 신호가 약하다.</p>
+        <p class="src">routes/mounts/index.tsx:105 (grid gap-3 sm:grid-cols-2 lg:grid-cols-3)</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>카드 액션을 <code>h-9</code> 이상 pill 버튼으로 항상 노출(<code>✎ 편집</code>, <code>↻ 갱신</code>, <code>🗑 삭제</code>), <code>group-hover opacity</code> 제거. 파괴 액션은 1차 confirm.</li>
+      <li><code>enrichment_pending</code> 마운트만 갱신 버튼을 <code>warn</code> 톤으로 강조 + “즉시 갱신” 카피. 필터 칩과 연동하여 “갱신 필요 · 1” 선택 시 일괄 작업 노출.</li>
+      <li><code>RefreshButton</code> 옆에 “<code>enrichment_pending</code> 마운트 일괄 재시작” 추가 액션 — 마운트 페이지의 자기완결성↑.</li>
+      <li>한글 i18n 키 보강, 그리드를 <code>lg:grid-cols-3 2xl:grid-cols-4</code>로 확장.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="screen" id="screen-07">
+  <div class="screen-head">
+    <div class="snum">07</div>
+    <div class="stitle">
+      <h2>메모리</h2>
+      <span class="route">/memory · routes/memory.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">일관성</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>메모리</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>Memory</h1><p class="sub">…</p></div>
+              </div>
+              <div class="flex gap4" style="margin:8px 0;position:relative">
+                <span class="chip pri" style="position:relative"><span class="pin" style="top:-6px;right:-6px">1</span>개요</span>
+                <span class="chip">탐색</span>
+                <span class="chip">맵</span>
+                <span class="chip">드림</span>
+                <span class="chip" style="position:relative"><span class="pin" style="top:-6px;right:-6px">2</span>검색</span>
+              </div>
+              <div class="g3">
+                <div class="card">
+                  <div class="row"><span class="kpi-ic">🧠</span>
+                    <div><div class="kpi-val">1,284</div><div class="xs mut">totalEntries</div></div></div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">4</span>
+                  <div class="row"><span class="kpi-ic">#</span>
+                    <div><div class="kpi-val">7</div><div class="xs mut">vectorIndex</div></div></div>
+                </div>
+                <div class="card">
+                  <div class="row"><span class="kpi-ic">◷</span>
+                    <div><div class="kpi-val">idle</div><div class="xs mut">dreamStatus</div></div></div>
+                </div>
+              </div>
+              <div class="g2">
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">3</span>
+                  <div class="card-h"><span class="card-t">tierDistribution</span></div>
+                  <div class="card-body">
+                    <div class="flex gap4 xs mut"><span class="w-20">hot</span><div class="grow" style="height:6px;background:var(--err);border-radius:99px;width:32%"></div><span class="mono">412</span></div>
+                    <div class="flex gap4 xs mut"><span class="w-20">warm</span><div class="grow" style="height:6px;background:var(--war);border-radius:99px;width:46%"></div><span class="mono">588</span></div>
+                    <div class="flex gap4 xs mut"><span class="w-20">cold</span><div class="grow" style="height:6px;background:var(--info);border-radius:99px;width:24%"></div><span class="mono">284</span></div>
+                  </div>
+                </div>
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">5</span>
+                  <div class="card-h"><span class="card-t">typeDistribution</span></div>
+                  <div class="card-body">
+                    <div class="flex gap4 xs mut"><span class="w-20">fact</span><div class="grow" style="height:6px;background:#8884d8;border-radius:99px;width:62%"></div><span class="mono">794</span></div>
+                    <div class="flex gap4 xs mut"><span class="w-20">preference</span><div class="grow" style="height:6px;background:#8884d8;border-radius:99px;width:18%"></div><span class="mono">232</span></div>
+                    <div class="flex gap4 xs mut"><span class="w-20">event</span><div class="grow" style="height:6px;background:#8884d8;border-radius:99px;width:20%"></div><span class="mono">258</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>메모리</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⌕ 메모리 내 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>메모리</h1><p class="sub">에이전트가 장기 기억으로 사용하는 항목들의 분포와 검색</p></div>
+                <div class="ver"><span class="pill pri">1,284 항목</span></div>
+              </div>
+              <div class="flex gap4" style="margin:8px 0">
+                <span class="chip pri">개요</span>
+                <span class="chip">탐색</span>
+                <span class="chip">맵</span>
+                <span class="chip">드림</span>
+                <span class="chip">검색</span>
+              </div>
+              <!-- KPI 카드: 라벨/링크/툴팁 명확화 -->
+              <div class="g3">
+                <div class="card">
+                  <div class="row"><span class="kpi-ic tc-pri">🧠</span>
+                    <div>
+                      <div class="kpi-val">1,284</div>
+                      <div class="xs mut">총 메모리 항목</div>
+                      <a class="xs tc-pri" style="text-decoration:underline">탐색으로 →</a>
+                    </div></div>
+                </div>
+                <div class="card">
+                  <div class="row"><span class="kpi-ic tc-pri">#</span>
+                    <div>
+                      <div class="kpi-val">7 / <span class="mut sm">활성</span></div>
+                      <div class="xs mut">벡터 인덱스 (유형 수)</div>
+                      <a class="xs tc-pri" style="text-decoration:underline">맵 보기 →</a>
+                    </div></div>
+                </div>
+                <div class="card">
+                  <div class="row"><span class="kpi-ic tc-war">◷</span>
+                    <div>
+                      <div class="kpi-val">idle <span class="mut sm">· 마지막 정리 2시간 전</span></div>
+                      <div class="xs mut">드림(컴팩션) 상태</div>
+                      <a class="xs tc-pri" style="text-decoration:underline">드림 탭 →</a>
+                    </div></div>
+                </div>
+              </div>
+              <!-- 분포에 x축(스케일)과 빈 상태 가이드 -->
+              <div class="g2">
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t">티어 분포</span>
+                    <span class="pill mut">최대 588</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">hot</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:70%;height:100%;background:var(--err);border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">412</span>
+                    </div>
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">warm</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:100%;height:100%;background:var(--war);border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">588</span>
+                    </div>
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">cold</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:48%;height:100%;background:var(--info);border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">284</span>
+                    </div>
+                    <p class="xs mut" style="margin-top:6px">hot = 자주 참조 · warm = 가끔 · cold = 보존. 값 0이면 행 숨김.</p>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h">
+                    <span class="card-t">유형 분포</span>
+                    <span class="pill mut">최대 794</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">fact</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:100%;height:100%;background:#8884d8;border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">794</span>
+                    </div>
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">pref</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:29%;height:100%;background:#8884d8;border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">232</span>
+                    </div>
+                    <div class="flex gap4 xs">
+                      <span class="w-16 mut">event</span>
+                      <div class="grow" style="height:8px;background:var(--mut);border-radius:99px"><div style="width:32%;height:100%;background:#8884d8;border-radius:99px"></div></div>
+                      <span class="mono bold" style="min-width:42px;text-align:right">258</span>
+                    </div>
+                    <p class="xs mut" style="margin-top:6px">탐색 탭에서 유형 필터로 좁혀 보세요.</p>
+                  </div>
+                </div>
+              </div>
+              <!-- 단축 CTA -->
+              <div class="card">
+                <div class="row"><span class="ava"></span>
+                  <div class="grow"><div class="nm">지금 어떤 기억이 있나요?</div><div class="sm mut">상단 검색 탭에서 자연어로 찾습니다 · ⌘K</div></div>
+                  <button class="btn-sm pri">검색 탭으로</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">탭 5개(개요/탐색/맵/드림/검색)가 모두 동등한 위젯으로 보이며, 가장 자주 쓰는 “검색/탐색”과 운영 액션 “드림”이 시각 가중치가 0</p>
+        <p class="fd">메모리 페이지의 핵심 가치(찾기·정리)는 “검색/탐색/드림” 탭에 있는데, 탭은 단순 <code>TabsList</code>의 동등한 트리거(<code>tabs.tsx:5</code> 참조, <code>memory.tsx:33-42</code>)로만 노출되어 첫 화면에서 “여기서 무엇을 할 수 있는가”가 보이지 않는다. 헤더 <code>page-head</code>에 “메모리 검색” 1차 CTA가 없음.</p>
+        <p class="src">routes/memory.tsx:27-42 (헤더/탭) · components/memory/memory-overview.tsx:79-93 (탭 콘텐츠에 CTA 없음)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">시맨틱→키워드 자동 폴백이 사용자에게 안내되지 않음</p>
+        <p class="fd">내부적으로는 시맨틱 호출이 HNSW 인덱스 부재 시 키워드 검색으로 자동 폴백되며(<code>memory-search.tsx:18-21</code> 주석), 이전의 “키워드 전용” 경로는 백엔드 배선 결여로 의도적으로 제거됐다. 즉 동작(시맨틱 → 키워드 폴백)은 보존되어 있다. 문제는 UI가 그것을 알리지 않는 것이다: <code>Zap</code> 배지(<code>:36-38</code>) 하나만으로 “지금 시맨틱 모드”만 알려 줄 뿐, 사용자는 “키워드 모드를 선택할 수 있는가 / 언제 폴백이 일어났는가”를 알 수 없고 폴백이 발생해도 검색 실패처럼 느껴질 수 있다.</p>
+        <p class="src">components/memory/memory-search.tsx:14-31 (단일 호출) · :18-21 (자동 폴백 주석) · :36-38 (Zap 배지)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">분포 차트 라벨(<code>totalEntries / vectorIndex / tierDistribution</code>)이 i18n 키 그대로 노출</p>
+        <p class="fd">시각화 헤더가 영문 식별자(<code>t('memory.tierDistribution')</code>, <code>t(`memory.${name}`, name)</code>)로 출력되어 한국어 키(<code>tier</code>)가 그대로 노출. 차트 행 라벨이 미번역이면 색구분만으로 의미를 알 수 없다.</p>
+        <p class="src">components/memory/memory-overview.tsx:97, 104, 117, 124 (t() 폴백) · routes/memory.tsx:29-30</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft"><code>stats.by_type</code> 객체 키 수가 “벡터 인덱스” KPI로 잘못 매핑됨</p>
+        <p class="fd"><code>vectorIndex</code> 카드의 값은 <code>Object.keys(stats.by_type).length</code>(<code>memory-overview.tsx:72</code>)로 “유형 수”이지 벡터 인덱스 상태가 아니다. 라벨은 “벡터 인덱스”인데 표시되는 7은 메모리 유형 수 — 의미/표시 불일치(가드 없는 라벨/값).</p>
+        <p class="src">components/memory/memory-overview.tsx:68-77 (statCards[1])</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">분포 차트에 스케일(최대값)과 0-값 처리 안내가 없음</p>
+        <p class="fd">각 행이 상대 백분율로 그려지지만(<code>DistBar</code> :34, <code>max</code> 기준) 카드 헤더에 “최대 N” 표기·빈 상태 가이드가 없어 “왜 warm는 hot보다 짧아 보이지 않는가”를 즉시 설명하지 못한다.</p>
+        <p class="src">components/memory/memory-overview.tsx:23-49 (DistBar) · :65-66 (max 산출)</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>헤더 우측에 “검색 탭으로 / 드림 탭으로” 같은 1차 CTA 두 개를 pill 버튼으로 노출하고, 탭 <code>TabsList</code>를 페이지 콘텐츠 위가 아니라 헤더 줄에 인라인 배치해 “탐색/검색/드림” 가중치↑.</li>
+      <li><code>MemorySearch</code>에 “시맨틱(기본) / 키워드” 모드 토글 + HNSW 미가용 시 자동 폴백 메시지. 한국어/영어 예시 쿼리 1개씩 placeholder에 권장.</li>
+      <li>KPI 카드 라벨을 “총 메모리 항목 / 유형 수 / 드림 상태”로 명확화, 각각 “탐색/맵/드림” 탭으로 연결. <code>vectorIndex</code> 카드는 실제 벡터 인덱스 상태(<code>idle/indexing/error</code> + <code>size</code>)로 교체.</li>
+      <li>분포 카드 헤더에 “최대 N” pill, 본문에 한 줄 안내.</li>
+    </ul>
+  </div>
+</section>

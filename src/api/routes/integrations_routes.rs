@@ -25,6 +25,8 @@ pub struct IntegrationRow {
     pub cli: Option<String>,
     /// `none` | `secret` | `oauth` — drives the frontend credential UI.
     pub resolver_kind: String,
+    /// `package_manager` | `cli_tool` | `credential_only` — UI grouping (S1).
+    pub kind: String,
     /// `null` when the integration has no CLI to detect.
     pub detected: Option<DetectedRow>,
     pub credential: CredentialStatus,
@@ -77,6 +79,7 @@ pub(crate) async fn handle_integrations_list(
             label: it.label.clone(),
             cli: it.cli.clone(),
             resolver_kind: resolver_kind_label(&it.credential),
+            kind: format!("{:?}", it.kind).to_lowercase(),
             detected,
             credential,
         });
@@ -97,28 +100,117 @@ pub(crate) async fn handle_integration_credential_status(
     Ok(Json(status))
 }
 
-/// `POST /api/integrations/{id}/install` — provision an integration.
+/// Response body for `POST /api/integrations/{id}/install` (RFC-041 M3).
+/// The route returns this immediately; the actual install runs in a background
+/// task whose progress and outcome arrive as `integration_install_*` events
+/// on the existing SSE channel (`/api/events`), keyed by `job_id`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallJob {
+    pub job_id: String,
+    pub integration_id: String,
+}
+
+/// `POST /api/integrations/{id}/install` — start a privileged install.
 ///
-/// Runs the first applicable install spec as a privileged kernel op (D8).
-/// User-triggered only (the UI shows a confirm gate). Returns the install
-/// output synchronously; SSE progress streaming (RFC M3) is a refinement.
+/// Returns `{ job_id }` immediately (M3). Output streams via SSE events
+/// `integration_install_started` / `_progress` / `_completed` / `_failed`,
+/// all keyed by `job_id`. The background task:
+/// 1. Publishes `Started` (audit subscriber records it automatically).
+/// 2. Runs the first applicable install spec via the kernel's privileged op.
+/// 3. On success: invalidates the scanner cache (B1 — the next `detect` call
+///    sees the freshly installed binary instead of the stale 60s TTL `None`)
+///    and publishes `Completed`. On failure: publishes `Failed`.
 pub(crate) async fn handle_integration_install(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<Json<oxios_kernel::host_tools::InstallOutput>, AppError> {
-    let out = state
-        .kernel
+) -> Result<Json<InstallJob>, AppError> {
+    use oxios_kernel::event_bus::KernelEvent;
+    use uuid::Uuid;
+
+    let kernel = state.kernel.clone();
+    // Validate the integration exists and has install specs up front so a
+    let it = kernel
         .host_tools
-        .install(&id)
-        .await
-        .map_err(|e| AppError::Internal(format!("install failed: {e}")))?;
-    Ok(Json(out))
+        .integration(&id)
+        .ok_or_else(|| AppError::NotFound(format!("integration '{id}' not found")))?;
+    if it.install.is_empty() {
+        return Err(AppError::BadRequest(format!(
+            "integration '{id}' has no install specs"
+        )));
+    }
+
+    let job_id = Uuid::new_v4().to_string();
+    let label = it.label.clone();
+    let integration_id = id.clone();
+    let job_id_for_task = job_id.clone();
+    // Build the preview command line up front — extracting it here lets us
+    // drop the `&Integration` borrow on `kernel.host_tools` before the
+    // spawned task moves `kernel` (the borrow checker would otherwise reject
+    // the move). All kernel access inside the task re-resolves by id.
+    let preview_cmd = it
+        .install
+        .first()
+        .and_then(|s| {
+            oxios_kernel::host_tools::provisioner::build_command(s)
+                .map(|(bin, args)| format!("{bin} {}", args.join(" ")))
+        })
+        .unwrap_or_else(|| format!("install {integration_id}"));
+    // Publish Started before spawn so the SSE subscriber sees a deterministic
+    // ordering: Started → (Progress?) → Completed|Failed.
+    let _ = kernel
+        .infra
+        .publish(KernelEvent::IntegrationInstallStarted {
+            job_id: job_id.clone(),
+            integration_id: integration_id.clone(),
+            label: label.clone(),
+        });
+
+    tokio::spawn(async move {
+        let _ = kernel
+            .infra
+            .publish(KernelEvent::IntegrationInstallProgress {
+                job_id: job_id_for_task.clone(),
+                integration_id: integration_id.clone(),
+                line: preview_cmd,
+            });
+
+        let outcome = kernel.host_tools.install(&integration_id).await;
+        match outcome {
+            Ok(out) => {
+                // B1: invalidate the scanner cache so the success is visible
+                // immediately — without this the 60s TTL hides the freshly
+                // installed binary and the UI keeps showing ✗ not-installed.
+                kernel.host_tools.invalidate();
+                let _ = kernel
+                    .infra
+                    .publish(KernelEvent::IntegrationInstallCompleted {
+                        job_id: job_id_for_task,
+                        integration_id,
+                        command: out.command,
+                        output: out.output,
+                        exit_code: out.exit_code,
+                    });
+            }
+            Err(e) => {
+                let _ = kernel.infra.publish(KernelEvent::IntegrationInstallFailed {
+                    job_id: job_id_for_task,
+                    integration_id,
+                    error: e.to_string(),
+                });
+            }
+        }
+    });
+
+    Ok(Json(InstallJob {
+        job_id,
+        integration_id: id,
+    }))
 }
 
 /// `POST /api/integrations/{id}/oauth/start` — begin a device-code flow.
 ///
 /// Returns `{ handle, user_code, verification_url, expires_in }`. The
-/// `device_code` stays daemon-side (H1) — it is never in the response.
 pub(crate) async fn handle_integration_oauth_start(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,

@@ -1,0 +1,178 @@
+<!-- ═══════════════════════════════════════════════════════════════════════
+     참조 섹션 — MCP (screen-12). 모든 단편의 구조적 템플릿.
+     compare 모드: 현재(핀) ↔ 제안(정규형).
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<section id="screen-12" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num">12</span>
+      <h2>MCP 서버</h2>
+      <span class="route">/mcp</span>
+      <span class="score">일관성 점수 <b>3.4 / 5</b></span>
+    </div>
+    <div class="rubric">
+      <span class="bar c3" title="C1 헤더: 부제 text-sm 누락">C1·3</span>
+      <span class="bar c5" title="C2 간격: space-y-6 정규 일치">C2·5</span>
+      <span class="bar c3" title="C3 버튼: Plus 아이콘 mr-1(margin) 사용">C3·3</span>
+      <span class="bar c3" title="C4 카드: 탭 콘텐츠를 Card로 래핑(형제 탭과 불일치)">C4·3</span>
+      <span class="bar c2" title="C5 탭: 트리거 아이콘이 있어 Memory/Budget과 불일치">C5·2</span>
+      <span class="bar c5" title="C6 상태: 공유 컴포넌트 사용">C6·5</span>
+      <span class="bar c5" title="C7 내비: 활성 상태 정상">C7·5</span>
+      <span class="bar c4" title="C8 타이포: 부제 크기만 편차">C8·4</span>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- 현재 -->
+    <div class="panel cur">
+      <div class="panel-label"><span class="dot"></span>현재 · 문제 핀 4</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <div class="mk-h1">MCP 서버</div>
+            <div class="mk-sub nosize">모델 컨텍스트 프로토콜 서버를 관리합니다<span class="pin">1</span></div>
+          </div>
+          <div class="mk-acts">
+            <button class="mk-btn"><span class="ic">✚</span><span class="mk-mr"></span>서버 추가<span class="pin">2</span></button>
+          </div>
+        </div>
+        <div class="mk-tabs">
+          <span class="mk-tab active"><span class="ic">▣</span>서버<span class="pin">3</span></span>
+          <span class="mk-tab"><span class="ic">⚙</span>도구</span>
+          <span class="mk-tab"><span class="ic">›_</span>테스트</span>
+        </div>
+        <div class="mk-card pt6">
+          <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">filesystem</span><span class="mk-tag">stdio</span></div>
+          <div class="mk-row"><span class="mk-dot"></span><span class="mk-srv-name">github</span><span class="mk-tag">stdio</span></div>
+          <div class="mk-row"><span class="mk-dot warn"></span><span class="mk-srv-name">postgres</span><span class="mk-tag">sse</span></div>
+          <div style="position:relative"><span class="pin" style="position:absolute;right:-6px;top:-2px">4</span></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--doc-muted);margin-top:10px;font-family:ui-monospace,Menlo,monospace">패널 전체가 외부 Card로 감싸짐 (CardContent pt-6)</div>
+    </div>
+
+    <!-- 제안 -->
+    <div class="panel prop">
+      <div class="panel-label"><span class="dot"></span>제안 · 정규형 적용</div>
+      <div class="mk-frame">
+        <div class="mk-header">
+          <div>
+            <div class="mk-h1">MCP 서버</div>
+            <div class="mk-sub" style="color:var(--app-success)">모델 컨텍스트 프로토콜 서버를 관리합니다</div>
+          </div>
+          <div class="mk-acts">
+            <button class="mk-btn"><span class="ic">✚</span>서버 추가</button>
+          </div>
+        </div>
+        <div class="mk-tabs">
+          <span class="mk-tab active">서버</span>
+          <span class="mk-tab">도구</span>
+          <span class="mk-tab">테스트</span>
+        </div>
+        <div>
+          <div class="mk-row" style="padding:9px 12px;background:var(--app-card);border:1px solid var(--app-border);border-radius:8px;margin-bottom:6px"><span class="mk-dot"></span><span class="mk-srv-name">filesystem</span><span class="mk-tag">stdio</span></div>
+          <div class="mk-row" style="padding:9px 12px;background:var(--app-card);border:1px solid var(--app-border);border-radius:8px;margin-bottom:6px"><span class="mk-dot"></span><span class="mk-srv-name">github</span><span class="mk-tag">stdio</span></div>
+          <div class="mk-row" style="padding:9px 12px;background:var(--app-card);border:1px solid var(--app-border);border-radius:8px"><span class="mk-dot warn"></span><span class="mk-srv-name">postgres</span><span class="mk-tag">sse</span></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--app-success);margin-top:10px;font-family:ui-monospace,Menlo,monospace">외부 Card 제거 → 행 카드만 (Memory 탭과 동일 패턴)</div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <ul class="flist">
+      <li class="med"><span class="badge">MED</span><span class="body"><b>부제 텍스트 크기 미지정</b> <span class="dim">C1</span> — `<code>text-muted-foreground</code>`만 있고 `text-sm` 누락. 다른 탭(budget·token-maxing·mounts·projects)은 `text-sm` 명시. 정규형은 부제 = `text-sm text-muted-foreground`. <code>routes/mcp.tsx:32</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>버튼 아이콘 간격이 margin 기반</b> <span class="dim">C3</span> — `<Plus className="h-4 w-4 mr-1" />`는 margin으로 띄움. 정규형은 flex `gap`(Button이 내장 gap 활용). <code>routes/mcp.tsx:36</code></span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>탭 트리거 아이콘이 형제 페이지와 불일치</b> <span class="dim">C5</span> — MCP는 Servers/Tools/Test 모두 아이콘(`routes/mcp.tsx:51-59`), Memory(`routes/memory.tsx:35-41`)·Budget(`routes/budget.tsx:45`)은 아이콘 없음. "모두 또는 아무것도" 위반. 다수 페이지가 무아이콘이므로 정규 = 무아이콘.</span></li>
+      <li class="med"><span class="badge">MED</span><span class="body"><b>탭 콘텐츠를 외부 Card로 래핑</b> <span class="dim">C4</span> — 각 `TabsContent`를 `<Card><CardContent className="pt-6">`로 감쌈(`routes/mcp.tsx:62-84`). Memory는 비래핑. 탭 스트립 자체가 그룹핑을 제공하므로 이중 카드는 시각적으로 무거움. 정규 = 외부 Card 제거, 필요시 행 카드만.</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     정규 디자인 사양 (개선 설계) — screen-spec
+     모든 탭이 수렴해야 할 통일 시스템.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<section id="screen-spec" class="screen">
+  <div class="screen-head">
+    <div class="screen-title">
+      <span class="num" style="background:var(--accent);color:#fff">★</span>
+      <h2>개선 설계 — 통일 디자인 사양</h2>
+      <span class="route">PageHeader · 간격 · 버튼 · 아이콘맵 · 탭 · 상태</span>
+    </div>
+    <p style="color:var(--doc-muted);font-size:14px;margin:0;max-width:72ch">각 탭의 "제안" 패널이 수렴하는 정규형(canonical)을 단일 사양으로 고정한다. 이 사양은 기존 다수 패턴을 근거로 삼되, 분열된 지점(헤더·간격·버튼 아이콘)은 하나로 좁힌다. 구현 시 공유 컴포넌트(<code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;color:var(--app-info);padding:1px 5px;border-radius:3px">&lt;PageHeader&gt;</code>)로 캡슐화해 분산 변형을 원천 차단한다.</p>
+  </div>
+
+  <!-- 사양 1: PageHeader -->
+  <div class="spec-block">
+    <h4>1. PageHeader (공유 컴포넌트화)</h4>
+    <p class="desc">모든 Console 탭의 헤더를 단일 컴포넌트로. 제목·부제·우측 액션 슬롯. Dashboard의 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">font-semibold tracking-tight</code>·<code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">items-end</code> 변형을 제거하고 전 탭 동일 적용.</p>
+    <div class="compare single">
+      <div class="panel prop">
+        <div class="panel-label"><span class="dot"></span>정규 PageHeader</div>
+        <div class="mk-frame">
+          <div class="mk-header">
+            <div>
+              <div class="mk-h1">페이지 제목</div>
+              <div class="mk-sub">text-sm text-muted-foreground — 항상 명시</div>
+            </div>
+            <div class="mk-acts">
+              <button class="mk-btn outline">↻ 새로고침</button>
+              <button class="mk-btn"><span class="ic">✚</span>생성</button>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--doc-muted);margin-top:12px;font-family:ui-monospace,Menlo,monospace;line-height:1.7">
+          &lt;div class="space-y-6"&gt;<br>
+          &nbsp;&nbsp;&lt;PageHeader title=… subtitle=…&gt;<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&lt;RefreshButton/&gt; &lt;Button&gt;&lt;Plus/&gt; 생성&lt;/Button&gt;<br>
+          &nbsp;&nbsp;&lt;/PageHeader&gt;<br>
+          규칙: h1=<b>text-2xl font-bold</b> · 부제=<b>text-sm</b> · 정렬=<b>items-center</b> · 액션 갭=<b>gap-2</b>
+        </div>
+      </div>
+    </div>
+    <div class="callout">제목 앞 아이콘은 <b>전 탭 동일하게 적용 또는 전 탭 미적용</b> — 현재 Skills·Agents·Sessions만 부분 적용 중(Dashboard로 통일 시 미적용 권장, 제목이 스스로 말하게). 버전/상태 뱃지는 우측 액션 슬롯으로.</div>
+  </div>
+
+  <!-- 사양 2: 간격 리듬 -->
+  <div class="spec-block">
+    <h4>2. 간격 리듬 — space-y-6 단일화</h4>
+    <p class="desc">현재 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">space-y-6</code>(12면) vs <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">space-y-4</code>(5면: Dashboard·Agents·Mounts·Projects·ProjectDetail) 분할. 구분 근거 없음 → <b>space-y-6으로 단일화</b>. 카드 그리드 내부는 기존대로 gap-3(KPI)/gap-4(일반) 유지.</p>
+  </div>
+
+  <!-- 사양 3: 버튼 아이콘 -->
+  <div class="spec-block">
+    <h4>3. 버튼 아이콘 간격 — gap 단일화</h4>
+    <p class="desc">현재 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">mr-1</code>(margin) vs flex gap 분할. Button 컴포넌트가 gap를 내장하므로 <b>margin 클래스(mr-1/ml-1) 전면 폐지, 아이콘은 자식으로</b>.</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:center">
+      <span style="font-size:12px;color:var(--hi);font-family:ui-monospace,Menlo,monospace">✗ &lt;Plus className="h-4 w-4 mr-1"/&gt;</span>
+      <span style="font-size:12px;color:var(--app-success);font-family:ui-monospace,Menlo,monospace">✓ &lt;Button&gt;&lt;Plus className="h-4 w-4"/&gt; 라벨&lt;/Button&gt;</span>
+    </div>
+  </div>
+
+  <!-- 사양 4: 사이드바 아이콘맵 -->
+  <div class="spec-block">
+    <h4>4. 사이드바 아이콘 맵 — 중복·의미 정정</h4>
+    <p class="desc">두 가지 정정: (a) Skills와 MCP가 같은 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">Zap</code> 사용 → Skills를 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">Sparkles</code> 또는 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">Wand2</code>로. (b) Security = <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">Bell</code>(알림 관례) → <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">ShieldCheck</code>로. 알림은 Header의 MenuClock→NotificationCenter가 담당.</p>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;font-size:13px">
+      <div style="padding:10px 12px;background:#fbecea;border:1px solid #f0d3cf;border-radius:7px"><b style="color:var(--hi)">현재</b><br><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--doc-ink-2)">Skills: Zap · MCP: Zap (중복)<br>Security: Bell</span></div>
+      <div style="padding:10px 12px;background:#e9f3ee;border:1px solid #c4dfce;border-radius:7px"><b style="color:var(--app-success)">정정</b><br><span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--doc-ink-2)">Skills: Sparkles · MCP: Zap<br>Security: ShieldCheck</span></div>
+    </div>
+  </div>
+
+  <!-- 사양 5: 탭 패턴 -->
+  <div class="spec-block">
+    <h4>5. 탭 패턴 — 무아이콘 + 비래핑 단일화</h4>
+    <p class="desc">트리거 아이콘: 다수가 무아이콘이므로 <b>정규 = 무아이콘</b>(MCP만 아이콘 제거). 탭 콘텐츠: 외부 Card로 감싸지 않음(MCP 래핑 제거), 내부 행 카드만. 다중 탭 페이지 간 동일 규칙 적용.</p>
+  </div>
+
+  <!-- 사양 6: 상태 컴포넌트 -->
+  <div class="spec-block">
+    <h4>6. 상태(빈/로딩/에러) — 공유 컴포넌트 의무화</h4>
+    <p class="desc">EmptyState·ErrorState·loading.tsx 패밀리는 이미 일관적(장점). 규칙을 명시: <b>인라인 자체 마크업 금지</b>, 색은 success/warning/error/info 시맨틱 토큰 변종만. Dashboard의 <code style="font-family:ui-monospace,Menlo,monospace;font-size:11px">if(loading) return</code> early-return도 인라인 조건부로 통일(레이아웃 시프트 감소).</p>
+  </div>
+
+  <div class="callout"><b>우선순위.</b> 1·2·4가 가장 큰 시각적 분열을 만든다(전 탭 반복). PageHeader 컴포넌트화 하나로 P1·P3·P6 상당부가 사라진다. 사이드바 아이콘 정정(P4)은 한 줄 변경이지만 발견성 향상이 즉각적.</div>
+</section>

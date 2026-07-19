@@ -56,9 +56,11 @@ pub trait OAuthProvider: Send + Sync {
     /// `Success`; otherwise return the pending/expired/denied state.
     async fn poll(&self, device_code: &str) -> Result<PollOutcome>;
 
-    /// Refresh an expiring token (no-op for GitHub). Returns the refreshed
-    /// `access_token`.
-    async fn refresh(&self, refresh_token: &str) -> Result<String>;
+    /// Refresh an expiring token. Returns the new `TokenBundle` so the
+    /// broker can persist the full bundle (rotated `refresh_token`,
+    /// fresh `expires_in`, scope changes). Static-key providers leave
+    /// this unimplemented.
+    async fn refresh(&self, refresh_token: &str) -> Result<oxi_sdk::TokenBundle>;
 
     /// Revoke a token at the provider (best-effort).
     async fn revoke(&self, token: &str) -> Result<()>;
@@ -252,7 +254,7 @@ impl OAuthProvider for GitHubProvider {
         }
     }
 
-    async fn refresh(&self, _refresh_token: &str) -> Result<String> {
+    async fn refresh(&self, _refresh_token: &str) -> Result<oxi_sdk::TokenBundle> {
         // GitHub device-flow tokens don't expire — nothing to refresh.
         anyhow::bail!("github device-flow tokens do not support refresh")
     }
@@ -439,7 +441,7 @@ mod tests {
         async fn poll(&self, _device_code: &str) -> Result<PollOutcome> {
             Ok(PollOutcome::Pending)
         }
-        async fn refresh(&self, _: &str) -> Result<String> {
+        async fn refresh(&self, _: &str) -> Result<oxi_sdk::TokenBundle> {
             unreachable!()
         }
         async fn revoke(&self, _: &str) -> Result<()> {

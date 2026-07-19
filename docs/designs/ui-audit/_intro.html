@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Oxios Web UI — 디자인 일관성 감사</title>
+<style>
+/* =========================================================================
+   Oxios Web UI 일관성 감사 — 글로벌 스타일 (리포트 크롬 + 공유 단편 클래스)
+   편집 디자인 리뷰 문서 미학: 여백 넉넉, 잉크 절제, 심각도 액센트 하나.
+   ========================================================================= */
+
+:root{
+  --doc-bg:#f7f7f5;
+  --doc-surface:#ffffff;
+  --doc-ink:#1a1a1f;
+  --doc-ink-2:#3d3d45;
+  --doc-muted:#6b6b73;
+  --doc-muted-2:#8a8a92;
+  --doc-rule:#e4e4e2;
+  --doc-rule-2:#ededeb;
+  --hi:#c0392b;        /* high severity */
+  --md:#b07d10;        /* med severity */
+  --lo:#566573;        /* low severity */
+  --accent:#2a2d3f;    /* primary ink accent */
+
+  /* 앱 토큰 유도값 (목형 재현용 — light 기준) */
+  --app-bg:#fafafa;
+  --app-card:#ffffff;
+  --app-muted:#f4f4f5;
+  --app-muted-2:#e9e9ec;
+  --app-fg:#1a1a1f;
+  --app-fg-2:#3f3f46;
+  --app-muted-fg:#71717a;
+  --app-border:#e4e4e7;
+  --app-primary:#2a2d3f;
+  --app-primary-fg:#fafafa;
+  --app-success:#2f9e6b;
+  --app-warning:#c79a3e;
+  --app-error:#d44a2b;
+  --app-info:#3b6fd4;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--doc-bg);
+  color:var(--doc-ink);
+  font-family:'Helvetica Neue',Helvetica,Arial,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+.wrap{max-width:1180px;margin:0 auto;padding:56px 40px 120px}
+
+/* ── 리포트 헤더 ─────────────────────────────────────────── */
+.report-head{margin-bottom:64px;padding-bottom:36px;border-bottom:1px solid var(--doc-rule)}
+.report-kicker{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--doc-muted);margin-bottom:14px}
+.report-title{font-family:'Iowan Old Style','Palatino Linotype',Georgia,serif;font-size:42px;line-height:1.1;font-weight:600;letter-spacing:-.01em;margin:0 0 14px;color:var(--doc-ink)}
+.report-sub{font-size:16px;color:var(--doc-muted);max-width:62ch;margin:0 0 28px}
+.report-meta{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:13px;color:var(--doc-ink-2)}
+.report-meta b{font-weight:600}
+.report-meta .mono{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--doc-muted)}
+
+/* ── 집계 카드 (상단 요약) ──────────────────────────────── */
+.tally{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--doc-rule);border:1px solid var(--doc-rule);border-radius:10px;overflow:hidden;margin:36px 0 0}
+.tally-cell{background:var(--doc-surface);padding:20px 22px}
+.tally-cell .n{font-family:'Iowan Old Style',Georgia,serif;font-size:34px;font-weight:600;line-height:1;color:var(--doc-ink)}
+.tally-cell .l{font-size:12px;color:var(--doc-muted);margin-top:6px;letter-spacing:.02em}
+.tally-cell.hi .n{color:var(--hi)}
+.tally-cell.md .n{color:var(--md)}
+
+/* ── 섹션 공유 클래스 (모든 단편이 사용) ───────────────── */
+.screen{padding:48px 0;border-bottom:1px solid var(--doc-rule)}
+.screen:first-of-type{border-top:none}
+.screen-head{display:flex;flex-direction:column;gap:14px;margin-bottom:28px}
+.screen-title{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.screen-title .num{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--doc-muted-2);background:var(--doc-muted);border-radius:4px;padding:2px 7px;letter-spacing:.04em}
+.screen-title h2{font-size:26px;font-weight:600;margin:0;letter-spacing:-.005em;color:var(--doc-ink)}
+.screen-title .route{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:13px;color:var(--doc-muted);background:var(--doc-surface);border:1px solid var(--doc-rule);padding:2px 8px;border-radius:5px}
+.screen-title .score{margin-left:auto;font-size:13px;color:var(--doc-muted)}
+.screen-title .score b{color:var(--doc-ink);font-weight:600}
+
+/* 루브릭 바 */
+.rubric{display:flex;flex-wrap:wrap;gap:6px}
+.rubric .bar{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;letter-spacing:.02em;cursor:help;border:1px solid transparent}
+.rubric .bar.c5{background:#e8f3ef;color:#2f7a52;border-color:#cfe6dc}
+.rubric .bar.c4{background:#e9eff5;color:#3a6694;border-color:#d2dff0}
+.rubric .bar.c3{background:#f5efe0;color:#8a6c1e;border-color:#ebe0c4}
+.rubric .bar.c2{background:#f5e7d8;color:#a56a1e;border-color:#ecd6b8}
+.rubric .bar.c1{background:#f4dcda;color:#a83a2c;border-color:#ecc4c0}
+
+/* 비교 패널 */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 26px}
+.compare.single{grid-template-columns:1fr}
+@media(max-width:860px){.compare{grid-template-columns:1fr}}
+.panel{background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:10px;padding:18px 18px 14px;position:relative}
+.panel-label{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--doc-muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel-label .dot{width:7px;height:7px;border-radius:50%;background:var(--hi)}
+.panel.cur .panel-label .dot{background:var(--hi)}
+.panel.prop .panel-label .dot{background:var(--app-success)}
+
+/* 핀 (번호 매긴 문제 표시) */
+.pin{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--hi);color:#fff;font-size:11px;font-weight:700;font-family:ui-monospace,Menlo,monospace;box-shadow:0 0 0 3px rgba(192,57,43,.18);vertical-align:middle;margin:0 2px}
+
+/* 발견 목록 */
+.findings{margin-top:4px}
+.findings .flist{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.findings li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;padding:11px 13px;background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:8px}
+.findings li .badge{flex-shrink:0;font-family:ui-monospace,Menlo,monospace;font-size:10px;font-weight:700;letter-spacing:.06em;padding:3px 7px;border-radius:4px;color:#fff;margin-top:1px}
+.findings li.high .badge{background:var(--hi)}
+.findings li.med .badge{background:var(--md)}
+.findings li.low .badge{background:var(--lo)}
+.findings li .body{flex:1;color:var(--doc-ink-2)}
+.findings li .body b{color:var(--doc-ink);font-weight:600}
+.findings li .dim{font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--doc-muted-2);background:var(--app-muted);padding:1px 5px;border-radius:3px;margin:0 4px;white-space:nowrap}
+.findings li code{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--app-info);background:#eef3fb;padding:1px 5px;border-radius:3px}
+
+/* ── 목형(Mockup) 프리미티브 — 앱 토큰 유도값으로 재현 ──── */
+.mk-frame{background:var(--app-bg);border:1px solid var(--app-border);border-radius:8px;padding:14px;overflow:hidden}
+.mk-h1{font-size:18px;font-weight:700;color:var(--app-fg);margin:0}
+.mk-h1.semibold{font-weight:600;letter-spacing:-.01em}
+.mk-sub{font-size:12px;color:var(--app-muted-fg);margin:2px 0 0}
+.mk-sub.nosize{font-size:13px}
+.mk-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.mk-header.end{align-items:flex-end}
+.mk-acts{display:flex;align-items:center;gap:6px}
+.mk-btn{display:inline-flex;align-items:center;gap:5px;background:var(--app-primary);color:var(--app-primary-fg);font-size:12px;font-weight:600;padding:6px 11px;border-radius:7px;border:none}
+.mk-btn.outline{background:transparent;color:var(--app-fg);border:1px solid var(--app-border)}
+.mk-btn.ghost{background:transparent;color:var(--app-muted-fg);border:none}
+.mk-btn .ic{width:13px;height:13px;display:inline-block}
+.mk-mr{margin-right:3px}
+.mk-card{background:var(--app-card);border:1px solid var(--app-border);border-radius:9px;padding:14px}
+.mk-card.pt6{padding-top:20px}
+.mk-tabs{display:flex;gap:3px;background:var(--app-muted);border-radius:8px;padding:3px;margin-bottom:12px}
+.mk-tab{font-size:11px;font-weight:500;color:var(--app-muted-fg);padding:5px 11px;border-radius:6px;display:inline-flex;align-items:center;gap:5px}
+.mk-tab.active{background:var(--app-card);color:var(--app-fg);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.mk-tab .ic{width:12px;height:12px;display:inline-block}
+.mk-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--app-muted-2);font-size:12px;color:var(--app-fg-2)}
+.mk-row:last-child{border-bottom:none}
+.mk-dot{width:8px;height:8px;border-radius:50%;background:var(--app-success);flex-shrink:0}
+.mk-dot.warn{background:var(--app-warning)}
+.mk-dot.err{background:var(--app-error)}
+.mk-srv-name{font-weight:600;color:var(--app-fg)}
+.mk-tag{font-size:10px;font-family:ui-monospace,Menlo,monospace;background:var(--app-muted);color:var(--app-muted-fg);padding:1px 6px;border-radius:4px}
+.mk-grid{display:grid;gap:8px}
+.mk-ellipsis{text-align:center;color:var(--app-muted-fg);font-size:11px;padding:4px 0;letter-spacing:.3em}
+
+/* 호출문(callout) */
+.callout{border-left:3px solid var(--accent);background:var(--doc-surface);padding:14px 18px;border-radius:0 8px 8px 0;margin:18px 0;font-size:14px;color:var(--doc-ink-2)}
+.callout b{color:var(--doc-ink)}
+
+/* ── 합성/사양 섹션 ─────────────────────────────────────── */
+.syn-pattern{padding:22px 0;border-bottom:1px solid var(--doc-rule-2)}
+.syn-pattern:last-child{border-bottom:none}
+.syn-pattern .ptag{display:inline-flex;align-items:center;gap:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;color:#fff;background:var(--accent);padding:3px 9px;border-radius:5px;margin-bottom:10px}
+.syn-pattern h3{font-size:19px;font-weight:600;margin:0 0 8px;color:var(--doc-ink)}
+.syn-pattern p{margin:0 0 8px;color:var(--doc-ink-2);font-size:14px}
+.syn-evidence{font-size:13px;color:var(--doc-muted);margin-top:8px;font-family:ui-monospace,Menlo,monospace;line-height:1.7}
+.syn-evidence code{color:var(--app-info);background:#eef3fb;padding:1px 4px;border-radius:3px}
+
+.spec-block{margin:26px 0;padding:22px;background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:10px}
+.spec-block h4{font-size:14px;font-weight:700;margin:0 0 4px;color:var(--accent);font-family:ui-monospace,Menlo,monospace;letter-spacing:.02em}
+.spec-block .desc{font-size:13px;color:var(--doc-muted);margin:0 0 14px}
+
+/* 인덱스(스티키) */
+.index-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+.index-tbl th,.index-tbl td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--doc-rule-2)}
+.index-tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--doc-muted);font-weight:600}
+.index-tbl td .r{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--doc-muted)}
+.index-tbl td .ct{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.index-tbl td .ct .h{color:var(--hi);font-weight:700}
+.index-tbl td .ct .m{color:var(--md);font-weight:700}
+.index-tbl td .ct .l{color:var(--lo);font-weight:700}
+.index-tbl tr:hover td{background:#fbfbfa}
+
+.section-divider{height:1px;background:var(--doc-rule);margin:64px 0}
+.sec-heading{font-family:'Iowan Old Style',Georgia,serif;font-size:30px;font-weight:600;margin:0 0 6px;letter-spacing:-.005em}
+.sec-intro{color:var(--doc-muted);font-size:14px;margin:0 0 28px;max-width:70ch}
+
+.report-foot{margin-top:80px;padding-top:28px;border-top:1px solid var(--doc-rule);font-size:12px;color:var(--doc-muted-2);font-family:ui-monospace,Menlo,monospace}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ══════════ 리포트 헤더 ══════════ -->
+<header class="report-head">
+  <div class="report-kicker">UI Design Consistency Audit · 2026-07-18</div>
+  <h1 class="report-title">Oxios Web UI — 디자인 일관성 감사</h1>
+  <p class="report-sub">Console · Knowledge · Chat 3개 모드, 19개 탭·패널을 8차원 일관성 루브릭으로 검사. 각 화면의 현재(문제 핀) ↔ 정규형 제안 비교와, 전 탭에 걸친 전신적 분열 패턴 8종을 정리한다. 모든 주장은 실제 소스 <code style="font-family:ui-monospace,Menlo,monospace;font-size:13px;background:#eef3fb;padding:1px 5px;border-radius:3px">file:line</code>에 근거한다.</p>
+  <div class="report-meta">
+    <div><b>대상</b> <span class="mono">web/ (React + TanStack Router)</span></div>
+    <div><b>프론트엔드 루트</b> <span class="mono">web/src/</span></div>
+    <div><b>디자인 시스템</b> <span class="mono">Geist · OKLCH · semantic status tokens</span></div>
+    <div><b>화면 수</b> <span class="mono">19 + 1 셸 + 1 사양</span></div>
+  </div>
+  <div class="tally">
+    <div class="tally-cell"><div class="n" id="t-screens">19</div><div class="l">감사 화면</div></div>
+    <div class="tally-cell hi"><div class="n" id="t-hi">—</div><div class="l">HIGH 발견</div></div>
+    <div class="tally-cell md"><div class="n" id="t-md">—</div><div class="l">MED 발견</div></div>
+    <div class="tally-cell"><div class="n" id="t-lo">—</div><div class="l">LOW 발견</div></div>
+  </div>
+</header>
+
+<!-- ══════════ 전신적 일관성 패턴 (상단 합성) ══════════ -->
+<section id="screen-summary" class="screen" style="border-top:none;padding-top:0">
+  <div class="screen-head">
+    <h2 class="sec-heading">전신적 일관성 패턴 — 상위 8종</h2>
+    <p class="sec-intro">개별 화면을 넘어 <b>2개 이상의 탭에서 반복</b>되는 분열의 뿌리. 이 패턴들이 일관성 점수를 갉아먹는 주원인이며, 가장 높은 수정 우선순위를 갖는다. 각 패턴은 발생 지점(<code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">file:line</code>)과 한 줄 해결 방향을 포함한다.</p>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P1 · HIGH</span>
+    <h3>페이지 헤더 파편화 (전 탭 반복)</h3>
+    <p>같은 역할의 헤더가 탭마다 5가지 축(제목 굵기·정렬·부제 크기·앞아이콘·액션 갭)에서 분화. 가장 큰 시각적 분열원. <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">&lt;PageHeader&gt;</code> 공유 컴포넌트 하나로 전부 흡수 가능.</p>
+    <div class="syn-evidence">
+      <b>제목 굵기:</b> Dashboard만 <code>font-semibold tracking-tight</code> <code>routes/index.tsx:107</code> vs 전 탭 <code>font-bold</code><br>
+      <b>헤더 정렬:</b> Dashboard만 <code>items-end</code> <code>routes/index.tsx:105</code><br>
+      <b>부제 크기:</b> 10면 <code>text-muted-foreground</code>(크기 미지정) vs 4면 <code>text-sm</code> — mcp/memory/cron/email/git/personas/resources/security/skills/workspace vs budget/token-maxing/mounts/projects<br>
+      <b>제목 앞 아이콘:</b> skills/agents/sessions만 부분 적용 (<code>routes/skills.tsx:269</code>, <code>routes/agents/index.tsx:320</code>, <code>routes/sessions/$sessionId.tsx:101</code>)<br>
+      <b>액션 클러스터 갭:</b> <code>gap-2</code> vs <code>gap-3</code> vs <code>flex gap-2</code>
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P2 · HIGH</span>
+    <h3>표면 간격 리듬 이중화</h3>
+    <p>페이지 루트 간격이 <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">space-y-6</code>과 <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">space-y-4</code>로 갈라짐. 의도적 밀도 구분의 근거 없음 → 시각적 리듬이 탭마다 흔들린다.</p>
+    <div class="syn-evidence">
+      <b>space-y-6 (12면):</b> budget·cron·email·git·mcp·memory·personas·resources·security·skills·sessions·agents-detail<br>
+      <b>space-y-4 (5면):</b> <code>routes/index.tsx:103</code> · <code>routes/agents/index.tsx:316</code> · <code>routes/mounts/index.tsx:57</code> · <code>routes/projects/index.tsx:31</code> · <code>routes/projects/$projectId.tsx:207</code><br>
+      → <code>space-y-6</code> 단일화 권장
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P3 · MED</span>
+    <h3>버튼 아이콘 간격 — margin vs flex gap</h3>
+    <p>생성 버튼의 <code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">Plus</code> 아이콘을 <code>mr-1</code>(margin)로 띄우는 경우와 flex <code>gap</code>으로 띄우는 경우가 혼재. Button이 gap를 내장하므로 margin는 불필요.</p>
+    <div class="syn-evidence">
+      <code>routes/mcp.tsx:36</code> · <code>routes/personas.tsx:122</code> (mr-1) vs Button 내장 gap 기반 페이지들
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P4 · HIGH</span>
+    <h3>사이드바 내비게이션 아이콘 — 중복 + 의미 오정합</h3>
+    <p>탐색 아이콘이 기능과 매치되지 않거나 중복되어 웨이파인딩을 해친다. 단일 행 변경으로 즉각 수정 가능한 대비 효과.</p>
+    <div class="syn-evidence">
+      <b>중복:</b> <code>Zap</code>가 Skills(<code>sidebar.tsx:97</code>) + MCP(<code>sidebar.tsx:137</code>) 양쪽 — 같은 아이콘 = 다른 기능<br>
+      <b>의미 오정합:</b> Security = <code>Bell</code>(<code>sidebar.tsx:146</code>) — Bell은 알림 관례, Security는 <code>ShieldCheck</code>가 정합. 알림은 Header의 MenuClock→NotificationCenter가 이미 담당.
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P5 · MED</span>
+    <h3>탭 패턴 — 트리거 아이콘·콘텐츠 래핑 불일치</h3>
+    <p>다중 탭 페이지(MCP·Memory·Budget·Skills)가 트리거 아이콘 유무와 콘텐츠 Card 래핑 유무를 각자 다르게 결정. "모두 또는 아무것도" 원칙 위반.</p>
+    <div class="syn-evidence">
+      <b>트리거 아이콘:</b> MCP(<code>routes/mcp.tsx:51-59</code>)만 있음; Memory/Budget/Skills 무아이콘<br>
+      <b>콘텐츠 Card 래핑:</b> MCP는 <code>&lt;Card&gt;&lt;CardContent className="pt-6"&gt;</code>로 래핑(<code>routes/mcp.tsx:62-84</code>); Memory는 비래핑
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P6 · LOW</span>
+    <h3>입장 애니메이션 부분 적용</h3>
+    <p><code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">animate-fade-in-up</code>가 일부 페이지에만. 전 탭 또는 무적용으로 통일.</p>
+    <div class="syn-evidence">
+      적용: <code>routes/index.tsx:103</code> · <code>routes/agents/index.tsx:316</code> · 미적용: mcp·memory·budget·skills 등
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P7 · MED</span>
+    <h3>Settings 패러다임 단절</h3>
+    <p><code style="font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#eef3fb;padding:1px 4px;border-radius:3px">/settings</code>가 3-zone <code>SettingsShell</code>(레일+본문+리뷰)로 헤더·간격·탭 패턴이 전 탭과 단절. 복잡 설정에는 적절하나 <b>경계 명시 없이</b> 다른 탭과 나란히 놓여 일관성으로 인지됨.</p>
+    <div class="syn-evidence">
+      <code>components/settings/settings-shell.tsx:65</code> (SettingsShell) · <code>routes/settings.tsx:838</code> (renderActiveSection)
+    </div>
+  </div>
+
+  <div class="syn-pattern">
+    <span class="ptag">P8 · LOW</span>
+    <h3>Persona 헤더 3줄 (고유 예외)</h3>
+    <p>유일하게 헤더가 title+subtitle+hint 3줄. 고유하지만 비일관 — hint는 부제에 통합 또는 본문으로 이동.</p>
+    <div class="syn-evidence">
+      <code>routes/personas.tsx:115-117</code> (singleActiveHint, text-xs 3째 줄)
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:24px"><b>종합.</b> 전 탭에 공통으로 반복되는 분열(P1·P2·P3)은 <b>PageHeader 공유 컴포넌트 + 간격·버튼 규칙 단일화</b> 한 방으로 대부분 흡수된다. 사이드바 아이콘 정정(P4)은 두 줄 변경이지만 발견성 향상이 즉각적이므로 최우선. 아래 "개선 설계" 사양 섹션에 통일 시스템을, 각 화면 섹션에 현재↔제안 비교를 제시한다.</div>
+</section>
+
+<!-- ══════════ 인덱스 ══════════ -->
+<section class="screen" style="border-top:none">
+  <div class="screen-head">
+    <h2 class="sec-heading" style="font-size:22px">화면 색인</h2>
+    <p class="sec-intro">전체 화면과 일관성 집계. ★ = 개선 설계 사양 섹션, ⇄ = 크로스모드 셸 섹션. H/M/L = 심각도별 발견 수.</p>
+  </div>
+  <table class="index-tbl" id="index-tbl">
+    <thead><tr><th>#</th><th>화면</th><th>라우트</th><th>점수</th><th class="ct"><span class="h">H</span>/<span class="m">M</span>/<span class="l">L</span></th></tr></thead>
+    <tbody id="index-body">
+    </tbody>
+  </table>
+</section>
+
+<div class="section-divider"></div>
+<h2 class="sec-heading">개선 설계 · 정규형</h2>
+<p class="sec-intro">먼저 통일 시스템 사양을 제시하고, 이어 각 화면의 현재(핀) ↔ 제안 비교를 따른다.</p>
+
+<!-- INSERT-REF -->
+<!-- INSERT-FRAGMENTS -->
+
+<div class="report-foot">
+Oxios Web UI 일관성 감사 · 2026-07-18 · evidence-grounded (모든 발견은 file:line 인용)
+</div>
+
+</div>
+</body>
+</html>

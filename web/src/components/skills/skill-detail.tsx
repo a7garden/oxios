@@ -58,7 +58,9 @@ export function SkillDetail({
     skill.missing.bins.length > 0 ||
     skill.missing.anyBins.length > 0 ||
     skill.missing.env.length > 0 ||
-    skill.missing.config.length > 0
+    skill.missing.config.length > 0 ||
+    skill.missing.integrations.length > 0 ||
+    skill.missing.anyIntegrations.length > 0
 
   return (
     <div className="space-y-4">
@@ -143,21 +145,59 @@ export function SkillDetail({
                   <ReqList items={skill.requirements.config} missing={skill.missing.config} />
                 )}
                 {skill.requirements.integrations.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <div className="space-y-1">
                     <span className="text-xs text-muted-foreground">
                       {t('skills.requiresIntegrations')}:
                     </span>
-                    {skill.requirements.integrations.map((id) => (
-                      <Badge key={id} variant="outline" className="font-mono text-[10px]">
-                        {id}
-                      </Badge>
-                    ))}
-                    <a
-                      className="text-[10px] text-info underline hover:opacity-80"
-                      href="/settings?section=host-tools"
-                    >
-                      {t('skills.configureInSettings')}
-                    </a>
+                    <ul className="flex flex-col gap-1">
+                      {skill.requirements.integrations.map((id) => {
+                        const status = skill.integration_status?.find(
+                          (s) => s.id === id,
+                        )
+                        const ok = status?.satisfied ?? false
+                        return (
+                          <li
+                            key={id}
+                            className="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-muted/40"
+                          >
+                            <div className="flex items-center gap-2">
+                              {ok ? (
+                                <CircleCheck className="h-3 w-3 text-success" />
+                              ) : (
+                                <CircleX className="h-3 w-3 text-destructive" />
+                              )}
+                              <span className="font-mono text-xs">{id}</span>
+                              {status && !status.installed && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] text-warning"
+                                >
+                                  {t('skills.integrationNotInstalled')}
+                                </Badge>
+                              )}
+                              {status &&
+                                status.installed &&
+                                !status.configured && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] text-warning"
+                                  >
+                                    {t('skills.integrationNotConfigured')}
+                                  </Badge>
+                                )}
+                            </div>
+                            {!ok && (
+                              <a
+                                className="text-[10px] text-info underline hover:opacity-80"
+                                href="/settings?section=host-tools"
+                              >
+                                {t('skills.configureInSettings')}
+                              </a>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
                   </div>
                 )}
               </div>
@@ -174,6 +214,8 @@ export function SkillDetail({
                     ...skill.missing.env.map((e) => `env:${e}`),
                     ...skill.missing.config.map((c) => `config:${c}`),
                     ...skill.missing.anyBins.map((b) => `any_bin:${b}`),
+                    ...skill.missing.integrations.map((i) => `integration:${i}`),
+                    ...skill.missing.anyIntegrations.map((i) => `any_integration:${i}`),
                   ].join(', '),
                 })}
               </p>

@@ -1,0 +1,176 @@
+/* =========================================================================
+   Oxios Web UI 일관성 감사 — 글로벌 스타일 (리포트 크롬 + 공유 단편 클래스)
+   편집 디자인 리뷰 문서 미학: 여백 넉넉, 잉크 절제, 심각도 액센트 하나.
+   ========================================================================= */
+
+:root{
+  --doc-bg:#f7f7f5;
+  --doc-surface:#ffffff;
+  --doc-ink:#1a1a1f;
+  --doc-ink-2:#3d3d45;
+  --doc-muted:#6b6b73;
+  --doc-muted-2:#8a8a92;
+  --doc-rule:#e4e4e2;
+  --doc-rule-2:#ededeb;
+  --hi:#c0392b;        /* high severity */
+  --md:#b07d10;        /* med severity */
+  --lo:#566573;        /* low severity */
+  --accent:#2a2d3f;    /* primary ink accent */
+
+  /* 앱 토큰 유도값 (목형 재현용 — light 기준) */
+  --app-bg:#fafafa;
+  --app-card:#ffffff;
+  --app-muted:#f4f4f5;
+  --app-muted-2:#e9e9ec;
+  --app-fg:#1a1a1f;
+  --app-fg-2:#3f3f46;
+  --app-muted-fg:#71717a;
+  --app-border:#e4e4e7;
+  --app-primary:#2a2d3f;
+  --app-primary-fg:#fafafa;
+  --app-success:#2f9e6b;
+  --app-warning:#c79a3e;
+  --app-error:#d44a2b;
+  --app-info:#3b6fd4;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--doc-bg);
+  color:var(--doc-ink);
+  font-family:'Helvetica Neue',Helvetica,Arial,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+.wrap{max-width:1180px;margin:0 auto;padding:56px 40px 120px}
+
+/* ── 리포트 헤더 ─────────────────────────────────────────── */
+.report-head{margin-bottom:64px;padding-bottom:36px;border-bottom:1px solid var(--doc-rule)}
+.report-kicker{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--doc-muted);margin-bottom:14px}
+.report-title{font-family:'Iowan Old Style','Palatino Linotype',Georgia,serif;font-size:42px;line-height:1.1;font-weight:600;letter-spacing:-.01em;margin:0 0 14px;color:var(--doc-ink)}
+.report-sub{font-size:16px;color:var(--doc-muted);max-width:62ch;margin:0 0 28px}
+.report-meta{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:13px;color:var(--doc-ink-2)}
+.report-meta b{font-weight:600}
+.report-meta .mono{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--doc-muted)}
+
+/* ── 집계 카드 (상단 요약) ──────────────────────────────── */
+.tally{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--doc-rule);border:1px solid var(--doc-rule);border-radius:10px;overflow:hidden;margin:36px 0 0}
+.tally-cell{background:var(--doc-surface);padding:20px 22px}
+.tally-cell .n{font-family:'Iowan Old Style',Georgia,serif;font-size:34px;font-weight:600;line-height:1;color:var(--doc-ink)}
+.tally-cell .l{font-size:12px;color:var(--doc-muted);margin-top:6px;letter-spacing:.02em}
+.tally-cell.hi .n{color:var(--hi)}
+.tally-cell.md .n{color:var(--md)}
+
+/* ── 섹션 공유 클래스 (모든 단편이 사용) ───────────────── */
+.screen{padding:48px 0;border-bottom:1px solid var(--doc-rule)}
+.screen:first-of-type{border-top:none}
+.screen-head{display:flex;flex-direction:column;gap:14px;margin-bottom:28px}
+.screen-title{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.screen-title .num{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--doc-muted-2);background:var(--doc-muted);border-radius:4px;padding:2px 7px;letter-spacing:.04em}
+.screen-title h2{font-size:26px;font-weight:600;margin:0;letter-spacing:-.005em;color:var(--doc-ink)}
+.screen-title .route{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:13px;color:var(--doc-muted);background:var(--doc-surface);border:1px solid var(--doc-rule);padding:2px 8px;border-radius:5px}
+.screen-title .score{margin-left:auto;font-size:13px;color:var(--doc-muted)}
+.screen-title .score b{color:var(--doc-ink);font-weight:600}
+
+/* 루브릭 바 */
+.rubric{display:flex;flex-wrap:wrap;gap:6px}
+.rubric .bar{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;letter-spacing:.02em;cursor:help;border:1px solid transparent}
+.rubric .bar.c5{background:#e8f3ef;color:#2f7a52;border-color:#cfe6dc}
+.rubric .bar.c4{background:#e9eff5;color:#3a6694;border-color:#d2dff0}
+.rubric .bar.c3{background:#f5efe0;color:#8a6c1e;border-color:#ebe0c4}
+.rubric .bar.c2{background:#f5e7d8;color:#a56a1e;border-color:#ecd6b8}
+.rubric .bar.c1{background:#f4dcda;color:#a83a2c;border-color:#ecc4c0}
+
+/* 비교 패널 */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 26px}
+.compare.single{grid-template-columns:1fr}
+@media(max-width:860px){.compare{grid-template-columns:1fr}}
+.panel{background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:10px;padding:18px 18px 14px;position:relative}
+.panel-label{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--doc-muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel-label .dot{width:7px;height:7px;border-radius:50%;background:var(--hi)}
+.panel.cur .panel-label .dot{background:var(--hi)}
+.panel.prop .panel-label .dot{background:var(--app-success)}
+
+/* 핀 (번호 매긴 문제 표시) */
+.pin{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--hi);color:#fff;font-size:11px;font-weight:700;font-family:ui-monospace,Menlo,monospace;box-shadow:0 0 0 3px rgba(192,57,43,.18);vertical-align:middle;margin:0 2px}
+
+/* 발견 목록 */
+.findings{margin-top:4px}
+.findings .flist{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.findings li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;padding:11px 13px;background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:8px}
+.findings li .badge{flex-shrink:0;font-family:ui-monospace,Menlo,monospace;font-size:10px;font-weight:700;letter-spacing:.06em;padding:3px 7px;border-radius:4px;color:#fff;margin-top:1px}
+.findings li.high .badge{background:var(--hi)}
+.findings li.med .badge{background:var(--md)}
+.findings li.low .badge{background:var(--lo)}
+.findings li .body{flex:1;color:var(--doc-ink-2)}
+.findings li .body b{color:var(--doc-ink);font-weight:600}
+.findings li .dim{font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--doc-muted-2);background:var(--app-muted);padding:1px 5px;border-radius:3px;margin:0 4px;white-space:nowrap}
+.findings li code{font-family:ui-monospace,'Geist Mono',Menlo,monospace;font-size:12px;color:var(--app-info);background:#eef3fb;padding:1px 5px;border-radius:3px}
+
+/* ── 목형(Mockup) 프리미티브 — 앱 토큰 유도값으로 재현 ──── */
+.mk-frame{background:var(--app-bg);border:1px solid var(--app-border);border-radius:8px;padding:14px;overflow:hidden}
+.mk-h1{font-size:18px;font-weight:700;color:var(--app-fg);margin:0}
+.mk-h1.semibold{font-weight:600;letter-spacing:-.01em}
+.mk-sub{font-size:12px;color:var(--app-muted-fg);margin:2px 0 0}
+.mk-sub.nosize{font-size:13px}
+.mk-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.mk-header.end{align-items:flex-end}
+.mk-acts{display:flex;align-items:center;gap:6px}
+.mk-btn{display:inline-flex;align-items:center;gap:5px;background:var(--app-primary);color:var(--app-primary-fg);font-size:12px;font-weight:600;padding:6px 11px;border-radius:7px;border:none}
+.mk-btn.outline{background:transparent;color:var(--app-fg);border:1px solid var(--app-border)}
+.mk-btn.ghost{background:transparent;color:var(--app-muted-fg);border:none}
+.mk-btn .ic{width:13px;height:13px;display:inline-block}
+.mk-mr{margin-right:3px}
+.mk-card{background:var(--app-card);border:1px solid var(--app-border);border-radius:9px;padding:14px}
+.mk-card.pt6{padding-top:20px}
+.mk-tabs{display:flex;gap:3px;background:var(--app-muted);border-radius:8px;padding:3px;margin-bottom:12px}
+.mk-tab{font-size:11px;font-weight:500;color:var(--app-muted-fg);padding:5px 11px;border-radius:6px;display:inline-flex;align-items:center;gap:5px}
+.mk-tab.active{background:var(--app-card);color:var(--app-fg);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.mk-tab .ic{width:12px;height:12px;display:inline-block}
+.mk-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--app-muted-2);font-size:12px;color:var(--app-fg-2)}
+.mk-row:last-child{border-bottom:none}
+.mk-dot{width:8px;height:8px;border-radius:50%;background:var(--app-success);flex-shrink:0}
+.mk-dot.warn{background:var(--app-warning)}
+.mk-dot.err{background:var(--app-error)}
+.mk-srv-name{font-weight:600;color:var(--app-fg)}
+.mk-tag{font-size:10px;font-family:ui-monospace,Menlo,monospace;background:var(--app-muted);color:var(--app-muted-fg);padding:1px 6px;border-radius:4px}
+.mk-grid{display:grid;gap:8px}
+.mk-ellipsis{text-align:center;color:var(--app-muted-fg);font-size:11px;padding:4px 0;letter-spacing:.3em}
+
+/* 호출문(callout) */
+.callout{border-left:3px solid var(--accent);background:var(--doc-surface);padding:14px 18px;border-radius:0 8px 8px 0;margin:18px 0;font-size:14px;color:var(--doc-ink-2)}
+.callout b{color:var(--doc-ink)}
+
+/* ── 합성/사양 섹션 ─────────────────────────────────────── */
+.syn-pattern{padding:22px 0;border-bottom:1px solid var(--doc-rule-2)}
+.syn-pattern:last-child{border-bottom:none}
+.syn-pattern .ptag{display:inline-flex;align-items:center;gap:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;color:#fff;background:var(--accent);padding:3px 9px;border-radius:5px;margin-bottom:10px}
+.syn-pattern h3{font-size:19px;font-weight:600;margin:0 0 8px;color:var(--doc-ink)}
+.syn-pattern p{margin:0 0 8px;color:var(--doc-ink-2);font-size:14px}
+.syn-evidence{font-size:13px;color:var(--doc-muted);margin-top:8px;font-family:ui-monospace,Menlo,monospace;line-height:1.7}
+.syn-evidence code{color:var(--app-info);background:#eef3fb;padding:1px 4px;border-radius:3px}
+
+.spec-block{margin:26px 0;padding:22px;background:var(--doc-surface);border:1px solid var(--doc-rule);border-radius:10px}
+.spec-block h4{font-size:14px;font-weight:700;margin:0 0 4px;color:var(--accent);font-family:ui-monospace,Menlo,monospace;letter-spacing:.02em}
+.spec-block .desc{font-size:13px;color:var(--doc-muted);margin:0 0 14px}
+
+/* 인덱스(스티키) */
+.index-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+.index-tbl th,.index-tbl td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--doc-rule-2)}
+.index-tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--doc-muted);font-weight:600}
+.index-tbl td .r{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--doc-muted)}
+.index-tbl td .ct{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.index-tbl td .ct .h{color:var(--hi);font-weight:700}
+.index-tbl td .ct .m{color:var(--md);font-weight:700}
+.index-tbl td .ct .l{color:var(--lo);font-weight:700}
+.index-tbl tr:hover td{background:#fbfbfa}
+
+.section-divider{height:1px;background:var(--doc-rule);margin:64px 0}
+.sec-heading{font-family:'Iowan Old Style',Georgia,serif;font-size:30px;font-weight:600;margin:0 0 6px;letter-spacing:-.005em}
+.sec-intro{color:var(--doc-muted);font-size:14px;margin:0 0 28px;max-width:70ch}
+
+.report-foot{margin-top:80px;padding-top:28px;border-top:1px solid var(--doc-rule);font-size:12px;color:var(--doc-muted-2);font-family:ui-monospace,Menlo,monospace}

@@ -334,6 +334,41 @@ pub enum KernelEvent {
         /// Origin of the change: "agent" | "api" | "ui".
         source: String,
     },
+    // ── Integration install (RFC-041 M3) ────────────────────────────────────
+    // These ride the same SSE channel as tool execution progress so the UI
+    // can stream install output without opening a second connection. Routing
+    // is by `job_id` (opaque to clients; the daemon mints it via uuid).
+    /// An integration install job has started.
+    IntegrationInstallStarted {
+        /// Opaque job ID; clients correlate all subsequent events with this.
+        job_id: String,
+        /// Integration registry id (e.g. "github").
+        integration_id: String,
+        /// Human-readable label.
+        label: String,
+    },
+    /// Incremental progress — a stdout line or stage transition.
+    IntegrationInstallProgress {
+        job_id: String,
+        integration_id: String,
+        /// One line of output or a stage label (e.g. "fetching", "extracting").
+        line: String,
+    },
+    /// Install completed successfully.
+    IntegrationInstallCompleted {
+        job_id: String,
+        integration_id: String,
+        /// Final command + summary output for the audit log and UI.
+        command: String,
+        output: String,
+        exit_code: Option<i32>,
+    },
+    /// Install failed (non-zero exit or spawn error).
+    IntegrationInstallFailed {
+        job_id: String,
+        integration_id: String,
+        error: String,
+    },
 }
 
 /// Convert a KernelEvent to an AuditAction for the audit trail.
@@ -497,6 +532,40 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         },
         KernelEvent::PersonaUpdated { id, name, source } => AuditAction::Other {
             detail: format!("persona:updated:{id}:{name}:{source}"),
+        },
+        KernelEvent::IntegrationInstallStarted {
+            job_id,
+            integration_id,
+            ..
+        } => AuditAction::Other {
+            detail: format!("install:started:{integration_id}:{job_id}"),
+        },
+        KernelEvent::IntegrationInstallProgress {
+            job_id,
+            integration_id,
+            ..
+        } => AuditAction::Other {
+            detail: format!("install:progress:{integration_id}:{job_id}"),
+        },
+        KernelEvent::IntegrationInstallCompleted {
+            job_id,
+            integration_id,
+            exit_code,
+            ..
+        } => AuditAction::Other {
+            detail: format!(
+                "install:completed:{integration_id}:{job_id}:exit={}",
+                exit_code
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "?".into())
+            ),
+        },
+        KernelEvent::IntegrationInstallFailed {
+            job_id,
+            integration_id,
+            ..
+        } => AuditAction::Other {
+            detail: format!("install:failed:{integration_id}:{job_id}"),
         },
     }
 }

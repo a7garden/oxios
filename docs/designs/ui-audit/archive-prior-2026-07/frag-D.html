@@ -1,0 +1,303 @@
+<section class="screen" id="screen-11">
+  <div class="screen-head">
+    <div class="snum">11</div>
+    <div class="stitle"><h2>토큰 맥싱</h2><span class="route">/token-maxing · routes/token-maxing.tsx (RFC-031)</span></div>
+    <div class="rubric"><div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
+  </div>
+  <div class="compare">
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>토큰 맥싱</div>
+              <div class="sb-grp">인프라</div><div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between" style="position:relative"><span class="pin" style="top:-6px;right:-6px">1</span><span class="pin" style="top:18px;right:-6px">2</span>
+                <div><div style="font-size:18px;font-weight:700">토큰 맥싱</div><div class="sm mut">토큰 할당량 내에서 최대한 활용</div></div>
+                <div></div>
+              </div>
+              <div class="card">
+                <div class="card-h"><span class="pin" style="top:-4px;right:-4px">4</span><span class="card-t">상태</span><span class="badge idle">유휴</span></div>
+                <div class="card-body">
+                  <div class="g4" style="grid-template-columns:repeat(3,1fr);gap:8px">
+                    <div><div class="xs mut">제공자</div><div class="sm bold">zai</div></div>
+                    <div><div class="xs mut">세션 토큰</div><div class="sm bold">0</div></div>
+                    <div><div class="xs mut">활성 윈도우</div><div class="sm bold">수동(Manual)</div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="position:relative"><span class="pin" style="top:8px;right:8px">3</span>
+                <div class="card-h"><span class="card-t">제어</span></div>
+                <div class="card-body">
+                  <div class="flex gap6"><span class="inp" style="flex:1;font-size:11px">2026-07-07 12:00</span><span style="font-size:11px;align-self:center">→</span><span class="inp" style="flex:1;font-size:11px">17:00</span></div>
+                  <div class="flex gap6" style="margin-top:8px"><span class="btn pri" style="flex:1">▶ 윈도우 시작</span><span class="btn" style="flex:1">✋ 수동 시작</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>토큰 맥싱</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">토큰 맥싱</div><div class="sm mut">남은 할당량을 자동으로 소진해 에이전트를 최대한 구동합니다 · RFC-031</div></div>
+                <span class="chip">오늘 248k / 500k</span>
+              </div>
+              <div class="card">
+                <div class="card-h"><span class="card-t">상태</span><span class="badge idle">유휴</span></div>
+                <div class="card-body"><div class="g4" style="grid-template-columns:repeat(3,1fr);gap:8px"><div><div class="xs mut">제공자</div><div class="sm bold">zai</div></div><div><div class="xs mut">세션 토큰</div><div class="sm bold">0</div></div><div><div class="xs mut">활성 윈도우</div><div class="sm bold">수동</div></div></div></div>
+              </div>
+              <div class="card">
+                <div class="card-h"><span class="card-t">제어</span><span class="badge" style="background:var(--mut);color:var(--fg2)">metered 1개 · 시작 시 확인</span></div>
+                <div class="card-body"><div class="flex gap6"><span class="inp" style="flex:1;font-size:11px">2026-07-07 12:00</span><span style="font-size:11px;align-self:center">→</span><span class="inp" style="flex:1;font-size:11px">17:00</span></div><div class="flex gap6" style="margin-top:8px"><span class="btn pri" style="flex:1">▶ 윈도우 시작</span><span class="btn" style="flex:1">✋ 수동 시작</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">헤더가 비어 있다 — 오른쪽 액션 자리가 공백</p><p class="fd">페이지 헤더의 오른쪽(<code>justify-between</code>의 두 번째 자식)이 아무것도 렌더하지 않는다. 페르소나·스킬 화면은 이 자리에 생성/새로고침 버튼을 둔다. 토큰 맥싱은 헤더가 텅 빈 채로 균형이 맞지 않는다.</p><p class="src">routes/token-maxing.tsx:20-25 (헤더, 오른쪽 자식 없음)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">화면 목적이 한눈에 들어오지 않는다</p><p class="fd">"토큰 맥싱"이라는 이름과 한 줄 부제만으로, 이 화면이 남은 토큰 할당량을 소진해 에이전트를 최대한 구동하는 기능이라는 것을 파악하기 어렵다. RFC-031 컨텍스트가 UI에 드러나지 않는다.</p><p class="src">routes/token-maxing.tsx:12-23 (부제만, 목적 설명 없음)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">시작 흐름이 두 가지 경로(window / 수동) + metered 확인 다이얼로그로 복잡</p><p class="fd">윈도우 시작과 수동 시작 두 변형이 있고, metered 과금 제공자가 있으면 추가 확인 다이얼로그가 끼어든다. 첫 사용자가 어떤 버튼을 눌러야 할지 결정하기 어렵다.</p><p class="src">components/token-maxing/controls.tsx:50-51,59-77 (metered guard + 두 시작 변형)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">상태 카드에 정보 밀도가 높다</p><p class="fd">상태 카드 하나에 running/idle 배지, 제공자+태스크, 세션 토큰 합계, 활성 윈도우(또는 수동)가 모두 들어간다. 한 카드에 4개 필드 영역이 밀집되어 있다.</p><p class="src">components/token-maxing/status-header.tsx:63-100 (Field/WindowField 다수)</p></div></li>
+    </ul>
+  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>헤더 오른쪽에 오늘 사용량 칩 또는 새로고침/도움말 버튼 추가.</li>
+    <li>부제에 한 줄 목적 설명 보강 ("남은 할당량을 자동 소진해 에이전트를 최대 구동").</li>
+    <li>시작 버튼에 tooltip/도움말로 window vs 수동 차이 안내.</li>
+  </ul></div>
+</section>
+
+<section class="screen" id="screen-12">
+  <div class="screen-head">
+    <div class="snum">12</div>
+    <div class="stitle"><h2>MCP 서버</h2><span class="route">/mcp · routes/mcp.tsx</span></div>
+    <div class="rubric"><div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
+  </div>
+  <div class="compare">
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">운영</div><div class="sb-it"><span class="ic" style="background:#bbb"></span>토큰 맥싱</div>
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>Git</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between" style="position:relative">
+                <div><div style="font-size:18px;font-weight:700">MCP 서버</div><div class="sm mut">Model Context Protocol 서버·도구 관리</div></div>
+                <span class="btn pri" style="position:relative"><span class="pin" style="top:-8px;right:-8px">2</span>＋ 서버 추가</span>
+              </div>
+              <div class="flex gap4" style="position:relative"><span class="pin" style="top:-2px;left:0">1</span><span class="pin" style="top:-2px;left:64px">4</span>
+                <div class="flex gap4" style="margin-left:14px;background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                  <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">▣ 서버</span>
+                  <span class="btn-sm" style="border:0">🔧 도구</span>
+                  <span class="btn-sm" style="border:0">⌨ 테스트</span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">filesystem</div><div class="ds">stdio · 8 도구</div></div><span class="badge run">연결</span></div>
+                <div class="row"><span class="pin" style="top:4px;right:4px">3</span><span class="ava"></span><div class="grow"><div class="nm">github</div><div class="ds">stdio · 12 도구</div></div><span class="badge err">오류</span></div>
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">fetch</div><div class="ds">stdio · 3 도구</div></div><span class="badge run">연결</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">MCP 서버</div><div class="sm mut">Model Context Protocol · <b>서버 3 · 도구 23</b></div></div>
+                <span class="btn pri">＋ 서버 추가</span>
+              </div>
+              <div class="flex gap4" style="background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">▣ 서버 <span class="tag">3</span></span>
+                <span class="btn-sm" style="border:0">🔧 도구 <span class="tag">23</span></span>
+                <span class="btn-sm" style="border:0">⌨ 테스트</span>
+              </div>
+              <div class="card">
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">filesystem</div><div class="ds">stdio · 8 도구</div></div><span class="badge run">연결</span></div>
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">github <span class="tag" style="background:var(--err);color:#fff">오류</span></div><div class="ds">stdio · 12 도구 · 재연결 필요</div></div><span class="btn des xs">↻ 재연결</span></div>
+                <div class="row"><span class="ava"></span><div class="grow"><div class="nm">fetch</div><div class="ds">stdio · 3 도구</div></div><span class="badge run">연결</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">탭(서버/도구/테스트) 상태가 uncontrolled defaultValue라 URL에 없다</p><p class="fd"><code>Tabs defaultValue="servers"</code>로 탭이 제어되지 않는다. 새로고침하면 항상 서버 탭으로 리셋되고, 특정 탭으로 직접 링크하거나 공유할 수 없다.</p><p class="src">routes/mcp.tsx:33 (defaultValue="servers", 제어형 아님)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">헤더의 "서버 추가"가 도구/테스트 탭에서도 보인다</p><p class="fd">"서버 추가" 버튼은 헤더에 고정되어 모든 탭에서 보이지만, 실제로 영향을 주는 건 서버 탭뿐이다. 도구·테스트 탭에서는 문맥에 맞지 않는 액션이다.</p><p class="src">routes/mcp.tsx:28-30 (헤더 버튼) · :33-69 (탭과 무관)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">연결 오류 서버의 복구 액션이 행 수준에 즉시 보이지 않는다</p><p class="fd">오류 상태 서버(github)가 있을 때 재연결/진단 액션이 행에 즉시 노출되는지가 <code>ServerList</code> 구현에 의존한다. 오류를 한눈에 보고 바로 조치하기엔 헤더 요약이 부족하다.</p><p class="src">routes/mcp.tsx:46-52 (ServerList에 위임) · components/mcp/server-list.tsx</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">탭 카운트(서버/도구 수)가 탭 라벨에 없다</p><p class="fd">서버 탭과 도구 탭에 각각 몇 개가 있는지 카운트가 표시되지 않아, 어느 탭에 내용이 있는지 라벨만으로 파악해야 한다.</p><p class="src">routes/mcp.tsx:35-43 (TabsTrigger에 카운트 없음)</p></div></li>
+    </ul>
+  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>탭을 제어형(value/onValueChange)으로 + URL search 동기화.</li>
+    <li>"서버 추가" 버튼은 서버 탭에서만, 또는 탭별로 문맥 액션 분리.</li>
+    <li>각 탭에 카운트 배지 추가; 오류 서버는 헤더 요약에 노출 + 행에 재연결 버튼.</li>
+  </ul></div>
+</section>
+
+<section class="screen" id="screen-13">
+  <div class="screen-head">
+    <div class="snum">13</div>
+    <div class="stitle"><h2>이메일</h2><span class="route">/email · routes/email.tsx</span></div>
+    <div class="rubric"><div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
+  </div>
+  <div class="compare">
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>이메일</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>Git</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">이메일</div><div class="sm mut">이메일 발송 구성·관리</div></div>
+                <div class="flex gap6 center"><span class="chip" style="background:color-mix(in oklch,var(--suc) 16%,transparent);color:var(--suc);border-color:transparent">✓ 구성됨</span><span class="btn-sm">↻</span></div>
+              </div>
+              <div style="position:relative"><span class="pin" style="top:-2px;left:0">1</span><span class="pin" style="top:-2px;left:70px">3</span><span class="pin" style="top:-2px;left:150px">4</span>
+                <div class="flex gap4" style="margin-left:14px;background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                  <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">✉ 개요</span>
+                  <span class="btn-sm" style="border:0">⚙ 설정</span>
+                  <span class="btn-sm" style="border:0">🕘 발송 이력</span>
+                  <span class="btn-sm" style="border:0">▦ 템플릿</span>
+                </div>
+              </div>
+              <div class="g3">
+                <div class="card"><div class="card-h"><span class="card-t">상태</span></div><div class="card-body"><div class="flex gap6 center"><span class="tc-suc">✓</span><span class="sm bold">준비</span></div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">발신자</span></div><div class="card-body"><div class="sm bold">bot@oxios.app</div><div class="xs mut">resend</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">활동</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">128</div><div class="xs mut">총 발송 · 3 템플릿</div></div></div>
+              </div>
+              <div class="xs mut" style="position:relative;padding-left:14px"><span class="pin" style="top:0;left:0">2</span>configured 사용자가 "설정" 탭 열면 자동으로 "개요"로 이동</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>이메일</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">이메일</div><div class="sm mut">이메일 발송 구성·관리</div></div>
+                <div class="flex gap6 center"><span class="chip" style="background:color-mix(in oklch,var(--suc) 16%,transparent);color:var(--suc);border-color:transparent">✓ 구성됨 · resend</span><span class="btn-sm">↻</span></div>
+              </div>
+              <div class="flex gap4" style="background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">✉ 개요</span>
+                <span class="btn-sm" style="border:0">⚙ 재설정</span>
+                <span class="btn-sm" style="border:0">🕘 이력 <span class="tag">128</span></span>
+                <span class="btn-sm" style="border:0">▦ 템플릿 <span class="tag">3</span></span>
+              </div>
+              <div class="g3">
+                <div class="card"><div class="card-h"><span class="card-t">상태</span></div><div class="card-body"><div class="flex gap6 center"><span class="tc-suc">✓</span><span class="sm bold">준비</span></div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">발신자</span></div><div class="card-body"><div class="sm bold">bot@oxios.app</div><div class="xs mut">resend</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">활동</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">128</div><div class="xs mut">총 발송 · 3 템플릿</div></div></div>
+              </div>
+              <div class="xs mut">탭 전환은 사용자 의도 존중 · URL 동기화(?tab=) · 이력/템플릿에 카운트</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">탭(개요/설정/이력/템플릿) 상태가 URL에 동기화되지 않는다</p><p class="fd"><code>activeTab</code>이 로컬 <code>useState</code>로만 관리된다. 새로고침·공유·직접 링크로 특정 탭을 열 수 없다.</p><p class="src">routes/email.tsx:158 (useState) · :201 (Tabs value)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">configured 사용자가 설정 탭을 열면 개요로 강제 이동한다</p><p class="fd">상태가 로드되어 configured가 참이면 <code>setActiveTab</code>으로 setup→overview로 옮긴다. 사용자가 의도적으로 재설정 탭을 열려 해도 예고 없이 이동해 예측 가능성을 해친다.</p><p class="src">routes/email.tsx:164-166 (configured 시 setup→overview 강제)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">4개 탭이 configured 여부와 무관하게 모두 표시</p><p class="fd">미설정 상태에서도 발송 이력·템플릿 탭이 보인다. 설정 전에는 의미 없는 탭이 노출되어 첫 진입 인지 부하가 있다.</p><p class="src">routes/email.tsx:201-219 (항상 4개 TabsTrigger)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">이력·템플릿 탭에 건수 카운트가 없다</p><p class="fd">발송 이력·템플릿 탭 라벨에 각각 몇 건인지 카운트가 없다. 개요 카드의 총 발송 수에서만 유추할 수 있다.</p><p class="src">routes/email.tsx:211-218 (TabsTrigger에 카운트 없음)</p></div></li>
+    </ul>
+  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>탭을 URL search(<code>?tab=</code>)와 동기화 — 새로고침·공유·히스토리 지원.</li>
+    <li>configured 사용자의 setup 탭 진입은 강제 이동 대신 배너로 "이미 구성됨" 안내.</li>
+    <li>미설정 시엔 setup 중심으로 탭 축소; 이력/템플릿 탭에 카운트 배지.</li>
+  </ul></div>
+</section>

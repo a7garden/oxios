@@ -9,7 +9,7 @@
  */
 
 import { CheckCircle2, Eye, EyeOff, Loader2, Trash2, XCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { OAuthModal } from '@/components/settings/oauth-modal'
@@ -21,6 +21,7 @@ import type { IntegrationRow } from '@/hooks/use-integrations'
 import {
   useDeleteIntegrationCredential,
   useInstallIntegration,
+  useInstallJobStatus,
   useIntegrations,
   useSetIntegrationCredential,
 } from '@/hooks/use-integrations'
@@ -137,27 +138,47 @@ function SecretControl({ row }: { row: IntegrationRow }) {
 function InstallButton({ row }: { row: IntegrationRow }) {
   const { t } = useTranslation()
   const installMut = useInstallIntegration()
+  const [jobId, setJobId] = useState<string | null>(null)
+  const status = useInstallJobStatus(jobId)
   // Only show Install when the integration has a CLI and it is NOT installed.
   // Credential-only integrations (no cli) and already-installed ones hide it.
   const notInstalled = row.cli && row.detected && !row.detected.installed
-  if (!notInstalled) return null
+  if (!notInstalled && !jobId) return null
+
+  // Surface terminal outcomes as a toast exactly once. The mutation itself
+  // only resolves with `{ jobId }` — the real success/failure signal rides
+  // SSE via `useInstallJobStatus`.
+  useEffect(() => {
+    if (status.state === 'completed') {
+      toast.success(t('settings.integrationsInstallDone'))
+      setJobId(null)
+    } else if (status.state === 'failed') {
+      toast.error(`${t('settings.integrationsInstallFailed')} (${status.error})`)
+      setJobId(null)
+    }
+  }, [status, t])
 
   const onInstall = async () => {
     if (!window.confirm(t('settings.integrationsInstallConfirm', { name: row.label }))) return
     try {
       const res = await installMut.mutateAsync(row.id)
-      if (res.success) toast.success(t('settings.integrationsInstallDone'))
-      else
-        toast.error(t('settings.integrationsInstallFailed') + (res.output ? `\n${res.output}` : ''))
+      setJobId(res.jobId)
     } catch (e) {
       toast.error(`${t('settings.integrationsInstallFailed')} (${String(e)})`)
     }
   }
 
+  const running = jobId !== null && (status.state === 'running' || status.state === 'idle')
+  const label = running
+    ? status.state === 'running' && status.line
+      ? status.line
+      : t('settings.integrationsInstalling')
+    : t('settings.integrationsInstall')
+
   return (
-    <Button size="sm" variant="outline" onClick={onInstall} disabled={installMut.isPending}>
-      {installMut.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-      {t('settings.integrationsInstall')}
+    <Button size="sm" variant="outline" onClick={onInstall} disabled={running}>
+      {running && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+      <span className="max-w-[16rem] truncate">{label}</span>
     </Button>
   )
 }
@@ -191,39 +212,60 @@ export function IntegrationsSectionCard() {
         </div>
       )}
       {rows && rows.length > 0 && (
-        <ul className="space-y-2">
-          {rows.map((row) => (
-            <li
-              key={row.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-muted/40"
-            >
-              <div className="flex min-w-0 flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-medium">{row.label}</span>
-                  {row.cli && <span className="text-xs text-muted-foreground">{row.cli}</span>}
-                </div>
-                <div className="flex items-center gap-3">
-                  <DetectedBadge detected={row.detected} />
-                  {row.resolverKind !== 'none' && (
-                    <CredentialBadge
-                      configured={row.credential.configured}
-                      source={row.credential.source}
-                    />
-                  )}
-                </div>
+        <div className="space-y-4">
+          {(
+            [
+              ['package_manager', t('settings.integrationsKindPackageManagers')],
+              ['cli_tool', t('settings.integrationsKindCliTools')],
+              ['credential_only', t('settings.integrationsKindCredentials')],
+            ] as const
+          ).map(([kind, heading]) => {
+            const groupRows = rows.filter((r) => r.kind === kind)
+            if (groupRows.length === 0) return null
+            return (
+              <div key={kind} className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {heading}
+                </p>
+                <ul className="space-y-2">
+                  {groupRows.map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-muted/40"
+                    >
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-medium">{row.label}</span>
+                          {row.cli && (
+                            <span className="text-xs text-muted-foreground">{row.cli}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <DetectedBadge detected={row.detected} />
+                          {row.resolverKind !== 'none' && (
+                            <CredentialBadge
+                              configured={row.credential.configured}
+                              source={row.credential.source}
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <InstallButton row={row} />
+                      {row.resolverKind === 'secret' && <SecretControl row={row} />}
+                      {row.resolverKind === 'oauth' && (
+                        <Button size="sm" variant="outline" onClick={() => setOauthRow(row)}>
+                          {row.credential.configured
+                            ? t('settings.integrationsConnected')
+                            : t('settings.integrationsConnect')}
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <InstallButton row={row} />
-              {row.resolverKind === 'secret' && <SecretControl row={row} />}
-              {row.resolverKind === 'oauth' && (
-                <Button size="sm" variant="outline" onClick={() => setOauthRow(row)}>
-                  {row.credential.configured
-                    ? t('settings.integrationsConnected')
-                    : t('settings.integrationsConnect')}
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
+            )
+          })}
+        </div>
       )}
       <OAuthModal row={oauthRow} onOpenChange={(o) => !o && setOauthRow(null)} />
     </SectionCard>

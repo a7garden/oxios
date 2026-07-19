@@ -1,0 +1,306 @@
+<section class="screen" id="screen-02">
+  <div class="screen-head">
+    <div class="snum">02</div>
+    <div class="stitle"><h2>에이전트</h2><span class="route">/agents · routes/agents/index.tsx</span></div>
+    <div class="rubric"><div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s2"><span class="rn">2</span><span class="rl">기능배치</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
+  </div>
+  <div class="compare">
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div><div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between" style="position:relative"><span class="pin" style="top:-6px;right:-6px">3</span><span class="pin" style="top:22px;left:2px">2</span>
+                <div><div style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:6px">⚡ 에이전트</div><div class="sm mut" style="margin-top:3px"><span class="tc-suc bold">3 running</span> · $0.0042 active cost · 12,480 tokens</div></div>
+                <div class="flex gap6" style="position:relative"><span class="pin" style="top:-10px;left:-10px">4</span>
+                  <div style="display:flex;border:1px solid var(--bd);background:var(--mut);border-radius:8px;padding:2px"><span class="btn-sm" style="background:var(--card);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.06)">▦ 캔버스</span><span class="btn-sm" style="border:0">▥ 테이블</span></div>
+                  <span class="btn-sm">↻</span>
+                </div>
+              </div>
+              <div class="card" style="height:200px;display:flex;align-items:center;justify-content:center;position:relative"><span class="pin" style="top:8px;left:8px">5</span>
+                <div class="mut sm" style="text-align:center">
+                  <div style="font-size:30px;opacity:.4;margin-bottom:6px">⟐ ⟐ ⟐</div>
+                  캔버스 뷰 (노드·엣지 그래프)<br><span class="xs">실행 중인 에이전트가 없으면 빈 그래프</span>
+                </div>
+              </div>
+              <div style="position:relative"><span class="pin" style="top:0;left:0">1</span>
+                <div class="flex gap4" style="margin-left:18px"><span class="chip">전체 42</span><span class="chip" style="background:color-mix(in oklch,var(--info) 14%,transparent);color:var(--info);border-color:transparent">실행 3</span><span class="chip">완료 36</span><span class="chip" style="color:var(--err)">실패 3</span></div>
+                <div class="xs mut" style="margin:6px 0 0 18px">↑ 상태 탭은 <b>테이블 뷰에서만</b> 노출 — 캔버스에선 필터 불가</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div><div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 새 에이전트</span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:6px">⚡ 에이전트</div>
+                  <div class="flex gap10 sm mut" style="margin-top:4px;align-items:center"><span><b class="tc-suc">3</b> 실행</span><span><b>$0.0042</b> 활동 비용</span><span><b>12,480</b> 토큰</span><span><b>3</b> A2A 연결</span></div>
+                </div>
+                <div class="flex gap6"><div style="display:flex;border:1px solid var(--bd);background:var(--mut);border-radius:8px;padding:2px"><span class="btn-sm" style="background:var(--card);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.06)">▦ 캔버스</span><span class="btn-sm" style="border:0">▥ 테이블</span></div><span class="btn-sm">↻</span></div>
+              </div>
+              <div class="flex gap6" style="position:sticky;top:0;background:var(--bg);padding:3px 0"><span class="chip">전체 42</span><span class="chip" style="background:color-mix(in oklch,var(--info) 14%,transparent);color:var(--info);border-color:transparent">실행 3</span><span class="chip">완료 36</span><span class="chip" style="color:var(--err)">실패 3</span></div>
+              <div class="card" style="height:180px;display:flex;align-items:center;justify-content:center">
+                <div class="mut sm" style="text-align:center"><div style="font-size:30px;opacity:.5;margin-bottom:6px">⟐ ⟐ ⟐</div>캔버스 뷰<br><span class="xs">빈 그래프 대신 <b class="tc-pri">"새 에이전트를 시작하세요"</b> 가이드 + 최근 에이전트 목록</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">뷰 간 기능 비대칭 — 상태 탭 필터가 테이블 뷰에만 존재</p><p class="fd">전체/실행/완료/실패 상태 탭과 카운트 뱃지는 테이블 뷰에서만 렌더된다. 캔버스(기본 뷰)에서는 상태별 필터링이 불가하여, 그래프에 떠 있는 노드를 상태로 좁힐 방법이 없다.</p><p class="src">routes/agents/index.tsx:421-459 (Tabs, table-view 블록 내) · :380-391 (캔버스엔 필터 없음)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">통계 표시가 뷰마다 두 가지 형태로 갈라진다</p><p class="fd">테이블 뷰는 <code>StatsBar</code> 컴포넌트로, 캔버스 뷰는 인라인 텍스트(<code>3 running · $cost · tokens</code>)로 통계를 보여준다. 동일 정보가 두 형태로 제공되어 일관성이 떨어진다.</p><p class="src">routes/agents/index.tsx:59-78 (StatsBar) · :318-329 (캔버스 인라인 통계)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">에이전트 시작/포크 액션이 화면에 없다 (모니터링 전용)</p><p class="fd">대시보드와 마찬가지로 에이전트 목록 화면에도 "새 에이전트 시작" CTA가 없다. Agent OS의 핵심 액션이 사이드바/헤더로만 접근된다. 빈 캔버스는 특히 행동 유도가 부재하다.</p><p class="src">routes/agents/index.tsx:307-516 (CTA 없음)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">페이지네이션 버튼이 영문 하드코딩</p><p class="fd">"← Previous" / "Next →" 가 <code>t()</code> 없이 문자열 리터럴로 박혀 있다. 한국어 UI에서도 영어로 표시된다.</p><p class="src">routes/agents/index.tsx:495, 503</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">캔버스 기본값이 첫 진입 시 정보 부족</p><p class="fd">기본 뷰는 캔버스이지만 실행 중인 에이전트가 없으면 빈 그래프만 보인다. "무엇을 할 수 있는가"에 대한 유도(최근 에이전트, 시작 버튼)가 없다.</p><p class="src">routes/agents/index.tsx:194 (view ?? 'canvas') · :380-391</p></div></li>
+    </ul>
+  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>상태 탭/필터를 캔버스 뷰에도 노출 (또는 뷰 전환 시 필터 상태 공유).</li>
+    <li>통계 표시를 단일 <code>StatsBar</code>로 양 뷰 통일.</li>
+    <li>헤더에 "새 에이전트" CTA 추가; 빈 캔버스에 시작 유도 + 최근 에이전트 목록.</li>
+    <li>페이지네이션 문자열 i18n 적용.</li>
+  </ul></div>
+</section>
+
+<section class="screen" id="screen-03">
+  <div class="screen-head">
+    <div class="snum">03</div>
+    <div class="stitle"><h2>페르소나</h2><span class="route">/personas · routes/personas.tsx</span></div>
+    <div class="rubric"><div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s2"><span class="rn">2</span><span class="rl">기능배치</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
+  </div>
+  <div class="compare">
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+              <div class="sb-grp">운영</div><div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">페르소나</div><div class="sm mut">에이전트 성격을 정의하세요</div></div>
+                <div class="flex gap6"><span class="btn-sm">↻</span><span class="btn" style="background:var(--pri);color:var(--pri2);border-color:var(--pri);position:relative">＋ 생성<span class="pin" style="top:-8px;right:-8px">5</span></span></div>
+              </div>
+              <div class="g3" style="grid-template-columns:repeat(2,1fr)">
+                <div class="card" style="position:relative"><span class="pin" style="top:8px;right:8px">1</span><span class="pin" style="top:36px;right:8px">2</span>
+                  <div class="card-h"><div class="flex col gap4"><div class="flex gap6 center"><span style="font-weight:600">연구원</span><span class="tc-war">★</span></div><div class="xs mut">깊이 있는 분석가</div></div><div class="flex gap4">✎ ◯ <span class="tc-err">🗑</span></div></div>
+                  <div class="card-body"><div class="xs mut">역할: research</div></div>
+                </div>
+                <div class="card" style="position:relative"><span class="pin" style="top:44px;right:8px">4</span>
+                  <div class="card-h"><div class="flex col gap4"><div class="flex gap6 center"><span style="font-weight:600">작성자</span></div><div class="xs mut">명확한 글쓰기</div></div><div class="flex gap4">✎ <span class="tc-war">★</span> <span class="tc-err">🗑</span></div></div>
+                  <div class="card-body"><div class="xs mut">역할: writer</div></div>
+                </div>
+              </div>
+              <div class="xs mut" style="position:relative;padding-left:16px"><span class="pin" style="top:0;left:-2px">3</span>활성(★) 페르소나를 끄거나 다중 활성 규칙은 UI에 표시되지 않음</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>페르소나</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>스킬</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700">페르소나</div><div class="sm mut">한 번에 하나만 활성화됩니다 · 에이전트 성격 정의</div></div>
+                <div class="flex gap6"><span class="btn-sm">↻</span><span class="btn" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 생성</span></div>
+              </div>
+              <div class="g3" style="grid-template-columns:repeat(2,1fr)">
+                <div class="card" style="border-color:var(--war)">
+                  <div class="card-h"><div class="flex col gap4"><div class="flex gap6 center"><span style="font-weight:600">연구원</span><span class="badge" style="background:color-mix(in oklch,var(--war) 16%,transparent);color:var(--war)">활성</span></div><div class="xs mut">깊이 있는 분석가 · 2줄 미리보기…</div></div><div class="flex gap4">✎ <span class="tc-mut">★ 끄기</span> <span class="tc-err">🗑</span></div></div>
+                  <div class="card-body"><div class="xs mut">역할: research · 프롬프트 240자…</div></div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><div class="flex col gap4"><div class="flex gap6 center"><span style="font-weight:600">작성자</span></div><div class="xs mut">명확한 글쓰기</div></div><div class="flex gap4">✎ <span class="tc-war">★ 활성</span> <span class="tc-err">🗑</span></div></div>
+                  <div class="card-body"><div class="xs mut">역할: writer · 프롬프트 180자…</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">활성 페르소나를 비활성화할 인-카드 방법이 없다 (단방향 토글)</p><p class="fd">활성화 버튼은 <code>{!persona.enabled && ...}</code> 조건으로 활성 페르소나에서 사라진다. 한 번 활성화하면 카드에서 끌 수 없고, 다른 페르소나를 활성화해야만 교체된다. 토글이 단방향이다.</p><p class="src">routes/personas.tsx:228-237 (활성화 버튼, enabled일 때 숨김)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">"활성" 상태가 별 아이콘(filled, 경고색)에만 의존</p><p class="fd">활성 상태가 색이 채워진 작은 별 하나로만 표시된다. "활성"이라는 텍스트 라벨이 없어 색맹·초기 사용자가 상태를 즉시 파악하기 어렵다.</p><p class="src">routes/personas.tsx:213 (Star className="text-warning fill-warning")</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">단일 활성 vs 다중 활성 규칙이 UI에 설명 없음</p><p class="fd">여러 페르소나를 동시에 켤 수 있는지, 한 번에 하나인지가 UI 어디에도 표시되지 않는다. 활성화 동작의 결과를 예측하기 어렵다.</p><p class="src">routes/personas.tsx:228-237 (활성화 로직에 안내 없음)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">카드에 시스템 프롬프트 미리보기가 없다</p><p class="fd">카드는 <code>role</code>만 표시하고 실제 시스템 프롬프트 내용은 보여주지 않는다. 프롬프트를 확인하려면 편집 다이얼로그를 열어야 한다.</p><p class="src">routes/personas.tsx:248-253 (role만 렌더)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">생성 다이얼로그의 설명 입력이 한 줄 Input</p><p class="fd">설명 필드가 단일 줄 <code>Input</code>이다. 페르소나 설명이 길어지면 입력이 잘리고 시스템 프롬프트처럼 <code>Textarea</code> 여백이 부족하다.</p><p class="src">routes/personas.tsx:155-162 (description Input) vs :164-175 (systemPrompt Textarea)</p></div></li>
+    </ul>
+  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>활성 페르소나 카드에 "활성 끄기" 토글 추가 — 단방향을 양방향으로.</li>
+    <li>별 아이콘에 "활성" 텍스트 뱃지 병기 — 색 의존 제거.</li>
+    <li>"한 번에 하나만 활성화됩니다" 안내 문구 추가.</li>
+    <li>카드에 시스템 프롬프트 2줄 미리보기 추가.</li>
+  </ul></div>
+</section>
+
+<section class="screen" id="screen-04">
+  <div class="screen-head">
+    <div class="snum">04</div>
+    <div class="stitle"><h2>스킬 · 마켓플레이스</h2><span class="route">/skills · routes/skills.tsx (마켓플레이스 = 두 번째 탭)</span></div>
+    <div class="rubric"><div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div><div class="rcell s2"><span class="rn">2</span><span class="rl">기능배치</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div><div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">인터랙션</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">접근성</span></div><div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div></div>
+  </div>
+  <div class="compare">
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>스킬</div>
+              <div class="sb-grp">운영</div><div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="btn-sm">⌕ <span class="kbd">⌘K</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between" style="position:relative"><span class="pin" style="top:-6px;right:-6px">3</span>
+                <div style="position:relative"><span class="pin" style="top:-6px;left:-6px">4</span><div style="font-size:18px;font-weight:700;display:flex;gap:6px;align-items:center">⚡ 스킬</div><div class="sm mut">SKILL.md 기반 통합 스킬 시스템</div></div>
+                <span class="chip">전체 8 · 준비 6 · 설정필요 2</span>
+              </div>
+              <div class="flex gap6"><span class="btn" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 생성</span><span class="btn">⬇ 가져오기 ▾</span></div>
+              <div style="position:relative"><span class="pin" style="top:-2px;left:-8px">1</span>
+                <div class="flex gap4" style="margin-left:14px;background:var(--mut);padding:3px;border-radius:8px;width:fit-content">
+                  <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">⚡ 설치됨 8</span>
+                  <span class="btn-sm" style="border:0;position:relative">🏪 마켓플레이스<span class="pin" style="top:-8px;left:0">2</span><span class="pin" style="top:6px;left:6px">5</span></span>
+                </div>
+              </div>
+              <div class="g2">
+                <div class="card"><div class="card-h"><span class="card-t">CODE-AUDIT</span><span class="badge run">준비</span></div><div class="card-body"><div class="xs mut">전체 코드베이스 감사…</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">WEB-PERF</span><span class="badge idle">설정필요</span></div><div class="card-body"><div class="xs mut">웹 성능 분석…</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">RELEASE-PREP</span><span class="badge run">준비</span></div><div class="card-body"><div class="xs mut">릴리스 준비…</div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>페르소나</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>스킬</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar"><span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span><div class="grow"></div><span class="btn-sm">⚡<span class="kbd">⌘J</span></span><span class="clock">◷</span></div>
+            <div class="page">
+              <div class="flex between">
+                <div><div style="font-size:18px;font-weight:700;display:flex;gap:6px;align-items:center">⚡ 스킬</div><div class="sm mut">SKILL.md 기반 통합 스킬 시스템</div></div>
+                <div class="flex gap4 center"><span class="chip">전체 8</span><span class="chip" style="cursor:pointer">↻ 새로고침</span></div>
+              </div>
+              <div class="flex gap6"><span class="btn" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 생성</span><span class="btn">⬇ 가져오기 ▾</span></div>
+              <div class="flex gap4" style="background:var(--mut);padding:3px;border-radius:8px;width:fit-content;position:relative">
+                <span class="btn-sm" style="background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06)">⚡ 설치됨 8 <span class="tag" style="background:var(--info);color:#fff">↑2</span></span>
+                <span class="btn-sm" style="border:0">🏪 마켓플레이스</span>
+              </div>
+              <div class="xs mut">탭 전환 시 URL 동기화 (<code>?tab=</code>) · 마켓플레이스 빈 검색어일 때 clawhub도 추천 목록 표시</div>
+              <div class="g2">
+                <div class="card"><div class="card-h"><span class="card-t">CODE-AUDIT <span class="tag" style="background:var(--info);color:#fff">업데이트</span></span><span class="badge run">준비</span></div><div class="card-body"><div class="xs mut">전체 코드베이스 감사…</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">WEB-PERF</span><span class="badge idle">설정필요</span></div><div class="card-body"><div class="xs mut">웹 성능 분석…</div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="findings"><h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div><p class="ft">탭(설치됨/마켓플레이스) 상태가 URL에 동기화되지 않는다</p><p class="fd">초기 진입 시에만 <code>search.tab</code>을 읽지만, 이후 탭 전환(<code>handleTabChange</code>)은 <code>setTab</code>만 호출하고 URL을 바꾸지 않는다. 새로고침·공유·브라우저 뒤로가기 시 현재 탭이 유실된다. <code>/marketplace</code> 리다이렉트가 <code>?tab=marketplace</code>로 보내지만 그 이후엔 URL이 의미를 잃는다.</p><p class="src">routes/skills.tsx:121 (초기값만 search.tab) · :247-252 (handleTabChange, URL 미갱신) · marketplace.tsx:4 (리다이렉트)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">마켓플레이스 두 소스(clawhub / skills.sh)의 빈 상태가 비대칭</p><p class="fd">검색어가 비어 있을 때 skills.sh는 트렌딩 목록으로 폴백하지만, clawhub는 <code>deferredQuery.trim().length > 0</code> 조건으로 쿼리 자체가 비활성화되어 빈 화면만 보인다. 같은 탭의 두 소스가 전혀 다른 첫 화면을 제공한다.</p><p class="src">routes/skills.tsx:185 (clawhub enabled 조건) · :359 (skills.sh trending 폴백)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div><p class="ft">요약 pill이 수동 새로고침을 대체하여 사용자 제어가 없다</p><p class="fd">이전의 새로고침 버튼이 <code>SkillSummaryPill</code>(필터 토글)로 대체되었다. 30초 자동 갱신에만 의존하므로, 설치 직후나 외부 변경 시 즉시 갱신할 수단이 없다.</p><p class="src">routes/skills.tsx:170 (refetchInterval 30000) · :268 (SkillSummaryPill이 새로고침 대체)</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft"><code>/marketplace</code>가 실제 화면이 아니라 리다이렉트</p><p class="fd"><code>/marketplace</code>는 <code>&lt;Navigate to="/skills" search={{tab:'marketplace'}}&gt;</code>일 뿐 별도 화면이 아니다. 별도 라우트처럼 보이지만 실제는 스킬 페이지의 두 번째 탭이어서 내비게이션에 혼란을 준다.</p><p class="src">routes/marketplace.tsx:3-5</p></div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div><p class="ft">업데이트 가능 표시가 마켓플레이스 탭 뱃지에만</p><p class="fd"><code>UpdateBadge</code>가 마켓플레이스 탭에만 표시된다. 설치됨 탭에서는 어떤 스킬에 업데이트가 있는지 한눈에 알기 어렵다(개별 카드를 봐야 함).</p><p class="src">routes/skills.tsx:326 (UpdateBadge on marketplace tab) · :312-313 (installed 탭엔 카운트만)</p></div></li>
+    </ul>
+  </div>
+  <div class="changes"><h3>변경 제안</h3><ul>
+    <li>탭 전환 시 <code>navigate({search:{tab}})</code>로 URL 동기화 — 새로고침·공유·히스토리 유지.</li>
+    <li>clawhub 빈 검색 시 추천/인기 폴백 추가 — 두 소스의 첫 화면 통일.</li>
+    <li>요약 pill 옆에 수동 새로고침 버튼 복원.</li>
+    <li>설치됨 탭에도 업데이트 가능 스킬 수 표시.</li>
+  </ul></div>
+</section>

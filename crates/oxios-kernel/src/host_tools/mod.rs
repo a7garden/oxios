@@ -14,7 +14,7 @@ pub mod registry;
 pub mod scanner;
 pub use oauth::{DeviceCodeResponse, OAuthBroker, PollOutcome, PollResponse};
 pub use provisioner::{InstallOutput, install as install_spec};
-pub use registry::{CredentialResolver, CredentialStatus, Integration, IntegrationRegistry};
+pub use registry::{CredentialResolver, CredentialStatus, Integration, IntegrationKind, IntegrationRegistry};
 pub use scanner::{DetectedTool, HostProbe, HostToolScanner, RealProbe, ToolSource};
 
 use std::sync::Arc;

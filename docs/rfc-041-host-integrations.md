@@ -1,7 +1,19 @@
 # RFC-041: Host Integrations Subsystem
 
-> **Status:** Proposed (rev. 2 — review findings H1–H6, M1–M6 folded in) · **Date:** 2026-07-12
+> **Status:** Phases 1–5 shipped (rev. 3 — review findings H1–H6, M1–M6, B1–B3, S1–S6 folded in and implemented) · **Date:** 2026-07-18
 > **Scope:** `oxios-kernel`, `src/api`, `web/`, `share/`
+>
+> **Implementation status (rev. 3):**
+>
+> | Phase | State | Notes |
+> |-------|-------|-------|
+> | 1 — Discovery (`HostToolScanner`) | ✅ shipped | Cross-platform, symlink-aware, 60s TTL cache. `which_sync` is the single PATH-lookup source (B3): `skill::requirements::has_bin` and the provisioner both call it. |
+> | 2 — Registry + credential status | ✅ shipped | `Integration.kind` (S1) added: `package_manager` / `cli_tool` / `credential_only` — drives UI grouping. `KNOWN_SECRETS`-class secrets (telegram/email/clawhub) migrated here (§9). |
+> | 3 — OAuth device-code | ✅ shipped | Start/poll + token persistence. Revoke-on-DELETE wired (M6). Refresh scheduler deferred (GitHub device-flow tokens don't expire; needed when a refresh-capable provider lands). |
+> | 4 — Provisioning | ✅ shipped | All `InstallKind`s spawn as privileged ops. `SkillInstallSpec::sha256` (B2) verifies download integrity before extraction. Audit logging rides the event bus → `attach_audit_trail` subscriber. |
+> | 5 — Skill ↔ integration linking | ✅ shipped (this rev.) | Join at the API layer (`/api/skills` enriches each entry with `integration_status`); kernel's `check_requirements` stays host-local and registry-unaware (per the `skill/types.rs:21` design note). `config_checks` now performs real file-existence checks (S6). |
+>
+> **Deferred follow-ups:** line-by-line stdout streaming during install (single `progress` event per job today), OAuth refresh scheduler (lands with the first refresh-capable provider).
 
 ## 1. Motivation
 
@@ -115,11 +127,16 @@ User overrides in `~/.oxios/integrations.d/*.toml`, merged **by id, whole-entry 
 override with `id = "github"` replaces the entire shipped `github` entry — no field merge).
 
 ```toml
+# The `kind` field (rev. 3, S1) drives UI grouping + card layout. Defaults to
+# `cli_tool`. Other values: `package_manager` (bootstrap, no install/credential)
+# and `credential_only` (no binary — e.g. bot tokens).
+
 # Package managers (bootstrap — no credential)
 [[integration]]
 id = "brew"
 label = "Homebrew"
 cli = "brew"
+kind = "package_manager"
 credential = { resolver = "none" }
 
 [[integration]]
@@ -307,13 +324,54 @@ free text → no injection surface). Agents may *report* a missing dependency bu
 the install endpoint; an agent request is routed to the user as an approval prompt via the
 existing `pending_tool_approvals` flow.
 
-### Install progress streaming (fix M3)
+### Install progress streaming (fix M3 — implemented rev. 3)
 
-`POST /api/integrations/{id}/install` returns immediately with `{ job_id }`. Output is
-streamed over the existing SSE event bus (`/events`), tagged by `job_id`; terminal status is
-pollable. This matches how long kernel operations already surface progress and avoids a
-multi-minute blocking POST.
+`POST /api/integrations/{id}/install` returns `{ job_id, integration_id }`
+immediately. The actual install runs in a background `tokio::spawn` that
+publishes four `KernelEvent` variants on the existing event bus
+(`/api/events`), all keyed by `job_id`:
 
+- `IntegrationInstallStarted { job_id, integration_id, label }` — published
+  before the spawn so the SSE subscriber sees deterministic ordering.
+- `IntegrationInstallProgress { job_id, integration_id, line }` — one
+  summary line carrying the resolved command (e.g. `brew install gh`).
+  Line-by-line stdout streaming is a deferred refinement; the single
+  summary covers the UX gap (the UI flips its button to "Installing…
+  <cmd>" immediately).
+- `IntegrationInstallCompleted { job_id, integration_id, command, output,
+  exit_code }` — published on success. The handler then calls
+  `HostToolsApi::invalidate()` so the scanner cache (60s TTL) drops the
+  stale `None` and the next `detect` reports the freshly installed binary
+  (fix B1 — without this the UI badge would keep showing ✗ for up to a
+  minute after a successful install).
+- `IntegrationInstallFailed { job_id, integration_id, error }` — published
+  on error.
+
+The audit trail subscriber (`attach_audit_trail`) records each variant via
+`kernel_event_to_audit_action`, so installs are Merkle-audited without
+the install path calling `SecurityApi::audit` directly. The frontend
+`useInstallJobStatus(jobId)` hook filters the SSE stream by `jobId` and
+flips the button + shows a terminal toast on completion.
+
+### Download integrity (fix B2 — implemented rev. 3)
+
+`SkillInstallSpec` gained an optional `sha256: Option<String>`. When set,
+`install_download` hashes the fetched bytes (`sha2::Sha256`) and rejects the
+archive **before any filesystem write** if the digest mismatches. Absence of
+the hash preserves the legacy TLS-only trust for specs whose `url` is
+`latest` (clawhub, dynamic release feeds). Pinning is recommended for any
+integration whose `url` resolves to a fixed release artifact; the field is
+additive and ignored by package-manager install kinds (`brew`/`node`/`cargo`/
+`pip`/`go`/`bun`/`uv`) — the manager's own verification chain (e.g. brew's
+bottle signatures) covers those.
+
+The registry TOML form:
+
+```toml
+install = [
+  { kind = "download", url = "https://.../gh_2.40.0_darwin_arm64.tar.gz", sha256 = "abc123…", strip_components = 1 }
+]
+```
 ## 8. Capability Layer 3 — OAuth (`OAuthBroker`)
 
 Device-code flow only (D2). Daemon-friendly: no local callback server, no in-daemon browser.
@@ -417,18 +475,64 @@ Engine/Providers tab.
 - **Install**: confirm dialog → SSE progress stream → terminal status.
 - Patterns mirror `provider-card.tsx`, `secrets-section.tsx`, marketplace install dialogs.
 
-## 11. Skill ↔ integration linking (fix M4)
+## 11. Skill ↔ integration linking (fix M4 — implemented rev. 3)
 
-- A skill's `requires.bins: ["gh"]` already gates eligibility (works today).
-- **New frontmatter** `requires.integrations: ["github"]` (hard gate) and
-  `any_integrations: ["github"]` (soft/optional, mirrors `any_bins`). The requirements check
-  becomes: bin present **and** hard-listed integration credentials satisfied.
-- **No regression risk:** `integrations` is a *new* field defaulting to empty. Existing skills
-  that worked before are unaffected. A skill that only *conditionally* needs `gh` should not
-  list it in `requires.integrations` — it should check at runtime via a tool. Hard-listing is
-  for "cannot run at all without this."
-- When a skill is ineligible due to a missing integration, the UI deep-links to that
-  integration's card — a guided setup wizard rather than a silent "not eligible".
+### Design constraint: the join lives at the API layer
+
+`SkillManager` is constructed with only two `PathBuf`s (`manager.rs:13-17`); it has
+zero references to `HostToolsApi` or the scanner, and we keep it that way. The
+`Requirements.integrations` / `any_integrations` fields are **parsed** by the
+frontmatter reader and stored on `SkillMetadata`, but they are **not** consulted
+by `check_requirements` — that function is host-local and registry-unaware by
+design (see the `skill/types.rs:21-22` doc comment). The join happens at the
+API layer, where `KernelHandle` exposes both `extensions` (wrapping
+`SkillManager`) and `host_tools` as siblings.
+
+This preserves the kernel module's invariants (no cross-module coupling in
+`skill::requirements`) while still surfacing live status to the UI.
+
+### Frontmatter
+
+```yaml
+requires:
+  integrations: ["github"]    # hard gate — every id must be satisfied
+  anyIntegrations: ["slack"]  # soft — at least one must be satisfied
+```
+
+Existing fields `bins` / `any_bins` / `env` / `config` keep working unchanged.
+A skill that only *conditionally* needs an integration should not list it in
+`requires.integrations` — it should check at runtime via a tool. Hard-listing is
+for "cannot run at all without this."
+
+### API enrichment (`GET /api/skills`, `GET /api/skills/:name`)
+
+For each request, the route builds an `integration_status_index: HashMap<id,
+IntegrationStatus>` from `HostToolsApi::integrations()` + `detect()` +
+`credential_status()`. `IntegrationStatus` carries:
+
+- `installed` — `CliTool`: detected on PATH. `PackageManager`/`CredentialOnly`: true.
+- `configured` — `Secret`/`OAuth`: credential store has an entry. `None` resolver: true.
+- `satisfied` — `installed && configured` — the single user-visible "ready" bit.
+
+Each skill entry then gains:
+
+- `requirements.integrations` / `requirements.anyIntegrations` (declared ids)
+- `missing.integrations` — declared ids that are not `satisfied`
+- `missing.anyIntegrations` — `anyIntegrations` cloned when none is satisfied, else empty
+- `integration_status: [{ id, installed, configured, satisfied }, …]` for each declared id
+
+`has_bin` itself is now a thin wrapper over `HostToolScanner::which_sync`
+(§6, fix B3) — the legacy `which` subprocess is gone, and Windows binary
+detection works as a side effect.
+
+### UI
+
+`SkillDetail` (and the skill row expander in `skills.tsx`) renders one card per
+`requires.integrations` entry with the live `installed`/`configured` status and
+a deep-link to `/settings?section=host-tools` when unsatisfied. The
+"needs_setup" badge and `missingWarning` now include `integration:` /
+`any_integration:` entries alongside the legacy `bin:` / `env:` / `config:`
+prefixes.
 
 ## 12. KernelHandle placement (fix L8)
 
@@ -448,17 +552,16 @@ integration `kind` without restructuring. Acknowledged overlap, explicitly defer
 
 ## 14. Phased rollout (fix L9)
 
-| Phase | Scope | Risk | Deliverable |
-|-------|-------|------|-------------|
-| **1** | `HostToolScanner` (per-OS, symlink-aware, cached) + `/api/host-tools` + UI badges | Low | "What's installed"; `has_bin` generalized; Windows fixed |
-| **2** | Registry TOML + full `CredentialDescriptor` schema (incl. OAuth variant fields) + `/api/integrations` exercising `Secret`/`Provider` resolvers; absorbs `resolve_secret`-class `KNOWN_SECRETS` | Low | Unified, truthful credential status (H6) |
-| **3** | OAuth device-code (`OAuthProvider` for GitHub) + refresh + revoke; broker owns `device_code` (H1) | Medium | First real OAuth in the daemon. *Note:* end-to-end gh OAuth also needs P4 to install gh; the OAuth machinery itself is independently testable with a mock provider. |
-| **4** | Provisioning — extend `InstallKind` (Cargo/Bun/Pip), privileged spawn, SSE progress, user-gated | Medium | "Install" button works |
-| **5** | `requires.integrations` / `any_integrations` + guided setup wizard | Low | Skill dependency guidance |
+| Phase | State | Scope | Deliverable |
+|-------|-------|-------|-------------|
+| **1** | ✅ shipped | `HostToolScanner` (per-OS, symlink-aware, cached) + `/api/host-tools` + UI badges; `which_sync` is the single PATH-lookup source (B3) | "What's installed"; `has_bin` generalized; Windows fixed |
+| **2** | ✅ shipped | Registry TOML + full `CredentialDescriptor` schema + `/api/integrations` exercising `Secret`/`OAuth` resolvers; absorbs `resolve_secret`-class `KNOWN_SECRETS` (telegram/email/clawhub). `Integration.kind` (S1) for UI grouping. | Unified, truthful credential status (H6) |
+| **3** | ✅ shipped | OAuth device-code (`OAuthProvider` for GitHub) + revoke-on-DELETE (M6); broker owns `device_code` (H1). Refresh scheduler deferred (GitHub device-flow tokens don't expire). | First real OAuth in the daemon. |
+| **4** | ✅ shipped | All `InstallKind`s (Cargo/Bun/Pip/Uv) spawn as privileged ops, SSE progress (M3), user-gated, audit-logged via the bus subscriber. `SkillInstallSpec::sha256` (B2) verifies downloads. | "Install" button works end-to-end. |
+| **5** | ✅ shipped (rev. 3) | `requires.integrations` / `any_integrations` parsed in frontmatter, joined to live registry status at the API layer (§11). Real `config_checks` (S6). | Skill dependency guidance with live ✓/✗ cards. |
 
-P2 defines the **full** descriptor schema (all resolver variants) even though only
-`Secret`/`Provider` are exercised — so P3/P4 don't reopen the schema. Each phase ships
-independently.
+P2 defined the **full** descriptor schema (all resolver variants) up front so P3/P4/P5
+didn't need to reopen it. Each phase shipped independently.
 
 ## 15. Testing (fix L6)
 

@@ -40,7 +40,7 @@ import CodeMirror, { EditorView, type ReactCodeMirrorRef } from '@uiw/react-code
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { useKnowledgeTree } from '@/hooks/use-knowledge'
+import { useKnowledgeRecursiveTree, useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
 import { emojiFoldExtension } from '@/lib/emoji-fold-extension'
 import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
@@ -51,7 +51,8 @@ import { mermaidDarkObserver, mermaidExtension } from '@/lib/mermaid-extension'
 import { tableFoldExtension } from '@/lib/table-fold-extension'
 import { tokenHideExtension } from '@/lib/token-hide-extension'
 import { cn } from '@/lib/utils'
-import { wikilinkExtension } from '@/lib/wikilink-extension'
+import { buildWikilinkIndex, resolveWikilink, type WikilinkIndex } from '@/lib/wikilink-resolve'
+import { configureWikilinkResolver, wikilinkExtension } from '@/lib/wikilink-extension'
 import { useEditorPrefs } from '@/stores/editor-prefs'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { countWords, type EditorStats } from './editor-status-bar'
@@ -291,6 +292,31 @@ export function MarkdownEditor({
     [],
   )
   const { data: treeEntries } = useKnowledgeTree()
+  // Recursive tree carries full note paths; used to build the wikilink
+  // resolver index. React Query dedupes this with the sidebar's own
+  // recursive-tree fetch, so the extra subscription is free.
+  const { data: recursiveTree } = useKnowledgeRecursiveTree()
+  // Build the stem → paths index whenever the tree changes. Cheap for
+  // personal KBs (hundreds of files) and memoized so decoration rebuilds
+  // don't re-walk.
+  const wikilinkIndex: WikilinkIndex | null = useMemo(
+    () => (recursiveTree ? buildWikilinkIndex(recursiveTree) : null),
+    [recursiveTree],
+  )
+  // Install the resolver into the (module-level) wikilink extension. The
+  // extension bumps an internal version counter via configureWikilinkResolver
+  // and re-resolves every visible link on the next update — so renaming a
+  // note makes its inbound `[[links]]` re-bind without an editor remount.
+  useEffect(() => {
+    if (!wikilinkIndex) {
+      configureWikilinkResolver(null)
+      return
+    }
+    const idx = wikilinkIndex
+    const path = currentFilePath
+    configureWikilinkResolver((target) => resolveWikilink(target, path, idx))
+    return () => configureWikilinkResolver(null)
+  }, [wikilinkIndex, currentFilePath])
   const [isDark, setIsDark] = useState(false)
   const { t } = useTranslation()
 

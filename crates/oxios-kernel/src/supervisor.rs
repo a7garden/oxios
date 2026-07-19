@@ -774,7 +774,7 @@ mod tests {
                         .expect("valid Skills.sh client"),
                 ),
             ),
-            None, // calendar (not configured in test)
+            None,                                     // calendar (not configured in test)
             Arc::new(parking_lot::RwLock::new(None)), // email (not configured in test)
         ));
 

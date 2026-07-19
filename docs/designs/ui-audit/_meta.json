@@ -1,0 +1,157 @@
+{
+ "sections": {
+  "screen-12": {
+   "pins": 4,
+   "h": 0,
+   "m": 4,
+   "l": 0,
+   "frag": "frag-ref.html"
+  },
+  "screen-spec": {
+   "pins": 0,
+   "h": 0,
+   "m": 0,
+   "l": 0,
+   "frag": "frag-ref.html"
+  },
+  "screen-01": {
+   "pins": 5,
+   "h": 2,
+   "m": 2,
+   "l": 1,
+   "frag": "frag-A.html"
+  },
+  "screen-17": {
+   "pins": 6,
+   "h": 2,
+   "m": 3,
+   "l": 1,
+   "frag": "frag-A.html"
+  },
+  "screen-02": {
+   "pins": 5,
+   "h": 1,
+   "m": 4,
+   "l": 0,
+   "frag": "frag-B.html"
+  },
+  "screen-04": {
+   "pins": 6,
+   "h": 2,
+   "m": 4,
+   "l": 0,
+   "frag": "frag-B.html"
+  },
+  "screen-07": {
+   "pins": 5,
+   "h": 2,
+   "m": 3,
+   "l": 0,
+   "frag": "frag-B.html"
+  },
+  "screen-09": {
+   "pins": 4,
+   "h": 0,
+   "m": 2,
+   "l": 2,
+   "frag": "frag-C.html"
+  },
+  "screen-13": {
+   "pins": 4,
+   "h": 0,
+   "m": 3,
+   "l": 1,
+   "frag": "frag-C.html"
+  },
+  "screen-14": {
+   "pins": 4,
+   "h": 0,
+   "m": 1,
+   "l": 3,
+   "frag": "frag-C.html"
+  },
+  "screen-15": {
+   "pins": 4,
+   "h": 0,
+   "m": 2,
+   "l": 2,
+   "frag": "frag-C.html"
+  },
+  "screen-16": {
+   "pins": 3,
+   "h": 0,
+   "m": 2,
+   "l": 1,
+   "frag": "frag-C.html"
+  },
+  "screen-11": {
+   "pins": 2,
+   "h": 0,
+   "m": 1,
+   "l": 1,
+   "frag": "frag-D.html"
+  },
+  "screen-19": {
+   "pins": 4,
+   "h": 0,
+   "m": 2,
+   "l": 2,
+   "frag": "frag-D.html"
+  },
+  "screen-05": {
+   "pins": 4,
+   "h": 0,
+   "m": 2,
+   "l": 2,
+   "frag": "frag-D.html"
+  },
+  "screen-06": {
+   "pins": 5,
+   "h": 0,
+   "m": 4,
+   "l": 1,
+   "frag": "frag-D.html"
+  },
+  "screen-08": {
+   "pins": 4,
+   "h": 0,
+   "m": 4,
+   "l": 0,
+   "frag": "frag-D.html"
+  },
+  "screen-10": {
+   "pins": 4,
+   "h": 0,
+   "m": 2,
+   "l": 2,
+   "frag": "frag-D.html"
+  },
+  "screen-03": {
+   "pins": 4,
+   "h": 0,
+   "m": 2,
+   "l": 2,
+   "frag": "frag-D.html"
+  },
+  "screen-18": {
+   "pins": 3,
+   "h": 0,
+   "m": 1,
+   "l": 2,
+   "frag": "frag-E.html"
+  },
+  "screen-shell": {
+   "pins": 4,
+   "h": 2,
+   "m": 1,
+   "l": 1,
+   "frag": "frag-E.html"
+  }
+ },
+ "tot": [
+  11,
+  49,
+  24
+ ],
+ "parity_ok": true
+}

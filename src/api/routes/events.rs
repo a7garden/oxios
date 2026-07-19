@@ -507,6 +507,50 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "name": name,
             "source": source,
         }),
+        KernelEvent::IntegrationInstallStarted {
+            job_id,
+            integration_id,
+            label,
+        } => serde_json::json!({
+            "type": "integration_install_started",
+            "job_id": job_id,
+            "integration_id": integration_id,
+            "label": label,
+        }),
+        KernelEvent::IntegrationInstallProgress {
+            job_id,
+            integration_id,
+            line,
+        } => serde_json::json!({
+            "type": "integration_install_progress",
+            "job_id": job_id,
+            "integration_id": integration_id,
+            "line": line,
+        }),
+        KernelEvent::IntegrationInstallCompleted {
+            job_id,
+            integration_id,
+            command,
+            output,
+            exit_code,
+        } => serde_json::json!({
+            "type": "integration_install_completed",
+            "job_id": job_id,
+            "integration_id": integration_id,
+            "command": command,
+            "output": output,
+            "exit_code": exit_code,
+        }),
+        KernelEvent::IntegrationInstallFailed {
+            job_id,
+            integration_id,
+            error,
+        } => serde_json::json!({
+            "type": "integration_install_failed",
+            "job_id": job_id,
+            "integration_id": integration_id,
+            "error": error,
+        }),
     };
     // Merge payload into base
     if let serde_json::Value::Object(mut map) = base {

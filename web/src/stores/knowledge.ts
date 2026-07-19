@@ -7,6 +7,16 @@ interface KnowledgeState {
 
   // Current file
   currentFilePath: string | null
+  /**
+   * Monotonic counter bumped ONLY on explicit file switches (openFile /
+   * goBack / goForward). Drives the editor's `key` so the editor fully
+   * remounts when the user navigates to a different file. In-place
+   * renames (renameCurrent) deliberately do NOT bump it — the editor
+   * stays mounted across a rename so cursor + undo history survive, and
+   * the content (kept warm in the React Query cache by useMoveFile's
+   * from→to migration) replaces itself as a no-op.
+   */
+  editorSessionId: number
 
   // Navigation history
   history: string[]
@@ -28,6 +38,13 @@ interface KnowledgeState {
   recentlyCreatedPath: string | null
   // Actions
   openFile: (path: string) => void
+  /**
+   * Swap the currently open file's path in place (used after a rename —
+   * either H1-driven or F2). Updates `currentFilePath` and rewrites the
+   * current history entry so back/forward navigation stays consistent,
+   * WITHOUT bumping `editorSessionId` (the editor must not remount).
+   */
+  renameCurrent: (newPath: string) => void
   openChat: () => void
   openHome: () => void
   goBack: () => string | null | undefined
@@ -49,13 +66,14 @@ interface KnowledgeState {
 
 /** Expand every parent directory of `filePath`. E.g. "brain/rust/x.md" → ["brain", "brain/rust"]. */
 function expandToPathSegments(filePath: string): string[] {
-  if (!filePath.includes('/')) return []
-  const dirs = filePath.split('/').slice(0, -1)
   const out: string[] = []
-  let acc = ''
-  for (const dir of dirs) {
-    acc = acc ? `${acc}/${dir}` : dir
-    out.push(acc)
+  if (filePath.includes('/')) {
+    const dirs = filePath.split('/').slice(0, -1)
+    let acc = ''
+    for (const dir of dirs) {
+      acc = acc ? `${acc}/${dir}` : dir
+      out.push(acc)
+    }
   }
   return out
 }
@@ -65,6 +83,7 @@ export const useKnowledgeStore = create<KnowledgeState>()(
     (set, get) => ({
       mode: 'home',
       currentFilePath: null,
+      editorSessionId: 0,
       history: [],
       historyIndex: -1,
       infoPanelOpen: false,
@@ -87,7 +106,21 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           history: newHistory,
           historyIndex: newHistory.length - 1,
           expandedPaths,
+          // New file → fresh editor session (remount, reset undo history).
+          editorSessionId: get().editorSessionId + 1,
         })
+      },
+      renameCurrent: (newPath) => {
+        const { currentFilePath, history, historyIndex } = get()
+        if (!currentFilePath || newPath === currentFilePath) return
+        // Rewrite the current history entry in place so back/forward
+        // navigation stays consistent, WITHOUT bumping editorSessionId
+        // (the editor stays mounted across a rename).
+        const newHistory = history.slice()
+        if (historyIndex >= 0 && historyIndex < newHistory.length) {
+          newHistory[historyIndex] = newPath
+        }
+        set({ currentFilePath: newPath, history: newHistory })
       },
       openChat: () => {
         set({ mode: 'chat' })
@@ -101,7 +134,12 @@ export const useKnowledgeStore = create<KnowledgeState>()(
         if (historyIndex <= 0) return null
         const newIndex = historyIndex - 1
         const path = history[newIndex]
-        set({ historyIndex: newIndex, currentFilePath: path, mode: 'editor' })
+        set({
+          historyIndex: newIndex,
+          currentFilePath: path,
+          mode: 'editor',
+          editorSessionId: get().editorSessionId + 1,
+        })
         return path
       },
 
@@ -110,7 +148,12 @@ export const useKnowledgeStore = create<KnowledgeState>()(
         if (historyIndex >= history.length - 1) return null
         const newIndex = historyIndex + 1
         const path = history[newIndex]
-        set({ historyIndex: newIndex, currentFilePath: path, mode: 'editor' })
+        set({
+          historyIndex: newIndex,
+          currentFilePath: path,
+          mode: 'editor',
+          editorSessionId: get().editorSessionId + 1,
+        })
         return path
       },
 

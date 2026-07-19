@@ -1,0 +1,853 @@
+        <p class="src">routes/security.tsx:1-15 (ApprovalsQueue 미import) · routes/index.tsx:7,200 (Queue는 대시보드 전용) · components/layout/sidebar.tsx:156 (Bell 아이콘) · hooks/use-global-events.ts:22 (주석: "link /approvals" 약속) vs :208-209 (실제 link: '/' / route 자체 부재)</p></div></li>
+<!-- =========================================================================
+     SCREEN 14 — GIT
+     ========================================================================= -->
+<section class="screen" id="screen-14">
+  <div class="screen-head">
+    <div class="snum">14</div>
+    <div class="stitle">
+      <h2>Git</h2>
+      <span class="route">/git · routes/git.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">기능배치</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>Git</div>
+              <div class="sb-grp">시스템</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>리소스</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>보안</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>Git</h1><p class="sub">커밋 로그 · 태그 · 체크포인트 복원</p></div>
+                <div class="flex gap6">
+                  <span class="btn-sm">↻ 새로고침</span>
+                  <span class="btn-sm" style="position:relative">
+                    <span class="pin" style="top:-6px;right:-6px">4</span>
+                    <span class="tc-suc">◈</span> 무결성 검증
+                  </span>
+                </div>
+              </div>
+
+              <div class="card" style="position:relative">
+                <span class="pin" style="top:8px;right:8px">3</span>
+                <div class="card-h"><span class="card-t">태그</span><span class="card-t tc-mut">＋ 만들기</span></div>
+                <div class="card-body">
+                  <div class="flex gap6">
+                    <div class="inp" style="background:var(--mut);color:var(--fg2)">v1.0-rc…</div>
+                    <span class="btn pri">생성</span>
+                  </div>
+                  <div class="flex gap4" style="margin-top:8px;flex-wrap:wrap">
+                    <span class="pill mut">v1.0.0</span>
+                    <span class="pill mut">v0.9.3</span>
+                    <span class="pill mut">checkpoint-2026-06-12</span>
+                    <span class="pill mut" style="opacity:.5">…</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card" style="position:relative">
+                <span class="pin" style="top:8px;right:8px">1</span>
+                <div class="card-h"><span class="card-t">체크포인트 복원</span><span class="card-t tc-err">⚠ 파괴적</span></div>
+                <div class="card-body">
+                  <div class="flex gap6">
+                    <div class="inp mono" style="background:var(--mut);color:var(--fg2)">7c9f3a…</div>
+                    <span class="btn des">복원</span>
+                  </div>
+                  <p class="mut xs" style="margin-top:6px">해시 7자 입력 → 즉시 호출</p>
+                </div>
+              </div>
+
+              <div class="card" style="position:relative">
+                <span class="pin" style="top:8px;right:8px">2</span>
+                <div class="card-h"><span class="card-t">커밋 로그</span><span class="card-t tc-mut">15초 자동 새로고침</span></div>
+                <div class="card-body">
+                  <div class="flex gap6" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <span class="mono sm" style="background:var(--mut);padding:1px 5px;border-radius:4px">7c9f3a1</span>
+                    <div class="grow">
+                      <div class="nm">chore: tighten exec allowlist</div>
+                      <div class="ds">oxios-bot · 2026-07-07 09:14</div>
+                    </div>
+                  </div>
+                  <div class="flex gap6" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <span class="mono sm" style="background:var(--mut);padding:1px 5px;border-radius:4px">4b8e0d2</span>
+                    <div class="grow">
+                      <div class="nm">feat(approval): RFC-017 tool capability</div>
+                      <div class="ds">oxios-bot · 2026-07-05 16:02</div>
+                    </div>
+                  </div>
+                  <div class="flex gap6" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <span class="mono sm" style="background:var(--mut);padding:1px 5px;border-radius:4px">2a14cf9</span>
+                    <div class="grow">
+                      <div class="nm">fix(resources): chart color tokens</div>
+                      <div class="ds">a7garden · 2026-07-03 22:41</div>
+                    </div>
+                  </div>
+                  <div class="mut xs center" style="padding:6px 0">… 최근 N개 더 보기 (스크롤)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>Git</div>
+              <div class="sb-grp">시스템</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>리소스</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>보안</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>Git</h1><p class="sub">커밋 로그 · 태그 · 체크포인트 복원</p></div>
+                <div class="flex gap6">
+                  <span class="btn-sm">↻ 새로고침</span>
+                  <span class="btn-sm"><span class="tc-suc">◈</span> 무결성 검증</span>
+                  <span class="btn-sm pri">＋ 새 태그</span>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-h"><span class="card-t">태그</span><span class="card-t tc-mut">선택 항목에 적용</span></div>
+                <div class="card-body">
+                  <div class="flex gap6">
+                    <div class="inp" style="background:var(--mut);color:var(--fg2)">v1.1.0</div>
+                    <span class="btn pri">생성</span>
+                    <span class="btn des" style="opacity:.4">선택 태그 삭제</span>
+                  </div>
+                  <div class="flex gap4" style="margin-top:8px;flex-wrap:wrap">
+                    <span class="pill pri" style="cursor:pointer">✓ v1.0.0</span>
+                    <span class="pill mut" style="cursor:pointer">v0.9.3</span>
+                    <span class="pill mut" style="cursor:pointer">checkpoint-2026-06-12</span>
+                    <span class="pill mut" style="opacity:.5">…</span>
+                  </div>
+                  <p class="mut xs" style="margin-top:4px">태그 클릭하면 선택 → 상단 "삭제" 활성화</p>
+                </div>
+              </div>
+
+              <div class="card" style="border-color:color-mix(in oklch,var(--err) 40%,transparent)">
+                <div class="card-h"><span class="card-t tc-err">체크포인트 복원 (파괴적)</span><span class="card-t tc-err">⌗</span></div>
+                <div class="card-body">
+                  <div class="flex gap6">
+                    <div class="inp mono" style="background:var(--mut);color:var(--fg2)">7c9f3a…</div>
+                    <span class="btn des">복원</span>
+                  </div>
+                  <p class="xs tc-mut" style="margin-top:6px">실행 전 확인 다이얼로그(해시·메시지 미리보기)와 현재 HEAD 백업 자동 생성</p>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-h"><span class="card-t">커밋 로그</span><span class="card-t tc-mut">해시 클릭 → 복원창</span></div>
+                <div class="card-body">
+                  <div class="flex gap6" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <span class="mono sm" style="background:var(--mut);padding:1px 5px;border-radius:4px;color:var(--pri);text-decoration:underline;cursor:pointer">7c9f3a1</span>
+                    <div class="grow">
+                      <div class="nm">chore: tighten exec allowlist</div>
+                      <div class="ds">oxios-bot · 2026-07-07 09:14</div>
+                    </div>
+                  </div>
+                  <div class="flex gap6" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <span class="mono sm" style="background:var(--mut);padding:1px 5px;border-radius:4px;color:var(--pri);text-decoration:underline;cursor:pointer">4b8e0d2</span>
+                    <div class="grow">
+                      <div class="nm">feat(approval): RFC-017 tool capability</div>
+                      <div class="ds">oxios-bot · 2026-07-05 16:02</div>
+                    </div>
+                  </div>
+                  <div class="flex gap6" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <span class="mono sm" style="background:var(--mut);padding:1px 5px;border-radius:4px;color:var(--pri);text-decoration:underline;cursor:pointer">2a14cf9</span>
+                    <div class="grow">
+                      <div class="nm">fix(resources): chart color tokens</div>
+                      <div class="ds">a7garden · 2026-07-03 22:41</div>
+                    </div>
+                  </div>
+                  <div class="mut xs center" style="padding:6px 0">… 최근 N개 더 보기</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">체크포인트 복원이 확인 다이얼로그 없이 즉시 실행</p>
+        <p class="fd"><code>variant="destructive"</code> 버튼이 SHA 입력 한 번으로 <code>POST /api/git/restore</code>를 호출한다. 사용자가 해시 7자만 보고 단축 일치로 잘못된 커밋을 복원할 위험이 있고, 현재 HEAD에 자동 백업도 없다. 파괴적 액션이 페이지 어디에서도 보호되지 않는다.</p>
+        <p class="src">routes/git.tsx:154-162 (Button destructive + restoreMutation.mutate) · :58-64 (mutationFn 무가드)</p></div></li>
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">커밋 해시가 클릭 불가 — 로그와 복원이 단절됨</p>
+        <p class="fd">커밋 로그의 해시는 단순 <code>&lt;code&gt;</code> 텍스트이고, 위의 복원 <code>Input</code>은 빈 입력 상태에서 시작한다. 사용자는 해시를 보고 → 옆으로 옮겨 적어야 한다. 같은 데이터(해시)가 두 영역에 따로 노는 셈이다.</p>
+        <p class="src">routes/git.tsx:185-187 (code className만) vs :147-162 (Input + Button)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">태그가 생성 전용 — 삭제·체크포인트로의 동선 없음</p>
+        <p class="fd"><code>tagMutation</code>만 있고 태그 삭제는 백엔드/프론트 어디에도 없다. 체크포인트로 쓰려면 매번 SHA를 다시 입력해야 한다. 사이드 그룹이 태그 ↔ 복원을 잇는 다리를 제공하지 않는다.</p>
+        <p class="src">routes/git.tsx:50-56 (tagMutation only) · :125-135 (Badge 렌더만, 액션 없음)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">무결성 검증이 헤더의 작은 outline 버튼 — 데이터 무효성 시 영향이 크다는 신호가 약함</p>
+        <p class="fd">Git 로그가 변조됐는지 확인하는 액션이 <code>↻ 새로고침</code>과 같은 톤의 28px outline 버튼에 들어 있어, 백엔드 응답 실패·변조 감지 같은 critical 단계를 사용자가 "보조 액션"으로 오인한다. 검증 결과는 토스트 한 줄로 사라진다.</p>
+        <p class="src">routes/git.tsx:91-99 (outline Button) · :66-74 (toast.success 만)</p></div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>체크포인트 복원 전 확인 다이얼로그(해시·메시지·작성자 미리보기)와 "현재 HEAD에 백업 태그 자동 생성"을 강제. <code>restoreMutation</code>에 가드 prop 추가.</li>
+      <li>커밋 로그의 해시를 <code>&lt;button&gt;</code>로 바꾸고 클릭 시 복원 input에 자동 주입·하이라이트. 같은 데이터를 한 번에 본다.</li>
+      <li>태그 배지에 선택 상태 + 삭제 액션 추가, 체크포인트 동선을 자연스럽게 묶기.</li>
+      <li>무결성 검증 버튼을 <code>pri</code> 톤으로 승격 + 검증 결과 패널(최근 N건)을 별도 카드로.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- =========================================================================
+     SCREEN 15 — 리소스 (시스템 자원)
+     ========================================================================= -->
+<section class="screen" id="screen-15">
+  <div class="screen-head">
+    <div class="snum">15</div>
+    <div class="stitle">
+      <h2>리소스</h2>
+      <span class="route">/resources · routes/resources.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">정보구조</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">기능배치</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">접근성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>Git</div>
+              <div class="sb-grp">시스템</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>리소스</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>보안</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>리소스</h1><p class="sub">CPU · 메모리 · 디스크 시계열</p></div>
+                <span class="btn-sm">↻</span>
+              </div>
+
+              <div class="g3" style="grid-template-columns:repeat(3,1fr)">
+                <div class="card" style="position:relative"><span class="pin" style="top:8px;right:8px">2</span>
+                  <div class="card-h"><span class="card-t">CPU</span><span class="kpi-ic tc-mut">⚙</span></div>
+                  <div class="card-body">
+                    <div class="kpi-val">34.2%</div>
+                    <div style="height:8px;background:var(--mut);border-radius:99px;margin-top:8px;position:relative">
+                      <div style="position:absolute;left:0;top:0;bottom:0;width:34.2%;background:#5b9bd5;border-radius:99px"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t">메모리</span><span class="kpi-ic tc-mut">◭</span></div>
+                  <div class="card-body">
+                    <div class="kpi-val">48.0%</div>
+                    <div style="height:8px;background:var(--mut);border-radius:99px;margin-top:8px;position:relative">
+                      <div style="position:absolute;left:0;top:0;bottom:0;width:48%;background:#ed7d31;border-radius:99px"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t">디스크</span><span class="kpi-ic tc-mut">◑</span></div>
+                  <div class="card-body">
+                    <div class="kpi-val">62.5%</div>
+                    <div style="height:8px;background:var(--mut);border-radius:99px;margin-top:8px;position:relative">
+                      <div style="position:absolute;left:0;top:0;bottom:0;width:62.5%;background:#a5a5a5;border-radius:99px"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card" style="position:relative">
+                <span class="pin" style="top:8px;right:8px">1</span>
+                <span class="pin" style="top:8px;right:32px">3</span>
+                <div class="card-h"><span class="card-t">자원 이력 (5초 간격 · 30개)</span><span class="card-t tc-mut">최근 2.5분</span></div>
+                <div class="card-body" style="position:relative">
+                  <svg viewBox="0 0 480 200" style="width:100%;height:200px;background:#fff;border:1px dashed var(--bd);border-radius:8px">
+                    <line x1="0" y1="40" x2="480" y2="40" stroke="#eee"/>
+                    <line x1="0" y1="100" x2="480" y2="100" stroke="#eee"/>
+                    <line x1="0" y1="160" x2="480" y2="160" stroke="#eee"/>
+                    <path d="M0,140 L20,135 L40,148 L80,142 L120,128 L160,135 L200,150 L240,125 L280,118 L320,110 L360,128 L400,142 L440,130 L480,135" fill="none" stroke="#5b9bd5" stroke-width="1.5"/>
+                    <path d="M0,90 L20,82 L40,76 L80,80 L120,68 L160,72 L200,84 L240,90 L280,96 L320,100 L360,98 L400,92 L440,86 L480,104" fill="none" stroke="#ed7d31" stroke-width="1.5"/>
+                    <path d="M0,68 L20,68 L40,68 L80,68 L120,68 L160,68 L200,68 L240,68 L280,68 L320,68 L360,68 L400,68 L440,68 L480,68" fill="none" stroke="#a5a5a5" stroke-width="1.5"/>
+                    <text x="6" y="120" font-size="9" fill="#999">CPU</text>
+                    <text x="6" y="74" font-size="9" fill="#999">RAM</text>
+                    <text x="6" y="50" font-size="9" fill="#999">DSK</text>
+                  </svg>
+                  <p class="mut xs" style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                    <span class="dot-s" style="background:#5b9bd5;display:inline-block"></span>?
+                    <span class="dot-s" style="background:#ed7d31;display:inline-block"></span>?
+                    <span class="dot-s" style="background:#a5a5a5;display:inline-block"></span>?
+                    <span class="mut">← 색만 보고는 무엇이 무엇인지 알 수 없음</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>Git</div>
+              <div class="sb-grp">시스템</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>리소스</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>보안</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>리소스</h1><p class="sub">CPU · 메모리 · 디스크 시계열</p></div>
+                <div class="flex gap6">
+                  <select class="btn-sm"><option>최근 2.5분</option><option>최근 1시간</option></select>
+                  <span class="btn-sm">↻ 5초</span>
+                </div>
+              </div>
+
+              <div class="g3" style="grid-template-columns:repeat(3,1fr)">
+                <div class="card">
+                  <div class="card-h"><span class="card-t">CPU</span><span class="kpi-ic tc-info">⚙</span></div>
+                  <div class="card-body">
+                    <div class="kpi-val">34.2%</div>
+                    <div class="kpi-hint">정상 · 80%↑ 주의</div>
+                    <div style="height:6px;background:var(--mut);border-radius:99px;margin-top:8px;position:relative">
+                      <div style="position:absolute;left:0;top:0;bottom:0;width:34.2%;background:var(--info);border-radius:99px"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t">메모리</span><span class="kpi-ic tc-info">◭</span></div>
+                  <div class="card-body">
+                    <div class="kpi-val">48.0%</div>
+                    <div class="kpi-hint">정상 · 90%↑ 위험</div>
+                    <div style="height:6px;background:var(--mut);border-radius:99px;margin-top:8px;position:relative">
+                      <div style="position:absolute;left:0;top:0;bottom:0;width:48%;background:var(--info);border-radius:99px"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t">디스크</span><span class="kpi-ic tc-info">◑</span></div>
+                  <div class="card-body">
+                    <div class="kpi-val">62.5%</div>
+                    <div class="kpi-hint">정상 · 95%↑ 위험</div>
+                    <div style="height:6px;background:var(--mut);border-radius:99px;margin-top:8px;position:relative">
+                      <div style="position:absolute;left:0;top:0;bottom:0;width:62.5%;background:var(--war);border-radius:99px"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-h"><span class="card-t">자원 이력</span><span class="flex gap8 sm"><span class="chip" style="cursor:pointer"><span class="dot-s" style="background:var(--info)"></span>CPU</span><span class="chip" style="cursor:pointer"><span class="dot-s" style="background:var(--info)"></span>메모리</span><span class="chip" style="cursor:pointer"><span class="dot-s" style="background:var(--war)"></span>디스크</span></span></div>
+                <div class="card-body">
+                  <svg viewBox="0 0 480 200" style="width:100%;height:200px;background:#fff;border:1px dashed var(--bd);border-radius:8px">
+                    <line x1="0" y1="40" x2="480" y2="40" stroke="#eee"/>
+                    <line x1="0" y1="100" x2="480" y2="100" stroke="#eee"/>
+                    <line x1="0" y1="160" x2="480" y2="160" stroke="#eee"/>
+                    <text x="466" y="38" font-size="9" fill="#999">80%</text>
+                    <text x="466" y="138" font-size="9" fill="#999">20%</text>
+                    <path d="M0,140 L40,135 L80,148 L120,128 L160,135 L200,150 L240,125 L280,118 L320,110 L360,128 L400,142 L440,130 L480,135" fill="none" stroke="var(--info)" stroke-width="2"/>
+                    <path d="M0,90 L40,82 L80,76 L120,68 L160,72 L200,84 L240,90 L280,96 L320,100 L360,98 L400,92 L440,86 L480,104" fill="none" stroke="var(--info)" stroke-width="2" stroke-dasharray="3,3"/>
+                    <path d="M0,68 L40,68 L80,68 L120,68 L160,68 L200,68 L240,68 L280,68 L320,68 L360,68 L400,68 L440,68 L480,68" fill="none" stroke="var(--war)" stroke-width="2"/>
+                  </svg>
+                  <p class="mut xs" style="margin-top:6px">체크포인트로 hover 시 정확한 값 표시 · 축 그리드 20/80% 임계치 표기</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">영역 차트가 범례·임계선 없이 색만으로 구분됨</p>
+        <p class="fd">세 개의 <code>Area</code>(CPU/RAM/디스크)는 recharts의 <code>Legend</code> 컴포넌트가 import 목록에 없기 때문에(<code>routes/resources.tsx:5-13</code>), 어느 라인이 무엇인지 호버·툴팝 의존으로만 식별된다. 색만 보면 시계열을 즉시 비교할 수 없다 — 대시보드(#screen-01 finding 1)와 같은 "라벨/색이 의미를 전달하지 못함" 패턴이 차트 안에서 반복된다.</p>
+        <p class="src">routes/resources.tsx:5-13 (Legend 미import) · :148-171 (3× Area, stroke/fill만 다름)</p></div></li>
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">KPI 바의 색이 메트릭별로 고정 — 임계치·의미 불일치</p>
+        <p class="fd">CPU 바는 <code>--chart-1</code>(파랑), RAM은 <code>--chart-2</code>(주황), 디스크는 <code>--chart-3</code>(회색)로 메트릭 자체에 묶여 있어 같은 60%라도 어떤 카드는 채워 보이지 않는다(디스크 회색). 정상 구간이면 모두 중성 색, 임계치 초과 시에만 색이 바뀌어야 한다. dashboard의 finding 1과 같은 근본 원인.</p>
+        <p class="src">routes/resources.tsx:80 (:chart-1 CPU) · :99 (:chart-2 RAM) · :116 (:chart-3 디스크) · routes/index.tsx:139,151 (위 패턴 참조)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">시계열 차트의 X축이 <code>toLocaleTimeString()</code> — 데이터 포인트 간격 불균일</p>
+        <p class="fd">X축 키는 <code>new Date(s.timestamp).toLocaleTimeString()</code>(<code>resources.tsx:50</code>)이고, 백엔드 timestamp가 고르지 않으면 라벨이 겹치거나 "HH:MM:SS"로 폭을 잡아먹는다. 5초 polling이라면 차라리 상대시간(0s/5s/10s/…)·시:분만·간격 균등화가 적절하다.</p>
+        <p class="src">routes/resources.tsx:40 (refetchInterval 5000) · :49-54 (time 키) · :137 (XAxis dataKey="time")</p></div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>import에 <code>Legend</code> 추가하고 차트 상단에 클릭 토글 가능한 범례를 둔다. 각 시리즈 색은 토큰(<code>--info</code>/<code>--war</code>/<code>--info-d</code>)으로 통일.</li>
+      <li>KPI 바 색을 임계치 기반으로: 0–70% 중성, 70–90% war, 90%+ err. 디스크는 95%+. 메트릭별 고정이 아닌 값 기반 그라데이션.</li>
+      <li>X축 키를 <code>snapshots.map((_, i) => i)</code> + 커스텀 tick(예: "−2:30", "−2:00", …)으로 바꾸고, 80% 가로 점선과 호버 툴팁에 정확한 값.</li>
+      <li>"이 라인이 무엇인지"를 hover로만 알아내는 모호함을 해소 — 색은 의미, 라벨은 위치.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- =========================================================================
+     SCREEN 16 — 보안 (감사 + 권한)
+     ========================================================================= -->
+<section class="screen" id="screen-16">
+  <div class="screen-head">
+    <div class="snum">16</div>
+    <div class="stitle">
+      <h2>보안</h2>
+      <span class="route">/security · routes/security.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s1"><span class="rn">1</span><span class="rl">기능배치</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>Git</div>
+              <div class="sb-grp">시스템</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>리소스</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>보안</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head" style="position:relative">
+                <span class="pin" style="top:-4px;right:6px">1</span>
+                <div><h1>보안</h1><p class="sub">권한 정책 및 감사 추적</p></div>
+                <span class="btn-sm">↻</span>
+              </div>
+
+              <div class="card" style="position:relative">
+                <span class="pin" style="top:8px;right:8px">2</span>
+                <div class="card-h"><span class="card-t">권한 · 기본 역할</span><span class="card-t tc-mut">읽기 전용</span></div>
+                <div class="card-body">
+                  <div class="flex between center" style="padding:6px 0;border-bottom:1px solid var(--bd)">
+                    <div class="flex gap6 center"><span class="kpi-ic">⚷</span><span class="bold sm">assistant</span></div>
+                    <span class="mut xs">7 resources</span>
+                  </div>
+                  <div class="flex gap4" style="margin-top:8px;flex-wrap:wrap">
+                    <span class="pill mut">file.read</span>
+                    <span class="pill mut">file.write</span>
+                    <span class="pill mut">web.fetch</span>
+                    <span class="pill mut">memory.query</span>
+                    <span class="pill mut">agent.invoke</span>
+                    <span class="pill mut">shell.exec</span>
+                    <span class="pill mut">…</span>
+                  </div>
+                  <div class="flex between center" style="padding:6px 0;border-bottom:1px solid var(--bd);margin-top:10px">
+                    <div class="flex gap6 center"><span class="kpi-ic">⚷</span><span class="bold sm">researcher</span></div>
+                    <span class="mut xs">3 resources</span>
+                  </div>
+                  <div class="flex gap4" style="margin-top:8px;flex-wrap:wrap">
+                    <span class="pill mut">web.fetch</span>
+                    <span class="pill mut">file.read</span>
+                    <span class="pill mut">memory.query</span>
+                  </div>
+                  <div class="flex between center" style="padding:6px 0;margin-top:10px">
+                    <div class="flex gap6 center"><span class="kpi-ic">⚷</span><span class="bold sm">approver</span></div>
+                    <span class="mut xs">2 resources</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card" style="position:relative">
+                <span class="pin" style="top:8px;right:8px">3</span>
+                <span class="pin" style="top:8px;right:32px">4</span>
+                <div class="card-h">
+                  <span class="card-t">감사 추적</span>
+                  <div class="flex gap6">
+                    <div class="inp" style="padding:4px 8px;background:var(--mut);color:var(--fg2);font-size:11px;min-width:140px">⌕ 액션·리소스…</div>
+                    <span class="btn-sm" style="border-color:color-mix(in oklch,var(--bd) 60%,transparent)">⌧ 거부만</span>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="flex between" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <div class="flex gap8">
+                      <span class="badge idle">허용</span>
+                      <div>
+                        <div class="nm">web.fetch → https://example.com</div>
+                        <div class="ds">researcher · 2026-07-07 09:14</div>
+                      </div>
+                    </div>
+                    <span class="mut xs">오전 9:14</span>
+                  </div>
+                  <div class="flex between" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <div class="flex gap8">
+                      <span class="badge err">거부</span>
+                      <div>
+                        <div class="nm">shell.exec → rm -rf /tmp/build</div>
+                        <div class="ds tc-war">researcher · 권한 없음</div>
+                      </div>
+                    </div>
+                    <span class="mut xs">오전 9:11</span>
+                  </div>
+                  <div class="flex between" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <div class="flex gap8">
+                      <span class="badge idle">허용</span>
+                      <div>
+                        <div class="nm">memory.store</div>
+                        <div class="ds">writer-agent · 2026-07-07 09:08</div>
+                      </div>
+                    </div>
+                    <span class="mut xs">오전 9:08</span>
+                  </div>
+                  <div class="flex between center" style="padding:8px 10px;border-top:1px solid var(--bd);margin-top:6px">
+                    <span class="mut xs">1–20 / 124</span>
+                    <div class="flex gap4">
+                      <span class="btn-sm" style="opacity:.4">‹ 이전</span>
+                      <span class="btn-sm" style="opacity:.4">다음 ›</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">인프라</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>MCP 서버</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>이메일</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>Git</div>
+              <div class="sb-grp">시스템</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>리소스</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri);position:relative">
+                <span class="pin" style="top:-2px;right:-2px">1</span>
+              </span>보안</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm" style="border-color:var(--err);color:var(--err);position:relative">
+                <span class="pin" style="top:-6px;right:-6px">1</span>
+                <span>▲</span> 대기 승인 3
+              </span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>보안</h1><p class="sub">권한 정책 및 감사 추적</p></div>
+                <span class="btn-sm">↻</span>
+              </div>
+
+              <div class="card" style="border-color:color-mix(in oklch,var(--err) 30%,transparent)">
+                <div class="card-h"><span class="card-t tc-err">▲ 대기 중인 승인 (3)</span><span class="card-t tc-mut">승인 시 활동 기록</span></div>
+                <div class="card-body">
+                  <div class="flex between center" style="padding:8px 0;border-bottom:1px solid var(--bd)">
+                    <div class="grow">
+                      <div class="nm">shell.exec → rm -rf /tmp/build</div>
+                      <div class="ds">researcher · 위험도 높음 · 5분 전</div>
+                    </div>
+                    <div class="flex gap6">
+                      <span class="btn-sm des">거부</span>
+                      <span class="btn-sm pri">승인</span>
+                    </div>
+                  </div>
+                  <div class="flex between center" style="padding:8px 0;border-bottom:1px solid var(--bd)">
+                    <div class="grow">
+                      <div class="nm">agent.invoke → writer-agent</div>
+                      <div class="ds">researcher · 7분 전</div>
+                    </div>
+                    <div class="flex gap6">
+                      <span class="btn-sm des">거부</span>
+                      <span class="btn-sm pri">승인</span>
+                    </div>
+                  </div>
+                  <div class="flex between center" style="padding:8px 0">
+                    <div class="grow">
+                      <div class="nm">file.write → /shared/notes.md</div>
+                      <div class="ds">writer-agent · 10분 전</div>
+                    </div>
+                    <div class="flex gap6">
+                      <span class="btn-sm des">거부</span>
+                      <span class="btn-sm pri">승인</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-h">
+                  <span class="card-t">권한 · 기본 역할</span>
+                  <span class="card-t tc-mut">읽기 전용 · 편집은 설정에서</span>
+                </div>
+                <div class="card-body">
+                  <div class="flex between center" style="padding:6px 0;border-bottom:1px solid var(--bd)">
+                    <div class="flex gap6 center"><span class="kpi-ic">⚷</span><span class="bold sm">assistant</span></div>
+                    <span class="mut xs">7 resources</span>
+                  </div>
+                  <div class="flex gap4" style="margin-top:8px;flex-wrap:wrap">
+                    <span class="pill mut">file.read</span>
+                    <span class="pill mut">file.write</span>
+                    <span class="pill mut">web.fetch</span>
+                    <span class="pill mut">memory.query</span>
+                    <span class="pill mut">agent.invoke</span>
+                    <span class="pill mut">shell.exec</span>
+                    <span class="pill mut">…</span>
+                  </div>
+                  <div class="flex between center" style="padding:6px 0;border-bottom:1px solid var(--bd);margin-top:10px">
+                    <div class="flex gap6 center"><span class="kpi-ic">⚷</span><span class="bold sm">researcher</span></div>
+                    <span class="mut xs">3 resources</span>
+                  </div>
+                  <div class="flex gap4" style="margin-top:8px;flex-wrap:wrap">
+                    <span class="pill mut">web.fetch</span>
+                    <span class="pill mut">file.read</span>
+                    <span class="pill mut">memory.query</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-h">
+                  <span class="card-t">감사 추적</span>
+                  <div class="flex gap6">
+                    <div class="inp" style="padding:4px 8px;background:var(--mut);color:var(--fg2);font-size:11px;min-width:140px">⌕ 액션·리소스…</div>
+                    <span class="btn-sm pri">⌧ 거부만</span>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="flex between" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <div class="flex gap8">
+                      <span class="badge idle">허용</span>
+                      <div>
+                        <div class="nm">web.fetch → https://example.com</div>
+                        <div class="ds">researcher · 2026-07-07 09:14</div>
+                      </div>
+                    </div>
+                    <span class="mut xs">오전 9:14</span>
+                  </div>
+                  <div class="flex between" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <div class="flex gap8">
+                      <span class="badge err">거부</span>
+                      <div>
+                        <div class="nm">shell.exec → rm -rf /tmp/build</div>
+                        <div class="ds tc-war">researcher · 권한 없음</div>
+                      </div>
+                    </div>
+                    <span class="mut xs">오전 9:11</span>
+                  </div>
+                  <div class="flex between" style="padding:8px 0;border-top:1px solid var(--bd)">
+                    <div class="flex gap8">
+                      <span class="badge idle">허용</span>
+                      <div>
+                        <div class="nm">memory.store</div>
+                        <div class="ds">writer-agent · 2026-07-07 09:08</div>
+                      </div>
+                    </div>
+                    <span class="mut xs">오전 9:08</span>
+                  </div>
+                  <div class="flex between center" style="padding:8px 10px;border-top:1px solid var(--bd);margin-top:6px">
+                    <span class="mut xs">1–20 / 124</span>
+                    <div class="flex gap4">
+                      <span class="btn-sm">‹ 이전</span>
+                      <span class="btn-sm">다음 ›</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">"보안" 화면인데 대기 중인 승인 큐가 없고, 알림도 발생하지 않음</p>
+        <p class="fd">보안은 사이드바 아이콘이 <code>Bell</code>(<code>sidebar.tsx:156</code>)이고 라벨이 "보안"이지만, 화면 본문(<code>routes/security.tsx</code>)에는 권한 정책 카드와 감사 추적 카드만 있고 <code>ApprovalsQueue</code>가 import되지도 않았다(<code>routes/index.tsx:7</code>에서만 import). <code>useApprovals</code>·<code>useGlobalEvents</code>의 알림 라우팅도 <code>link: '/'</code>(<code>use-global-events.ts:209</code>)로 대시보드 홈을 가리킨다 — 사용자가 "보안"에 들어와도 보류 중인 요청을 처리할 곳이 없다.</p>
+        <p class="src">routes/security.tsx:1-15 (ApprovalsQueue 미import) · routes/index.tsx:7,200 (Queue는 대시보드 전용) · components/layout/sidebar.tsx:156 (Bell 아이콘) · hooks/use-global-events.ts:22 (주석 약속 "link /approvals") vs :208-209 (실제 link: '/', /approvals 라우트 부재)</p></div></li>
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">권한 정책이 읽기 전용 — 라벨은 "권한"인데 액션이 0개</p>
+        <p class="fd"><code>security.tsx:108-146</code>의 권한 영역은 단순 정렬·렌더만 한다. 역할 추가·리소스 토글·정책 수정이 화면 어디에도 없다. <code>t('security.permissions')</code> 같은 라벨이 "사용자가 권한을 관리한다"는 신호를 주지만, 실제로는 <code>GET /api/security/permissions</code> 결과만 보여준다.</p>
+        <p class="src">routes/security.tsx:53-65 (query만) · :108-146 (mutation/useApproveApproval류 부재)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">감사 추적의 거부 필터가 "켜짐" 상태와 "안 켜짐" 상태의 구분이 약함</p>
+        <p class="fd"><code>auditOnlyDenied</code> 토글 버튼은 <code>variant={auditOnlyDenied ? 'default' : 'outline'}</code>(<code>:170</code>) 두 톤뿐이라, 어떤 데이터가 표시되고 있는지 카드 안에서 한눈에 알기 어렵다. 필터 ON일 때는 결과 카운트·총 카운트를 명시해 사용자가 "전체 N건 중 거부만 M건"임을 인식시켜야 한다.</p>
+        <p class="src">routes/security.tsx:168-179 (variant만 분기) · :229-237 (카드 하단 카운트)</p></div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">감사 추적에 에이전트 ID 잘림이 있어 추적성이 약함</p>
+        <p class="fd"><code>entry.agent_name.slice(0, 8) + '...'</code>(<code>:213</code>)로 표시하고 복사·필터링 단축키가 없다. 거부 이벤트 후 "정확한 에이전트 이름"을 찾으려면 본문에서 다시 검색해야 한다. 같은 키가 검색창(<code>auditQuery</code>)에서 부분일치로 사용되지만 UI가 그 관계를 설명하지 않는다.</p>
+        <p class="src">routes/security.tsx:158-167 (검색) · :211-215 (slice 표기) · :80-90 (필터 로직)</p></div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>이 화면 상단에 <code>ApprovalsQueue</code> 카드를 임포트(또는 가벼운 변형)하고, 사이드바 Bell 아이콘에 카운트 배지를 둔다. 알림 클릭 라우팅을 <code>/security</code>로 변경.</li>
+      <li>권한 카드에 "권한 추가/리소스 토글" 영역을 분리된 sub-card로 두거나, "설정 → 권한"으로의 deep link CTA 추가 — 정적이지 않게 만든다.</li>
+      <li>"거부만" 필터 ON일 때 카드 헤더 옆에 <code>N / total</code> 배지 노출·키보드 단축키(<kbd>⌥</kbd>+<kbd>D</kbd>) 추가.</li>
+      <li>에이전트 ID 클릭 → 클립보드 복사 + 검색창 자동 채움. 거부 이벤트는 별도 row tint로 시각 분리.</li>
+    </ul>
+  </div>
+</section>

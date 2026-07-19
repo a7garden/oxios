@@ -21,6 +21,23 @@ use serde::{Deserialize, Serialize};
 use crate::credential::{CredentialSource, CredentialStore};
 use crate::skill::SkillInstallSpec;
 
+/// Coarse category of an integration, used by the UI to group entries with
+/// different card layouts (RFC-041 S1). Defaults to `CliTool` for backward
+/// compatibility with registries authored before the field existed.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum IntegrationKind {
+    /// Package manager — `brew`/`npm`/`cargo`/etc. No credential, no install
+    /// specs (it *is* the bootstrap).
+    PackageManager,
+    /// CLI tool installed via a package manager or download. Has install
+    /// specs and (optionally) a credential. The default for legacy entries.
+    #[default]
+    CliTool,
+    /// Credential-only — no binary to detect or install (e.g. a bot token).
+    /// The card hides the install/detect affordances.
+    CredentialOnly,
+}
 // ─── Credential descriptor (fix H6) ──────────────────────────────────────────
 
 /// Which resolution path applies to a credential. Per D7 there is **no**
@@ -68,6 +85,9 @@ pub struct Integration {
     /// Credential descriptor — which resolver applies + store key + env var.
     #[serde(default)]
     pub credential: CredentialResolver,
+    /// Coarse category for UI grouping (S1). Defaults to `CliTool`.
+    #[serde(default)]
+    pub kind: IntegrationKind,
 }
 
 // ─── Install-spec TOML shim ──────────────────────────────────────────────────
@@ -76,7 +96,6 @@ pub struct Integration {
 // registry TOML writes `kind = "brew"` etc., which maps cleanly. We deserialize
 // through this shim to keep the registry file self-describing and tolerant of
 // future InstallKind variants (Cargo/Bun/Pip — Phase 4).
-
 #[derive(Debug, Deserialize)]
 struct RawIntegration {
     id: String,
@@ -87,6 +106,8 @@ struct RawIntegration {
     install: Vec<SkillInstallSpec>,
     #[serde(default)]
     credential: CredentialResolver,
+    #[serde(default)]
+    kind: IntegrationKind,
 }
 
 impl From<RawIntegration> for Integration {
@@ -97,11 +118,10 @@ impl From<RawIntegration> for Integration {
             cli: r.cli,
             install: r.install,
             credential: r.credential,
+            kind: r.kind,
         }
     }
 }
-
-/// Top-level registry file: a list of integrations.
 #[derive(Debug, Deserialize)]
 struct RegistryFile {
     #[serde(default, rename = "integration")]

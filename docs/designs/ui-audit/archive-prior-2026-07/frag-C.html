@@ -1,0 +1,858 @@
+<!-- SCREEN 08 — WORKSPACE -->
+<section class="screen" id="screen-08">
+  <div class="screen-head">
+    <div class="snum">08</div>
+    <div class="stitle">
+      <h2>워크스페이스</h2>
+      <span class="route">/workspace · routes/workspace/index.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">기능배치</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>작업공간</h1><p class="sub">파일 브라우저 · 15초 자동 새로고침</p></div>
+                <div class="ver" style="position:relative">
+                  <span class="pin" style="top:-6px;right:-6px">4</span>
+                  <span class="btn-sm">＋ 생성</span>
+                  <span class="btn-sm">↻</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:9px;min-height:0;flex:1">
+                <!-- left: file tree -->
+                <div class="card" style="position:relative;width:180px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden">
+                  <span class="pin" style="top:6px;right:6px">5</span>
+                  <div class="card-h"><span class="card-t"><span style="margin-right:4px">📂</span>파일</span></div>
+                  <div style="padding:4px 6px;overflow-y:auto;flex:1;font-size:11px">
+                    <div style="padding:4px 6px;border-radius:5px"><span style="color:var(--fg2)">▸</span> 📁 <span>agents/</span></div>
+                    <div style="padding:4px 6px;border-radius:5px;background:var(--sba);color:var(--fg);font-weight:600"><span style="color:var(--fg2)">▾</span> 📁 docs/</div>
+                    <div style="padding:4px 14px;border-radius:5px">📄 README.md <span class="mut xs" style="float:right">1.2KB</span></div>
+                    <div style="padding:4px 14px;border-radius:5px">📄 ARCH.md <span class="mut xs" style="float:right">3.4KB</span></div>
+                    <div style="padding:4px 14px;border-radius:5px">📁 examples/</div>
+                    <div style="padding:4px 14px;border-radius:5px">📄 config.json <span class="mut xs" style="float:right">120B</span></div>
+                    <span class="mut xs">…</span>
+                  </div>
+                  <div style="border-top:1px solid var(--bd);padding:6px 8px;position:relative">
+                    <span class="pin" style="bottom:18px;right:6px">6</span>
+                    <span class="btn-sm" style="width:100%;justify-content:center">↑ 업로드</span>
+                  </div>
+                </div>
+                <!-- right: viewer/editor -->
+                <div class="card" style="position:relative;flex:1;display:flex;flex-direction:column;overflow:hidden">
+                  <span class="pin" style="top:6px;right:6px">2</span>
+                  <div class="card-h" style="border-bottom:1px solid var(--bd)">
+                    <span class="card-t">docs / README.md <span class="mut sm">· 1.2KB</span></span>
+                    <div style="display:flex;gap:4px">
+                      <span class="btn-sm">👁</span>
+                      <span class="btn-sm" style="background:var(--mut);font-weight:600">✎</span>
+                      <span class="btn-sm" style="color:var(--err)">🗑</span>
+                    </div>
+                  </div>
+                  <div style="padding:10px 14px;font-family:'Geist Mono',monospace;font-size:11px;line-height:1.55;flex:1;background:color-mix(in oklch,var(--mut) 40%,transparent);overflow:hidden">
+                    <span style="color:var(--fg2)">#</span> Oxios 가이드<br>
+                    <span style="color:var(--fg2)">-</span> 에이전트 시작<br>
+                    <span style="color:var(--fg2)">-</span> 페르소나 관리<br>
+                    <span style="color:var(--fg2)">-</span> 스킬 설치<br>
+                  </div>
+                  <div class="mut xs" style="padding:6px 12px;border-top:1px solid var(--bd);background:var(--card);position:relative">
+                    <span class="pin" style="top:-8px;right:6px">3</span>
+                    <span>↑ 더블클릭하여 편집 · </span>
+                    <span style="position:relative;display:inline-block">
+                      <span style="font-family:'Geist Mono',monospace;background:var(--pri);color:var(--pri2);padding:1px 5px;border-radius:4px;font-size:9px">Save</span>
+                      <span class="pin" style="top:-12px;right:-12px">1</span>
+                    </span>
+                    <span style="font-family:'Geist Mono',monospace"> ⌘S</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- below: a row for small caption ribbons -->
+    <!-- (keep concise — the on-canvas pins are the cues) -->
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>프로젝트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>마운트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>메모리</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 새 파일</span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>작업공간</h1><p class="sub">파일 브라우저 · 자동 동기화 표시</p></div>
+                <div class="ver"><span class="chip" style="color:var(--suc)">● 동기화됨</span></div>
+              </div>
+              <div style="display:flex;gap:9px;min-height:0;flex:1">
+                <div class="card" style="width:200px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden">
+                  <div class="card-h"><span class="card-t"><span style="margin-right:4px">📂</span>파일</span>
+                    <span class="xs mut">9</span></div>
+                  <div style="padding:4px 6px;overflow-y:auto;flex:1;font-size:11px">
+                    <div style="padding:4px 6px;border-radius:5px"><span style="color:var(--fg2)">▸</span> 📁 agents/</div>
+                    <div style="padding:4px 6px;border-radius:5px;background:var(--sba);color:var(--fg);font-weight:600"><span style="color:var(--fg2)">▾</span> 📁 docs/</div>
+                    <div style="padding:4px 14px;border-radius:5px">📄 README.md <span class="mut xs" style="float:right">1.2KB</span></div>
+                    <div style="padding:4px 14px;border-radius:5px">📄 ARCH.md <span class="mut xs" style="float:right">3.4KB</span></div>
+                    <div style="padding:4px 14px;border-radius:5px">📁 examples/</div>
+                    <div style="padding:4px 14px;border-radius:5px">📄 config.json <span class="mut xs" style="float:right">120B</span></div>
+                    <span class="mut xs">…</span>
+                  </div>
+                  <div style="border-top:1px solid var(--bd);padding:6px 8px;display:flex;gap:4px">
+                    <span class="btn-sm" style="flex:1;justify-content:center">＋ 파일</span>
+                    <span class="btn-sm" style="flex:1;justify-content:center">📤 업로드</span>
+                  </div>
+                </div>
+                <div class="card" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+                  <div class="card-h" style="border-bottom:1px solid var(--bd)">
+                    <span class="card-t">docs / README.md <span class="mut sm">· 1.2KB · 편집됨</span></span>
+                    <div style="display:flex;gap:4px">
+                      <span class="btn-sm">👁 보기</span>
+                      <span class="btn-sm" style="background:var(--mut);font-weight:600">✎ 편집</span>
+                      <span class="btn-sm" style="color:var(--err)">🗑 <span style="margin-left:3px">삭제</span></span>
+                    </div>
+                  </div>
+                  <div style="padding:10px 14px;font-family:'Geist Mono',monospace;font-size:11px;line-height:1.55;flex:1;background:color-mix(in oklch,var(--mut) 40%,transparent);overflow:hidden">
+                    <span style="color:var(--fg2)">#</span> Oxios 가이드<br>
+                    <span style="color:var(--fg2)">-</span> 에이전트 시작 (바이라인 강조)<br>
+                    <span style="color:var(--fg2)">-</span> 페르소나 관리<br>
+                    <span style="color:var(--fg2)">-</span> 스킬 설치<br>
+                  </div>
+                  <div class="mut xs" style="padding:6px 12px;border-top:1px solid var(--bd);background:var(--card);display:flex;justify-content:space-between">
+                    <span>선택: README.md · 보기 모드</span>
+                    <span>변경 시 자동 저장 인디케이터</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">툴바 "Save"가 편집 내용을 버리고 원본을 그대로 저장 — 라벨이 실제 동작과 반대</p>
+        <p class="fd">편집 모드 진입은 파일 가져오기(<code>useQuery ['workspace-file', path]</code>, 95-105)가 끝나야 가능하고, <code>FileEditor</code>에는 <code>onChange</code> prop이 전달되지 않는다(357-361). 툴바의 Save 버튼은 <code>handleSave(fileData)</code>(339-341)를 호출해 <strong>리패치된 원본</strong>을 그대로 <code>saveFile.mutate</code>에 넘긴다. 인-에디터 <code>⌘S</code>(file-editor.tsx:52-61,37-42)는 에디터의 라이브 doc를 저장하므로 두 경로의 결과가 다르다. 사용자가 "Save"를 누르면 <em>방금 한 편집</em>이 무시되고 마지막 서버 상태가 다시 기록된다.</p>
+        <p class="src">routes/workspace/index.tsx:339-341 (handleSave(fileData)) · :357-361 (FileEditor onChange 미전달) · :95-105 (fileData query) · components/workspace/file-editor.tsx:52-61, :37-42 (Ctrl+S 경로)</p>
+      </div></li>
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">삭제가 네이티브 <code>confirm()</code>으로만 보호됨 — 동시에 페이지 내 유일한 모달 흐름</p>
+        <p class="fd">삭제 핸들러는 <code>confirm(`Delete ${path}?`)</code>로 OS 다이얼로그를 띄우고 결과에 따라 진행한다(169-178). 화면 나머지 흐름이 전부 인라인(트리 토글, 편집 모드 전환, 업로드 토글)이라 삭제 보호 방식만 시스템 톤에서 벗어난다. 프로젝트 컨텍스트 분리·실수 취소가 없고, 같은 줄에서 다른 작업으로 복귀하기 어렵다.</p>
+        <p class="src">routes/workspace/index.tsx:171 (confirm) · :169-178 (handleDelete)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">보기/편집/삭제 툴바 버튼이 아이콘만, <code>aria-label</code> 없음 — 크론 잡과 비대칭</p>
+        <p class="fd">툴바의 <Eye/>·<Pencil/>·<Trash2/> 버튼(308-333)은 aria-label·툴팁·텍스트 라벨이 전혀 없고 아이콘만으로 상태를 표현한다. 동일 라우트의 다른 액션 그룹(예: cron-jobs.tsx:195-217)은 aria-label을 항상 부여한다. 스크린리더 사용자는 모드를 알 수 없고, 마우스 사용자도 hover 전에는 무엇이 active인지 식별 불가.</p>
+        <p class="src">routes/workspace/index.tsx:308-333 (icon-only 버튼) · 비교: routes/cron-jobs.tsx:195-217 (aria-label 일관)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">"더블클릭으로 편집" 안내가 빈 카드 푸터에만 있고, 툴바와의 진입 경로가 둘로 갈라짐</p>
+        <p class="fd">편집 모드 진입은 (a) 빈 상태 카드의 "더블클릭으로 편집" 안내(379-381)와 (b) 툴바의 ✎ 버튼(316-323) 두 곳에서 일어난다(<code>handleDoubleClick</code>는 136-142, 라우트 자체 핸들러). 비어있지 않을 때는 (a)가 보이지 않으므로 사용자는 ✎ 버튼을 발견해야 하고, 더블클릭 제스처 자체는 어디에도 설명되지 않는다.</p>
+        <p class="src">routes/workspace/index.tsx:136-142 (handleDoubleClick) · :316-323 (toolbar edit) · :378-381 (empty-state hint)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">생성·업로드 1차 액션이 헤더에서 outline 버튼으로 묻히고, 업로드는 트리 푸터에 ghost 버튼으로 존재</p>
+        <p class="fd">헤더의 "+ 생성" 버튼(250-252)은 <code>variant="outline"</code>으로 다른 outline 버튼과 톤이 같아 2차 액션처럼 보이고, 업로드는 트리 카드 내부의 ghost 토글(<code>Upload file / Hide upload</code>, 286-295)에만 존재한다. 가장 자주 쓰는 두 신규 파일 작업이 시각 무게 0인 자리에 있어, 페이지에서 신규 작성 의도가 거의 읽히지 않는다.</p>
+        <p class="src">routes/workspace/index.tsx:250-256 (헤더 생성·새로고침) · :286-295 (업로드 토글)</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">트리 노드는 크기만 표시 — 파일 종류/언어 식별 불가, 미리보기 가능 여부 예측 불가</p>
+        <p class="fd">트리 노드는 단일 <code>File</code> 아이콘과 크기만 보여주고(215-225), 확장자별 분기가 없다. <code>isEditable</code>/<code>isImage</code>(types/workspace.ts)처럼 미리보기 가능 여부가 미리 결정돼 있는데도 트리에서는 이를 사용자에게 알리지 않는다. 결과적으로 텍스트/이미지/JSON/마크다운 구분이 한눈에 되지 않는다.</p>
+        <p class="src">routes/workspace/index.tsx:215-225 (size만 표시) · types/workspace.ts (isEditable/isImage)</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li><strong>(HIGH)</strong> <code>FileEditor</code>에 <code>onChange</code>를 라우트에서 받아 워크스페이스 페이지 내부 버퍼로 유지하고, 툴바 Save는 그 버퍼를 저장하도록 변경. <code>handleSave(fileData)</code>(339-341) 제거. 또는 툴바 Save를 제거하고 ⌘S만 살아남도록 단순화.</li>
+      <li>삭제 시 인라인 2단계 확인(파일 경로 + 보조 셀렉터)으로 교체. 네이티브 <code>confirm()</code> 제거.</li>
+      <li>툴바 보기/편집/삭제 버튼에 <code>aria-label</code> + 텍스트 라벨(예: "보기", "편집", "삭제") 추가. 현재 모드는 버튼 자체에 visible 상태(배지 또는 active 색상)로 표시.</li>
+      <li>빈 상태 카드의 "더블클릭으로 편집" 안내는 제거하고, 툴바 또는 편집기 자체 진입 시 한 줄 짧은 안내만 유지.</li>
+      <li>생성·업로드를 헤더 1차 액션(Primary 버튼)으로 승격. 트리 푸터의 업로드 토글은 보조로 강등(또는 제거하고 헤더에만 두기).</li>
+      <li>트리 노드에 확장자별 아이콘 분기(JS/MD/JSON/이미지) 적용.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- SCREEN 09 — CRON JOBS -->
+<section class="screen" id="screen-09">
+  <div class="screen-head">
+    <div class="snum">09</div>
+    <div class="stitle">
+      <h2>크론 작업</h2>
+      <span class="route">/cron-jobs · routes/cron-jobs.tsx</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">기능배치</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">일관성</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>크론 작업</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>토큰 맥싱</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head" style="position:relative">
+                <span class="pin" style="top:-6px;right:-6px">3</span>
+                <div><h1>Cron 작업</h1><p class="sub">예약 작업 관리 · 기본: 타임라인 뷰 (모든 잡 액션 잠김)</p></div>
+                <div class="ver">
+                  <span class="btn-sm" style="position:relative;background:var(--mut);font-weight:600">📅 타임라인
+                    <span class="pin" style="top:-8px;right:-8px">5</span>
+                  </span>
+                  <span class="btn-sm">📋 목록</span>
+                  <span class="btn-sm">↻</span>
+                  <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 새 작업</span>
+                </div>
+              </div>
+              <div class="card" style="position:relative">
+                <span class="pin" style="top:6px;right:6px">2</span>
+                <div class="card-h"><span class="card-t"><span style="margin-right:4px">⏰</span>작업 4개 · 예정 실행 28회</span>
+                  <div style="display:flex;gap:3px"><span class="btn-sm" style="background:var(--mut);font-weight:600">24시간</span><span class="btn-sm">48시간</span><span class="btn-sm">7일</span></div>
+                </div>
+                <div style="display:flex;border-bottom:1px solid var(--bd);background:var(--mut);font-size:10px;color:var(--fg2);font-weight:600">
+                  <div style="width:120px;padding:7px 9px;border-right:1px solid var(--bd)">현재</div>
+                  <div style="flex:1;padding:7px 9px;display:flex;justify-content:space-between"><span>14:00</span><span>16:00</span><span>18:00</span><span>20:00</span><span>22:00</span></div>
+                </div>
+                <div style="display:flex;border-bottom:1px solid var(--bd);min-height:38px;position:relative">
+                  <div style="width:120px;padding:6px 9px;border-right:1px solid var(--bd);font-size:11px;display:flex;align-items:center;gap:5px"><span style="color:var(--warn)">⏰</span><span>nightly-cleanup</span><span class="pill mut" style="font-size:8px">0 2 * * *</span></div>
+                  <div style="flex:1;position:relative">
+                    <span class="pin" style="top:6px;right:6px">1</span>
+                    <span style="position:absolute;top:50%;left:18%;transform:translateY(-50%);width:6px;height:18px;border-radius:99px;background:hsl(220 70% 55%);box-shadow:0 0 0 3px color-mix(in oklch,hsl(220 70% 55%) 25%,transparent)" title="next run"></span>
+                    <span style="position:absolute;top:50%;left:32%;transform:translateY(-50%);width:3px;height:12px;border-radius:99px;background:hsl(220 70% 55%)"></span>
+                    <span style="position:absolute;top:50%;left:46%;transform:translateY(-50%);width:3px;height:12px;border-radius:99px;background:hsl(220 70% 55%)"></span>
+                    <span style="position:absolute;top:50%;left:78%;transform:translateY(-50%);width:3px;height:12px;border-radius:99px;background:hsl(220 70% 55%);opacity:.4"></span>
+                  </div>
+                </div>
+                <div style="display:flex;border-bottom:1px solid var(--bd);min-height:38px;opacity:.55;position:relative">
+                  <div style="width:120px;padding:6px 9px;border-right:1px solid var(--bd);font-size:11px;display:flex;align-items:center;gap:5px;color:var(--fg2)"><span style="color:var(--warn)">⏰</span><span>old-job</span><span class="pill mut" style="font-size:8px">0 0 * * *</span><span class="pill mut" style="font-size:8px">비활성</span></div>
+                  <div style="flex:1;position:relative">
+                    <span class="pin" style="top:6px;right:6px">4</span>
+                    <span style="position:absolute;top:50%;left:62%;transform:translateY(-50%);width:6px;height:18px;border-radius:99px;background:hsl(220 70% 55%);opacity:.3"></span>
+                  </div>
+                </div>
+                <div style="display:flex;min-height:38px">
+                  <div style="width:120px;padding:6px 9px;border-right:1px solid var(--bd);font-size:11px;display:flex;align-items:center;gap:5px"><span style="color:var(--warn)">⏰</span><span>daily-report</span><span class="pill mut" style="font-size:8px">30 9 * * *</span></div>
+                  <div style="flex:1;position:relative">
+                    <span style="position:absolute;top:50%;left:7%;transform:translateY(-50%);width:6px;height:18px;border-radius:99px;background:hsl(160 60% 45%);box-shadow:0 0 0 3px color-mix(in oklch,hsl(160 60% 45%) 25%,transparent)"></span>
+                    <span style="position:absolute;top:50%;left:71%;transform:translateY(-50%);width:3px;height:12px;border-radius:99px;background:hsl(160 60% 45%)"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="position:relative;border-top:1px dashed var(--bd)">
+                <span class="pin" style="top:6px;right:6px">6</span>
+                <div class="card-h"><span class="card-t">＋ Cron 작업 만들기</span></div>
+                <div style="padding:10px 12px;display:flex;flex-direction:column;gap:9px">
+                  <input class="inp" value="nightly-cleanup" style="font-family:inherit">
+                  <div style="display:flex;align-items:center;justify-content:space-between"><span class="mut xs">반복</span><span class="btn-sm">고급 (Cron) ⇄</span></div>
+                  <select class="inp" style="font-family:inherit"><option>분 단위</option></select>
+                  <input class="inp" placeholder="Goal or prompt for the agent" style="font-family:inherit">
+                  <div class="mut xs">라벨 없음 · placeholder만 · i18n 키 <code>cronJobs.goalPlaceholder</code> 미정의</div>
+                  <div style="display:flex;gap:6px"><span class="btn-sm pri" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">생성</span><span class="btn-sm">취소</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>크론 작업</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>비용</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>토큰 맥싱</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>Cron 작업</h1><p class="sub">예약 작업 관리 · 기본: 목록 (가독)</p></div>
+                <div class="ver">
+                  <span class="btn-sm">📅 타임라인</span>
+                  <span class="btn-sm" style="background:var(--mut);font-weight:600">📋 목록</span>
+                  <span class="btn-sm" style="background:var(--pri);color:var(--pri2);border-color:var(--pri)">＋ 새 작업</span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="row">
+                  <span class="ava" style="background:var(--mut)">⏰</span>
+                  <div class="grow">
+                    <div class="nm">nightly-cleanup <span class="pill mut" style="font-size:9px">활성</span></div>
+                    <div class="ds">매일 오전 2:00 · "임시 파일 정리 및 인덱스 재구축"</div>
+                  </div>
+                  <div style="display:flex;gap:6px">
+                    <span class="chip">마지막 11/05 02:00</span>
+                    <span class="chip">다음 11/06 02:00</span>
+                  </div>
+                  <span class="badge run">실행</span>
+                  <div style="display:flex;gap:3px;margin-left:8px">
+                    <span class="btn-sm" title="편집">✎</span>
+                    <span class="btn-sm" title="활성/비활성">⏼</span>
+                    <span class="btn-sm" style="color:var(--err)" title="삭제">🗑</span>
+                  </div>
+                </div>
+                <div class="row" style="opacity:.6">
+                  <span class="ava" style="background:var(--mut)">⏰</span>
+                  <div class="grow">
+                    <div class="nm">old-job <span class="pill mut" style="font-size:9px">비활성</span></div>
+                    <div class="ds">매일 자정 · "use no longer"</div>
+                  </div>
+                  <div style="display:flex;gap:6px">
+                    <span class="chip">마지막 10/01 00:00</span>
+                    <span class="chip">—</span>
+                  </div>
+                  <span class="badge idle">대기</span>
+                  <div style="display:flex;gap:3px;margin-left:8px">
+                    <span class="btn-sm" title="편집">✎</span>
+                    <span class="btn-sm" title="활성/비활성">⏼</span>
+                    <span class="btn-sm" style="color:var(--err)" title="삭제">🗑</span>
+                  </div>
+                </div>
+                <div class="row">
+                  <span class="ava" style="background:var(--mut)">⏰</span>
+                  <div class="grow">
+                    <div class="nm">daily-report <span class="pill mut" style="font-size:9px">활성</span></div>
+                    <div class="ds">매일 오전 9:30 · "전일 에이전트 실행 요약 + 비용 요약 메일 발송"</div>
+                  </div>
+                  <div style="display:flex;gap:6px">
+                    <span class="chip">마지막 11/05 09:30</span>
+                    <span class="chip">다음 11/06 09:30</span>
+                  </div>
+                  <span class="badge run">실행</span>
+                  <div style="display:flex;gap:3px;margin-left:8px">
+                    <span class="btn-sm" title="편집">✎</span>
+                    <span class="btn-sm" title="활성/비활성">⏼</span>
+                    <span class="btn-sm" style="color:var(--err)" title="삭제">🗑</span>
+                  </div>
+                </div>
+                <div class="row" style="opacity:.6">
+                  <span class="ava" style="background:var(--mut)">⏰</span>
+                  <div class="grow">
+                    <div class="nm">archive-snapshot <span class="pill mut" style="font-size:9px">활성</span></div>
+                    <div class="ds">매주 일요일 03:15 · "워크스페이스 스냅샷 tar.gz"</div>
+                  </div>
+                  <div style="display:flex;gap:6px">
+                    <span class="chip">마지막 11/03 03:15</span>
+                    <span class="chip">다음 11/10 03:15</span>
+                  </div>
+                  <span class="badge run">실행</span>
+                  <div style="display:flex;gap:3px;margin-left:8px">
+                    <span class="btn-sm" title="편집">✎</span>
+                    <span class="btn-sm" title="활성/비활성">⏼</span>
+                    <span class="btn-sm" style="color:var(--err)" title="삭제">🗑</span>
+                  </div>
+                </div>
+                <span class="mut xs" style="padding:6px 13px;display:block">… 외 0건</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">타임라인 뷰는 잡별 편집·활성 토글·삭제가 도달 불가 — 모드 전환이 강제됨</p>
+        <p class="fd">기본 진입이 타임라인(<code>viewMode='timeline'</code>, 32)이고, <code>CronTimelineView</code>의 각 행(113-209)은 fire marker와 스케줄 라벨만 렌더하고 row-level 액션 버튼을 갖지 않는다. 반면 목록 뷰의 카드(165-223)는 잡마다 편집(Pencil)/활성 토글(Power/PowerOff)/삭제(Trash2)를 가진다(<code>aria-label</code> 포함). 사용자가 타임라인에서 잡을 더블클릭하거나 행을 선택해 액션을 기대해도 보이는 경로가 없다.</p>
+        <p class="src">routes/cron-jobs.tsx:32 (기본 timeline) · cron-timeline-view.tsx:113-209 (row 렌더) · routes/cron-jobs.tsx:194-219 (목록 액션 비교)</p>
+      </div></li>
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">타임라인 fire marker가 hover 전용 툴팁 — 키보드/터치 접근 불가</p>
+        <p class="fd">각 marker의 이벤트 핸들러는 <code>onMouseEnter</code>/<code>onMouseLeave</code>(cron-timeline-view.tsx:194-202)뿐이고 <code>role</code>/<code>tabIndex</code>가 부여되지 않는다. 시각적 "next run" 표식(<code>ft.isPrimary</code>, 182-191)과 일반 fire marker의 구분을 키보드가 인지하지 못한다. 터치 디바이스에서는 첫 탭이 marker 식별을 야기한다.</p>
+        <p class="src">cron-timeline-view.tsx:176-205 (marker 핸들러) · :214-238 (fixed 툴팁)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">기본 진입이 타임라인 — 신규 사용자에게 학습 비용 화면이 첫 인상</p>
+        <p class="fd"><code>viewMode</code> 초기값이 <code>'timeline'</code>(32)이며 페이지 헤더의 토글이 "타임라인"을 active로 표시한다(307-308). 도메인 지식이 필요한 시각화(isPrimary vs 일반 marker, 시간대 그라데이션)를 첫 화면에 노출한다.</p>
+        <p class="src">routes/cron-jobs.tsx:32 (초기값) · :307-310 (토글 표시)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">비활성 잡 표현이 타임라인은 시각적으로, 목록은 배지만으로 — 일관성 깨짐</p>
+        <p class="fd">타임라인은 비활성 행에서 라벨을 muted, row 전체 <code>opacity: 0.55</code>, 마커까지 불투명도 0.3으로 표면 차원에서 약화시킨다(cron-timeline-view.tsx:129-130, 187, 334). 목록 카드는 <code>Badge variant="secondary"</code>(cron-jobs.tsx:172-174)만으로 같은 상태를 표시하고 row 자체는 정상 톤을 유지한다. 두 뷰가 같은 정보를 다르게 그려 일관성이 깨진다.</p>
+        <p class="src">cron-timeline-view.tsx:129-130 (row muted) · routes/cron-jobs.tsx:172-174 (목록 배지만)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">"생성"·"편집" 두 폼이 비대칭 — 인라인 Card vs Dialog, 같은 엔티티에 두 형제 폼</p>
+        <p class="fd">생성 폼은 페이지 안에 인라인 <code>&lt;Card&gt;</code>(123-154)로 펼쳐지고, 편집은 모달 <code>&lt;EditCronDialog&gt;</code>(225-238)로 열린다. 같은 입력 필드(name / schedule / goal)·같은 검증(<code>!name || !schedule || !goal</code>, 144)이 두 곳에 분기되어 있어 사용자가 편집을 시도할 때 갑자기 모달로 인터페이스가 바뀐다.</p>
+        <p class="src">routes/cron-jobs.tsx:123-154 (인라인 폼) · :225-238 (EditCronDialog) · edit-cron-dialog.tsx 전체</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">"목표" 입력에 라벨 없고 i18n 키 누락 — 영문 fallback 노출 가능</p>
+        <p class="fd">인라인 생성 폼의 <code>&lt;Input&gt;</code>(135-139)은 <code>placeholder={t('cronJobs.goalPlaceholder', 'Goal or prompt for the agent')}</code>만 받고, 둘러싼 <code>&lt;Label&gt;</code>/<code>&lt;label&gt;</code>가 없다. <code>goalPlaceholder</code>는 ko/en i18n JSON에 정의돼 있지 않으므로 두 번째 인자(영문)가 그대로 화면에 노출된다. (참고: 같은 폼의 <code>CronScheduleEditor</code>는 내부적으로 <code>&lt;Label&gt;</code>를 사용한다 — cron-schedule-editor.tsx:186.)</p>
+        <p class="src">routes/cron-jobs.tsx:135-139 (goal Input) · i18n/locales/ko.json, en.json (goalPlaceholder 미정의) · cron-schedule-editor.tsx:186 (label 사용)</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li><strong>(HIGH)</strong> 타임라인 행에 작업 액션을 인라인으로 노출(우측에 ✎/⏼/🗑 아이콘 또는 호버 시 패널 슬라이드). 또는 각 행이 상세 사이드 패널을 열어잡 액션을 일관되게 보여주도록 라우트 위에서 처리.</li>
+      <li><strong>(HIGH)</strong> fire marker에 <code>role="button"</code> + <code>tabIndex={0}</code> 부여, <code>onKeyDown</code>(Enter/Space)로도 툴팁 활성화. 모바일은 long-press로 대체.</li>
+      <li>기본 view를 <code>'list'</code>로 변경, 헤더 토글을 "고급" 톤으로 강등. 첫 사용자 가벼움 우선.</li>
+      <li>목록 카드의 비활성 행을 타임라인과 동일한 muted + opacity 0.55 룰로 통일. 토글 상태는 텍스트 라벨·색상으로 명시.</li>
+      <li>생성 폼을 <code>EditCronDialog</code>와 동일한 <code>Dialog</code>로 통일. 인라인 Card 제거 또는 "고급" 섹션으로 강등.</li>
+      <li>i18n JSON에 <code>cronJobs.goalPlaceholder</code>(ko/en) 추가, <code>&lt;Input&gt;</code> 위에 <code>&lt;Label&gt;</code> 부착.</li>
+    </ul>
+  </div>
+</section>
+
+
+<!-- SCREEN 10 — COST -->
+<section class="screen" id="screen-10">
+  <div class="screen-head">
+    <div class="snum">10</div>
+    <div class="stitle">
+      <h2>비용</h2>
+      <span class="route">/budget · routes/budget.tsx — 비용 + 예산 통합</span>
+    </div>
+    <div class="rubric" title="8차원 평가 (1–5)">
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">정보구조</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">레이아웃</span></div>
+      <div class="rcell s1"><span class="rn">1</span><span class="rl">기능배치</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">내비게이션</span></div>
+      <div class="rcell s2"><span class="rn">2</span><span class="rl">일관성</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">인터랙션</span></div>
+      <div class="rcell s3"><span class="rn">3</span><span class="rl">접근성</span></div>
+      <div class="rcell s4"><span class="rn">4</span><span class="rl">타이포</span></div>
+    </div>
+  </div>
+
+  <div class="compare">
+    <!-- CURRENT -->
+    <div>
+      <div class="panel-cap cur"><span class="dot"></span>현재 (주석)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>비용</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>토큰 맥싱</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head" style="position:relative">
+                <span class="pin" style="top:-6px;right:-6px">5</span>
+                <div><h1>비용 및 지출</h1><p class="sub"><span class="mono" style="background:var(--mut);padding:1px 5px;border-radius:3px;font-size:10px">/budget</span> · 달러 기반 지출 추적 및 제공자 할당량</p></div>
+                <div class="ver"><span class="btn-sm">↻</span></div>
+              </div>
+              <div style="display:grid;grid-template-columns:2fr 3fr;gap:9px">
+                <div class="card" style="position:relative">
+                  <span class="pin" style="top:6px;right:6px">1</span>
+                  <div class="card-h"><span class="card-t"><span style="margin-right:4px">🎯</span>지출 한도</span>
+                    <span class="pill war" style="font-size:9px;background:color-mix(in oklch,var(--war) 14%,transparent);color:var(--war)">75%</span>
+                  </div>
+                  <div class="card-body" style="font-size:11px">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline">
+                      <span style="font-size:18px;font-weight:700">$37.50</span>
+                      <span class="mut">/ $50.00 이번 달</span>
+                    </div>
+                    <div style="position:relative;height:6px;background:var(--mut);border-radius:99px;overflow:hidden;margin-top:6px"><span class="pin" style="top:-12px;right:0">6</span><div style="height:100%;width:75%;background:var(--war);border-radius:99px"></div></div>
+                    <div style="display:flex;justify-content:space-between;margin-top:6px">
+                      <span class="mut xs">잔여: $12.50</span>
+                      <span class="warn" style="color:var(--war);font-size:10px">⚠ 한도 임박</span>
+                    </div>
+                    <div style="margin-top:6px"><span class="btn-sm">✎ 한도 편집</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t">기간 선택</span></div>
+                  <div class="card-body" style="display:flex;gap:4px">
+                    <span class="btn-sm">오늘</span>
+                    <span class="btn-sm">7일</span>
+                    <span class="btn-sm" style="background:var(--mut);font-weight:600">30일</span>
+                    <span class="btn-sm">전체</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px">
+                <div class="card"><div class="card-h"><span class="card-t">총 지출</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">$74.32</div><div class="mut xs">USD</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">토큰</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">1.2M</div><div class="mut xs">토큰 소모</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">에이전트 실행</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">182</div><div class="mut xs">실행 횟수</div></div></div>
+              </div>
+              <div class="card" style="position:relative">
+                <span class="pin" style="top:6px;right:6px">4</span>
+                <div class="card-h"><span class="card-t">일일 지출 (30d)</span></div>
+                <div class="card-body" style="height:90px;display:flex;align-items:flex-end;gap:3px">
+                  <span style="height:32px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:18px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:48px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:60px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:72px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:54px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:78px;width:8px;background:var(--war);border-radius:2px 2px 0 0"></span>
+                  <span style="height:64px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:58px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:42px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:36px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+                <div class="card"><div class="card-h"><span class="card-t">모델별 지출</span></div>
+                  <div class="card-body" style="font-size:11px">
+                    <div style="display:flex;justify-content:space-between"><span style="font-family:'Geist Mono'">claude-opus-4-1</span><span class="mut">$48.20 · 820k</span></div>
+                    <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin-top:3px"><div style="height:100%;width:88%;background:var(--pri);border-radius:99px"></div></div>
+                    <div style="display:flex;justify-content:space-between;margin-top:8px"><span style="font-family:'Geist Mono'">claude-sonnet-4-5</span><span class="mut">$22.10 · 360k</span></div>
+                    <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin-top:3px"><div style="height:100%;width:42%;background:var(--pri);border-radius:99px"></div></div>
+                    <span class="mut xs">… 외 3건</span>
+                  </div>
+                </div>
+                <div class="card"><div class="card-h"><span class="card-t">프로젝트별 지출</span></div>
+                  <div class="card-body" style="font-size:11px">
+                    <div style="display:flex;justify-content:space-between"><span style="font-family:'Geist Mono'">7f3a91…</span><span class="mut">$52.20 · 920k · 9×</span></div>
+                    <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin-top:3px"><div style="height:100%;width:96%;background:var(--pri);border-radius:99px"></div></div>
+                    <span class="mut xs">…</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-h"><span class="card-t"><span style="margin-right:4px">👛</span>제공자 할당량</span></div>
+                <div class="card-body" style="font-size:11px">
+                  <div style="display:flex;justify-content:space-between;padding:7px 11px;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px"><span style="font-weight:500">anthropic <span class="pill pri" style="font-size:9px">API 키</span> <span class="pill mut" style="font-size:9px">Pro</span></span><span class="mut">이번 기간 $31.20 · 잔액 $128.40</span></div>
+                  <div style="display:flex;justify-content:space-between;padding:7px 11px;border:1px solid var(--bd);border-radius:7px"><span style="font-weight:500">openai <span class="pill mut" style="font-size:9px">키 없음</span></span><span class="mut">할당량 정보를 불러올 수 없습니다</span></div>
+                </div>
+              </div>
+              <div style="position:relative">
+                <span class="pin" style="top:-2px;right:6px">2</span>
+                <h2 class="sm" style="font-size:14px;font-weight:600;margin:0 0 8px">예산 <span class="mut xs" style="font-weight:400">에이전트의 토큰 및 호출 예산 추적</span></h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
+                  <div class="card" style="position:relative">
+                    <span class="pin" style="top:6px;right:6px">3</span>
+                    <div class="card-h"><span class="card-t" style="font-family:'Geist Mono'">research-agent</span><span class="pill pri" style="font-size:9px">활성</span></div>
+                    <div class="card-body" style="font-size:10px">
+                      <div>토큰 42,100 / 50,000</div>
+                      <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin:3px 0"><div style="height:100%;width:84%;background:var(--war);border-radius:99px"></div></div>
+                      <div>호출 89 / 100</div>
+                      <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin:3px 0"><div style="height:100%;width:89%;background:var(--pri);border-radius:99px"></div></div>
+                      <div class="mut">남은 시간 4m 12s</div>
+                      <div style="margin-top:6px;display:flex;gap:4px"><span class="btn-sm">✎</span><span class="btn-sm">↻</span><span class="btn-sm" style="color:var(--err)">×</span></div>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <div class="card-h"><span class="card-t" style="font-family:'Geist Mono'">writer-agent</span><span class="pill pri" style="font-size:9px">활성</span></div>
+                    <div class="card-body" style="font-size:10px">
+                      <div>토큰 12,400 / 50,000</div>
+                      <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin:3px 0"><div style="height:100%;width:25%;background:var(--pri);border-radius:99px"></div></div>
+                      <div class="mut">남은 시간 28m 03s</div>
+                    </div>
+                  </div>
+                  <div class="card" style="border:1px dashed var(--bd)">
+                    <div class="card-h"><span class="card-t" style="font-family:'Geist Mono'">demo-bot</span></div>
+                    <div class="card-body" style="font-size:10px"><div class="mut">예산이 설정되지 않음</div><div style="margin-top:6px"><span class="btn-sm">＋ 예산 설정</span></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="panel-cap prop"><span class="dot"></span>제안 (같은 토큰, 개선)</div>
+      <div class="frame">
+        <div class="os">
+          <div class="sb">
+            <div class="sb-brand"><span class="zk">⚡</span>Oxios</div>
+            <div class="sb-mode"><span class="mt on">Console</span><span class="mt">Knowledge</span><span class="mt">Chat</span></div>
+            <div class="sb-nav">
+              <div class="sb-grp">메인</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>대시보드</div>
+              <div class="sb-grp">에이전트</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>에이전트</div>
+              <div class="sb-grp">저장소</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>워크스페이스</div>
+              <div class="sb-grp">운영</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>크론 작업</div>
+              <div class="sb-it on"><span class="ic" style="background:var(--pri)"></span>비용</div>
+              <div class="sb-it"><span class="ic" style="background:#bbb"></span>토큰 맥싱</div>
+            </div>
+            <div class="sb-foot"><span class="ft-it">☀</span><span class="ft-it">⚙</span></div>
+          </div>
+          <div class="main">
+            <div class="bar">
+              <span class="bm on">Console</span><span class="bm">Knowledge</span><span class="bm">Chat</span>
+              <div class="grow"></div>
+              <span class="btn-sm">⚡<span class="kbd">⌘J</span></span>
+              <span class="btn-sm">⌕ 검색 <span class="kbd">⌘K</span></span>
+              <span class="clock">◷</span>
+            </div>
+            <div class="page">
+              <div class="page-head">
+                <div><h1>비용</h1><p class="sub"><span style="color:var(--war)">⚠</span> 지출 한도는 모니터링 알림 전용 — 실행은 차단하지 않습니다</p></div>
+                <div class="ver">
+                  <span class="btn-sm">오늘</span>
+                  <span class="btn-sm" style="background:var(--mut);font-weight:600">7일</span>
+                  <span class="btn-sm">30일</span>
+                  <span class="btn-sm">전체</span>
+                </div>
+              </div>
+              <div class="card" style="border-left:3px solid var(--war)">
+                <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+                  <div><span style="font-weight:600">🛈 단계 1 안내</span> · 현재 지출 한도(<span class="mono">$50.00</span>)는 <em>모니터링</em>만 수행합니다. 새 에이전트 실행은 차단되지 않습니다. 강제 차단은 향후 단계에서 제공됩니다.</div>
+                  <span class="btn-sm">✕</span>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px">
+                <div class="card"><div class="card-h"><span class="card-t">총 지출</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">$74.32</div><div class="mut xs">USD · 7일</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">토큰</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">1.2M</div><div class="mut xs">토큰 소모</div></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">에이전트 실행</span></div><div class="card-body"><div style="font-size:18px;font-weight:700">182</div><div class="mut xs">실행 횟수</div></div></div>
+              </div>
+              <div class="card"><div class="card-h"><span class="card-t">일일 지출 (30d)</span></div>
+                <div class="card-body" style="height:90px;display:flex;align-items:flex-end;gap:3px">
+                  <span style="height:32px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:18px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:48px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:60px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:72px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:54px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                  <span style="height:78px;width:8px;background:var(--war);border-radius:2px 2px 0 0"></span>
+                  <span style="height:64px;width:8px;background:var(--pri);border-radius:2px 2px 0 0"></span>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+                <div class="card"><div class="card-h"><span class="card-t">모델별 지출</span></div><div class="card-body" style="font-size:11px"><div style="display:flex;justify-content:space-between"><span style="font-family:'Geist Mono'">claude-opus-4-1</span><span class="mut">$48.20 · 820k</span></div><div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin-top:3px"><div style="height:100%;width:88%;background:var(--pri);border-radius:99px"></div></div><span class="mut xs">… 외 3건</span></div></div>
+                <div class="card"><div class="card-h"><span class="card-t">프로젝트별 지출</span></div><div class="card-body" style="font-size:11px"><div style="display:flex;justify-content:space-between"><span style="font-family:'Geist Mono'">7f3a91…</span><span class="mut">$52.20 · 920k · 9×</span></div><div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin-top:3px"><div style="height:100%;width:96%;background:var(--pri);border-radius:99px"></div></div><span class="mut xs">…</span></div></div>
+              </div>
+              <div class="card">
+                <div class="card-h"><span class="card-t"><span style="margin-right:4px">👛</span>제공자 할당량</span></div>
+                <div class="card-body" style="font-size:11px">
+                  <div style="display:flex;justify-content:space-between;padding:7px 11px;border:1px solid var(--bd);border-radius:7px;margin-bottom:6px"><span style="font-weight:500">anthropic <span class="pill pri" style="font-size:9px">API 키</span> <span class="pill mut" style="font-size:9px">Pro</span></span><span class="mut">이번 기간 $31.20 · 잔액 $128.40</span></div>
+                  <div style="display:flex;justify-content:space-between;padding:7px 11px;border:1px solid var(--bd);border-radius:7px"><span style="font-weight:500">openai <span class="pill mut" style="font-size:9px">키 없음</span></span><span class="mut">할당량 정보를 불러올 수 없습니다</span></div>
+                </div>
+              </div>
+              <h2 class="sm" style="font-size:14px;font-weight:600;margin:8px 0">에이전트 예산 <span class="mut xs" style="font-weight:400">토큰/호출 사용량 윈도우</span></h2>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
+                <div class="card">
+                  <div class="card-h"><span class="card-t" style="font-family:'Geist Mono'">research-agent</span><span class="pill pri" style="font-size:9px">활성</span></div>
+                  <div class="card-body" style="font-size:10px">
+                    <div>토큰 42,100 / 50,000</div>
+                    <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin:3px 0"><div style="height:100%;width:84%;background:var(--war);border-radius:99px"></div></div>
+                    <div>호출 89 / 100</div>
+                    <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin:3px 0"><div style="height:100%;width:89%;background:var(--pri);border-radius:99px"></div></div>
+                    <div class="mut">남은 시간 4m 12s</div>
+                    <div style="margin-top:6px;display:flex;gap:4px"><span class="btn-sm">✎ 편집</span><span class="btn-sm">↻ 초기화</span><span class="btn-sm" style="color:var(--err)">× 제거</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-h"><span class="card-t" style="font-family:'Geist Mono'">writer-agent</span><span class="pill pri" style="font-size:9px">활성</span></div>
+                  <div class="card-body" style="font-size:10px">
+                    <div>토큰 12,400 / 50,000</div>
+                    <div style="height:4px;background:var(--mut);border-radius:99px;overflow:hidden;margin:3px 0"><div style="height:100%;width:25%;background:var(--pri);border-radius:99px"></div></div>
+                    <div class="mut">남은 시간 28m 03s</div>
+                  </div>
+                </div>
+                <div class="card" style="border:1px dashed var(--bd)">
+                  <div class="card-h"><span class="card-t" style="font-family:'Geist Mono'">demo-bot</span></div>
+                  <div class="card-body" style="font-size:10px"><div class="mut">예산이 설정되지 않음</div><div style="margin-top:6px"><span class="btn-sm">＋ 예산 설정</span></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="findings">
+    <h3>발견 (Findings)</h3>
+    <ul class="flist">
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">"지출 한도"가 모니터링 알림 전용 — 라벨/힌트는 차단처럼 읽힘</p>
+        <p class="fd">JSDoc은 명시적으로 "Phase 1: monitoring + visual alert only. Phase 2 will add pre-execution enforcement"라고 선언한다(<code>spend-limit-card.tsx:21-22</code>). 화면의 한도 카드는 진도 바·경고 배지·"한도 초과/임박" 메시지로 마치 임계치 도달 시 실행이 멈추는 듯 표시하지만, 실제로는 알림만 뜬다. 사용자는 추가 비용이 차단된다고 오해한 채 안심한다.</p>
+        <p class="src">components/cost/spend-limit-card.tsx:21-23 (JSDoc), :32-50 (isOver/isNear/badge) · i18n cost.spendLimitHint · routes/budget.tsx:40 (SpendLimitCard)</p>
+      </div></li>
+      <li class="fitem high"><span class="sev high">HIGH</span><div>
+        <p class="ft">같은 라우트에 두 종류의 한도가 섞여 있고 헤더는 한 쪽만 표시</p>
+        <p class="fd">라우트 상단에는 USD 기반 <code>SpendLimitCard</code>가, 페이지 하단에는 토큰/호출 기반 <code>BudgetManagement</code>가 등장한다. 페이지를 나누지 않고 같은 스크롤 위에 늘어놓았으나 두 개념의 차이가 헤더·중간 헤딩(<code>h2 budget.title</code>)·컴포넌트 이름 어디에서도 설명되지 않는다. 사용자는 "예산(= 한도)"으로 통합 인식한다.</p>
+        <p class="src">routes/budget.tsx:40 (SpendLimitCard) · :71 (h2 budget.title) · :72 (BudgetManagement) · cost/budget의 컴포넌트 분기</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">상단 기간 탭이 화면 일부에만 적용 — 탭과 데이터의 관계가 깨짐</p>
+        <p class="fd">Tabs(<code>PERIODS</code>: 오늘/7일/30일/전체)는 <code>CostSummaryCards</code>, <code>CostByModel</code>, <code>CostByProject</code>에만 <code>period</code> prop으로 전달된다(<code>budget.tsx:42-63</code>). <code>SpendLimitCard</code>는 자체 <code>/api/costs/spend-limit</code>만, <code>ProviderQuotaCards</code>는 quota API, <code>CostChart</code>는 30일 고정(<code>days={30}</code>, <code>cost-chart.tsx:11-12</code>), <code>BudgetManagement</code>는 기간 인자 자체가 없다. "30일" 선택해도 차트는 변하지 않고, "오늘" 선택해도 한도·프로바이더 카드는 변하지 않는다.</p>
+        <p class="src">routes/budget.tsx:42-63 (탭) · :40 (SpendLimitCard 미수신) · :58 (CostChart days 고정) · :67 (ProviderQuotaCards) · :72 (BudgetManagement)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">에이전트 카드의 3개 액션(편집/초기화/제거) 모두 아이콘만 — 파괴/비파괴 구분 없음</p>
+        <p class="fd"><code>AgentBudgetCard</code>(<code>agent-budget-card.tsx:117-137</code>)는 "편집/초기화/제거"가 모두 같은 outline ghost 버튼이며, 색 구분(파괴=error 색) 외엔 위치·스타일이 동일하다. <code>resetWindow</code>는 윈도우 리셋이라 사실상 비파괴지만 한 번에 3개 액션이 늘어서면 사용자는 무엇이 무엇을 트리거하는지 학습이 필요하다.</p>
+        <p class="src">components/budget/agent-budget-card.tsx:117-137 · set-budget-dialog.tsx 전체 (3-dialog 모달도 별도)</p>
+      </div></li>
+      <li class="fitem med"><span class="sev med">MED</span><div>
+        <p class="ft">URL은 <code>/budget</code>인데 페이지 타이틀은 <code>cost.title</code>("비용 및 지출")</p>
+        <p class="fd">라우트는 <code>createFileRoute('/budget')</code>(<code>budget.tsx:16</code>)로 등록되지만 헤더는 <code>t('cost.title')</code>("비용 및 지출", <code>i18n/ko.json:1310</code>)을 쓴다. 사이드바 항목 이름("비용", <code>i18n:67</code>)과 라우트 경로(<code>/budget</code>)가 한 단어 체계로 어긋난다. URL 공유/딥링크에서 의도가 흐려진다.</p>
+        <p class="src">routes/budget.tsx:16 (route='/budget') · :30 (t('cost.title')) · i18n/locales/ko.json:1310, 67</p>
+      </div></li>
+      <li class="fitem low"><span class="sev low">LOW</span><div>
+        <p class="ft">모니터링/예산 두 영역의 progress bar 색 임계값이 일치하지 않음</p>
+        <p class="fd"><code>SpendLimitCard</code>는 80%에서 warning, 100%에서 error(<code>spend-limit-card.tsx:32-33</code>). <code>AgentBudgetCard</code>는 70%에서 warning, 90%에서 error(<code>agent-budget-card.tsx:88, 104</code>). 같은 의미(임박/소진)를 다른 임계에서 발화시켜 사용자가 한 페이지 안에서 두 영역을 동시에 읽을 때 느끼는 위기감의 강도가 불일치한다.</p>
+        <p class="src">components/cost/spend-limit-card.tsx:32-33, :62-67 · components/budget/agent-budget-card.tsx:88, 104</p>
+      </div></li>
+    </ul>
+  </div>
+
+  <div class="changes">
+    <h3>변경 제안</h3>
+    <ul>
+      <li>SpendLimitCard 상단에 "모니터링 전용" 배너를 영구 노출. i18n <code>cost.spendLimitHint</code>를 "강제 차단은 향후 단계에서 제공됩니다" 문구로 교체. 색은 항상 warning 유지.</li>
+      <li><code>/budget</code> 단일 라우트를 두 서브섹션(<code>/budget/spend</code>, <code>/budget/agents</code>) 또는 명확한 두 영역 헤딩("지출 한도(USD)" / "에이전트 예산(토큰·호출)")으로 분리. 헤딩에 의미 명시.</li>
+      <li>기간 탭을 페이지 전역에 적용하거나, 적용 범위를 탭 근처에 명시("기간 적용: 차트·모델별"). CostChart는 탭과 동기화.</li>
+      <li>에이전트 카드의 액션에 라벨 부착. "제거"만 error 색상. 1차 액션은 편집, 2차는 초기화, 3차(파괴)는 분리 영역.</li>
+      <li>라우트 path를 <code>/cost</code>로 옮기거나 사이드바 라벨과 페이지 타이틀을 통일. <code>i18n</code> 정합성 회귀 테스트.</li>
+      <li>두 progress bar의 임계치 룰을 공통 함수 <code>thresholdLevel(pct)</code>로 통일. 설정 화면에서 한 곳에서 조정 가능하도록.</li>
+    </ul>
+  </div>
+</section>

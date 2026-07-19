@@ -116,7 +116,17 @@ export function useMoveFile() {
   return useMutation({
     mutationFn: ({ from, to }: { from: string; to: string }) =>
       api.post('/api/knowledge/move', { from, to }),
-    onSuccess: () => {
+    onSuccess: (_, { from, to }) => {
+      // Migrate the file-content cache from the old path to the new one so
+      // the editor (keyed on editorSessionId, not the path) doesn't flash
+      // "Loading…" when the store swaps currentFilePath after a rename.
+      // The moved file's content is unchanged on disk, so the cached body
+      // + ETag are still valid.
+      const cached = qc.getQueryData<FileWithEtag>(['knowledge', 'file', from])
+      if (cached) {
+        qc.setQueryData(['knowledge', 'file', to], cached)
+        qc.removeQueries({ queryKey: ['knowledge', 'file', from] })
+      }
       qc.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
       qc.invalidateQueries({ queryKey: ['knowledge', 'backlinks'] })
     },
