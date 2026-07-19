@@ -236,7 +236,7 @@ pub struct CreateTaskParams {
     pub sort_order: Option<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct ListTasksParams {
     #[serde(default)]
     pub statuses: Option<Vec<String>>,

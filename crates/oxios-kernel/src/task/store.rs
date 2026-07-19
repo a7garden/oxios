@@ -14,10 +14,15 @@ pub struct TaskStore {
 }
 
 impl TaskStore {
-    pub fn new(conn: Arc<Mutex<Connection>>) -> Result<Self> {
-        let store = Self { conn };
-        store.init_schema()?;
-        Ok(store)
+    /// Create a TaskStore from a raw connection. Schema is initialized
+    /// on the connection *before* it is wrapped in the async mutex, so
+    /// this constructor is safe to call from inside a Tokio runtime —
+    /// no `blocking_lock` is involved.
+    pub fn new(conn: Connection) -> Result<Self> {
+        init_schema(&conn)?;
+        Ok(Self {
+            conn: Arc::new(Mutex::new(conn)),
+        })
     }
 
     /// Create a TaskStore from a database file path.
@@ -25,124 +30,47 @@ impl TaskStore {
         let conn = Connection::open(path)
             .with_context(|| format!("Failed to open task database: {path}"))?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
-        Self::new(Arc::new(Mutex::new(conn)))
+        Self::new(conn)
     }
 
     /// Create an in-memory TaskStore (for tests).
     pub fn in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
-        Self::new(Arc::new(Mutex::new(conn)))
-    }
-
-    fn init_schema(&self) -> Result<()> {
-        let conn = self.conn.clone();
-        // Block on init — called during startup
-        let conn = conn.blocking_lock();
-        conn.execute_batch(
-            r#"
-            CREATE TABLE IF NOT EXISTS tasks (
-                id TEXT PRIMARY KEY,
-                identifier TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT,
-                instruction TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'backlog',
-                priority INTEGER DEFAULT 0,
-                sort_order REAL,
-                parent_task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-                assignee_agent_id TEXT,
-                created_by_agent_id TEXT,
-                created_by_session_id TEXT,
-                automation_mode TEXT,
-                schedule_pattern TEXT,
-                schedule_timezone TEXT,
-                heartbeat_interval_secs INTEGER,
-                max_executions INTEGER,
-                execution_count INTEGER DEFAULT 0,
-                verify_enabled INTEGER DEFAULT 0,
-                verify_requirement TEXT,
-                verify_max_iterations INTEGER DEFAULT 3,
-                verify_verifier_agent_id TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                started_at TEXT,
-                completed_at TEXT,
-                last_run_at TEXT,
-                next_run_at TEXT,
-                last_error TEXT,
-                consecutive_failures INTEGER DEFAULT 0,
-                context_json TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS task_dependencies (
-                task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                depends_on TEXT NOT NULL,
-                PRIMARY KEY (task_id, depends_on)
-            );
-
-            CREATE TABLE IF NOT EXISTS task_comments (
-                id TEXT PRIMARY KEY,
-                task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                content TEXT NOT NULL,
-                author_agent_id TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS task_runs (
-                id TEXT PRIMARY KEY,
-                task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                session_id TEXT,
-                trigger TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'running',
-                summary TEXT,
-                result_content TEXT,
-                started_at TEXT NOT NULL,
-                completed_at TEXT,
-                error TEXT,
-                cost_usd REAL,
-                tokens_used INTEGER
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-            CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id);
-            CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run_at);
-            CREATE INDEX IF NOT EXISTS idx_runs_task ON task_runs(task_id);
-            "#,
-        )?;
-        Ok(())
+        Self::new(conn)
     }
 
     pub async fn create_task(&self, params: CreateTaskParams) -> Result<Task> {
-        let conn = self.conn.lock().await;
-        let now = Utc::now().to_rfc3339();
         let id = uuid::Uuid::new_v4().to_string();
-        let identifier = params
-            .identifier
-            .unwrap_or_else(|| Task::slug_from_name(&params.name));
+        {
+            let conn = self.conn.lock().await;
+            let now = Utc::now().to_rfc3339();
+            let identifier = params
+                .identifier
+                .unwrap_or_else(|| Task::slug_from_name(&params.name));
 
-        conn.execute(
-            r#"INSERT INTO tasks
-               (id, identifier, name, description, instruction, status, priority,
-                sort_order, parent_task_id, assignee_agent_id, created_at, updated_at,
-                verify_enabled, execution_count, consecutive_failures)
-               VALUES (?1, ?2, ?3, ?4, ?5, 'backlog', ?6, ?7, ?8, ?9, ?10, ?11, 0, 0, 0)"#,
-            params![
-                id,
-                identifier,
-                params.name,
-                params.description,
-                params.instruction,
-                params.priority.unwrap_or(0),
-                params.sort_order,
-                params.parent_task_id,
-                params.assignee_agent_id,
-                now,
-                now,
-            ],
-        )
-        .context("insert task")?;
-
+            conn.execute(
+                r#"INSERT INTO tasks
+                   (id, identifier, name, description, instruction, status, priority,
+                    sort_order, parent_task_id, assignee_agent_id, created_at, updated_at,
+                    verify_enabled, execution_count, consecutive_failures)
+                   VALUES (?1, ?2, ?3, ?4, ?5, 'backlog', ?6, ?7, ?8, ?9, ?10, ?11, 0, 0, 0)"#,
+                params![
+                    id,
+                    identifier,
+                    params.name,
+                    params.description,
+                    params.instruction,
+                    params.priority.unwrap_or(0),
+                    params.sort_order,
+                    params.parent_task_id,
+                    params.assignee_agent_id,
+                    now,
+                    now,
+                ],
+            )
+            .context("insert task")?;
+        }
+        // Lock released — safe to call another `&self` method.
         self.get_task_by_id(&id).await
     }
 
@@ -285,6 +213,81 @@ impl TaskStore {
         Ok(())
     }
 }
+fn init_schema(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS tasks (
+            id TEXT PRIMARY KEY,
+            identifier TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            instruction TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'backlog',
+            priority INTEGER DEFAULT 0,
+            sort_order REAL,
+            parent_task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
+            assignee_agent_id TEXT,
+            created_by_agent_id TEXT,
+            created_by_session_id TEXT,
+            automation_mode TEXT,
+            schedule_pattern TEXT,
+            schedule_timezone TEXT,
+            heartbeat_interval_secs INTEGER,
+            max_executions INTEGER,
+            execution_count INTEGER DEFAULT 0,
+            verify_enabled INTEGER DEFAULT 0,
+            verify_requirement TEXT,
+            verify_max_iterations INTEGER DEFAULT 3,
+            verify_verifier_agent_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            started_at TEXT,
+            completed_at TEXT,
+            last_run_at TEXT,
+            next_run_at TEXT,
+            last_error TEXT,
+            consecutive_failures INTEGER DEFAULT 0,
+            context_json TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS task_dependencies (
+            task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            depends_on TEXT NOT NULL,
+            PRIMARY KEY (task_id, depends_on)
+        );
+
+        CREATE TABLE IF NOT EXISTS task_comments (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            content TEXT NOT NULL,
+            author_agent_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS task_runs (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+            session_id TEXT,
+            trigger TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running',
+            summary TEXT,
+            result_content TEXT,
+            started_at TEXT NOT NULL,
+            completed_at TEXT,
+            error TEXT,
+            cost_usd REAL,
+            tokens_used INTEGER
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+        CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id);
+        CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run_at);
+        CREATE INDEX IF NOT EXISTS idx_runs_task ON task_runs(task_id);
+        "#,
+    )?;
+    Ok(())
+}
 
 // ── Row mapper ──
 
@@ -334,4 +337,93 @@ fn map_task_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
         context,
         dependencies: Vec::new(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_params(name: &str) -> CreateTaskParams {
+        CreateTaskParams {
+            name: name.to_string(),
+            instruction: format!("do {name}"),
+            identifier: None,
+            description: None,
+            priority: None,
+            parent_task_id: None,
+            assignee_agent_id: None,
+            sort_order: None,
+        }
+    }
+
+    // Regression: `TaskStore::open` / `in_memory` must be safe to call from
+    // inside a Tokio runtime. The production web surface constructs the
+    // store on the runtime (`src/api/plugin.rs`); an earlier version used
+    // `blocking_lock()` during schema init and panicked at startup with
+    // "Cannot block the current thread from within a runtime".
+    #[tokio::test]
+    async fn in_memory_store_construction_does_not_panic_on_runtime() {
+        let store = TaskStore::in_memory().expect("in-memory store builds");
+        // Sanity: schema is usable.
+        let task = store
+            .create_task(sample_params("regression"))
+            .await
+            .expect("create works");
+        assert_eq!(task.name, "regression");
+    }
+
+    #[tokio::test]
+    async fn open_from_file_path_works_on_runtime() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("tasks.db");
+        let path_str = path.to_str().expect("utf8 path");
+        let store = TaskStore::open(path_str).expect("open builds");
+        let created = store
+            .create_task(sample_params("from-disk"))
+            .await
+            .expect("create");
+        // Re-open the same file — schema init must be idempotent and the
+        // row must survive reopen.
+        drop(store);
+        let reopened = TaskStore::open(path_str).expect("reopen builds");
+        let fetched = reopened
+            .get_task_by_id(&created.id)
+            .await
+            .expect("get_by_id");
+        assert_eq!(fetched.name, "from-disk");
+    }
+
+    #[tokio::test]
+    async fn create_list_update_delete_roundtrip() {
+        let store = TaskStore::in_memory().expect("in-memory store builds");
+        let t1 = store
+            .create_task(sample_params("alpha"))
+            .await
+            .expect("create alpha");
+        let _t2 = store
+            .create_task(sample_params("beta"))
+            .await
+            .expect("create beta");
+
+        let listed = store
+            .list_tasks(ListTasksParams::default())
+            .await
+            .expect("list");
+        assert_eq!(listed.len(), 2);
+
+        store
+            .update_status(&t1.id, &TaskStatus::Completed)
+            .await
+            .expect("update");
+        let fetched = store.get_task_by_id(&t1.id).await.expect("get_by_id");
+        assert_eq!(fetched.status, TaskStatus::Completed);
+        assert!(fetched.completed_at.is_some());
+
+        store.delete_task(&t1.id).await.expect("delete");
+        let after = store
+            .list_tasks(ListTasksParams::default())
+            .await
+            .expect("list after delete");
+        assert_eq!(after.len(), 1);
+    }
 }
