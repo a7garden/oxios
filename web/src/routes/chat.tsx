@@ -2,7 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChatInput, type ContextAttachment } from '@/components/chat/chat-input'
+import { type ContextAttachment } from '@/components/chat/chat-input'
+import { ChatInputWithTools } from '@/components/chat/chat-input-with-tools'
 import { EmptyChatState } from '@/components/chat/empty-chat-state'
 import { InterviewWizard } from '@/components/chat/interview-wizard'
 import { LiveActivityBar } from '@/components/chat/live-activity-bar'
@@ -247,7 +248,7 @@ function ChatPage() {
         {/* ── Input (fixed at bottom) ── */}
         {!activeInterview && (
           <div className="border-t bg-background/95 backdrop-blur-sm shrink-0">
-            <ChatInput
+            <ChatInputWithTools
               value={input}
               onChange={setInput}
               onSend={handleSend}
@@ -263,6 +264,9 @@ function ChatPage() {
               queuedCount={queuedCount}
               onAttachMount={handleAttachMount}
               onRemoveMount={handleRemoveMount}
+              enableSearchToggle
+              enableKnowledgeToggle
+              enableFileUpload
             />
           </div>
         )}

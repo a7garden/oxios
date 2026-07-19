@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { CronScheduleEditor } from '@/components/cron/cron-schedule-editor'
 import { CronTimelineView } from '@/components/cron/cron-timeline-view'
 import { EditCronDialog } from '@/components/cron/edit-cron-dialog'
+import { TaskTemplateGallery } from '@/components/cron/task-template-gallery'
+import type { TaskTemplate } from '@/types/task-templates'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -78,8 +80,22 @@ function CronJobsPage() {
 
   const jobs = Array.isArray(data) ? data : []
 
+  const handleSelectTemplate = (template: TaskTemplate) => {
+    setName(template.title)
+    setSchedule(template.cronPattern)
+    setGoal(template.instruction)
+    setShowCreate(true)
+  }
+
   return (
     <div className="space-y-6">
+      {/* Task templates */}
+      {jobs.length === 0 && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">{t('cronJobs.templates', 'Recommended Tasks')}</h2>
+          <TaskTemplateGallery onSelectTemplate={handleSelectTemplate} />
+        </div>
+      )}
       <PageHeader
         title={t('cronJobs.title')}
         subtitle={t('cronJobs.subtitle')}
