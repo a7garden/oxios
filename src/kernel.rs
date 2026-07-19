@@ -181,8 +181,8 @@ impl Kernel {
                         let mut count = 0;
                         for (path, _) in &files {
                             let rel = format!("{reconcile_prefix}/{path}");
-                            if let Ok(info) = reconcile_git
-                                .commit_file(&rel, "knowledge: post-crash reconcile")
+                            if let Ok(info) =
+                                reconcile_git.commit_file(&rel, "knowledge: post-crash reconcile")
                                 && info.hash != "(disabled)"
                             {
                                 count += 1;
