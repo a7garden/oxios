@@ -115,6 +115,16 @@ export interface SkillInstallSpec {
   bins: string[]
 }
 
+/** Per-integration live status, joined from the registry + scanner + credential
+ * resolver at the API layer (RFC-041 Phase 5). Keys mirror the `id`s in
+ * `SkillRequirements.integrations` / `anyIntegrations`. */
+export interface SkillIntegrationStatus {
+  id: string
+  installed: boolean
+  configured: boolean
+  satisfied: boolean
+}
+
 export interface Skill {
   name: string
   description: string
@@ -134,6 +144,8 @@ export interface Skill {
   os: string[]
   install: SkillInstallSpec[]
   config_checks: Array<{ path: string; satisfied: boolean }>
+  /** Live status for each required/any integration (RFC-041 Phase 5). */
+  integration_status: SkillIntegrationStatus[]
   format: SkillFormat
 }
 
@@ -185,25 +197,37 @@ export interface ChatMessage {
     duration_ms?: number
     tool_calls?: ToolCallSummary[]
     /// RFC-032: rendered as an inline error card with a retry action.
-    /// Populated by the chat store's `error` chunk handler.
     isError?: boolean
-    /// Optional error category ('quota_exceeded' | 'auth' | 'routing' | 'unknown').
-    /// Drives the copy + icon in the inline error card.
+    /// Optional error category.
     errorKind?: 'quota_exceeded' | 'auth' | 'routing' | 'unknown'
   }
-  // RFC-015: real-time activity timeline attached to an assistant turn.
-  // Populated as the agent executes tools, recalls memories, emits reasoning
-  // fragments, and reports token usage. Also restored from the persisted
-  // trajectory_steps when a session is re-opened.
+  // RFC-015: real-time activity timeline.
   activities?: ChatActivity[]
-  // RFC-015: cumulative token usage for the turn.
   totalInputTokens?: number
   totalOutputTokens?: number
-  // Interview history: persisted questions from a completed interview round.
-  // Used by MessageBubble to render the Q&A exchange inline. Prefixed with
-  // _ to signal this is internal-only and not serialized to the backend.
   _interviewQuestions?: InterviewQuestion[]
   _interviewRound?: number
+  // ── LobeHub-ported fields ──
+  /** Thinking/reasoning block content + metadata. */
+  reasoning?: { content?: string; duration?: number; thinking?: boolean } | null
+  /** Web search grounding with citation cards. */
+  search?: { citations?: { favicon?: string; title?: string; url: string }[]; imageResults?: { domain?: string; imageUri?: string; sourceUri?: string; title?: string }[]; imageSearchQueries?: string[]; searchQueries?: string[] } | null
+  /** RAG reference chunks from knowledge base. */
+  chunksList?: { id: string; content: string; filename?: string; score?: number }[]
+  /** Generated or attached images. */
+  imageList?: { alt?: string; url: string }[]
+  /** Attached files. */
+  fileList?: { id: string; name: string; size: number; type: string; url?: string }[]
+  /** Rich error with classification (LobeHub-ported). */
+  chatError?: { attribution?: 'user' | 'provider' | 'harness' | 'system'; body?: unknown; category?: string; httpStatus?: number; message?: string; retryable?: boolean; severity?: 'info' | 'warning' | 'error' | 'critical'; type: string } | null
+  /** Whether this message is currently generating (streaming). */
+  generating?: boolean
+  /** Whether this message is in reasoning phase. */
+  isReasoning?: boolean
+  /** Whether tool calls are being generated. */
+  isToolCallGenerating?: boolean
+  /** Whether this message is collapsed. */
+  isCollapsed?: boolean
 }
 
 // RFC-015: a single transparency activity entry shown in the chat timeline.

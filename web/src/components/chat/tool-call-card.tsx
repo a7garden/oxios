@@ -1,8 +1,15 @@
-import { ChevronDown, ChevronRight, Wrench } from 'lucide-react'
-import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
+// ToolCallCard — uses shadcn Accordion + custom tool render registry
+// Ported from LobeHub's AssistantGroup/Tool rendering pattern.
+
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import { Wrench } from 'lucide-react'
 import type { ToolCallSummary } from '@/types'
+import { getToolRender, DefaultToolRender } from './tool-renders'
 
 interface ToolCallCardProps {
   call: ToolCallSummary
@@ -10,47 +17,45 @@ interface ToolCallCardProps {
 }
 
 export function ToolCallCard({ call, className }: ToolCallCardProps) {
-  const [expanded, setExpanded] = useState(false)
-  const { t } = useTranslation()
+  const toolName = call.tool_name ?? call.tool ?? 'unknown'
+  const Render = getToolRender(toolName) ?? DefaultToolRender
   const durationStr =
-    call.duration_ms >= 1000 ? `${(call.duration_ms / 1000).toFixed(1)}s` : `${call.duration_ms}ms`
+    call.duration_ms >= 1000
+      ? `${(call.duration_ms / 1000).toFixed(1)}s`
+      : `${call.duration_ms}ms`
+
+  // Parse args from input string
+  let args: Record<string, unknown> = {}
+  try {
+    args = typeof call.input === 'string' ? JSON.parse(call.input) : (call.input ?? {})
+  } catch {
+    args = { raw: call.input }
+  }
 
   return (
-    <div className={cn('rounded-lg border bg-muted/50 my-2 overflow-hidden', className)}>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/80 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
-      >
-        {expanded ? (
-          <ChevronDown className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5" />
-        )}
-        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="font-medium truncate">{call.tool_name}</span>
-        <span className="ml-auto text-xs text-muted-foreground">{durationStr}</span>
-      </button>
-      {expanded && (
-        <div className="border-t px-3 py-2 space-y-2">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">
-              {t('agents.inputLabel')}
-            </p>
-            <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
-              {call.input}
-            </pre>
+    <Accordion type="single" collapsible className={className}>
+      <AccordionItem value="tool" className="border rounded-lg px-3">
+        <AccordionTrigger className="py-2 hover:no-underline">
+          <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
+            <Wrench className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <span className="font-medium truncate">{toolName}</span>
+            {durationStr && (
+              <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                {durationStr}
+              </span>
+            )}
           </div>
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">
-              {t('agents.outputLabel')}
-            </p>
-            <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
-              {call.output}
-            </pre>
-          </div>
-        </div>
-      )}
-    </div>
+        </AccordionTrigger>
+        <AccordionContent>
+          <Render
+            toolName={toolName}
+            args={args}
+            result={call.output}
+            isRunning={false}
+            durationMs={call.duration_ms}
+          />
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   )
 }

@@ -1,201 +1,121 @@
-import { AlertCircle, Bot, ClipboardList, KeyRound, RefreshCw, Route } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import ReactMarkdown from 'react-markdown'
-import rehypeHighlight from 'rehype-highlight'
-import remarkGfm from 'remark-gfm'
+import { Copy, RefreshCw } from 'lucide-react'
+import { useCallback, useState } from 'react'
 import type { ChatMessage } from '@/types'
-import { ActivityTimeline } from './activity-timeline'
+import { ChatItem } from './chat-item'
+import type { ChatItemAvatar } from './chat-item'
 import { ChatMetadata } from './chat-metadata'
 import { KnowledgeSaveIndicator } from './knowledge-save-indicator'
+import { MarkdownMessage } from './markdown-message'
+import { SearchGrounding } from './search-grounding'
+import { Thinking } from './thinking'
 import { ToolCallCard } from './tool-call-card'
 
 interface MessageBubbleProps {
   message: ChatMessage
-  /** Session ID for knowledge save tracking (RFC-016). */
   sessionId?: string
-  /** Index of this message among assistant messages only (RFC-016). */
   assistantIndex?: number
-  /** RFC-032: retry the last failed send. Called from the inline error card. */
   onRetry?: () => void
 }
 
-/**
- * Chat message renderer — restrained, Claude-inspired layout.
- *
- * - User messages are subtle muted cards (left-aligned, NOT right-aligned
- *   bubbles): a small uppercase role label + the prompt. They never squeeze
- *   the assistant's rich output.
- * - Assistant messages are background-less, full-width markdown prose. A
- *   small "oxios" role mark precedes them. The activity timeline (reasoning,
- *   tool calls, usage) renders ABOVE the prose so the trace is the preamble
- *   and the answer is the hero — then metadata + the knowledge-save affordance.
- * - Tool messages (`role === 'tool'`) render as a full-width `ToolCallCard`.
- * - Inline error cards (RFC-032) keep the Oxios error-subtle treatment.
- *
- * No chat bubbles; the narrow-`bg-muted`-on-code wart is gone.
- */
 export function MessageBubble({ message, sessionId, assistantIndex, onRetry }: MessageBubbleProps) {
-  const { t, i18n } = useTranslation()
   const isUser = message.role === 'user'
   const isTool = message.role === 'tool'
 
-  // Timestamp — absolute time with hour:minute (today → HH:MM, else M/D HH:MM)
-  const relTime = (() => {
-    if (!message.timestamp) return ''
-    const d = new Date(message.timestamp)
-    if (Date.now() - d.getTime() < 60000) return t('common.justNow')
-    const hm = d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
-    if (d.toDateString() === new Date().toDateString()) return hm
-    return `${d.toLocaleDateString(i18n.language, { month: 'numeric', day: 'numeric' })} ${hm}`
-  })()
-  // Model mark — strip the `provider/` prefix for the visible chip; fall back
-  // gracefully when the turn has no model (e.g. pre-threaded history).
   const modelMark = message.model
     ? message.model.includes('/')
       ? message.model.split('/').slice(1).join('/')
       : message.model
     : null
 
-  // ── tool messages: full-width ToolCallCard, no bubble ──────────────
+  const avatar: ChatItemAvatar = isUser
+    ? { name: 'You' }
+    : { name: modelMark ?? 'Oxios' }
+
+  // tool messages
   if (isTool) {
-    if (!message.toolName) return null
     return (
-      <div className="my-1.5">
-        <ToolCallCard
-          call={{
-            tool_name: message.toolName,
-            input:
-              typeof message.toolArgs === 'string'
-                ? message.toolArgs
-                : JSON.stringify(message.toolArgs ?? '', null, 2),
-            output:
-              typeof message.toolResult === 'string'
-                ? message.toolResult
-                : JSON.stringify(message.toolResult ?? '', null, 2),
-            duration_ms: message.toolDurationMs ?? 0,
-          }}
-        />
-      </div>
+      <ToolCallCard
+        call={{
+          tool_name: message.toolName,
+          input: typeof message.toolArgs === 'string'
+            ? message.toolArgs
+            : JSON.stringify(message.toolArgs ?? {}),
+          output: typeof message.toolResult === 'string'
+            ? message.toolResult
+            : JSON.stringify(message.toolResult ?? ''),
+          duration_ms: message.toolDurationMs ?? 0,
+        }}
+        className="my-1"
+      />
     )
   }
 
-  // ── user messages: subtle muted card, left-aligned ─────────────────
+  // user messages
   if (isUser) {
     return (
-      <div className="my-3">
-        <div className="rounded-lg border border-border bg-muted px-4 py-3">
-          <p className="m-0 text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+      <ChatItem
+        avatar={avatar}
+        placement="right"
+        time={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
+        showTitle={false}
+      >
+        <div className="inline-block max-w-[85%] rounded-lg bg-muted/50 px-3 py-2 text-sm">
+          {message.content}
         </div>
-      </div>
+      </ChatItem>
     )
   }
 
-  // ── assistant messages: background-less, full-width ────────────────
+  // assistant messages
+  const hasReasoning = !!(message.reasoning?.content || message.isReasoning)
+  const hasSearch = !!(message.search?.citations?.length || message.search?.imageResults?.length)
+  const hasContent = !!message.content
+
+  const [copied, setCopied] = useState(false)
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(message.content).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [message.content])
+
+  const msgError = message.metadata?.isError
+    ? { type: message.metadata.errorKind ?? 'unknown', message: message.content }
+    : null
+
   return (
-    <div className="my-3">
-      {/* Model mark — prominent chip above the answer */}
-      {modelMark && (
-        <div className="mb-3 flex items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs font-medium text-primary">
-            <Bot className="h-3 w-3" />
-            {modelMark}
-          </span>
-        </div>
-      )}
-      {/* Interview questions summary (persisted after submit) */}
-      {message._interviewQuestions && message._interviewQuestions.length > 0 && (
-        <div className="mb-3 rounded-lg border border-border bg-muted/40 p-3">
-          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <ClipboardList className="h-3 w-3" />
-            <span>
-              {t('chat.interviewTitle')}
-              {message._interviewRound ? ` R${message._interviewRound}` : ''}
-            </span>
-          </div>
-          <div className="space-y-1">
-            {message._interviewQuestions.map((q, i) => (
-              <p key={q.id} className="text-xs text-muted-foreground">
-                {i + 1}. {q.text}
-              </p>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* RFC-032: inline error card */}
-      {message.metadata?.isError ? (
-        <div className="mb-2 flex items-start gap-2.5 rounded-lg border border-error/30 bg-error/5 px-3.5 py-3 text-sm">
-          {message.metadata.errorKind === 'auth' ? (
-            <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-error" />
-          ) : message.metadata.errorKind === 'routing' ? (
-            <Route className="mt-0.5 h-4 w-4 shrink-0 text-error" />
-          ) : (
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-error" />
+    <ChatItem
+      avatar={avatar}
+      error={msgError}
+      time={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
+      actions={
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={handleCopy} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            {copied ? <span>Copied</span> : <><Copy className="w-3 h-3" />Copy</>}
+          </button>
+          {onRetry && (
+            <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              <RefreshCw className="w-3 h-3" />Retry
+            </button>
           )}
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-error">
-              {message.metadata.errorKind === 'quota_exceeded'
-                ? t('chat.error.quotaExceeded')
-                : message.metadata.errorKind === 'auth'
-                  ? t('chat.error.authFailed')
-                  : message.metadata.errorKind === 'routing'
-                    ? t('chat.error.noRoute')
-                    : t('chat.error.generateFailed')}
-            </p>
-            {message.content && (
-              <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
-                {message.content}
-              </p>
-            )}
-            {onRetry && (
-              <button
-                type="button"
-                onClick={onRetry}
-                className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-error/30 bg-background px-2.5 py-1 text-xs font-medium text-error transition-colors hover:bg-error/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <RefreshCw className="h-3 w-3" />
-                {t('chat.retry')}
-              </button>
-            )}
-          </div>
         </div>
-      ) : (
+      }
+      messageExtra={
         <>
-          {/* RFC-015: activity timeline (reasoning / tool calls / usage) —
-              renders ABOVE the prose so the trace is the preamble and the
-              answer is the hero. */}
-          {message.activities && message.activities.length > 0 && (
-            <div className="mb-2">
-              <ActivityTimeline activities={message.activities} />
-            </div>
-          )}
-
-          {/* Markdown body — full-width, no background bubble */}
-          {message.content && (
-            <div className="max-w-none text-sm prose prose-sm dark:prose-invert [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-                {message.content}
-              </ReactMarkdown>
-            </div>
+          {message.metadata && !message.metadata.isError && <ChatMetadata message={message} />}
+          {sessionId != null && assistantIndex != null && (
+            <KnowledgeSaveIndicator sessionId={sessionId} messageIndex={assistantIndex} />
           )}
         </>
-      )}
-
-      {/* Footer: timestamp + phase/eval/duration + tokens */}
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-2xs text-muted-foreground">
-        {relTime && <span>{relTime}</span>}
-        <ChatMetadata message={message} className="mt-0" />
-        {(message.totalInputTokens || message.totalOutputTokens) && (
-          <span>
-            in {message.totalInputTokens ?? 0} · out {message.totalOutputTokens ?? 0} tok
-          </span>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        {hasReasoning && (
+          <Thinking content={message.reasoning?.content ?? ''} thinking={message.isReasoning ?? false} duration={message.reasoning?.duration} />
         )}
+        {hasSearch && message.search && <SearchGrounding search={message.search} />}
+        {hasContent && <MarkdownMessage>{message.content}</MarkdownMessage>}
       </div>
-
-      {/* RFC-016: Knowledge save — assistant messages only */}
-      {sessionId && assistantIndex !== undefined && (
-        <KnowledgeSaveIndicator sessionId={sessionId} messageIndex={assistantIndex} />
-      )}
-    </div>
+    </ChatItem>
   )
 }
