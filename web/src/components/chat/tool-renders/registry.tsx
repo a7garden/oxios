@@ -1,12 +1,17 @@
-// Tool render registry — pluggable custom renders for tool results (ported from LobeHub)
+// Tool render registry — 4-tier pluggable components per tool (LobeHub-aligned).
 //
-// LobeHub original: /tmp/lobehub/packages/builtin-tools/src/register.ts
-// Each tool can register a custom React component to render its result.
-// Falls back to DefaultToolRender for unregistered tools.
+// LobeHub analogue: packages/builtin-tools/src/{renders,inspectors,streamings,interventions}.ts
+//
+// Phase 3 (2026-07-21): introduces the 4-tier TYPE system. Phase 3 ships
+// renders + inspectors; streamings and interventions are typed for forward
+// compat but not yet populated.
+//
+// See docs/designs/2026-07-21-lobehub-chat-port-design.md §7 Phase 3.
 
 import type { ComponentType } from 'react'
+import type { ChatToolPayload } from '@/types/chat'
 
-// ── Types ──
+// ── Prop types ──
 
 export interface ToolRenderProps {
   toolName: string
@@ -15,22 +20,64 @@ export interface ToolRenderProps {
   isRunning: boolean
   durationMs?: number
 }
-
 export type ToolRenderComponent = ComponentType<ToolRenderProps>
 
-// ── Registry ──
+export interface ToolInspectorProps {
+  call: ChatToolPayload
+}
+export type ToolInspectorComponent = ComponentType<ToolInspectorProps>
 
-const registry = new Map<string, ToolRenderComponent>()
+export interface ToolStreamingProps {
+  toolName: string
+  progress?: string
+  args: Record<string, unknown>
+}
+export type ToolStreamingComponent = ComponentType<ToolStreamingProps>
+
+export interface ToolInterventionProps {
+  call: ChatToolPayload
+  onApprove: () => void
+  onReject: () => void
+}
+export type ToolInterventionComponent = ComponentType<ToolInterventionProps>
+
+// ── Registries (4 tiers) ──
+
+const renders = new Map<string, ToolRenderComponent>()
+const inspectors = new Map<string, ToolInspectorComponent>()
+const streamings = new Map<string, ToolStreamingComponent>()
+const interventions = new Map<string, ToolInterventionComponent>()
 
 export function registerToolRender(toolName: string, component: ToolRenderComponent): void {
-  registry.set(toolName, component)
+  renders.set(toolName, component)
+}
+export function registerToolInspector(toolName: string, component: ToolInspectorComponent): void {
+  inspectors.set(toolName, component)
+}
+export function registerToolStreaming(toolName: string, component: ToolStreamingComponent): void {
+  streamings.set(toolName, component)
+}
+export function registerToolIntervention(
+  toolName: string,
+  component: ToolInterventionComponent,
+): void {
+  interventions.set(toolName, component)
 }
 
 export function getToolRender(toolName: string): ToolRenderComponent | undefined {
-  return registry.get(toolName)
+  return renders.get(toolName)
+}
+export function getToolInspector(toolName: string): ToolInspectorComponent | undefined {
+  return inspectors.get(toolName)
+}
+export function getToolStreaming(toolName: string): ToolStreamingComponent | undefined {
+  return streamings.get(toolName)
+}
+export function getToolIntervention(toolName: string): ToolInterventionComponent | undefined {
+  return interventions.get(toolName)
 }
 
-// ── Default fallback ──
+// ── Default fallbacks ──
 
 export function DefaultToolRender({ args, result, isRunning }: ToolRenderProps) {
   return (

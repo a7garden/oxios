@@ -1,19 +1,17 @@
-// messages/components/ToolCallList — render ChatToolPayload[] using the tool render registry.
+// messages/components/ToolCallList — render ChatToolPayload[] as accordion.
 //
-// LobeHub analogue: Messages/AssistantGroup/Tool — each tool call is an
-// AccordionItem with Inspector header + Detail body. Phase 2 keeps it simple:
-// each call renders as a collapsible card, dispatching to the registered
-// custom render or falling back to a JSON view. Phase 3 will expand into
-// the full 4-tier registry (renders/inspectors/streamings/interventions).
+// LobeHub analogue: Messages/AssistantGroup/Tool/index.tsx
+//
+// Each call becomes a collapsible card. Header = ToolInspector, body = the
+// registered ToolRender (or DefaultToolRender fallback). Calls registered
+// with custom inspectors replace the default header entirely.
 
 import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { ChatToolPayload } from '@/types/chat'
-import {
-  DefaultToolRender,
-  getToolRender,
-} from '@/components/chat/tool-renders/registry'
+import { DefaultToolRender, getToolRender } from '@/components/chat/tool-renders'
+import { ToolInspector } from './ToolInspector'
 
 interface ToolCallListProps {
   calls: ChatToolPayload[]
@@ -42,7 +40,6 @@ function ToolCallCard({
   const [open, setOpen] = useState(defaultExpanded)
   const isRunning = call.status === 'loading'
   const isError = call.status === 'error'
-
   const Render = getToolRender(call.apiName)
 
   return (
@@ -55,7 +52,7 @@ function ToolCallCard({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/50 transition-colors"
+        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-muted/50 transition-colors"
       >
         <ChevronRight
           className={cn(
@@ -63,13 +60,7 @@ function ToolCallCard({
             open && 'rotate-90',
           )}
         />
-        <StatusDot status={call.status} />
-        <span className="font-mono text-xs font-medium">{call.apiName}</span>
-        {call.durationMs !== undefined && (
-          <span className="ml-auto text-2xs text-muted-foreground tabular-nums">
-            {formatDuration(call.durationMs)}
-          </span>
-        )}
+        <ToolInspector call={call} />
       </button>
       {open && (
         <div className="border-t border-border/60 px-2.5 py-2">
@@ -102,21 +93,4 @@ function ToolCallCard({
       )}
     </div>
   )
-}
-
-function StatusDot({ status }: { status: ChatToolPayload['status'] }) {
-  const cls =
-    status === 'loading'
-      ? 'bg-amber-500 animate-pulse'
-      : status === 'error'
-        ? 'bg-destructive'
-        : status === 'aborted'
-          ? 'bg-muted-foreground'
-          : 'bg-emerald-500'
-  return <span className={cn('inline-block w-2 h-2 rounded-full shrink-0', cls)} />
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
 }
