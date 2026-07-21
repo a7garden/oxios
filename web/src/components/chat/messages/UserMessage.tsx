@@ -6,6 +6,8 @@ import type { ChatMessage } from '@/types'
 import { useChatStore } from '@/stores/chat'
 import { ChatItem } from '@/components/chat/chat-item'
 import type { ChatItemAvatar } from '@/components/chat/chat-item'
+import { MessageActionBar } from './components/MessageActionBar'
+import type { MessageAction } from './components/MessageActionBar'
 
 interface UserMessageProps {
   message: ChatMessage
@@ -33,6 +35,17 @@ function UserMessageImpl({ message }: UserMessageProps) {
     removeMessage?.(message.id)
   }, [message.id, removeMessage])
 
+  const actions: MessageAction[] = [
+    { id: 'edit', icon: <Pencil className="w-3 h-3" />, label: 'Edit', onClick: startEdit },
+    {
+      id: 'delete',
+      icon: <Trash2 className="w-3 h-3" />,
+      label: 'Delete',
+      onClick: handleDelete,
+      danger: true,
+    },
+  ]
+
   const avatar: ChatItemAvatar = { name: 'You' }
 
   return (
@@ -41,26 +54,7 @@ function UserMessageImpl({ message }: UserMessageProps) {
       placement="right"
       time={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
       showTitle={false}
-      actions={
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={startEdit}
-            title="Edit"
-            className="inline-flex items-center justify-center w-7 h-7 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <Pencil className="w-3 h-3" />
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            title="Delete"
-            className="inline-flex items-center justify-center w-7 h-7 rounded text-xs text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
-      }
+      actions={<MessageActionBar actions={actions} />}
     >
       {editing ? (
         <div className="flex flex-col gap-2">

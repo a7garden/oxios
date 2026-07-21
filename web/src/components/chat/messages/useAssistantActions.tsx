@@ -2,13 +2,15 @@
 //
 // Extracted from the legacy message-bubble.tsx so both AssistantMessage and
 // future variants (supervisor, agent-council) can share the same action set.
+//
+// Phase 4 (2026-07-21): returns a MessageAction[] consumed by MessageActionBar,
+// replacing the bespoke inline JSX.
 
 import { useCallback, useState } from 'react'
-import { toast } from 'sonner'
+import { Copy, RefreshCw, Trash2 } from 'lucide-react'
 import { useChatStore } from '@/stores/chat'
 import type { ChatMessage } from '@/types'
-import type { ReactNode } from 'react'
-import { Copy, RefreshCw, Trash2 } from 'lucide-react'
+import type { MessageAction } from './components/MessageActionBar'
 
 interface UseAssistantActionsArgs {
   message: ChatMessage
@@ -16,7 +18,7 @@ interface UseAssistantActionsArgs {
 }
 
 export interface AssistantActionsResult {
-  actions: ReactNode
+  actions: MessageAction[]
   copied: boolean
 }
 
@@ -38,7 +40,6 @@ export function useAssistantActions({
   }, [message.id, removeMessage])
 
   const handleRegenerate = useCallback(() => {
-    // Find preceding user message and re-send it
     const idx = messages.findIndex((m) => m.id === message.id)
     if (idx <= 0) return
     const precedingUser = messages[idx - 1]
@@ -50,55 +51,37 @@ export function useAssistantActions({
 
   const isError = !!message.metadata?.isError
 
-  return {
-    copied,
-    actions: (
-      <div className="flex items-center gap-0.5">
-        <ActionButton onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>
-          {copied ? <span className="text-2xs">Copied</span> : <Copy className="w-3 h-3" />}
-        </ActionButton>
-        {!isError && (
-          <ActionButton onClick={handleRegenerate} title="Regenerate">
-            <RefreshCw className="w-3 h-3" />
-          </ActionButton>
-        )}
-        {isError && onRetry && (
-          <ActionButton onClick={onRetry} title="Retry" hoverDanger>
-            <RefreshCw className="w-3 h-3" />
-          </ActionButton>
-        )}
-        <ActionButton onClick={handleDelete} title="Delete" hoverDanger>
-          <Trash2 className="w-3 h-3" />
-        </ActionButton>
-      </div>
-    ),
-  }
-}
+  const actions: MessageAction[] = [
+    {
+      id: 'copy',
+      icon: <Copy className="w-3 h-3" />,
+      label: copied ? 'Copied!' : 'Copy',
+      onClick: handleCopy,
+      children: copied ? <span className="text-2xs">Copied</span> : undefined,
+    },
+    {
+      id: 'regenerate',
+      icon: <RefreshCw className="w-3 h-3" />,
+      label: 'Regenerate',
+      onClick: handleRegenerate,
+      hidden: isError,
+    },
+    {
+      id: 'retry',
+      icon: <RefreshCw className="w-3 h-3" />,
+      label: 'Retry',
+      onClick: onRetry ?? (() => {}),
+      hidden: !isError || !onRetry,
+      danger: true,
+    },
+    {
+      id: 'delete',
+      icon: <Trash2 className="w-3 h-3" />,
+      label: 'Delete',
+      onClick: handleDelete,
+      danger: true,
+    },
+  ]
 
-function ActionButton({
-  onClick,
-  title,
-  hoverDanger,
-  children,
-}: {
-  onClick: () => void
-  title: string
-  hoverDanger?: boolean
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`inline-flex items-center justify-center w-7 h-7 rounded text-xs text-muted-foreground hover:bg-muted transition-colors ${
-        hoverDanger ? 'hover:text-destructive' : 'hover:text-foreground'
-      }`}
-    >
-      {children}
-    </button>
-  )
+  return { actions, copied }
 }
-
-/** Silence unused-import warnings when toast ends up unused after refactors. */
-void toast

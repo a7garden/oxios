@@ -19,6 +19,8 @@ import { KnowledgeSaveIndicator } from '@/components/chat/knowledge-save-indicat
 import { MarkdownMessage } from '@/components/chat/markdown-message'
 import { SearchGrounding } from '@/components/chat/search-grounding'
 import { Thinking } from '@/components/chat/thinking'
+import { ErrorCard } from './components/ErrorCard'
+import { MessageActionBar } from './components/MessageActionBar'
 import { ToolCallList } from './components/ToolCallList'
 import { useAssistantActions } from './useAssistantActions'
 
@@ -49,8 +51,12 @@ function AssistantMessageImpl({
   const hasToolCalls = !!(message.toolCalls && message.toolCalls.length > 0)
   const hasChunks = !!(message.chunksList && message.chunksList.length > 0)
   const isError = !!message.metadata?.isError
-  const msgError = isError
-    ? { type: message.metadata?.errorKind ?? 'unknown', message: message.content }
+  const chatError = isError
+    ? {
+        type: message.metadata?.errorKind ?? 'unknown',
+        message: message.content,
+        severity: 'error' as const,
+      }
     : null
 
   // Stream just started — no content yet, still generating. Show ContentLoading.
@@ -60,9 +66,9 @@ function AssistantMessageImpl({
   return (
     <ChatItem
       avatar={avatar}
-      error={msgError}
+      error={chatError}
       time={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
-      actions={actions}
+      actions={<MessageActionBar actions={actions} />}
       messageExtra={
         <>
           {message.metadata && !isError && <ChatMetadata message={message} />}
@@ -83,7 +89,8 @@ function AssistantMessageImpl({
         {hasSearch && message.search && <SearchGrounding search={message.search} />}
         {hasChunks && <FileChunksPlaceholder chunks={message.chunksList!} />}
         {showLoading && <ContentLoading id={`loading-${message.id}`} />}
-        {hasContent && <MarkdownMessage>{message.content}</MarkdownMessage>}
+        {hasContent && !isError && <MarkdownMessage>{message.content}</MarkdownMessage>}
+        {isError && chatError && <ErrorCard error={chatError} onRetry={onRetry} />}
         {hasToolCalls && <ToolCallList calls={message.toolCalls!} />}
         {hasContent && !isError && (
           <FollowUpChips
