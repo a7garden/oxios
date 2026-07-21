@@ -242,6 +242,10 @@ export function ChatInput({
       }
     },
   })
+  // Sync editable when connection state changes after mount
+  useEffect(() => {
+    if (editor) editor.setEditable(!disabled && !!connected)
+  }, [editor, connected, disabled])
 
   // Sync
   useEffect(() => {
