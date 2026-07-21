@@ -4,7 +4,9 @@ import { Check, Copy } from 'lucide-react'
 import { type ComponentPropsWithoutRef, memo, useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
+import rehypeRaw from 'rehype-raw'
 import remarkGfm from 'remark-gfm'
+import { rehypeThinking } from './markdown-plugins/rehype-thinking'
 import { cn } from '@/lib/utils'
 
 // ── Code block with language label + copy button ──────────────────
@@ -79,7 +81,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({ children, classNa
     <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        rehypePlugins={[[rehypeRaw, { allowDangerousHtml: true }], rehypeHighlight, rehypeThinking]}
         components={markdownComponents}
       >
         {children}
