@@ -10,6 +10,9 @@ import type {
   ToolCallContext,
   ToolCallSummary,
 } from '@/types'
+import { adaptChunk } from '@/lib/stream/adapter'
+import type { ChatActivityEmission, ProcessorResult } from '@/lib/stream/StreamProcessor'
+import { StreamProcessor } from '@/lib/stream/StreamProcessor'
 import { useAuthStore } from './auth'
 
 // ---------------------------------------------------------------------------
@@ -635,11 +638,28 @@ function flushPendingTokens(): void {
   if (!_pendingTokens) return
   const content = _pendingTokens
   _pendingTokens = ''
-  useChatStore.setState((s) => ({
-    messages: appendTokenToMessages(s.messages, content, {
-      placeholderModel: s.pendingModel ?? s.activeModelId,
-    }),
-  }))
+  useChatStore.setState((s) => {
+    const msgId = lastAssistantMessageId(s.messages)
+    if (!msgId) {
+      // No assistant target — fall back to legacy append behavior.
+      return {
+        messages: appendTokenToMessages(s.messages, content, {
+          placeholderModel: s.pendingModel ?? s.activeModelId,
+        }),
+      }
+    }
+    const processor = getOrCreateProcessor(msgId)
+    const result = processor.handleEvent({
+      kind: 'text.delta',
+      messageId: msgId,
+      text: content,
+    })
+    return {
+      messages: applyProcessorResult(s.messages, msgId, result, {
+        placeholderModel: s.pendingModel ?? s.activeModelId,
+      }),
+    }
+  })
 }
 
 function scheduleTokenFlush(): void {
@@ -658,10 +678,91 @@ function discardPendingTokens(): void {
   _pendingTokens = ''
 }
 
+
+// ---------------------------------------------------------------------------
+// StreamProcessor integration (Phase 1, 2026-07-21)
+// ---------------------------------------------------------------------------
+// One processor per active assistant message. Phase 1 has a single stream at
+// a time, but the map keys by message id for forward-compat with concurrent
+// streams (background agents, A2A).
+
+/** Test-only: clear all StreamProcessor instances. Phase 1 has module-level
+ *  processor state that would otherwise leak between tests. */
+export function __clearStreamProcessorsForTesting(): void {
+  streamProcessors.clear()
+}
+const streamProcessors = new Map<string, StreamProcessor>()
+
+function getOrCreateProcessor(messageId: string): StreamProcessor {
+  let p = streamProcessors.get(messageId)
+  if (!p) {
+    p = new StreamProcessor(messageId)
+    streamProcessors.set(messageId, p)
+  }
+  return p
+}
+
+/** Find the last assistant message id in the list, or null. */
+function lastAssistantMessageId(messages: ChatMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]!.role === 'assistant') return messages[i]!.id
+  }
+  return null
+}
+
+/** Apply a StreamProcessor result to a specific message by id, creating an
+ *  assistant placeholder if absent. Returns new messages array (immutable). */
+function applyProcessorResult(
+  messages: ChatMessage[],
+  msgId: string,
+  result: ProcessorResult,
+  ctx: AssistantCtx,
+): ChatMessage[] {
+  let next = messages
+  // Ensure target message exists — create empty assistant placeholder.
+  if (!messages.some((m) => m.id === msgId)) {
+    const placeholder: ChatMessage = {
+      id: msgId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+      model: ctx.placeholderModel ?? undefined,
+      generating: true,
+    }
+    next = messages.concat(placeholder)
+  }
+  // Apply patch.
+  if (result.patch && Object.keys(result.patch).length > 0) {
+    next = next.map((m) => (m.id === msgId ? { ...m, ...result.patch } : m))
+  }
+  // Apply activity emission (backward-compat with existing timeline rendering).
+  if (result.activity) {
+    const activity = emissionToActivity(msgId, result.activity)
+    if (activity) {
+      next = appendActivityToMessages(next, activity, ctx)
+    }
+  }
+  return next
+}
+
+/** Convert a processor emission to a ChatActivity suitable for the timeline. */
+function emissionToActivity(msgId: string, em: ChatActivityEmission): ChatActivity | null {
+  return {
+    id:
+      em.type === 'tool_call' && em.toolCallId
+        ? `tool-${em.toolCallId}`
+        : `${em.type}-${msgId}-${Date.now()}`,
+    type: em.type,
+    timestamp: new Date().toISOString(),
+    // toolCallId must land on the activity itself so mergeOrAppendActivity
+    // can match by id (it reads activity.toolCallId, not em.toolCallId).
+    ...(em.toolCallId ? { toolCallId: em.toolCallId } : {}),
+    ...(em.patch as object),
+  } as ChatActivity
+}
 // ---------------------------------------------------------------------------
 // Store definition
 // ---------------------------------------------------------------------------
-
 export const useChatStore = create<ChatStore>()(
   persist(
     (set, get) => ({
@@ -1282,8 +1383,27 @@ export const useChatStore = create<ChatStore>()(
           case 'tool_start':
           case 'tool_progress':
           case 'tool_end':
+          case 'reasoning': {
+            // Phase 1: route through StreamProcessor (toolCalls[], reasoning,
+            // generating state) for first-class fields; processor also emits
+            // backward-compat activity entries for the timeline.
+            const msgId = lastAssistantMessageId(get().messages)
+            if (!msgId) break
+            const processor = getOrCreateProcessor(msgId)
+            const { events } = adaptChunk(chunk, { msgId })
+            for (const ev of events) {
+              const result = processor.handleEvent(ev)
+              set((s) => ({
+                messages: applyProcessorResult(s.messages, msgId, result, {
+                  placeholderModel: s.pendingModel ?? s.activeModelId,
+                }),
+              }))
+              if (result.finished) streamProcessors.delete(msgId)
+            }
+            break
+          }
+
           case 'memory':
-          case 'reasoning':
           case 'usage': {
             const activity = chunkToActivity(chunk)
             if (!activity) break

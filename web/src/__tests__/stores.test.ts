@@ -7,6 +7,7 @@ import {
   ensureLastAssistant,
   mergeOrAppendActivity,
   patchAssistantModel,
+  __clearStreamProcessorsForTesting,
   useChatStore,
 } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'
@@ -74,8 +75,10 @@ describe('useSidebarStore', () => {
 describe('useChatStore handleChunk (RFC-015)', () => {
   beforeEach(() => {
     localStorage.clear()
+    // Phase 1: StreamProcessor instances are module-level and persist across
+    // tests. Reset them so accumulation doesn't leak between tests.
+    __clearStreamProcessorsForTesting()
     // Start each test with a single empty assistant message so chunks
-    // have a target to attach to.
     useChatStore.setState({
       messages: [
         {
@@ -288,40 +291,42 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     expect(last.totalOutputTokens).toBe(50)
   })
 
-  it('reasoning appends a reasoning activity', () => {
+  it('reasoning populates first-class reasoning field (Phase 1)', () => {
+    // Phase 1 refactor (2026-07-21): reasoning is now a first-class field on
+    // ChatMessage, no longer an activity entry. See
+    // docs/designs/2026-07-21-lobehub-chat-port-design.md §6.1.
     useChatStore.getState().handleChunk({
       type: 'reasoning',
       content: 'compaction complete',
       source: 'compaction',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.activities![0]).toMatchObject({
-      type: 'reasoning',
+    expect(last.reasoning).toMatchObject({
       content: 'compaction complete',
-      reasoningSource: 'compaction',
+      thinking: true,
     })
+    expect(last.isReasoning).toBe(true)
   })
 
-  it('merges consecutive same-source reasoning fragments into one activity', () => {
-    // Reasoning streams as per-token deltas; each delta must append to the
-    // existing reasoning activity's content rather than create a new card
-    // (the "one block per word" explosion the user reported).
+  it('accumulates reasoning deltas into single content string (Phase 1)', () => {
+    // Phase 1: reasoning streams as per-token deltas that accumulate into
+    // message.reasoning.content. Source-based grouping from the old activity
+    // model is intentionally dropped — Phase 1 has one reasoning span per
+    // message; multi-source reasoning is a Phase 2+ concern.
     useChatStore.getState().handleChunk({ type: 'reasoning', content: 'Thi', source: 'thinking' })
     useChatStore.getState().handleChunk({ type: 'reasoning', content: 's is', source: 'thinking' })
     useChatStore
       .getState()
       .handleChunk({ type: 'reasoning', content: ' a thought', source: 'thinking' })
     const last = useChatStore.getState().messages.at(-1)!
-    const reasoning = last.activities!.filter((a) => a.type === 'reasoning')
-    expect(reasoning).toHaveLength(1)
-    expect(reasoning[0]).toMatchObject({
-      type: 'reasoning',
-      content: 'This is a thought',
-      reasoningSource: 'thinking',
-    })
+    expect(last.reasoning?.content).toBe('This is a thought')
+    expect(last.reasoning?.thinking).toBe(true)
   })
 
-  it('starts a new reasoning activity when the source changes', () => {
+  it('reasoning across sources still accumulates into one field (Phase 1)', () => {
+    // Phase 1 simplification: source-based grouping is gone. All reasoning
+    // chunks accumulate into message.reasoning.content regardless of source.
+    // Multi-span reasoning UI is a Phase 2+ concern.
     useChatStore
       .getState()
       .handleChunk({ type: 'reasoning', content: 'thinking…', source: 'thinking' })
@@ -329,15 +334,12 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       .getState()
       .handleChunk({ type: 'reasoning', content: 'compacting…', source: 'compaction' })
     const last = useChatStore.getState().messages.at(-1)!
-    const reasoning = last.activities!.filter((a) => a.type === 'reasoning')
-    expect(reasoning).toHaveLength(2)
-    expect(reasoning[0]).toMatchObject({ content: 'thinking…', reasoningSource: 'thinking' })
-    expect(reasoning[1]).toMatchObject({ content: 'compacting…', reasoningSource: 'compaction' })
+    expect(last.reasoning?.content).toBe('thinking…compacting…')
   })
 
   it('token chunk does not add an activity', async () => {
-    useChatStore.getState().handleChunk({ type: 'token', content: 'hello' })
     // F9: tokens are batched via requestAnimationFrame; wait one frame for flush.
+    useChatStore.getState().handleChunk({ type: 'token', content: 'hello' })
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     const last = useChatStore.getState().messages.at(-1)!
     expect(last.content).toBe('hello')

@@ -1,3 +1,32 @@
+// LobeHub-ported chat types (named versions; replace inline anonymous types below).
+import type {
+  ChatError,
+  ChatFileChunk,
+  ChatFileItem,
+  ChatImageItem,
+  ChatToolPayload,
+  GroundingSearch,
+  ModelReasoning,
+} from './chat'
+export type {
+  ChatError,
+  ChatErrorAttribution,
+  ChatErrorSeverity,
+  ChatFileChunk,
+  ChatFileItem,
+  ChatImageItem,
+  ChatItemAvatar,
+  ChatItemProps,
+  ChatMessageExtensions,
+  ChatToolPayload,
+  ChatToolStatus,
+  CitationItem,
+  GroundingSearch,
+  ImageCitationItem,
+  ModelReasoning,
+  ToolRenderProps,
+} from './chat'
+
 // Agent
 export interface Agent {
   id: string
@@ -207,19 +236,23 @@ export interface ChatMessage {
   totalOutputTokens?: number
   _interviewQuestions?: InterviewQuestion[]
   _interviewRound?: number
-  // ── LobeHub-ported fields ──
-  /** Thinking/reasoning block content + metadata. */
-  reasoning?: { content?: string; duration?: number; thinking?: boolean } | null
+  // ── LobeHub-aligned fields (Phase 1 streaming foundation, 2026-07-21) ──
+  // Named types imported from './chat'. Old inline anonymous types removed.
+  /** Thinking/reasoning block content + metadata. First-class (not an activity). */
+  reasoning?: ModelReasoning | null
   /** Web search grounding with citation cards. */
-  search?: { citations?: { favicon?: string; title?: string; url: string }[]; imageResults?: { domain?: string; imageUri?: string; sourceUri?: string; title?: string }[]; imageSearchQueries?: string[]; searchQueries?: string[] } | null
+  search?: GroundingSearch | null
   /** RAG reference chunks from knowledge base. */
-  chunksList?: { id: string; content: string; filename?: string; score?: number }[]
+  chunksList?: ChatFileChunk[]
   /** Generated or attached images. */
-  imageList?: { alt?: string; url: string }[]
+  imageList?: ChatImageItem[]
   /** Attached files. */
-  fileList?: { id: string; name: string; size: number; type: string; url?: string }[]
-  /** Rich error with classification (LobeHub-ported). */
-  chatError?: { attribution?: 'user' | 'provider' | 'harness' | 'system'; body?: unknown; category?: string; httpStatus?: number; message?: string; retryable?: boolean; severity?: 'info' | 'warning' | 'error' | 'critical'; type: string } | null
+  fileList?: ChatFileItem[]
+  /** Structured tool calls (LobeHub-aligned, replaces toolName/toolArgs/toolResult).
+   *  Migration: legacy single-tool fields kept for one cycle; new code reads toolCalls[]. */
+  toolCalls?: ChatToolPayload[]
+  /** Rich error with classification (LobeHub-ported). Renamed from chatError (which was unused). */
+  error?: ChatError | null
   /** Whether this message is currently generating (streaming). */
   generating?: boolean
   /** Whether this message is in reasoning phase. */
@@ -707,4 +740,5 @@ export interface LogResponse {
   total: number
 }
 
+export * from './chat'
 export * from './calendar'

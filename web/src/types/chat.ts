@@ -75,6 +75,39 @@ export interface ChatFileItem {
   url?: string
 }
 
+// ── Tool call payload (LobeHub-aligned, replaces toolName/toolArgs/toolResult) ──
+
+export type ChatToolStatus = 'loading' | 'success' | 'error' | 'aborted'
+
+export interface ChatToolPayload {
+  /** Tool call id — matches backend `tool_call_id`. Stable across stream lifecycle. */
+  id: string
+  /** Tool package/namespace (Oxios: always 'kernel' for now; reserved for future plugins). */
+  identifier: string
+  /** Specific tool name, e.g. 'read_file', 'bash', 'web_search'. */
+  apiName: string
+  /** Parsed arguments. JSON-parsed form of backend tool_args. */
+  arguments: unknown
+  /** Parsed result. Absent until the tool completes. */
+  result?: unknown
+  /** Rich error if the tool failed. */
+  error?: ChatError | null
+  /** Lifecycle status — drives Inspector spinner/check/x. */
+  status: ChatToolStatus
+  /** Epoch ms when tool started. */
+  startedAt?: number
+  /** Epoch ms when tool ended. */
+  endedAt?: number
+  /** Duration in ms (set on end). */
+  durationMs?: number
+  /** Human approval state (RFC-017 GatedTool). */
+  intervention?: { required: boolean; resolved?: 'approved' | 'rejected' }
+  /** Latest progress text from a running tool (RFC-015 v0.12+). */
+  progress?: string
+  /** Browser tab id when upstream tool is tab-aware (browser tools). */
+  tabId?: string
+}
+
 // ── Tool render types ──
 
 export interface ToolRenderProps {
