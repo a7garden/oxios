@@ -81,6 +81,7 @@ interface SlashCommand {
 }
 
 const SLASH_COMMANDS: SlashCommand[] = [
+  // ── Conversation control ──
   {
     id: 'compact',
     label: '/compact',
@@ -101,6 +102,51 @@ const SLASH_COMMANDS: SlashCommand[] = [
     description: 'Clear the current input',
     icon: '🗑️',
     action: (ed) => ed?.commands.clearContent(),
+  },
+  // ── Search & web ──
+  {
+    id: 'search-on',
+    label: '/search',
+    description: 'Toggle web search for this message',
+    icon: '🌐',
+    action: (ed) => ed?.commands.insertContent('/search '),
+  },
+  {
+    id: 'web',
+    label: '/web',
+    description: 'Fetch a URL and use it as context',
+    icon: '🔗',
+    action: (ed) => ed?.commands.insertContent('/web '),
+  },
+  // ── Skill invocation ──
+  {
+    id: 'skill',
+    label: '/skill',
+    description: 'Invoke a skill by name',
+    icon: '⚡',
+    action: (ed) => ed?.commands.insertContent('/skill '),
+  },
+  {
+    id: 'persona',
+    label: '/persona',
+    description: 'Switch active persona',
+    icon: '🎭',
+    action: (ed) => ed?.commands.insertContent('/persona '),
+  },
+  // ── Session ──
+  {
+    id: 'save',
+    label: '/save',
+    description: 'Save the current response to knowledge base',
+    icon: '📌',
+    action: (ed) => ed?.commands.insertContent('/save '),
+  },
+  {
+    id: 'export',
+    label: '/export',
+    description: 'Export the conversation',
+    icon: '📤',
+    action: (ed) => ed?.commands.insertContent('/export '),
   },
 ]
 
