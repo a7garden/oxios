@@ -64,22 +64,20 @@ pub struct ExecResult {
 /// - **shell_exec**: audit logging (cannot sandbox arbitrary shell).
 /// - **structured_exec**: pre-flight permission check via `AccessManager`.
 pub struct ExecTool {
-    /// Hot-reloadable execution configuration (allowlist, timeouts).
-    /// Read via `.read()` on each call so `PUT /api/config` takes effect immediately.
     config: crate::kernel_handle::SharedExecConfig,
-    /// Access manager for direct permission checks (legacy path).
     access: Arc<Mutex<AccessManager>>,
-    /// Agent security context — always present in production.
     context: Option<AgentContext>,
-    /// Optional access gate for unified checks.
-    #[allow(dead_code)] // Used via gate when new_gated() is called
+    #[allow(dead_code)]
     gate: Option<Arc<AccessGate>>,
+    /// Phase D: pending approvals registry for human-in-the-loop approval.
+    /// When Some, shell-mode exec requests user approval before running.
+    pending_approvals: Option<Arc<crate::tools::PendingToolApprovals>>,
+    /// Phase D: event bus for publishing ApprovalRequested events.
+    event_bus: Option<crate::event_bus::EventBus>,
 }
 
 impl ExecTool {
     /// Create a new `ExecTool` with an `AgentContext` (production path).
-    ///
-    /// All executions are attributed to the agent and pass through access checks.
     pub fn new(
         config: crate::kernel_handle::SharedExecConfig,
         access: Arc<Mutex<AccessManager>>,
@@ -90,6 +88,8 @@ impl ExecTool {
             access,
             context: Some(context),
             gate: None,
+            pending_approvals: None,
+            event_bus: None,
         }
     }
 
@@ -99,44 +99,43 @@ impl ExecTool {
         context: AgentContext,
         gate: Arc<AccessGate>,
     ) -> Self {
-        // Extract access manager from gate for fallback path
         Self {
             config,
             access: gate.access_clone(),
             context: Some(context),
             gate: Some(gate),
+            pending_approvals: None,
+            event_bus: None,
         }
     }
 
     /// Create an `ExecTool` from a [`KernelHandle`] with an agent context.
-    ///
-    /// This is the primary production constructor.
     pub fn from_kernel_with_context(
         kernel: &crate::kernel_handle::KernelHandle,
         context: AgentContext,
     ) -> Self {
-        Self::new(
+        let mut tool = Self::new(
             Arc::new(parking_lot::RwLock::new(kernel.exec.config_snapshot())),
             kernel.exec.access_manager().clone(),
             context,
-        )
+        );
+        tool.pending_approvals = Some(kernel.infra.pending_tool_approvals());
+        tool.event_bus = Some(kernel.infra.event_bus_clone());
+        tool
     }
 
     /// Create an `ExecTool` from a [`KernelHandle`] (legacy, no context).
-    ///
-    /// Binds the tool to the default agent name `"oxios-agent"`.
-    /// Prefer `from_kernel_with_context` for full security.
     pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
         Self {
             config: Arc::new(parking_lot::RwLock::new(kernel.exec.config_snapshot())),
             access: kernel.exec.access_manager().clone(),
             context: None,
             gate: None,
+            pending_approvals: Some(kernel.infra.pending_tool_approvals()),
+            event_bus: Some(kernel.infra.event_bus_clone()),
         }
     }
 
-    /// Create a new `ExecTool` bound to a specific agent name (legacy).
-    ///
     /// Prefer `new()` with `AgentContext` for full security.
     pub fn for_agent(
         config: crate::kernel_handle::SharedExecConfig,
@@ -148,6 +147,8 @@ impl ExecTool {
             access,
             context: None,
             gate: None,
+            pending_approvals: None,
+            event_bus: None,
         }
     }
 
@@ -164,6 +165,8 @@ impl ExecTool {
             access,
             context: None,
             gate: None,
+            pending_approvals: None,
+            event_bus: None,
         }
     }
 
@@ -614,6 +617,30 @@ impl AgentTool for ExecTool {
                     }
                 };
 
+                // Phase D: request user approval before executing shell commands.
+                if let (Some(approvals), Some(bus)) = (&self.pending_approvals, &self.event_bus) {
+                    let (approval_id, rx) = approvals.register("exec".to_string());
+                    let reason = format!("Execute: {}", &command[..command.len().min(80)]);
+                    let _ = bus.publish(crate::event_bus::KernelEvent::ApprovalRequested {
+                        id: approval_id,
+                        tool_name: "exec".to_string(),
+                        action: "shell_exec".to_string(),
+                        resource: command.chars().take(200).collect(),
+                        reason,
+                        session_id: None,
+                    });
+                    match tokio::time::timeout(std::time::Duration::from_secs(120), rx).await {
+                        Ok(Ok(crate::tools::ToolApprovalResult::Approved)) => {
+                            tracing::info!(approval_id = %approval_id, "exec approved by user");
+                        }
+                        _ => {
+                            let _ = approvals.resolve(approval_id, crate::tools::ToolApprovalResult::Denied);
+                            return Ok(AgentToolResult::error(
+                                "Shell execution was denied or timed out (120s).",
+                            ));
+                        }
+                    }
+                }
                 match self.shell_exec(command, timeout_ms, shutdown).await {
                     Ok(result) => {
                         let output = format_exec_output(&result);

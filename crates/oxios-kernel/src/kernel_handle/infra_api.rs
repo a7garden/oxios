@@ -21,7 +21,7 @@ pub struct InfraApi {
     /// Hot-reloadable orchestrator config (evolution iterations, score threshold).
     pub(crate) orchestrator_config: parking_lot::RwLock<crate::config::OrchestratorConfig>,
     /// Pending tool approval requests (HitL escalation).
-    pub(crate) pending_tool_approvals: PendingToolApprovals,
+    pub(crate) pending_tool_approvals: Arc<PendingToolApprovals>,
     /// Pending `ask_user` requests (RFC-027 agent-driven clarification).
     pub(crate) pending_ask_user: Arc<PendingAskUser>,
 }
@@ -46,7 +46,7 @@ impl InfraApi {
             orchestrator_config: parking_lot::RwLock::new(
                 crate::config::OrchestratorConfig::default(),
             ),
-            pending_tool_approvals: PendingToolApprovals::new(),
+            pending_tool_approvals: Arc::new(PendingToolApprovals::new()),
             pending_ask_user: Arc::new(PendingAskUser::new()),
         }
     }
@@ -170,8 +170,8 @@ impl InfraApi {
     }
 
     /// Access the pending tool approvals registry.
-    pub fn pending_tool_approvals(&self) -> &PendingToolApprovals {
-        &self.pending_tool_approvals
+    pub fn pending_tool_approvals(&self) -> Arc<PendingToolApprovals> {
+        self.pending_tool_approvals.clone()
     }
 
     /// Access the pending `ask_user` registry (RFC-027 agent-driven clarification).
