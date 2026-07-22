@@ -929,6 +929,21 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 break;
                             }
                         }
+                        // Phase E: when a web_search tool finishes, extract URLs
+                        // from output_summary and emit a grounding chunk so the
+                        // frontend can render citations as a separate panel.
+                        if let Some(grounding) = grounding_from_event(&event, &active_message_id) {
+                            let json = match serde_json::to_string(&grounding) {
+                                Ok(j) => j,
+                                Err(e) => {
+                                    tracing::warn!(error = %e, "Failed to serialize grounding chunk");
+                                    continue;
+                                }
+                            };
+                            if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -1594,6 +1609,97 @@ fn kernel_event_to_ws_chunk(
         c["message_id"] = serde_json::json!(active_message_id);
         c
     })
+}
+
+/// Phase E: extract search citations from a finished web_search tool call and
+/// emit a separate `grounding` WS chunk so the frontend can render citations
+/// as a dedicated panel (not buried inside the tool_end payload).
+///
+/// Returns `None` when the event is not a web_search completion or when no
+/// URLs are found in the output summary.
+fn grounding_from_event(
+    event: &oxios_kernel::event_bus::KernelEvent,
+    active_message_id: &Option<uuid::Uuid>,
+) -> Option<serde_json::Value> {
+    use oxios_kernel::event_bus::KernelEvent;
+
+    let KernelEvent::ToolExecutionFinished {
+        tool_name,
+        output_summary,
+        ..
+    } = event
+    else {
+        return None;
+    };
+
+    let summary: &str = output_summary;
+    let is_search = matches!(
+        tool_name.as_str(),
+        "web_search" | "get_search_results" | "search" | "web_fetch"
+    );
+    if !is_search {
+        return None;
+    }
+
+
+    let citations = extract_urls(summary);
+
+    if citations.is_empty() {
+        return None;
+    }
+
+    Some(serde_json::json!({
+        "type": "grounding",
+        "message_id": active_message_id,
+        "citations": citations,
+        "tool_name": tool_name,
+    }))
+}
+
+/// Simple URL extractor: scans text for `http://` or `https://` patterns
+/// and returns them as citation objects. No regex dependency.
+fn extract_urls(text: &str) -> Vec<serde_json::Value> {
+    let mut urls = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut start = 0;
+    while let Some(pos) = text[start..].find("http") {
+        let abs = start + pos;
+        let rest = &text[abs..];
+        let end = rest
+            .find(|c: char| c.is_whitespace() || c == ')' || c == ']' || c == '"' || c == '\'')
+            .unwrap_or(rest.len());
+        let url = rest[..end].trim_end_matches(|c: char| c == '.' || c == ',');
+        if url.len() > 10 && seen.insert(url.to_string()) {
+            // Try to extract a title from surrounding markdown [title](url).
+            let title = extract_link_title(text, abs);
+            let mut citation = serde_json::json!({ "url": url });
+            if let Some(t) = title {
+                citation["title"] = serde_json::json!(t);
+            }
+            urls.push(citation);
+        }
+        start = abs + end;
+    }
+    urls
+}
+
+/// If the URL at `url_pos` is preceded by `[title](url)` markdown, extract title.
+fn extract_link_title(text: &str, url_pos: usize) -> Option<String> {
+    if url_pos < 2 {
+        return None;
+    }
+    // Look backwards for `[` before `](`.
+    let before = &text[..url_pos];
+    if !before.ends_with("](") {
+        return None;
+    }
+    let title_end = before.len() - 2; // before "]("
+    let title_start = before[..title_end].rfind('[')?;
+    let title = &before[title_start + 1..title_end];
+    if title.is_empty() {
+        return None;
+    }
+    Some(title.to_string())
 }
 
 /// GET /api/sessions/{id}/tool-calls — Get tool call timeline for a session.
