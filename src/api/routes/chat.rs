@@ -778,6 +778,8 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         } else {
                             let has_interview = msg.meta.as_ref().and_then(|m| m.interview_questions.as_ref()).is_some();
                             let is_reasoning = msg.metadata.get("stream_kind").map(|v| v.as_str()) == Some("reasoning");
+                            let is_reasoning_start = msg.metadata.get("stream_kind").map(|v| v.as_str()) == Some("reasoning.start");
+                            let is_reasoning_end = msg.metadata.get("stream_kind").map(|v| v.as_str()) == Some("reasoning.end");
 
                             if has_interview {
                                 let interview_chunk = serde_json::json!({
@@ -813,6 +815,46 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                     Ok(j) => j,
                                     Err(e) => {
                                         tracing::error!(error = %e, "Failed to serialize reasoning chunk");
+                                        continue;
+                                    }
+                                };
+                                if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                    break;
+                                }
+                            } else if is_reasoning_start {
+                                // Phase B: reasoning lifecycle marker — frontend auto-expands Thinking block.
+                                let chunk = serde_json::json!({
+                                    "type": "reasoning",
+                                    "subtype": "start",
+                                    "seq": msg.seq,
+                                    "message_id": msg_id,
+                                    "session_id": session_id,
+                                    "project_id": project_id,
+                                });
+                                let json = match serde_json::to_string(&chunk) {
+                                    Ok(j) => j,
+                                    Err(e) => {
+                                        tracing::error!(error = %e, "Failed to serialize reasoning.start chunk");
+                                        continue;
+                                    }
+                                };
+                                if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                    break;
+                                }
+                            } else if is_reasoning_end {
+                                // Phase B: reasoning lifecycle marker — frontend auto-collapses Thinking block.
+                                let chunk = serde_json::json!({
+                                    "type": "reasoning",
+                                    "subtype": "end",
+                                    "seq": msg.seq,
+                                    "message_id": msg_id,
+                                    "session_id": session_id,
+                                    "project_id": project_id,
+                                });
+                                let json = match serde_json::to_string(&chunk) {
+                                    Ok(j) => j,
+                                    Err(e) => {
+                                        tracing::error!(error = %e, "Failed to serialize reasoning.end chunk");
                                         continue;
                                     }
                                 };

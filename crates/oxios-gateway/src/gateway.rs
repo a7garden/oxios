@@ -471,9 +471,34 @@ impl Gateway {
                 let user_id = msg.user_id.clone();
                 let streaming_sinks_for_unregister = streaming_sinks.clone();
                 let handle = tokio::spawn(async move {
+                    // Phase B: track reasoning lifecycle so we can emit
+                    // explicit reasoning.start / reasoning.end markers for
+                    // the frontend's Thinking block animation.
+                    let mut was_reasoning = false;
                     while let Some(delta) = rx.recv().await {
                         match delta {
                             oxios_kernel::agent_runtime::StreamDelta::Text(text) => {
+                                // Phase B: emit reasoning.end before the first
+                                // text chunk if we were in a reasoning span.
+                                if was_reasoning {
+                                    was_reasoning = false;
+                                    let mut end_msg = OutgoingMessage::with_id(
+                                        uuid::Uuid::new_v4(),
+                                        channel_name_for_collector.clone(),
+                                        user_id.clone(),
+                                        String::new(),
+                                    );
+                                    end_msg.target_conn_id = conn_id.clone();
+                                    end_msg.metadata.insert(
+                                        "stream_kind".to_string(),
+                                        "reasoning.end".to_string(),
+                                    );
+                                    end_msg.metadata.insert(
+                                        meta::SESSION_ID.to_string(),
+                                        session_id_for_collector.clone(),
+                                    );
+                                    let _ = send_with_retry(&channel, end_msg).await;
+                                }
                                 let mut outgoing = OutgoingMessage::with_id(
                                     uuid::Uuid::new_v4(),
                                     channel_name_for_collector.clone(),
@@ -525,12 +550,30 @@ impl Gateway {
                                 let _ = send_with_retry(&channel, outgoing).await;
                             }
                             oxios_kernel::agent_runtime::StreamDelta::Thinking => {
-                                // Signal only — LiveActivityBar reacts to
-                                // this via the local activity-stream arm in
-                                // chat.rs (existing RFC-015 ReasoningFragment
-                                // chunks). No WS chunk emitted here.
+                                // Phase B: emit explicit reasoning.start marker
+                                // so the frontend's Thinking block can auto-expand.
+                                was_reasoning = true;
+                                let mut start_msg = OutgoingMessage::with_id(
+                                    uuid::Uuid::new_v4(),
+                                    channel_name_for_collector.clone(),
+                                    user_id.clone(),
+                                    String::new(),
+                                );
+                                start_msg.target_conn_id = conn_id.clone();
+                                start_msg.metadata.insert(
+                                    "stream_kind".to_string(),
+                                    "reasoning.start".to_string(),
+                                );
+                                start_msg.metadata.insert(
+                                    meta::SESSION_ID.to_string(),
+                                    session_id_for_collector.clone(),
+                                );
+                                let _ = send_with_retry(&channel, start_msg).await;
                             }
                             oxios_kernel::agent_runtime::StreamDelta::ThinkingDelta(text) => {
+                                // Phase B: ensure was_reasoning is set even if
+                                // the Thinking signal was missed (defensive).
+                                was_reasoning = true;
                                 // Batched reasoning fragment — same partial
                                 // delivery rules as Text (partial=true, no
                                 // assign_seq, conn_id scoped). Emitted as a
@@ -560,6 +603,26 @@ impl Gateway {
                             }
                             _ => {}
                         }
+                    }
+                    // Phase B: if the stream ended while still reasoning (no
+                    // Text chunk followed), emit a final reasoning.end.
+                    if was_reasoning {
+                        let mut end_msg = OutgoingMessage::with_id(
+                            uuid::Uuid::new_v4(),
+                            channel_name_for_collector.clone(),
+                            user_id.clone(),
+                            String::new(),
+                        );
+                        end_msg.target_conn_id = conn_id.clone();
+                        end_msg.metadata.insert(
+                            "stream_kind".to_string(),
+                            "reasoning.end".to_string(),
+                        );
+                        end_msg.metadata.insert(
+                            meta::SESSION_ID.to_string(),
+                            session_id_for_collector.clone(),
+                        );
+                        let _ = send_with_retry(&channel, end_msg).await;
                     }
                     streaming_sinks_for_unregister.unregister(&session_id_for_collector);
                 });
