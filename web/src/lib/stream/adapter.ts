@@ -55,6 +55,19 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
         ? { events: [{ kind: 'reasoning.delta', messageId: mid, text }] }
         : { events: [] }
     }
+    case 'grounding':
+      return raw.citations && raw.citations.length > 0
+        ? {
+            events: [
+              {
+                kind: 'grounding',
+                messageId: mid,
+                search: { citations: raw.citations },
+              },
+            ],
+          }
+        : { events: [] }
+
     case 'tool_start':
       return {
         events: [

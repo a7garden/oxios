@@ -171,6 +171,7 @@ const KNOWN_CHUNK_TYPES = new Set<StreamChunk['type']>([
   'reasoning',
   'usage',
   'interview',
+  'grounding',
   'tool_approval',
   'model',
 ])

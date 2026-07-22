@@ -15,6 +15,26 @@
 
 use serde::Serialize;
 
+/// Phase D: per-tool human intervention requirement (LobeHub-aligned).
+/// Drives the frontend 4-tier tool render registry's `interventions` slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum HumanIntervention {
+    /// Tool is safe to run without user confirmation.
+    None,
+    /// Approval required only when args match certain criteria (path outside
+    /// sandbox, etc.). The existing AccessGate path-based check remains the
+    /// primary gate; this level is informational for the UI.
+    Conditional,
+    /// Approval always required before execution.
+    Required,
+}
+
+impl Default for HumanIntervention {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 /// Metadata for a single tool in the registry.
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolMeta {
@@ -24,6 +44,9 @@ pub struct ToolMeta {
     pub description_key: &'static str,
     /// Category slug for UI grouping.
     pub category: &'static str,
+    /// Phase D: whether this tool requires human approval before execution.
+    #[serde(default)]
+    pub human_intervention: HumanIntervention,
 }
 
 impl ToolMeta {
@@ -36,7 +59,14 @@ impl ToolMeta {
             name,
             description_key,
             category,
+            human_intervention: HumanIntervention::None,
         }
+    }
+
+    /// Phase D: builder method to override the default intervention level.
+    pub const fn with_intervention(mut self, level: HumanIntervention) -> Self {
+        self.human_intervention = level;
+        self
     }
 }
 
@@ -52,15 +82,15 @@ pub fn known_tools() -> &'static [ToolMeta] {
 const TOOL_CATALOG: &[ToolMeta] = &[
     // ── Always-on tools (registered for every agent) ──────────────
     ToolMeta::new("read", "tools.read", "fs"),
-    ToolMeta::new("write", "tools.write", "fs"),
-    ToolMeta::new("edit", "tools.edit", "fs"),
+    ToolMeta::new("write", "tools.write", "fs").with_intervention(HumanIntervention::Conditional),
+    ToolMeta::new("edit", "tools.edit", "fs").with_intervention(HumanIntervention::Conditional),
     ToolMeta::new("grep", "tools.grep", "fs"),
     ToolMeta::new("find", "tools.find", "fs"),
     ToolMeta::new("ls", "tools.ls", "fs"),
     ToolMeta::new("web_search", "tools.webSearch", "comms"),
     ToolMeta::new("get_search_results", "tools.getSearchResults", "comms"),
     // ── Kernel domain tools (CSpace-driven) ───────────────────────
-    ToolMeta::new("exec", "tools.exec", "exec"),
+    ToolMeta::new("exec", "tools.exec", "exec").with_intervention(HumanIntervention::Required),
     ToolMeta::new("browse", "tools.browse", "comms"),
     ToolMeta::new("memory_read", "tools.memoryRead", "memory"),
     ToolMeta::new("memory_write", "tools.memoryWrite", "memory"),

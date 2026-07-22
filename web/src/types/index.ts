@@ -369,6 +369,8 @@ export interface StreamChunk {
     | 'memory'
     | 'reasoning'
     | 'usage'
+    // Phase E: search grounding with citation cards
+    | 'grounding'
     // Chat UI redesign: interactive interview
     | 'interview'
     // RFC-017: runtime tool capability escalation
@@ -421,6 +423,8 @@ export interface StreamChunk {
   /// regular reasoning deltas. Backend emits these as explicit markers
   /// so the frontend can auto-expand/collapse the Thinking block.
   subtype?: 'start' | 'end'
+  /// Phase E: grounding chunk fields (web search citations).
+  citations?: Array<{ url: string; title?: string; favicon?: string }>
 }
 
 // ── Browser observability (RFC-015 Phase G, oxi-agent 0.29.1+) ─────────
