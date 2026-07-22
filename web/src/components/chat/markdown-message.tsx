@@ -1,13 +1,23 @@
-// MarkdownMessage — enhanced markdown renderer with syntax highlighting + copy button
+// MarkdownMessage — enhanced markdown renderer with syntax highlighting + copy button.
+//
+// Pipeline (Phase 6, 2026-07-21):
+//   remark-gfm → rehype-raw → rehype-sanitize → rehype-highlight → rehype-thinking
+//
+// Security: rehype-raw parses model output as HTML (needed so <think> tags work).
+// rehype-sanitize then strips dangerous constructs (event handlers, scripts,
+// iframes) using a schema that still permits formatting + our thinking-block
+// details/summary. Without sanitize, model output could execute arbitrary JS.
 
 import { Check, Copy } from 'lucide-react'
 import { type ComponentPropsWithoutRef, memo, useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
-import { rehypeThinking } from './markdown-plugins/rehype-thinking'
+import type { Schema } from 'hast-util-sanitize'
 import { cn } from '@/lib/utils'
+import { rehypeThinking } from './markdown-plugins/rehype-thinking'
 
 // ── Code block with language label + copy button ──────────────────
 
@@ -56,12 +66,32 @@ function InlineCode({ children }: ComponentPropsWithoutRef<'code'>) {
   return <code className="px-1.5 py-0.5 rounded bg-muted text-[0.85em] font-mono">{children}</code>
 }
 
+// ── Sanitize schema (extending default) ───────────────────────────
+//
+// defaultSchema already strips scripts/event handlers. We extend it to:
+//   • allow class names on code/pre (for syntax highlight + our CodeBlock)
+//   • allow summary/details (for thinking-block rewrite)
+//   • keep the safe-by-default denylist for iframes, embeds, etc.
+
+const sanitizeSchema: Schema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    code: [...(defaultSchema.attributes?.code ?? []), ['className']],
+    pre: [...(defaultSchema.attributes?.pre ?? []), ['className']],
+    span: [...(defaultSchema.attributes?.span ?? []), ['className']],
+    div: [...(defaultSchema.attributes?.div ?? []), ['className']],
+    details: [...(defaultSchema.attributes?.details ?? []), ['className']],
+    summary: [...(defaultSchema.attributes?.summary ?? []), ['className']],
+  },
+  tagNames: [...(defaultSchema.tagNames ?? []), 'details', 'summary'],
+}
+
 // ── Component map for react-markdown ──────────────────────────────
 
 const markdownComponents = {
   pre: ({ children }: ComponentPropsWithoutRef<'pre'>) => <>{children}</>,
   code({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
-    // react-markdown v9+ provides `inline` prop on code elements
     const inline = 'inline' in props ? (props as { inline?: boolean }).inline : false
     if (inline) return <InlineCode>{children}</InlineCode>
 
@@ -81,7 +111,12 @@ export const MarkdownMessage = memo(function MarkdownMessage({ children, classNa
     <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeRaw, { allowDangerousHtml: true }], rehypeHighlight, rehypeThinking]}
+        rehypePlugins={[
+          [rehypeRaw, { allowDangerousHtml: true }],
+          [rehypeSanitize, sanitizeSchema],
+          rehypeHighlight,
+          rehypeThinking,
+        ]}
         components={markdownComponents}
       >
         {children}

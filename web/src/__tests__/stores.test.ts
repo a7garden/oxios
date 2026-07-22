@@ -346,6 +346,59 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     expect(last.activities ?? []).toEqual([])
   })
 
+  it('mixed stream populates all first-class fields end-to-end (Phase 1+2 contract)', async () => {
+    // Simulates a realistic stream: model announcement → reasoning deltas →
+    // tool call (start/progress/end) → text tokens → usage → done.
+    // Asserts the final ChatMessage shape matches the design's pipeline contract
+    // (docs/designs/2026-07-21-lobehub-chat-port-design.md §6.1, §7).
+    const store = useChatStore.getState()
+    store.handleChunk({ type: 'model', model: 'zai/glm-5.2' })
+    store.handleChunk({ type: 'reasoning', content: 'Thinking ' })
+    store.handleChunk({ type: 'reasoning', content: 'about it…' })
+    store.handleChunk({
+      type: 'tool_start',
+      tool_name: 'read_file',
+      tool_call_id: 'tc-1',
+      tool_args: { path: '/etc/hosts' },
+    })
+    store.handleChunk({
+      type: 'tool_progress',
+      tool_call_id: 'tc-1',
+      progress: 'reading…',
+    })
+    store.handleChunk({
+      type: 'tool_end',
+      tool_call_id: 'tc-1',
+      duration_ms: 42,
+      output_summary: '127.0.0.1 localhost',
+    })
+    store.handleChunk({ type: 'token', content: 'Hello ' })
+    store.handleChunk({ type: 'token', content: 'world' })
+    // Allow RAF token flush.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    store.handleChunk({ type: 'usage', input_tokens: 12, output_tokens: 7 })
+    store.handleChunk({ type: 'done', phase: 'Execute', evaluation_passed: true })
+
+    const last = useChatStore.getState().messages.at(-1)!
+    // First-class reasoning field — content accumulated, not in activities.
+    expect(last.reasoning?.content).toBe('Thinking about it…')
+    expect(last.isReasoning).toBe(false) // done cleared it
+    // Structured toolCalls[] with full lifecycle.
+    expect(last.toolCalls).toHaveLength(1)
+    expect(last.toolCalls![0]).toMatchObject({
+      apiName: 'read_file',
+      status: 'success',
+      durationMs: 42,
+    })
+    // Token stream accumulated into content.
+    expect(last.content).toBe('Hello world')
+    // Token totals carried through.
+    expect(last.totalInputTokens).toBe(12)
+    expect(last.totalOutputTokens).toBe(7)
+    // Model badge stamped.
+    expect(last.model).toBe('zai/glm-5.2')
+  })
+
   it('done chunk keeps accumulated activities and sets isStreaming=false', () => {
     useChatStore.getState().handleChunk({
       type: 'tool_start',

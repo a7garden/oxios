@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import type { ChatActivity, ChatMessage, StreamChunk } from '@/types'
 import {
   appendActivityToMessages,
-  appendTokenToMessages,
+  applyContentChunk,
+  applyTextFlush,
   buildWsUrl,
   chunkToActivity,
   getToken,
@@ -81,7 +82,7 @@ function flushPendingTokens(): void {
   const content = _pendingTokens
   _pendingTokens = ''
   useQuickAskStore.setState((s) => ({
-    messages: appendTokenToMessages(s.messages, content, {
+    messages: applyTextFlush(s.messages, content, {
       placeholderModel: s.pendingModel ?? s.quickAskModel,
     }),
   }))
@@ -332,7 +333,14 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
     case 'reasoning':
     case 'tool_start':
     case 'tool_progress':
-    case 'tool_end':
+    case 'tool_end': {
+      set((s) => ({
+        messages: applyContentChunk(s.messages, chunk, {
+          placeholderModel: s.pendingModel ?? s.quickAskModel ?? undefined,
+        }).messages,
+      }))
+      break
+    }
     case 'memory':
     case 'usage': {
       const activity = chunkToActivity(chunk)

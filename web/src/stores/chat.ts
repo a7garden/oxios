@@ -760,6 +760,52 @@ function emissionToActivity(msgId: string, em: ChatActivityEmission): ChatActivi
     ...(em.patch as object),
   } as ChatActivity
 }
+
+// ---------------------------------------------------------------------------
+// Pure content-chunk routing — shared with quick-ask.ts.
+// Encapsulates adapt → processor → applyProcessorResult so other stores don't
+// duplicate the helpers or the processor map. Returns a new messages array
+// (caller wraps with setState).
+// ---------------------------------------------------------------------------
+
+/** Apply one content-streaming chunk (token, reasoning, tool_*, phase) to the
+ *  messages list using the StreamProcessor. Pure. */
+export function applyContentChunk(
+  messages: ChatMessage[],
+  chunk: StreamChunk,
+  ctx: AssistantCtx,
+): { messages: ChatMessage[]; finishedMsgId?: string } {
+  const msgId = lastAssistantMessageId(messages)
+  if (!msgId) return { messages }
+  const processor = getOrCreateProcessor(msgId)
+  const { events } = adaptChunk(chunk, { msgId })
+  let next = messages
+  let finishedMsgId: string | undefined
+  for (const ev of events) {
+    const result = processor.handleEvent(ev)
+    next = applyProcessorResult(next, msgId, result, ctx)
+    if (result.finished) {
+      finishedMsgId = msgId
+      streamProcessors.delete(msgId)
+    }
+  }
+  return { messages: next, finishedMsgId }
+}
+
+/** Flush a buffered text run to the last assistant message via StreamProcessor.
+ *  Falls back to appendTokenToMessages when no assistant target exists. Pure. */
+export function applyTextFlush(
+  messages: ChatMessage[],
+  text: string,
+  ctx: AssistantCtx,
+): ChatMessage[] {
+  if (!text) return messages
+  const msgId = lastAssistantMessageId(messages)
+  if (!msgId) return appendTokenToMessages(messages, text, ctx)
+  const processor = getOrCreateProcessor(msgId)
+  const result = processor.handleEvent({ kind: 'text.delta', messageId: msgId, text })
+  return applyProcessorResult(messages, msgId, result, ctx)
+}
 // ---------------------------------------------------------------------------
 // Store definition
 // ---------------------------------------------------------------------------
@@ -1442,6 +1488,13 @@ export const useChatStore = create<ChatStore>()(
           }
 
           case 'done': {
+            // Phase 1: route done through StreamProcessor first so reasoning.end
+            // and stream.stop events fire (clearing isReasoning, generating).
+            set((s) => ({
+              messages: applyContentChunk(s.messages, chunk, {
+                placeholderModel: s.pendingModel ?? s.activeModelId,
+              }).messages,
+            }))
             const sid = chunk.session_id ?? null
             const vid = chunk.project_id ?? null
             // RFC-025: extract mount_tag from metadata (gateway sets it)
@@ -1591,6 +1644,13 @@ export const useChatStore = create<ChatStore>()(
             break
           }
           case 'error': {
+            // Phase 1: route error through StreamProcessor first so stream.stop
+            // fires (clearing generating state on the in-flight message).
+            set((s) => ({
+              messages: applyContentChunk(s.messages, chunk, {
+                placeholderModel: s.pendingModel ?? s.activeModelId,
+              }).messages,
+            }))
             // RFC-032: create an assistant message with the error text
             // so the user sees the failure inline rather than just a
             // loading spinner that silently stops.
