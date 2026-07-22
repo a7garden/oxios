@@ -1,16 +1,19 @@
 // tool-renders/index.ts — registers all builtin tool renders + inspectors.
 //
 // Aliases: a single render often covers multiple tool names. We register
-// under both Oxios kernel names (exec, knowledge) and oxi-sdk builtins
-// (read_file, write_file, edit_file, glob, grep, list_files, web_search,
-// web_fetch) so lookups hit regardless of which layer emitted the call.
+// under both Oxios kernel names and oxi-sdk builtins so lookups hit
+// regardless of which layer emitted the call.
 
+import { A2aDelegateRender, A2aQueryRender, A2aSendRender } from './A2a'
+import { ActionToolRender } from './ActionTool'
 import { BashRender } from './Bash'
+import { CalendarRender } from './Calendar'
 import { FileEditRender } from './FileEdit'
 import { FileReadRender } from './FileRead'
 import { GlobRender } from './Glob'
 import { GrepRender } from './Grep'
 import { ListFilesRender } from './ListFiles'
+import { SendEmailRender } from './SendEmail'
 import { registerToolRender } from './registry'
 import { WebFetchRender } from './WebFetch'
 import { WebSearchRender } from './WebSearch'
@@ -29,7 +32,7 @@ registerToolRender('editFile', FileEditRender)
 registerToolRender('edit', FileEditRender)
 
 // ── Shell ──
-registerToolRender('exec', BashRender) // Oxios kernel name
+registerToolRender('exec', BashRender)
 registerToolRender('bash', BashRender)
 registerToolRender('run_command', BashRender)
 registerToolRender('shell', BashRender)
@@ -50,6 +53,34 @@ registerToolRender('get_search_results', WebSearchRender)
 registerToolRender('web_fetch', WebFetchRender)
 registerToolRender('webFetch', WebFetchRender)
 registerToolRender('fetch', WebFetchRender)
+
+// ── Communication ──
+registerToolRender('send_email', SendEmailRender)
+registerToolRender('sendEmail', SendEmailRender)
+
+// ── A2A (agent-to-agent) ──
+registerToolRender('a2a_delegate', A2aDelegateRender)
+registerToolRender('a2aDelegate', A2aDelegateRender)
+registerToolRender('a2a_send', A2aSendRender)
+registerToolRender('a2aSend', A2aSendRender)
+registerToolRender('a2a_query', A2aQueryRender)
+registerToolRender('a2aQuery', A2aQueryRender)
+
+// ── Calendar ──
+registerToolRender('calendar', CalendarRender)
+
+// ── Action-based kernel tools (generic renderer) ──
+registerToolRender('knowledge', ActionToolRender)
+registerToolRender('persona', ActionToolRender)
+registerToolRender('cron', ActionToolRender)
+registerToolRender('budget', ActionToolRender)
+registerToolRender('security', ActionToolRender)
+registerToolRender('project', ActionToolRender)
+registerToolRender('resource', ActionToolRender)
+registerToolRender('mount', ActionToolRender)
+registerToolRender('marketplace', ActionToolRender)
+registerToolRender('skill_forge', ActionToolRender)
+registerToolRender('kernel_agent', ActionToolRender)
 
 export {
   DefaultToolRender,
