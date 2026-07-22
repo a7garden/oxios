@@ -18,6 +18,8 @@ import remarkGfm from 'remark-gfm'
 import type { Schema } from 'hast-util-sanitize'
 import { cn } from '@/lib/utils'
 import { rehypeThinking } from './markdown-plugins/rehype-thinking'
+import { rehypeArtifact } from './markdown-plugins/rehype-artifact'
+import { rehypeLinkCard } from './markdown-plugins/rehype-link-card'
 
 // ── Code block with language label + copy button ──────────────────
 
@@ -116,6 +118,8 @@ export const MarkdownMessage = memo(function MarkdownMessage({ children, classNa
           [rehypeSanitize, sanitizeSchema],
           rehypeHighlight,
           rehypeThinking,
+          rehypeArtifact,
+          rehypeLinkCard,
         ]}
         components={markdownComponents}
       >
