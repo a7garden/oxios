@@ -1642,7 +1642,7 @@ fn grounding_from_event(
     }
 
 
-    let citations = extract_urls(summary);
+    let citations = extract_citations(summary);
 
     if citations.is_empty() {
         return None;
@@ -1656,8 +1656,42 @@ fn grounding_from_event(
     }))
 }
 
-/// Simple URL extractor: scans text for `http://` or `https://` patterns
-/// and returns them as citation objects. No regex dependency.
+/// Extract citations from search output. JSON-first, URL-scan fallback.
+fn extract_citations(text: &str) -> Vec<serde_json::Value> {
+    // Strategy 1: structured JSON (provider-specific formats).
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
+        let arr = if parsed.is_array() {
+            parsed.as_array().cloned()
+        } else {
+            parsed.get("results").and_then(|v| v.as_array()).cloned()
+        };
+        if let Some(items) = arr {
+            let citations: Vec<serde_json::Value> = items.iter().filter_map(|item| {
+                let url = item.get("url")?.as_str()?.to_string();
+                if !url.starts_with("http") { return None; }
+                let mut c = serde_json::json!({ "url": &url, "favicon": favicon_url(&url) });
+                if let Some(t) = item.get("title").and_then(|v| v.as_str()) { c["title"] = t.into(); }
+                if let Some(s) = item.get("snippet").and_then(|v| v.as_str()) { c["snippet"] = s.into(); }
+                Some(c)
+            }).collect();
+            if !citations.is_empty() { return citations; }
+        }
+    }
+    // Strategy 2: URL scan (heuristic, handles plain-text output).
+    extract_urls(text)
+}
+
+/// Generate favicon URL via Google's favicon service.
+fn favicon_url(page_url: &str) -> String {
+    let domain = page_url
+        .split("//")
+        .nth(1)
+        .and_then(|rest| rest.split('/').next())
+        .unwrap_or("");
+    format!("https://www.google.com/s2/favicons?domain={domain}&sz=32")
+}
+
+/// Simple URL extractor: scans text for `http` patterns (fallback).
 fn extract_urls(text: &str) -> Vec<serde_json::Value> {
     let mut urls = Vec::new();
     let mut seen = std::collections::HashSet::new();
@@ -1670,10 +1704,8 @@ fn extract_urls(text: &str) -> Vec<serde_json::Value> {
             .unwrap_or(rest.len());
         let url = rest[..end].trim_end_matches(|c: char| c == '.' || c == ',');
         if url.len() > 10 && seen.insert(url.to_string()) {
-            // Try to extract a title from surrounding markdown [title](url).
-            let title = extract_link_title(text, abs);
-            let mut citation = serde_json::json!({ "url": url });
-            if let Some(t) = title {
+            let mut citation = serde_json::json!({ "url": url, "favicon": favicon_url(url) });
+            if let Some(t) = extract_link_title(text, abs) {
                 citation["title"] = serde_json::json!(t);
             }
             urls.push(citation);
@@ -1683,22 +1715,15 @@ fn extract_urls(text: &str) -> Vec<serde_json::Value> {
     urls
 }
 
-/// If the URL at `url_pos` is preceded by `[title](url)` markdown, extract title.
+/// Extract title from `[title](url)` markdown pattern.
 fn extract_link_title(text: &str, url_pos: usize) -> Option<String> {
-    if url_pos < 2 {
-        return None;
-    }
-    // Look backwards for `[` before `](`.
+    if url_pos < 2 { return None; }
     let before = &text[..url_pos];
-    if !before.ends_with("](") {
-        return None;
-    }
-    let title_end = before.len() - 2; // before "]("
+    if !before.ends_with("](") { return None; }
+    let title_end = before.len() - 2;
     let title_start = before[..title_end].rfind('[')?;
     let title = &before[title_start + 1..title_end];
-    if title.is_empty() {
-        return None;
-    }
+    if title.is_empty() { return None; }
     Some(title.to_string())
 }
 
