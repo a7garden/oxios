@@ -594,6 +594,10 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
             // Track the active session so we only forward events tagged with it.
             // Multi-turn conversations keep the same session_id across messages.
             let mut active_session_id: Option<String> = None;
+            // Phase A: track the current assistant message id so KernelEvents
+            // (which lack message_id attribution) can be stamped with the
+            // current stream's message_id at the WS layer.
+            let mut active_message_id: Option<uuid::Uuid> = None;
 
             loop {
                 tokio::select! {
@@ -633,6 +637,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         // (some events are system-wide).
                         if session_id.is_some() {
                             active_session_id = session_id.clone();
+                        }
+                        if msg.partial == Some(true) || msg.metadata.contains_key("stream_kind") {
+                            active_message_id = Some(msg_id);
                         }
 
                         // RFC-024 SP2 / C2: a synthetic `type: "resync"` message
@@ -679,6 +686,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             let model_chunk = serde_json::json!({
                                 "type": "model",
                                 "seq": msg.seq,
+                                "message_id": msg_id,
                                 "model": model_id,
                                 "session_id": session_id,
                                 "project_id": project_id,
@@ -750,6 +758,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             let error_chunk = serde_json::json!({
                                 "type": "error",
                                 "seq": msg.seq,
+                                "message_id": msg_id,
                                 "message": err.message,
                                 "kind": err.kind,
                                 "suggestion": err.suggestion,
@@ -774,6 +783,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 let interview_chunk = serde_json::json!({
                                     "type": "interview",
                                     "seq": msg.seq,
+                                    "message_id": msg_id,
                                     "session_id": session_id,
                                     "project_id": project_id,
                                     "questions": msg.meta.as_ref().and_then(|m| m.interview_questions.clone()),
@@ -793,6 +803,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 let reasoning_chunk = serde_json::json!({
                                     "type": "reasoning",
                                     "seq": msg.seq,
+                                    "message_id": msg_id,
                                     "content": msg.content,
                                     "source": "thinking",
                                     "session_id": session_id,
@@ -812,6 +823,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 let token_chunk = serde_json::json!({
                                     "type": "token",
                                     "seq": msg.seq,
+                                    "message_id": msg_id,
                                     "content": msg.content,
                                     "session_id": session_id,
                                     "project_id": project_id,
@@ -832,6 +844,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             let done_chunk = serde_json::json!({
                                 "type": "done",
                                 "seq": msg.seq,
+                                "message_id": msg_id,
                                 "session_id": session_id,
                                 "project_id": project_id,
                                 "phase": phase,
@@ -861,7 +874,8 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             // Lagged or closed — skip and keep waiting.
                             continue;
                         };
-                        if let Some(chunk) = kernel_event_to_ws_chunk(&event, &active_session_id) {
+                        // Phase A: stamp the current stream's message_id onto every chunk.
+                        if let Some(chunk) = kernel_event_to_ws_chunk(&event, &active_session_id, &active_message_id) {
                             let json = match serde_json::to_string(&chunk) {
                                 Ok(j) => j,
                                 Err(e) => {
@@ -1409,6 +1423,7 @@ async fn persist_session(
 fn kernel_event_to_ws_chunk(
     event: &oxios_kernel::event_bus::KernelEvent,
     active_session_id: &Option<String>,
+    active_message_id: &Option<uuid::Uuid>,
 ) -> Option<serde_json::Value> {
     use oxios_kernel::event_bus::KernelEvent;
 
@@ -1430,7 +1445,7 @@ fn kernel_event_to_ws_chunk(
         return None;
     }
 
-    match event {
+    let chunk = match event {
         KernelEvent::ToolExecutionStarted {
             tool_name,
             tool_call_id,
@@ -1530,7 +1545,13 @@ fn kernel_event_to_ws_chunk(
             }))
         }
         _ => None,
-    }
+    };
+    // Phase A: stamp active stream's message_id on every chunk so frontend
+    // can route KernelEvent-sourced chunks to the correct assistant message.
+    chunk.map(|mut c| {
+        c["message_id"] = serde_json::json!(active_message_id);
+        c
+    })
 }
 
 /// GET /api/sessions/{id}/tool-calls — Get tool call timeline for a session.
@@ -1646,7 +1667,7 @@ mod rfc015_tests {
             tool_args: serde_json::json!({"path": "/x"}),
             context: None,
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None).unwrap();
         assert_eq!(chunk["type"], "tool_start");
         assert_eq!(chunk["tool_name"], "read_file");
         assert_eq!(chunk["tool_call_id"], "c1");
@@ -1663,7 +1684,7 @@ mod rfc015_tests {
             is_error: false,
             output_summary: "ok".into(),
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None).unwrap();
         assert_eq!(chunk["type"], "tool_end");
         assert_eq!(chunk["duration_ms"], 123);
         assert_eq!(chunk["is_error"], false);
@@ -1685,7 +1706,7 @@ mod rfc015_tests {
             tab_id: Some(tab_id),
             context: None,
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None).unwrap();
         assert_eq!(chunk["type"], "tool_progress");
         assert_eq!(chunk["tool_call_id"], "c1");
         assert_eq!(chunk["tool_name"], "browse");
@@ -1704,7 +1725,7 @@ mod rfc015_tests {
             tab_id: None,
             context: None,
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()));
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None);
         assert!(chunk.is_none(), "foreign progress should be filtered");
     }
 
@@ -1721,7 +1742,7 @@ mod rfc015_tests {
             tab_id: None,
             context: None,
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None).unwrap();
         assert!(
             chunk.get("tab_id").is_none(),
             "tab_id key should be absent when None; got: {chunk}"
@@ -1736,7 +1757,7 @@ mod rfc015_tests {
             count: 3,
             source: "warm".into(),
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None).unwrap();
         assert_eq!(chunk["type"], "memory");
         assert_eq!(chunk["action"], "recall");
         assert_eq!(chunk["count"], 3);
@@ -1749,7 +1770,7 @@ mod rfc015_tests {
             input_tokens: 100,
             output_tokens: 50,
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None).unwrap();
         assert_eq!(chunk["type"], "usage");
         assert_eq!(chunk["input_tokens"], 100);
         assert_eq!(chunk["output_tokens"], 50);
@@ -1762,7 +1783,7 @@ mod rfc015_tests {
             content: "compaction done".into(),
             source: "compaction".into(),
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None).unwrap();
         assert_eq!(chunk["type"], "reasoning");
         assert_eq!(chunk["content"], "compaction done");
         assert_eq!(chunk["source"], "compaction");
@@ -1779,7 +1800,7 @@ mod rfc015_tests {
             tool_args: serde_json::Value::Null,
             context: None,
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()));
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()), &None);
         assert!(chunk.is_none(), "foreign session should not be forwarded");
     }
 
@@ -1796,7 +1817,7 @@ mod rfc015_tests {
             input_tokens: 1,
             output_tokens: 1,
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &None);
+        let chunk = kernel_event_to_ws_chunk(&event, &None, &None);
         assert!(
             chunk.is_some(),
             "filter is inactive without an active session"
@@ -1812,7 +1833,7 @@ mod rfc015_tests {
         let event = KernelEvent::AgentStarted {
             id: AgentId::new_v4(),
         };
-        let chunk = kernel_event_to_ws_chunk(&event, &None);
+        let chunk = kernel_event_to_ws_chunk(&event, &None, &None);
         assert!(chunk.is_none());
     }
 }
