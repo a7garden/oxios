@@ -417,6 +417,10 @@ export interface StreamChunk {
   // ── Tool approval (RFC-017) ──
   id?: string
   reason?: string
+  /// Phase B: reasoning lifecycle subtype ('start' | 'end'). Absent on
+  /// regular reasoning deltas. Backend emits these as explicit markers
+  /// so the frontend can auto-expand/collapse the Thinking block.
+  subtype?: 'start' | 'end'
 }
 
 // ── Browser observability (RFC-015 Phase G, oxi-agent 0.29.1+) ─────────

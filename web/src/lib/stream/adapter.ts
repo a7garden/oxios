@@ -42,12 +42,19 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
         : { events: [] }
 
     case 'reasoning': {
+      // Phase B: check for lifecycle subtype markers emitted by the backend.
+      if (raw.subtype === 'start') {
+        return { events: [{ kind: 'reasoning.start', messageId: mid }] }
+      }
+      if (raw.subtype === 'end') {
+        return { events: [{ kind: 'reasoning.end', messageId: mid }] }
+      }
+      // Regular reasoning delta (accumulated text).
       const text = raw.content ?? ''
       return text
         ? { events: [{ kind: 'reasoning.delta', messageId: mid, text }] }
         : { events: [] }
     }
-
     case 'tool_start':
       return {
         events: [
