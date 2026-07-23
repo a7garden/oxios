@@ -135,6 +135,7 @@ impl TelegramChannel {
     }
 
     /// Override API base URL (for local Bot API servers).
+    #[allow(dead_code)] // public builder surface — callers opt in via config wiring (not yet wired in default plugin path)
     pub fn with_api_base(mut self, base: String) -> Self {
         self.api_base = base;
         self

@@ -107,6 +107,9 @@ struct StoreLimiter {
 
 #[cfg(feature = "wasm-sandbox")]
 impl wasmtime::ResourceLimiter for StoreLimiter {
+    /// Enforce `WasmConfig::max_memory_bytes`. Returns `Ok(true)` only when
+    /// the guest's `memory.grow` request fits inside the configured ceiling;
+    /// otherwise wasmtime makes the `memory.grow` instruction trap with -1.
     fn memory_growing(
         &mut self,
         _current: usize,
@@ -114,6 +117,19 @@ impl wasmtime::ResourceLimiter for StoreLimiter {
         _maximum: Option<usize>,
     ) -> std::result::Result<bool, anyhow::Error> {
         Ok((desired as u64) <= self.max_memory_bytes)
+    }
+
+    /// Tables are not user-configured (only memory is); defer to wasmtime's
+    /// built-in table limit (10,000 elements by default). Allowing growth here
+    /// lets wasmtime enforce its own cap — denying unconditionally would
+    /// regress any module that imports a table.
+    fn table_growing(
+        &mut self,
+        _current: u32,
+        _desired: u32,
+        _maximum: Option<u32>,
+    ) -> std::result::Result<bool, anyhow::Error> {
+        Ok(true)
     }
 }
 

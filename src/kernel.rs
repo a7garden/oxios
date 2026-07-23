@@ -17,7 +17,7 @@ use oxios_kernel::{
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
