@@ -366,6 +366,7 @@ export interface StreamChunk {
     | 'tool_start'
     | 'tool_end'
     | 'tool_progress'
+    | 'tool_call_delta'
     | 'memory'
     | 'reasoning'
     | 'usage'
@@ -391,6 +392,9 @@ export interface StreamChunk {
   tool_calls?: ToolCallSummary[]
   // RFC-015 chunk fields
   tool_call_id?: string
+  /// Partial tool-call args fragment (oxi 0.58+ ToolCallDelta). Raw JSON
+  /// fragment; the frontend accumulates per tool_call_id.
+  args_delta?: string
   status?: 'started' | 'completed'
   summary?: string
   output_summary?: string

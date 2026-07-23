@@ -207,6 +207,59 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     expect('tabId' in toolActivities[0]!).toBe(false)
   })
 
+  it('tool_call_delta accumulates partial args before tool_start (oxi 0.58+)', () => {
+    // The LLM streams raw JSON fragments for a tool call it is still
+    // constructing. Two deltas for the same tool_call_id must concatenate.
+    useChatStore.getState().handleChunk({
+      type: 'tool_call_delta',
+      tool_call_id: 'c1',
+      args_delta: '{"path": "/tm',
+    })
+    useChatStore.getState().handleChunk({
+      type: 'tool_call_delta',
+      tool_call_id: 'c1',
+      args_delta: 'p/foo"}',
+    })
+    const last = useChatStore.getState().messages.at(-1)!
+    // A placeholder toolCall exists with accumulated raw-JSON args.
+    expect(last.toolCalls).toHaveLength(1)
+    expect(last.toolCalls![0]).toMatchObject({
+      id: 'c1',
+      apiName: '(constructing…)',
+    })
+    expect(last.toolCalls![0]!.arguments).toBe('{"path": "/tmp/foo"}')
+    // No activity yet — tool.start hasn't arrived.
+    expect(last.activities ?? []).toHaveLength(0)
+  })
+
+  it('tool_call_delta placeholder is replaced by tool_start', () => {
+    useChatStore.getState().handleChunk({
+      type: 'tool_call_delta',
+      tool_call_id: 'c1',
+      args_delta: '{"q":"hi"}',
+    })
+    useChatStore.getState().handleChunk({
+      type: 'tool_start',
+      tool_name: 'web_search',
+      tool_call_id: 'c1',
+      tool_args: { q: 'hi' },
+    })
+    const last = useChatStore.getState().messages.at(-1)!
+    // The placeholder is replaced by the real tool (parsed args + name).
+    expect(last.toolCalls).toHaveLength(1)
+    expect(last.toolCalls![0]).toMatchObject({
+      id: 'c1',
+      apiName: 'web_search',
+    })
+    expect(last.toolCalls![0]!.arguments).toEqual({ q: 'hi' })
+    // tool.start creates the activity.
+    expect(last.activities).toHaveLength(1)
+    expect(last.activities![0]).toMatchObject({
+      type: 'tool_call',
+      toolName: 'web_search',
+    })
+  })
+
   it('subsequent tool_progress replaces the prior progress text', () => {
     useChatStore.getState().handleChunk({
       type: 'tool_start',

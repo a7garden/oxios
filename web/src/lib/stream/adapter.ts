@@ -68,6 +68,18 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
           }
         : { events: [] }
 
+    case 'tool_call_delta':
+      return {
+        events: [
+          {
+            kind: 'tool.args_delta',
+            messageId: mid,
+            toolCallId: raw.tool_call_id ?? '',
+            argsDelta: raw.args_delta ?? '',
+          },
+        ],
+      }
+
     case 'tool_start':
       return {
         events: [

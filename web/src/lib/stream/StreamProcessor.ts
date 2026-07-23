@@ -112,6 +112,32 @@ export class StreamProcessor {
         }
       }
 
+      case 'tool.args_delta': {
+        // oxi 0.58+: partial tool-call args streamed by the LLM before
+        // ToolExecutionStart. Create a placeholder if this tool_call_id is
+        // unseen; otherwise accumulate the raw JSON fragment. When tool.start
+        // arrives it replaces the placeholder with the parsed args + real name.
+        const cur = this.tools.get(ev.toolCallId)
+        if (!cur) {
+          this.tools.set(ev.toolCallId, {
+            id: ev.toolCallId,
+            identifier: 'kernel',
+            apiName: '(constructing…)',
+            arguments: ev.argsDelta,
+            status: 'loading' satisfies ChatToolStatus,
+            startedAt: Date.now(),
+          })
+        } else {
+          this.tools.set(ev.toolCallId, {
+            ...cur,
+            arguments:
+              (typeof cur.arguments === 'string' ? cur.arguments : '') +
+              ev.argsDelta,
+          })
+        }
+        return { patch: { toolCalls: this.toolsList() } }
+      }
+
       case 'tool.start': {
         const tool: ChatToolPayload = {
           id: ev.toolCallId,

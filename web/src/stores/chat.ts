@@ -167,6 +167,7 @@ const KNOWN_CHUNK_TYPES = new Set<StreamChunk['type']>([
   'tool_start',
   'tool_end',
   'tool_progress',
+  'tool_call_delta',
   'memory',
   'reasoning',
   'usage',
@@ -1430,6 +1431,7 @@ export const useChatStore = create<ChatStore>()(
           case 'tool_start':
           case 'tool_progress':
           case 'tool_end':
+          case 'tool_call_delta':
           case 'reasoning': {
             // Phase 1: route through StreamProcessor (toolCalls[], reasoning,
             // generating state) for first-class fields; processor also emits

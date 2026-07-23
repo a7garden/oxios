@@ -31,6 +31,12 @@ export type ChatEvent =
   | { kind: 'reasoning.delta'; messageId: string; text: string }
   | { kind: 'reasoning.end'; messageId: string; durationMs?: number }
   | {
+      kind: 'tool.args_delta'
+      messageId: string
+      toolCallId: string
+      argsDelta: string
+    }
+  | {
       kind: 'tool.start'
       messageId: string
       toolCallId: string
