@@ -632,6 +632,22 @@ impl EngineHandle {
         })
     }
 
+    /// Resolve a specific model by ID against the live engine catalog.
+    ///
+    /// For callers that need a model other than the default (e.g. the
+    /// Ouroboros lightweight model). Honors hot-swaps like `resolve_default`
+    /// and reuses the same provider cache.
+    pub fn resolve(&self, id: &str) -> Result<ResolvedModel> {
+        let engine = self.get();
+        let model = engine.resolve_model(id)?;
+        let provider = self.cached_provider(&model.provider)?;
+        Ok(ResolvedModel {
+            model,
+            provider,
+            model_id: id.to_string(),
+        })
+    }
+
     /// Get a (cached) provider for a provider name, creating it on first use.
     fn cached_provider(&self, name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
         if let Some(p) = self.provider_cache.read().get(name) {
@@ -648,6 +664,10 @@ impl EngineHandle {
 impl ModelResolver for EngineHandle {
     fn resolve_default(&self) -> Result<ResolvedModel> {
         EngineHandle::resolve_default(self)
+    }
+
+    fn resolve(&self, id: &str) -> Result<ResolvedModel> {
+        EngineHandle::resolve(self, id)
     }
 }
 

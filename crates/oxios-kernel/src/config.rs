@@ -1016,6 +1016,9 @@ pub struct OxiosConfig {
     /// Orchestrator settings (Ouroboros protocol execution).
     #[serde(default)]
     pub orchestrator: OrchestratorConfig,
+    /// Intent engine settings (assess/crystallize/review model + retry).
+    #[serde(default)]
+    pub intent: IntentConfig,
     /// System agent model assignments (LobeHub-inspired).
     #[serde(default)]
     pub system_agents: SystemAgentsConfig,

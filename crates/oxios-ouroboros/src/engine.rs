@@ -95,16 +95,18 @@ impl IntentEngine {
 
     /// Resolve the model to use for an intent-handling call.
     ///
-    /// When a lightweight model is configured, it is resolved through the
-    /// same ModelResolver port that supplies the default model. If the
-    /// resolver does not support lightweight model IDs (the current trait
-    /// only has resolve_default), we fall back to the default model.
+    /// When a lightweight model is configured (`[intent] lightweight_model`),
+    /// it is resolved through [`ModelResolver::resolve`] against the live
+    /// engine catalog; otherwise the resolver's default (the agent execution
+    /// model) is used so intent and execution agree.
     fn resolve_model(&self) -> Result<ResolvedModel> {
-        // TODO: add a `resolve(id)` method to the ModelResolver trait so
-        // lightweight_model can override the model. For now, always use
-        // the default model — lightweight_model is stored but unused.
-        let _ = self.lightweight_model.as_ref();
-        self.resolver.resolve_default()
+        // Use the configured lightweight model for intent-handling calls
+        // (assess/crystallize/review) when one is set; otherwise fall back
+        // to the resolver's default (the agent execution model).
+        match self.lightweight_model.as_deref() {
+            Some(id) => self.resolver.resolve(id),
+            None => self.resolver.resolve_default(),
+        }
     }
     async fn llm_complete(&self, system_prompt: &str, user_message: &str) -> Result<String> {
         let effective_system = if let Some(ref persona) = *self.persona_prompt.lock() {
@@ -417,5 +419,86 @@ mod tests {
         assert!(prompt.contains("\"score\""));
         assert!(prompt.contains("\"notes\""));
         assert!(prompt.contains("\"gaps\""));
+    }
+
+    // -----------------------------------------------------------------------
+    // resolve_model routing — proves lightweight_model actually reaches
+    // ModelResolver::resolve(id) (vs silently falling back to the default).
+    // Guards against the half-wired regression where the constructor stored
+    // the model but resolve_model ignored it.
+    // -----------------------------------------------------------------------
+
+    /// Resolver that records which method the engine called and with what arg.
+    struct RecordingResolver {
+        default_calls: std::sync::atomic::AtomicUsize,
+        resolve_ids: Mutex<Vec<String>>,
+    }
+
+    impl ModelResolver for RecordingResolver {
+        fn resolve_default(&self) -> Result<ResolvedModel> {
+            self.default_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(fake_resolved("default"))
+        }
+        fn resolve(&self, id: &str) -> Result<ResolvedModel> {
+            self.resolve_ids.lock().push(id.to_string());
+            Ok(fake_resolved(id))
+        }
+    }
+
+    fn fake_resolved(id: &str) -> ResolvedModel {
+        let model = oxi_sdk::Model::new(id, id, oxi_sdk::Api::OpenAiCompletions, "test", "");
+        let provider: std::sync::Arc<dyn oxi_sdk::Provider> =
+            std::sync::Arc::new(oxi_sdk::OpenAiProvider::with_base_url_and_key(
+                "https://invalid.invalid/v1",
+                Some("unused".to_string()),
+            ));
+        ResolvedModel {
+            model,
+            provider,
+            model_id: id.to_string(),
+        }
+    }
+
+    #[test]
+    fn with_lightweight_routes_to_resolve_by_id() {
+        use std::sync::atomic::Ordering;
+        let rec = std::sync::Arc::new(RecordingResolver {
+            default_calls: std::sync::atomic::AtomicUsize::new(0),
+            resolve_ids: Mutex::new(Vec::new()),
+        });
+        let engine =
+            IntentEngine::with_lightweight(rec.clone(), Some("anthropic/claude-haiku".into()));
+        engine.resolve_model().expect("resolve succeeds");
+        assert_eq!(
+            rec.default_calls.load(Ordering::SeqCst),
+            0,
+            "lightweight model must route to resolve(id), not resolve_default"
+        );
+        assert_eq!(
+            rec.resolve_ids.lock().as_slice(),
+            &["anthropic/claude-haiku".to_string()],
+            "resolve(id) must receive the configured lightweight model id"
+        );
+    }
+
+    #[test]
+    fn without_lightweight_routes_to_default() {
+        use std::sync::atomic::Ordering;
+        let rec = std::sync::Arc::new(RecordingResolver {
+            default_calls: std::sync::atomic::AtomicUsize::new(0),
+            resolve_ids: Mutex::new(Vec::new()),
+        });
+        let engine = IntentEngine::new(rec.clone());
+        engine.resolve_model().expect("resolve succeeds");
+        assert_eq!(
+            rec.default_calls.load(Ordering::SeqCst),
+            1,
+            "no lightweight model must route to resolve_default"
+        );
+        assert!(
+            rec.resolve_ids.lock().is_empty(),
+            "resolve(id) must not be called when no lightweight model is set"
+        );
     }
 }

@@ -183,6 +183,13 @@ impl Orchestrator {
         *self.intent_engine.write() = Some(engine);
     }
 
+    /// Wire the RFC-027 intent config (retry settings, lightweight model, etc.)
+    /// from the parsed TOML. Called by the kernel assembler after construction;
+    /// before this, retry thresholds hold their `Default` values.
+    pub fn set_intent_config(&self, cfg: crate::config::IntentConfig) {
+        *self.intent_config.write() = cfg;
+    }
+
     /// Wire the RFC-029 recovery coordinator. Called by the kernel
     /// assembler after construction (shares `RoutingStats` with
     /// `EngineApi` / `AgentRuntime`).

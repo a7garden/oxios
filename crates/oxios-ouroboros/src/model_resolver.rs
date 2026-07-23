@@ -49,6 +49,18 @@ pub trait ModelResolver: Send + Sync {
     /// Implementations MUST validate the model ID and return an error for
     /// unknown models / unconfigured providers, so callers fail fast.
     fn resolve_default(&self) -> Result<ResolvedModel>;
+
+    /// Resolve a specific model by its canonical `provider/model` ID.
+    ///
+    /// Backed by the engine's catalog, this lets a caller pick a model
+    /// other than the default (e.g. a lightweight model for the Ouroboros
+    /// assess/crystallize/review phases). The default implementation
+    /// ignores `id` and returns the default model, so simple resolvers
+    /// (tests, fixtures) need no changes.
+    fn resolve(&self, id: &str) -> Result<ResolvedModel> {
+        let _ = id;
+        self.resolve_default()
+    }
 }
 
 /// A [`ModelResolver`] that always returns the same fixed model.

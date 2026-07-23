@@ -1050,7 +1050,10 @@ impl KernelBuilder {
 
         let resolver: Arc<dyn oxios_ouroboros::ModelResolver> = engine_handle.clone();
         let intent_engine: Arc<oxios_ouroboros::IntentEngine> =
-            Arc::new(oxios_ouroboros::IntentEngine::new(resolver.clone()));
+            Arc::new(oxios_ouroboros::IntentEngine::with_lightweight(
+                resolver.clone(),
+                config.intent.lightweight_model.clone(),
+            ));
 
         let mut access_manager = AccessManager::new();
         if let Some(ref audit_path) = config.security.audit_log_path {
@@ -1656,6 +1659,7 @@ impl KernelBuilder {
             config.orchestrator.clone(),
         );
         orchestrator.set_intent_engine(intent_engine.clone());
+        orchestrator.set_intent_config(config.intent.clone());
         orchestrator.set_git_layer(git_layer.clone());
         orchestrator.set_a2a(a2a_protocol.clone());
         if let Some(pm) = project_manager.clone() {
