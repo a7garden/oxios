@@ -18,6 +18,7 @@ import { KnowledgeSaveIndicator } from '@/components/chat/knowledge-save-indicat
 import { MarkdownMessage } from '@/components/chat/markdown-message'
 import { SearchGrounding } from '@/components/chat/search-grounding'
 import { Thinking } from '@/components/chat/thinking'
+import { useChatStore } from '@/stores/chat'
 import type { ChatMessage } from '@/types'
 import { ErrorCard } from './components/ErrorCard'
 import { MessageActionBar } from './components/MessageActionBar'
@@ -43,6 +44,7 @@ function AssistantMessageImpl({
   onRetry,
 }: AssistantMessageProps) {
   const { actions } = useAssistantActions({ message, onRetry })
+  const { sendMessage } = useChatStore()
   const avatar: ChatItemAvatar = { name: modelDisplayName(message.model) ?? 'Oxios' }
 
   const hasReasoning = !!(message.reasoning?.content || message.isReasoning)
@@ -96,7 +98,7 @@ function AssistantMessageImpl({
             sessionId={sessionId}
             messageId={message.id}
             content={message.content}
-            onSelect={() => {}}
+            onSelect={(s) => sendMessage(s)}
           />
         )}
       </div>
