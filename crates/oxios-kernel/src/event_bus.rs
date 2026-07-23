@@ -235,6 +235,20 @@ pub enum KernelEvent {
         /// Source label: "chain_of_thought" | "compaction" | "reflection".
         source: String,
     },
+    /// Partial tool-call arguments streamed by the LLM (RFC-015 Phase C).
+    ///
+    /// Emitted by oxi 0.58+ (`AgentEvent::ToolCallDelta`) while the model is
+    /// still constructing a tool call, before `ToolExecutionStarted`. Each
+    /// `args_delta` is a raw JSON fragment; consumers accumulate per
+    /// `tool_call_id`.
+    ToolArgsDelta {
+        /// Session this delta belongs to.
+        session_id: String,
+        /// Tool call identifier (matches the later `ToolExecutionStarted`).
+        tool_call_id: String,
+        /// Raw JSON argument fragment from the LLM stream.
+        args_delta: String,
+    },
 
     /// Compaction was triggered (RFC-035 gap 2 observability).
     ///
@@ -489,6 +503,9 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::ReasoningFragment { source, .. } => AuditAction::Other {
             detail: format!("reasoning:{source}"),
         },
+        KernelEvent::ToolArgsDelta { tool_call_id, .. } => AuditAction::Other {
+            detail: format!("tool_args_delta:{tool_call_id}"),
+        },
         KernelEvent::CompactionTriggered { source, .. } => AuditAction::Other {
             detail: format!("compaction:triggered:{source}"),
         },
@@ -588,6 +605,7 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         KernelEvent::MemoryRecallUsed { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::TokenUsageUpdate { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::ReasoningFragment { session_id, .. } => format!("session:{session_id}"),
+        KernelEvent::ToolArgsDelta { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::KnowledgePersisted { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::KnowledgeRemoved { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::CompactionTriggered { session_id, .. } => session_id
@@ -609,6 +627,13 @@ pub fn attach_audit_trail(bus: &EventBus, audit: Arc<AuditTrail>) {
         loop {
             match rx.recv().await {
                 Ok(event) => {
+                    // Skip high-frequency streaming variants that are UI data,
+                    // not audit-relevant. ToolCallDelta fires per-token (raw
+                    // JSON fragments) — appending each would flood the Merkle
+                    // chain + JSONL with partial-JSON Debug strings per call.
+                    if matches!(event, KernelEvent::ToolArgsDelta { .. }) {
+                        continue;
+                    }
                     let actor = extract_agent_id(&event);
                     let action = kernel_event_to_audit_action(&event);
                     let resource = format!("{event:?}");

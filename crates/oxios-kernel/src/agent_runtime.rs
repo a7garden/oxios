@@ -88,6 +88,14 @@ pub enum StreamDelta {
     /// `AgentEvent::ThinkingDelta { text }` into ~50ms batches before
     /// emitting this delta to avoid flooding the mpsc.
     ThinkingDelta(String),
+    /// The model finished a reasoning span (signal-only, no payload).
+    ///
+    /// Emitted by oxi 0.58+ (`AgentEvent::ThinkingEnd`). For interleaved
+    /// reasoning models (Claude 4, o-series) this fires once per span. The
+    /// gateway collector uses it as the authoritative `reasoning.end`
+    /// marker; models that never emit it (reasoning_content via openai.rs —
+    /// GLM/DeepSeek/Qwen) fall back to the collector's first-Text heuristic.
+    ThinkingEnd,
 }
 
 /// Connection-scoped streaming sink sender.
@@ -1371,6 +1379,36 @@ async fn run_agent(
                             && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
                         {
                             let _ = tx.try_send(StreamDelta::ThinkingDelta(text.clone()));
+                        }
+                    }
+                    AgentEvent::ThinkingEnd => {
+                        // oxi 0.58+: explicit reasoning-end signal. Drives the
+                        // authoritative `reasoning.end` close for providers that
+                        // emit it. The collector resets its `was_reasoning` flag
+                        // so the first-Text fallback (reasoning_content models)
+                        // never double-fires.
+                        if let Some(ref sid) = transparency_session
+                            && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                        {
+                            let _ = tx.try_send(StreamDelta::ThinkingEnd);
+                        }
+                    }
+                    AgentEvent::ToolCallDelta {
+                        tool_call_id,
+                        args_delta,
+                    } => {
+                        // oxi 0.58+: partial tool-call args streamed by the LLM
+                        // while it is still constructing the call (before
+                        // ToolExecutionStart). Each `args_delta` is a raw JSON
+                        // fragment; consumers accumulate per `tool_call_id`.
+                        if let Some(ref sid) = transparency_session {
+                            let _ = kernel_handle_for_cb.infra.publish(
+                                KernelEvent::ToolArgsDelta {
+                                    session_id: sid.clone(),
+                                    tool_call_id: tool_call_id.clone(),
+                                    args_delta: args_delta.clone(),
+                                },
+                            );
                         }
                     }
                     _ => {}

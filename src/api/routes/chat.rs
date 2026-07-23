@@ -1494,6 +1494,7 @@ fn kernel_event_to_ws_chunk(
         KernelEvent::MemoryRecallUsed { session_id, .. } => Some(session_id),
         KernelEvent::TokenUsageUpdate { session_id, .. } => Some(session_id),
         KernelEvent::ReasoningFragment { session_id, .. } => Some(session_id),
+        KernelEvent::ToolArgsDelta { session_id, .. } => Some(session_id),
         _ => None,
     };
     if let (Some(eid), Some(active)) = (event_session_id, active_session_id.as_ref())
@@ -1553,6 +1554,15 @@ fn kernel_event_to_ws_chunk(
             }
             Some(obj)
         }
+        KernelEvent::ToolArgsDelta {
+            tool_call_id,
+            args_delta,
+            ..
+        } => Some(serde_json::json!({
+            "type": "tool_call_delta",
+            "tool_call_id": tool_call_id,
+            "args_delta": args_delta,
+        })),
         KernelEvent::MemoryRecallUsed {
             query,
             count,

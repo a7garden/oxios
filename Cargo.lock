@@ -5254,9 +5254,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.56.0"
+version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99c90e7fdd24ad1b3b873a884c16ec8079ab8a1dd4e7554bbce6ff92adcb8ce4"
+checksum = "4e4cb8fa467141c48d2077b4046b0e695b6bc1349762692aabeaf31902e55b5a"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5284,9 +5284,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.56.0"
+version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df6ade8f53b9f5c4e68602f9f241c2245367b4198877aca25d47a0799f562f89"
+checksum = "9038afa14fbf3b6bb57361aa584000b036eca979df05df2d5e1422b7db30f76a"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5321,9 +5321,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-hashline"
-version = "0.56.0"
+version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99a5a43748e03af9f79ac8746de398ad5db0386dd724a82d31dda8317f690e0e"
+checksum = "14404bfba96197fcbd174c201e90ba5e83fe71b4493c9a5ecf1651057cb82532"
 dependencies = [
  "async-trait",
  "lru 0.18.0",
@@ -5335,9 +5335,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.56.0"
+version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51d9576bab6779e9a3ee0482462efd7a34516276dd0df352de6d4f170e4913b6"
+checksum = "6b107298cf86bf90cf133c5b94f87b530c93bb04df597d9b8d7c87539d9074e3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5369,9 +5369,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-snapcompact"
-version = "0.56.0"
+version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc7346b60028b5b6482de73879867539534c67766e3563c8baa982ea24cb0d2b"
+checksum = "f09a949390d8b29b811ca3ad77b5ac7afde035996dafaca16d5784ea14efab1a"
 dependencies = [
  "fontdue",
  "png 0.17.16",

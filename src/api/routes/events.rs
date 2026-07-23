@@ -429,6 +429,16 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "content": content,
             "source": source,
         }),
+        KernelEvent::ToolArgsDelta {
+            session_id,
+            tool_call_id,
+            args_delta,
+        } => serde_json::json!({
+            "type": "tool_call_delta",
+            "session_id": session_id,
+            "tool_call_id": tool_call_id,
+            "args_delta": args_delta,
+        }),
         KernelEvent::CompactionTriggered { session_id, source } => serde_json::json!({
             "type": "compaction_triggered",
             "session_id": session_id,

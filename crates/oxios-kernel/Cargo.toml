@@ -24,7 +24,7 @@ oxios-calendar = { version = "1.24.1", path = "../oxios-calendar" }
 oxios-mcp = { version = "1.24.1", path = "../oxios-mcp" }
 oxios-memory = { version = "1.24.1", path = "../oxios-memory" }
 oxi-sdk = { workspace = true }
-oxi-agent = "0.56.0"
+oxi-agent = "0.58.0"
 # oxi-ai no longer needed directly — all types re-exported via oxi-sdk
 tokio = { workspace = true }
 futures = { workspace = true }

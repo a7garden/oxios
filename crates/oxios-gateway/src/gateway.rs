@@ -601,6 +601,30 @@ impl Gateway {
                                 );
                                 let _ = send_with_retry(&channel, outgoing).await;
                             }
+                            oxios_kernel::agent_runtime::StreamDelta::ThinkingEnd => {
+                                // oxi 0.58+: authoritative reasoning-end signal.
+                                // Reset the shared flag so the first-Text
+                                // heuristic (kept as a fallback for
+                                // reasoning_content models that never emit
+                                // ThinkingEnd) does not double-fire.
+                                was_reasoning = false;
+                                let mut end_msg = OutgoingMessage::with_id(
+                                    uuid::Uuid::new_v4(),
+                                    channel_name_for_collector.clone(),
+                                    user_id.clone(),
+                                    String::new(),
+                                );
+                                end_msg.target_conn_id = conn_id.clone();
+                                end_msg.metadata.insert(
+                                    "stream_kind".to_string(),
+                                    "reasoning.end".to_string(),
+                                );
+                                end_msg.metadata.insert(
+                                    meta::SESSION_ID.to_string(),
+                                    session_id_for_collector.clone(),
+                                );
+                                let _ = send_with_retry(&channel, end_msg).await;
+                            }
                             _ => {}
                         }
                     }
