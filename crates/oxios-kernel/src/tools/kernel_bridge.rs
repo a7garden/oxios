@@ -1,8 +1,7 @@
 //! KernelToolProvider bridge — plugs oxios kernel tools into oxi-sdk agent builder.
 //!
 //! Implements [`oxi_sdk::KernelToolProvider`] so that oxios kernel tools
-//! (exec, memory, browser, etc.) can be registered into the SDK's
-//! `AgentBuilder` via `.kernel_tools()`.
+//! (exec, memory, project, etc.) can be registered into the SDK's
 
 use std::sync::Arc;
 
@@ -42,37 +41,40 @@ impl OxiosKernelBridge {
 impl SdkKernelToolProvider for OxiosKernelBridge {
     fn tool_names(&self) -> Vec<&str> {
         vec![
-            // Always-on file tools
+            // Always-on file + web-search tools (registration::register_always_on)
             "read",
             "write",
             "edit",
             "grep",
             "find",
             "ls",
-            // Kernel domain
+            "web_search",
+            "get_search_results",
+            // Kernel domain tools (builtin::register_all_kernel_tools)
             "exec",
             "memory_read",
+            "memory_write",
             "memory_search",
+            "subagent",
             "project",
-            "agent",
-            "a2a_delegate",
-            "a2a_send",
-            "a2a_query",
+            "mount",
+            "kernel_agent",
             "persona",
             "cron",
             "security",
             "budget",
             "resource",
-            "mcp",
-            "browser",
+            "a2a_delegate",
+            "a2a_send",
+            "a2a_query",
             "knowledge",
-            // Marketplace (ClawHub)
-            "marketplace",
-            // Calendar
-            "calendar",
-            // Email
-            "send_email",
             "ask_user",
+            "marketplace",
+            "skill_forge",
+            "calendar", // conditional on [calendar] config
+            "send_email",
+            // NOTE: MCP tools use a dynamic `full_name` and are enumerated
+            // per-server at registration time, so they are not listed here.
         ]
     }
 
@@ -189,8 +191,11 @@ mod tests {
         let bridge = OxiosKernelBridge::new(kernel);
 
         let names = bridge.tool_names();
-        // 6 always-on + 18 kernel domain = 24 ... plus knowledge = 25 ... plus calendar = 25 (optional, not configured)
-        // plus send_email = 26
-        assert_eq!(names.len(), 26, "expected 26 tools, got {:?}", names);
+        // 8 always-on (file ops + web_search/get_search_results)
+        // + 22 kernel domain (exec, memory×3, subagent, project, mount,
+        //   kernel_agent, persona, cron, security, budget, resource, a2a×3,
+        //   knowledge, ask_user, marketplace, skill_forge, calendar, send_email)
+        // = 30. MCP tools are dynamic (per-server) and excluded from the list.
+        assert_eq!(names.len(), 30, "expected 30 tools, got {:?}", names);
     }
 }

@@ -192,38 +192,15 @@ pub(crate) async fn handle_task_set_verify(
 
 // ── Run task ──────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
-pub struct RunTaskRequest {
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub prompt: Option<String>,
-}
-
-/// POST /api/tasks/:id/run — trigger manual execution
+/// POST /api/tasks/:id/run — trigger manual execution.
+///
+/// Not yet implemented: spawning an agent session from a stored task
+/// requires `KernelHandle.agent` session integration. Returns 503 so the
+/// caller gets a real error instead of a task silently stuck in "Running".
 pub(crate) async fn handle_task_run(
-    state: State<Arc<AppState>>,
     Path(id): Path<String>,
-    Json(_req): Json<RunTaskRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let store = state.task_store.lock().await;
-    let task = store
-        .get_task_by_id(&id)
-        .await
-        .map_err(|e| AppError::NotFound(format!("Task not found: {e}")))?;
-
-    // Update status to running
-    drop(store);
-
-    let store = state.task_store.lock().await;
-    let _ = store.update_status(&id, &TaskStatus::Running).await;
-
-    // TODO: Spawn an agent session with the task instruction
-    // This requires integration with KernelHandle.agent.create_session()
-
-    Ok(Json(serde_json::json!({
-        "id": id,
-        "status": "running",
-        "message": "Task execution started",
-        "instruction": task.instruction,
-    })))
+    Err(AppError::ServiceUnavailable(format!(
+        "Task execution is not yet implemented (task '{id}')"
+    )))
 }

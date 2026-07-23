@@ -1722,7 +1722,7 @@ fn extract_urls(text: &str) -> Vec<serde_json::Value> {
         let end = rest
             .find(|c: char| c.is_whitespace() || c == ')' || c == ']' || c == '"' || c == '\'')
             .unwrap_or(rest.len());
-        let url = rest[..end].trim_end_matches(|c: char| c == '.' || c == ',');
+        let url = rest[..end].trim_end_matches(['.', ',']);
         if url.len() > 10 && seen.insert(url.to_string()) {
             let mut citation = serde_json::json!({ "url": url, "favicon": favicon_url(url) });
             if let Some(t) = extract_link_title(text, abs) {
