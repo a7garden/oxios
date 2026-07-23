@@ -106,9 +106,6 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
         kernel.infra.pending_ask_user(),
         kernel.infra.event_bus_clone(),
     ));
-    // Browser (optional feature, stores Arc<KernelHandle>)
-    #[cfg(feature = "native-browser")]
-    {}
 
     // Marketplace (ClawHub — search, install, update)
     registry.register(MarketplaceTool::from_kernel(kernel));

@@ -13,9 +13,6 @@ pub enum AppError {
     BadRequest(String),
     /// Internal server error.
     Internal(String),
-    /// Authentication required or failed.
-    #[allow(dead_code)]
-    Unauthorized(String),
     /// Permission denied.
     Forbidden(String),
     /// Service unavailable (e.g. optional subsystem not initialized).
@@ -39,7 +36,6 @@ impl std::fmt::Display for AppError {
             AppError::NotFound(m) => write!(f, "Not Found: {m}"),
             AppError::BadRequest(m) => write!(f, "Bad Request: {m}"),
             AppError::Internal(m) => write!(f, "Internal Error: {m}"),
-            AppError::Unauthorized(m) => write!(f, "Unauthorized: {m}"),
             AppError::Forbidden(m) => write!(f, "Forbidden: {m}"),
             AppError::ServiceUnavailable(m) => write!(f, "Service Unavailable: {m}"),
             AppError::PayloadTooLarge { size, limit } => write!(
@@ -60,7 +56,6 @@ impl IntoResponse for AppError {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, m.clone()),
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
-            AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m.clone()),
             AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m.clone()),
             AppError::ServiceUnavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m.clone()),
             AppError::PayloadTooLarge { size, limit } => (

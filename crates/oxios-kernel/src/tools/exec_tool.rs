@@ -28,7 +28,7 @@ use serde_json::{Value, json};
 use tokio::sync::oneshot;
 
 use crate::access_manager::AccessManager;
-use crate::access_manager::{AccessGate, AgentContext};
+use crate::access_manager::AgentContext;
 
 // ─── Shell metacharacter blocklist ──────────
 
@@ -67,8 +67,6 @@ pub struct ExecTool {
     config: crate::kernel_handle::SharedExecConfig,
     access: Arc<Mutex<AccessManager>>,
     context: Option<AgentContext>,
-    #[allow(dead_code)]
-    gate: Option<Arc<AccessGate>>,
     /// Phase D: pending approvals registry for human-in-the-loop approval.
     /// When Some, shell-mode exec requests user approval before running.
     pending_approvals: Option<Arc<crate::tools::PendingToolApprovals>>,
@@ -87,23 +85,6 @@ impl ExecTool {
             config,
             access,
             context: Some(context),
-            gate: None,
-            pending_approvals: None,
-            event_bus: None,
-        }
-    }
-
-    /// Create a gated `ExecTool` with both context and access gate.
-    pub fn new_gated(
-        config: crate::kernel_handle::SharedExecConfig,
-        context: AgentContext,
-        gate: Arc<AccessGate>,
-    ) -> Self {
-        Self {
-            config,
-            access: gate.access_clone(),
-            context: Some(context),
-            gate: Some(gate),
             pending_approvals: None,
             event_bus: None,
         }
@@ -130,7 +111,6 @@ impl ExecTool {
             config: Arc::new(parking_lot::RwLock::new(kernel.exec.config_snapshot())),
             access: kernel.exec.access_manager().clone(),
             context: None,
-            gate: None,
             pending_approvals: Some(kernel.infra.pending_tool_approvals()),
             event_bus: Some(kernel.infra.event_bus_clone()),
         }
@@ -146,7 +126,6 @@ impl ExecTool {
             config,
             access,
             context: None,
-            gate: None,
             pending_approvals: None,
             event_bus: None,
         }
@@ -154,7 +133,7 @@ impl ExecTool {
 
     /// Legacy constructor without agent context (for backward compatibility).
     ///
-    /// **Warning:** This bypasses the new `AgentContext` / `AccessGate` path.
+    /// **Warning:** This bypasses the `AgentContext` path.
     /// Use only for migration or testing.
     pub fn new_unrestricted(
         config: crate::kernel_handle::SharedExecConfig,
@@ -164,7 +143,6 @@ impl ExecTool {
             config,
             access,
             context: None,
-            gate: None,
             pending_approvals: None,
             event_bus: None,
         }

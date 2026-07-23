@@ -363,6 +363,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn evaluate_keyword_ratio_majority_pass_threshold() {
         // criterion: "function must return value" → tokens: function, return, value
         // output omits "value" → 2/3 = 67% → passes (>= 0.5).

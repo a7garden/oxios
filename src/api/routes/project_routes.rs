@@ -45,13 +45,6 @@ pub(crate) struct CreateProjectRequest {
     pub tags: Vec<String>,
     pub emoji: Option<String>,
     pub description: Option<String>,
-    #[serde(default = "default_true")]
-    #[allow(dead_code)]
-    pub memory_visible: bool,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 #[derive(Debug, Deserialize)]
