@@ -49,7 +49,7 @@ impl IncomingMessage {
 /// Attached by `Gateway::dispatch()` from `OrchestrationResult`.
 /// The legacy `HashMap<String, String>` metadata is retained for channel-specific data
 /// (chat_id, message_id, etc.).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ResponseMeta {
     /// Session ID for multi-turn conversations.
     #[serde(skip_serializing_if = "Option::is_none")]

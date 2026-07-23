@@ -102,17 +102,11 @@ mod tests {
     #[test]
     fn format_success_with_phase() {
         let meta = ResponseMeta {
-            session_id: None,
-            project_id: None,
             project_tag: Some("[🔧 Test]".to_string()),
             phase: "Execute".to_string(),
             evaluation_passed: Some(true),
             duration_ms: Some(3500),
-            error: None,
-            interview_questions: None,
-            interview_round: None,
-            interview_ambiguity: None,
-            mode: None,
+            ..Default::default()
         };
         let msg = make_msg("Done!", Some(meta));
         let fmt = TelegramFormatter;
@@ -126,21 +120,12 @@ mod tests {
     #[test]
     fn format_error_internal() {
         let meta = ResponseMeta {
-            session_id: None,
-            project_id: None,
-            project_tag: None,
-            phase: String::new(),
-            evaluation_passed: None,
-            duration_ms: None,
             error: Some(UserFacingError {
                 message: "Internal error".to_string(),
                 kind: ErrorKind::Internal,
                 suggestion: None,
             }),
-            interview_questions: None,
-            interview_round: None,
-            interview_ambiguity: None,
-            mode: None,
+            ..Default::default()
         };
         let msg = make_msg("Internal error", Some(meta));
         let fmt = TelegramFormatter;
@@ -151,21 +136,12 @@ mod tests {
     #[test]
     fn format_error_provider_with_suggestion() {
         let meta = ResponseMeta {
-            session_id: None,
-            project_id: None,
-            project_tag: None,
-            phase: String::new(),
-            evaluation_passed: None,
-            duration_ms: None,
             error: Some(UserFacingError {
                 message: "AI service error".to_string(),
                 kind: ErrorKind::ProviderError,
                 suggestion: Some("Try again in 1-2 minutes.".to_string()),
             }),
-            interview_questions: None,
-            interview_round: None,
-            interview_ambiguity: None,
-            mode: None,
+            ..Default::default()
         };
         let msg = make_msg("AI service error", Some(meta));
         let fmt = TelegramFormatter;
