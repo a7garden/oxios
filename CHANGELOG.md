@@ -5,6 +5,32 @@ All notable changes to this project are documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.25.0] - 2026-07-23
+
+### Fixed
+- **`--workspace --all-features` compile gate** — three pre-existing
+  regressions blocked by wasmtime 24 migration and the `ResponseMeta`
+  rework:
+  - `crates/oxios-kernel/src/wasm_sandbox.rs`: `StoreLimiter` now
+    implements `wasmtime::ResourceLimiter` v24 contract — adds
+    `table_growing` (defer to wasmtime default table cap), while
+    `memory_growing` continues to enforce `WasmConfig::max_memory_bytes`.
+  - `src/kernel.rs`: imports `std::path::Path` alongside the existing
+    `PathBuf` — the embedding/gguf `cfg` branches at lines 930/1200
+    reference `Path::new(&config.kernel.workspace)`.
+  - `src/channels/telegram/format.rs`: three tests referenced
+    `ResponseMeta` fields removed in the gateway rework
+    (`interview_ambiguity`, `mode`). Switched to `..Default::default()`
+    against a new `Default` impl on `ResponseMeta` so future field
+    additions keep the tests compiling.
+- **`telegram::with_api_base` dead-code lint** — public builder for
+  local Bot API servers; marked `#[allow(dead_code)]` until config
+  wiring lands.
+
+### Docs
+- AGENTS.md `--all-features` note refreshed to reflect the wasm-sandbox
+  fix.
+
 ## [1.24.1] - 2026-07-19
 
 ### Fixed
