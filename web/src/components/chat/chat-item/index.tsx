@@ -7,10 +7,10 @@
 // Dependencies removed: @lobehub/ui (Flexbox), antd-style (createStaticStyles, cx)
 // Replaced with: Tailwind utility classes, cn() from clsx/tailwind-merge
 
-import { cn } from '@/lib/utils'
-import type { ChatError, ChatItemAvatar, ChatItemProps as _ChatItemProps } from '@/types/chat'
 import { Loader2 } from 'lucide-react'
 import { memo } from 'react'
+import { cn } from '@/lib/utils'
+import type { ChatItemProps as _ChatItemProps, ChatError, ChatItemAvatar } from '@/types/chat'
 
 // ── Re-export the props type ──
 export type { ChatItemAvatar }
@@ -20,13 +20,7 @@ export type ChatItemProps = _ChatItemProps
 
 function Avatar({ name, avatar, color }: ChatItemAvatar) {
   if (avatar) {
-    return (
-      <img
-        src={avatar}
-        alt={name ?? 'agent'}
-        className="w-7 h-7 rounded-full shrink-0 mt-1"
-      />
-    )
+    return <img src={avatar} alt={name ?? 'agent'} className="w-7 h-7 rounded-full shrink-0 mt-1" />
   }
   // Fallback: initials circle
   const fallbackName = name ?? '?'
@@ -45,20 +39,12 @@ function Avatar({ name, avatar, color }: ChatItemAvatar) {
   )
 }
 
-function TitleRow({
-  name,
-  time,
-}: {
-  name?: string
-  time?: number
-}) {
+function TitleRow({ name, time }: { name?: string; time?: number }) {
   return (
     <div className="flex items-center gap-2 mb-1">
       {name && <span className="text-sm font-medium">{name}</span>}
       {time != null && (
-        <span className="text-xs text-muted-foreground">
-          {formatChatTime(time)}
-        </span>
+        <span className="text-xs text-muted-foreground">{formatChatTime(time)}</span>
       )}
     </div>
   )
@@ -68,9 +54,7 @@ function ErrorBlock({ error }: { error: ChatError }) {
   return (
     <div className="mb-2 px-3 py-2 rounded-md border border-destructive/50 bg-destructive/5 text-sm text-destructive">
       <p className="font-medium">{error.type}</p>
-      {error.message && (
-        <p className="text-xs text-muted-foreground mt-0.5">{error.message}</p>
-      )}
+      {error.message && <p className="text-xs text-muted-foreground mt-0.5">{error.message}</p>}
     </div>
   )
 }
@@ -113,11 +97,7 @@ export const ChatItem = memo(function ChatItem({
   return (
     <div
       id={id}
-      className={cn(
-        'group flex gap-3 px-4 py-2',
-        isRight && 'flex-row-reverse',
-        className,
-      )}
+      className={cn('group flex gap-3 px-4 py-2', isRight && 'flex-row-reverse', className)}
     >
       {/* Avatar column */}
       {showAvatar ? (

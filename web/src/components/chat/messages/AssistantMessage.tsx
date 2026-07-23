@@ -9,9 +9,8 @@
 // See docs/designs/2026-07-21-lobehub-chat-port-design.md §7 Phase 2.
 
 import { memo } from 'react'
-import type { ChatMessage } from '@/types'
-import { ChatItem } from '@/components/chat/chat-item'
 import type { ChatItemAvatar } from '@/components/chat/chat-item'
+import { ChatItem } from '@/components/chat/chat-item'
 import { ChatMetadata } from '@/components/chat/chat-metadata'
 import { ContentLoading } from '@/components/chat/content-loading'
 import { FollowUpChips } from '@/components/chat/follow-up-chips'
@@ -19,6 +18,7 @@ import { KnowledgeSaveIndicator } from '@/components/chat/knowledge-save-indicat
 import { MarkdownMessage } from '@/components/chat/markdown-message'
 import { SearchGrounding } from '@/components/chat/search-grounding'
 import { Thinking } from '@/components/chat/thinking'
+import type { ChatMessage } from '@/types'
 import { ErrorCard } from './components/ErrorCard'
 import { MessageActionBar } from './components/MessageActionBar'
 import { ToolCallList } from './components/ToolCallList'
@@ -60,8 +60,7 @@ function AssistantMessageImpl({
     : null
 
   // Stream just started — no content yet, still generating. Show ContentLoading.
-  const showLoading =
-    !!message.generating && !hasContent && !hasReasoning && !hasToolCalls
+  const showLoading = !!message.generating && !hasContent && !hasReasoning && !hasToolCalls
 
   return (
     <ChatItem
@@ -107,11 +106,7 @@ function AssistantMessageImpl({
 
 /** Phase 2 placeholder for RAG reference chunks. Phase 3 will port
  *  LobeHub FileChunks accordion with similarity scores + file icons. */
-function FileChunksPlaceholder({
-  chunks,
-}: {
-  chunks: NonNullable<ChatMessage['chunksList']>
-}) {
+function FileChunksPlaceholder({ chunks }: { chunks: NonNullable<ChatMessage['chunksList']> }) {
   return (
     <details className="text-xs text-muted-foreground">
       <summary className="cursor-pointer hover:text-foreground transition-colors">

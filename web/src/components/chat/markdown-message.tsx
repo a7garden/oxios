@@ -8,6 +8,7 @@
 // iframes) using a schema that still permits formatting + our thinking-block
 // details/summary. Without sanitize, model output could execute arbitrary JS.
 
+import type { Schema } from 'hast-util-sanitize'
 import { Check, Copy } from 'lucide-react'
 import { type ComponentPropsWithoutRef, memo, useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -15,11 +16,10 @@ import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
-import type { Schema } from 'hast-util-sanitize'
 import { cn } from '@/lib/utils'
-import { rehypeThinking } from './markdown-plugins/rehype-thinking'
 import { rehypeArtifact } from './markdown-plugins/rehype-artifact'
 import { rehypeLinkCard } from './markdown-plugins/rehype-link-card'
+import { rehypeThinking } from './markdown-plugins/rehype-thinking'
 
 // ── Code block with language label + copy button ──────────────────
 
@@ -42,7 +42,17 @@ function CodeBlock({ language, children }: { language?: string; children: string
           onClick={handleCopy}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100"
         >
-          {copied ? <><Check className="w-3 h-3" />Copied</> : <><Copy className="w-3 h-3" />Copy</>}
+          {copied ? (
+            <>
+              <Check className="w-3 h-3" />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy className="w-3 h-3" />
+              Copy
+            </>
+          )}
         </button>
       </div>
       <pre className="overflow-x-auto p-3 text-xs leading-relaxed">
@@ -56,7 +66,13 @@ function CodeBlock({ language, children }: { language?: string; children: string
 
 function ExternalLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'>) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 hover:opacity-80 transition-opacity" {...props}>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary underline underline-offset-2 hover:opacity-80 transition-opacity"
+      {...props}
+    >
       {children}
     </a>
   )
@@ -106,9 +122,15 @@ const markdownComponents = {
 
 // ── Main ──────────────────────────────────────────────────────────
 
-interface MarkdownMessageProps { children: string; className?: string }
+interface MarkdownMessageProps {
+  children: string
+  className?: string
+}
 
-export const MarkdownMessage = memo(function MarkdownMessage({ children, className }: MarkdownMessageProps) {
+export const MarkdownMessage = memo(function MarkdownMessage({
+  children,
+  className,
+}: MarkdownMessageProps) {
   return (
     <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
       <ReactMarkdown

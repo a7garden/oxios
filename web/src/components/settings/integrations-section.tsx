@@ -143,7 +143,6 @@ function InstallButton({ row }: { row: IntegrationRow }) {
   // Only show Install when the integration has a CLI and it is NOT installed.
   // Credential-only integrations (no cli) and already-installed ones hide it.
   const notInstalled = row.cli && row.detected && !row.detected.installed
-  if (!notInstalled && !jobId) return null
 
   // Surface terminal outcomes as a toast exactly once. The mutation itself
   // only resolves with `{ jobId }` — the real success/failure signal rides
@@ -157,6 +156,8 @@ function InstallButton({ row }: { row: IntegrationRow }) {
       setJobId(null)
     }
   }, [status, t])
+
+  if (!notInstalled && !jobId) return null
 
   const onInstall = async () => {
     if (!window.confirm(t('settings.integrationsInstallConfirm', { name: row.label }))) return

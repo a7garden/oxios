@@ -1,4 +1,5 @@
-import { Check,
+import {
+  Check,
   ChevronDown,
   Cpu,
   Eye,
@@ -12,12 +13,12 @@ import { Check,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ModelDetail } from '@/components/engine/model-detail'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useEngineConfig, useModels, useSetModel } from '@/hooks/use-engine'
 import { cn } from '@/lib/utils'
 import type { ModelInfo } from '@/types/engine'
-import { ModelDetail } from '@/components/engine/model-detail'
-import { EmptyState } from '@/components/shared/empty-state'
 
 // ─── Helpers ─────────────────────────────────────────────────
 

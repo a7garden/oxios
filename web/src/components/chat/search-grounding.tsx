@@ -4,9 +4,9 @@
 // Dependencies removed: @lobehub/ui (SearchResultCards, Flexbox), antd-style
 // Replaced with: Tailwind utility classes
 
-import { cn } from '@/lib/utils'
-import { Globe, Image, ChevronDown } from 'lucide-react'
+import { ChevronDown, Globe, Image } from 'lucide-react'
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
 
 // ── Types ──
 
@@ -46,12 +46,7 @@ export function SearchGrounding({ search, className }: SearchGroundingProps) {
   if (!hasCitations && !hasImages) return null
 
   return (
-    <div
-      className={cn(
-        'rounded-lg border bg-muted/30 overflow-hidden',
-        className,
-      )}
-    >
+    <div className={cn('rounded-lg border bg-muted/30 overflow-hidden', className)}>
       {/* Header */}
       <button
         type="button"
@@ -110,7 +105,7 @@ export function SearchGrounding({ search, className }: SearchGroundingProps) {
                     alt=""
                     className="w-4 h-4 rounded mt-0.5 shrink-0"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none'
+                      ;(e.target as HTMLImageElement).style.display = 'none'
                     }}
                   />
                 ) : (
@@ -120,9 +115,7 @@ export function SearchGrounding({ search, className }: SearchGroundingProps) {
                   <div className="text-xs font-medium truncate group-hover:text-primary transition-colors">
                     {c.title || c.url}
                   </div>
-                  <div className="text-[10px] text-muted-foreground truncate mt-0.5">
-                    {c.url}
-                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate mt-0.5">{c.url}</div>
                 </div>
               </a>
             ))}

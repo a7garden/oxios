@@ -1,23 +1,46 @@
 // SystemAgentSettings — model assignment UI for system tasks
 // Ported from LobeHub's ModelAssignmentsForm pattern.
 
-import { Brain, Bot, Tag, Image, Languages, Archive, MessageCircle, Sparkles, Wand2, Box, UserCircle, type LucideIcon } from 'lucide-react'
+import {
+  Archive,
+  Bot,
+  Box,
+  Brain,
+  Image,
+  Languages,
+  type LucideIcon,
+  MessageCircle,
+  Sparkles,
+  Tag,
+  UserCircle,
+  Wand2,
+} from 'lucide-react'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ModelSelect } from '@/components/engine/model-select'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { useModels } from '@/hooks/use-engine'
 import { cn } from '@/lib/utils'
 import {
+  type MemoryServiceModelConfig,
   SYSTEM_AGENT_METADATA,
   type SystemAgentConfig,
   type SystemAgentItem,
-  type MemoryServiceModelConfig,
 } from '@/types/system-agent'
-import { ModelSelect } from '@/components/engine/model-select'
-import { Switch } from '@/components/ui/switch'
-import { Input } from '@/components/ui/input'
 
 const ICONS: Record<string, LucideIcon> = {
-  Brain, Bot, Tag, Image, Languages, Archive, MessageCircle, Sparkles, Wand2, Box, UserCircle,
+  Brain,
+  Bot,
+  Tag,
+  Image,
+  Languages,
+  Archive,
+  MessageCircle,
+  Sparkles,
+  Wand2,
+  Box,
+  UserCircle,
 }
 
 interface SystemAgentSettingsProps {
@@ -41,9 +64,21 @@ export function SystemAgentSettings({
   const { t } = useTranslation()
 
   const groups = [
-    { id: 'system' as const, title: t('settings.systemAgents.system'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'system') },
-    { id: 'memory' as const, title: t('settings.systemAgents.memory'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'memory') },
-    { id: 'optional' as const, title: t('settings.systemAgents.optional'), items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'optional') },
+    {
+      id: 'system' as const,
+      title: t('settings.systemAgents.system'),
+      items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'system'),
+    },
+    {
+      id: 'memory' as const,
+      title: t('settings.systemAgents.memory'),
+      items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'memory'),
+    },
+    {
+      id: 'optional' as const,
+      title: t('settings.systemAgents.optional'),
+      items: SYSTEM_AGENT_METADATA.filter((m) => m.group === 'optional'),
+    },
   ]
 
   return (

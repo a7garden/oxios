@@ -6,8 +6,8 @@
 // Phase 4 (2026-07-21): returns a MessageAction[] consumed by MessageActionBar,
 // replacing the bespoke inline JSX.
 
-import { useCallback, useState } from 'react'
 import { Copy, RefreshCw, Trash2 } from 'lucide-react'
+import { useCallback, useState } from 'react'
 import { useChatStore } from '@/stores/chat'
 import type { ChatMessage } from '@/types'
 import type { MessageAction } from './components/MessageActionBar'
@@ -43,7 +43,7 @@ export function useAssistantActions({
     const idx = messages.findIndex((m) => m.id === message.id)
     if (idx <= 0) return
     const precedingUser = messages[idx - 1]
-    if (!precedingUser || precedingUser.role !== 'user') return
+    if (precedingUser?.role !== 'user') return
     removeMessage?.(message.id)
     removeMessage?.(precedingUser.id)
     sendMessage(precedingUser.content)

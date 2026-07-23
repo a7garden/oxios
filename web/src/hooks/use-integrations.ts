@@ -124,10 +124,7 @@ function isInstallEvent<
 /** Narrow an install event payload to its typed fields. Returns `null` if
  * the event shape doesn't match expectation — the caller treats that as
  * "ignore this event" rather than risking a wrong read. */
-function readInstallEvent(
-  e: unknown,
-  type: string,
-): Record<string, unknown> | null {
+function readInstallEvent(e: unknown, type: string): Record<string, unknown> | null {
   if (!isInstallEvent<Record<string, unknown>>(e, type)) return null
   return e as Record<string, unknown>
 }
@@ -158,8 +155,7 @@ export function useInstallJobStatus(jobId: string | null): InstallJobStatus {
     qc.invalidateQueries({ queryKey: ['integrations'] })
     const command = typeof completed.command === 'string' ? completed.command : ''
     const output = typeof completed.output === 'string' ? completed.output : ''
-    const exitCode =
-      typeof completed.exitCode === 'number' ? completed.exitCode : null
+    const exitCode = typeof completed.exitCode === 'number' ? completed.exitCode : null
     return { state: 'completed', command, output, exitCode }
   }
 

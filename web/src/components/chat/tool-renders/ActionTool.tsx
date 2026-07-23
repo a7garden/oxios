@@ -15,16 +15,14 @@ export const ActionToolRender: ToolRenderComponent = ({ args, result, isRunning,
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2 text-xs">
         <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{toolName}</span>
-        {action && (
-          <span className="text-primary font-medium">{action}</span>
-        )}
+        {action && <span className="text-primary font-medium">{action}</span>}
         {isRunning && (
           <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
         )}
       </div>
       {resultStr && !isRunning && (
         <pre className="p-2 rounded bg-muted text-xs overflow-x-auto max-h-64 whitespace-pre-wrap">
-          {resultStr.length > 2000 ? resultStr.slice(0, 2000) + '\n...' : resultStr}
+          {resultStr.length > 2000 ? `${resultStr.slice(0, 2000)}\n...` : resultStr}
         </pre>
       )}
     </div>

@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  desiredRenamePath,
-  extractH1,
-  isProtectedPath,
-  sanitizeFilenameStem,
-} from './note-rename'
+import { desiredRenamePath, extractH1, isProtectedPath, sanitizeFilenameStem } from './note-rename'
 
 describe('extractH1', () => {
   it('extracts a normal H1', () => {

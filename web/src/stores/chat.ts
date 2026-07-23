@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { adaptChunk } from '@/lib/stream/adapter'
+import type { ChatActivityEmission, ProcessorResult } from '@/lib/stream/StreamProcessor'
+import { StreamProcessor } from '@/lib/stream/StreamProcessor'
 import type {
   ChatActivity,
   ChatMessage,
@@ -10,9 +13,6 @@ import type {
   ToolCallContext,
   ToolCallSummary,
 } from '@/types'
-import { adaptChunk } from '@/lib/stream/adapter'
-import type { ChatActivityEmission, ProcessorResult } from '@/lib/stream/StreamProcessor'
-import { StreamProcessor } from '@/lib/stream/StreamProcessor'
 import { useAuthStore } from './auth'
 
 // ---------------------------------------------------------------------------
@@ -679,7 +679,6 @@ function discardPendingTokens(): void {
   }
   _pendingTokens = ''
 }
-
 
 // ---------------------------------------------------------------------------
 // StreamProcessor integration (Phase 1, 2026-07-21)

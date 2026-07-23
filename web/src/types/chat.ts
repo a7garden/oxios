@@ -9,19 +9,19 @@ export type ChatErrorSeverity = 'info' | 'warning' | 'error' | 'critical'
 export interface ChatError {
   attribution?: ChatErrorAttribution
   body?: unknown
-  category?: string  // 'auth' | 'quota' | 'capacity' | 'routing' | ...
+  category?: string // 'auth' | 'quota' | 'capacity' | 'routing' | ...
   httpStatus?: number
   message?: string
   retryable?: boolean
   severity?: ChatErrorSeverity
-  type: string  // ErrorType from model-runtime
+  type: string // ErrorType from model-runtime
 }
 
 // ── Reasoning (ported from @lobechat/types message/common/base.ts) ──
 
 export interface ModelReasoning {
   content: string
-  duration?: number  // milliseconds
+  duration?: number // milliseconds
   /** Whether this turn is still streaming its reasoning block. */
   thinking?: boolean
 }
@@ -154,7 +154,7 @@ export interface ChatMessageExtensions {
 
 export interface ChatItemAvatar {
   name?: string
-  avatar?: string  // URL or emoji
+  avatar?: string // URL or emoji
   color?: string
 }
 
@@ -164,7 +164,7 @@ export interface ChatItemProps {
   placement?: 'left' | 'right'
   loading?: boolean
   error?: ChatError | null
-  time?: number  // unix ms
+  time?: number // unix ms
   showTitle?: boolean
   showAvatar?: boolean
   actions?: React.ReactNode

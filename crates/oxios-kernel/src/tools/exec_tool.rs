@@ -634,7 +634,8 @@ impl AgentTool for ExecTool {
                             tracing::info!(approval_id = %approval_id, "exec approved by user");
                         }
                         _ => {
-                            let _ = approvals.resolve(approval_id, crate::tools::ToolApprovalResult::Denied);
+                            let _ = approvals
+                                .resolve(approval_id, crate::tools::ToolApprovalResult::Denied);
                             return Ok(AgentToolResult::error(
                                 "Shell execution was denied or timed out (120s).",
                             ));

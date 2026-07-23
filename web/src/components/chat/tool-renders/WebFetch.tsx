@@ -14,7 +14,7 @@ interface FetchResult {
 export const WebFetchRender: ToolRenderComponent = ({ args, result, isRunning }) => {
   const url = (args?.url ?? args?.uri ?? '') as string
   const parsed: FetchResult =
-    typeof result === 'string' ? tryJson(result) ?? { content: result } : (result as FetchResult)
+    typeof result === 'string' ? (tryJson(result) ?? { content: result }) : (result as FetchResult)
 
   return (
     <div className="space-y-2 text-sm">
@@ -28,9 +28,7 @@ export const WebFetchRender: ToolRenderComponent = ({ args, result, isRunning })
         >
           {parsed.title ?? url}
         </a>
-        {parsed.status && (
-          <span className="text-muted-foreground/60 ml-auto">{parsed.status}</span>
-        )}
+        {parsed.status && <span className="text-muted-foreground/60 ml-auto">{parsed.status}</span>}
       </div>
       {isRunning ? (
         <div className="text-xs text-muted-foreground">Fetching...</div>

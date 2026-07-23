@@ -60,7 +60,7 @@ export interface ServiceModelConfig {
 
 export const DEFAULT_SYSTEM_AGENT: SystemAgentItem = {
   enabled: true,
-  model: '',  // empty = inherit default
+  model: '', // empty = inherit default
 }
 
 export const DEFAULT_SERVICE_MODEL_CONFIG: ServiceModelConfig = {
@@ -134,7 +134,8 @@ export const SYSTEM_AGENT_METADATA: SystemAgentMeta[] = [
   {
     key: 'memoryAnalysis',
     label: 'Memory Analysis',
-    description: 'Determines if conversation contains memory and extracts identity, preferences, context, activity, experience',
+    description:
+      'Determines if conversation contains memory and extracts identity, preferences, context, activity, experience',
     icon: 'Brain',
     group: 'memory',
   },

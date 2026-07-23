@@ -2,17 +2,26 @@
 // Ported from LobeHub's RecommendTaskTemplates pattern.
 // Shows cards for each template with "Add Task" button.
 
-import { useState, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
 import {
-  Palette, Users, Video, Newspaper, CheckCircle, Radar,
-  Search, BarChart, PenTool, Clock, Plus,
+  BarChart,
+  CheckCircle,
+  Clock,
   type LucideIcon,
+  Newspaper,
+  Palette,
+  PenTool,
+  Plus,
+  Radar,
+  Search,
+  Users,
+  Video,
 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import {
-  TASK_TEMPLATES,
   TASK_TEMPLATE_CATEGORIES,
+  TASK_TEMPLATES,
   type TaskTemplate,
   type TaskTemplateCategory,
 } from '@/types/task-templates'
@@ -20,8 +29,15 @@ import {
 // ── Icon map ──
 
 const ICONS: Record<string, LucideIcon> = {
-  Palette, Users, Video, Newspaper, CheckCircle, Radar,
-  Search, BarChart, PenTool,
+  Palette,
+  Users,
+  Video,
+  Newspaper,
+  CheckCircle,
+  Radar,
+  Search,
+  BarChart,
+  PenTool,
 }
 
 // ── Props ──
@@ -111,10 +127,12 @@ function CategoryChip({
     >
       {icon}
       <span>{label}</span>
-      <span className={cn(
-        'text-xs px-1.5 py-0.5 rounded-full',
-        active ? 'bg-primary-foreground/20' : 'bg-background/50',
-      )}>
+      <span
+        className={cn(
+          'text-xs px-1.5 py-0.5 rounded-full',
+          active ? 'bg-primary-foreground/20' : 'bg-background/50',
+        )}
+      >
         {count}
       </span>
     </button>

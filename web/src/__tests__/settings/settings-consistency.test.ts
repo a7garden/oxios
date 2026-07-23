@@ -30,6 +30,10 @@ const RENDERABLE_SECTION_IDS = new Set<string>([
   'host-tools',
   'memory',
   'channels.telegram',
+  'system-agents',
+  'image',
+  'stats',
+  'appearance',
   // Declarative new sections (driven by NEW_SECTIONS)
   ...NEW_SECTIONS.map((s) => s.key),
   // Legacy field-based sections (legacyFieldsBySection)

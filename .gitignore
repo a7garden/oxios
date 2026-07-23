@@ -45,4 +45,6 @@ report-*.json
 # Local benchmark and browser-automation artifacts
 /.oxios-bench/
 /.playwright-cli/
+# sccache: local Rust compilation cache (SCCACHE_DIR). Regenerable, never commit.
+/.sccache/
 .worktrees/

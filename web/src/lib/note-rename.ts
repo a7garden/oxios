@@ -58,6 +58,7 @@ export function sanitizeFilenameStem(name: string): string {
   // Strip path separators and characters reserved by common filesystems.
   const cleaned = name
     .replace(/[\\/:*?"<>|]/g, '')
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally strip control chars for safe filenames
     .replace(/[\u0000-\u001f]/g, '')
     .trim()
   if (cleaned.length === 0) return ''

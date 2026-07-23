@@ -25,5 +25,5 @@ export const FileReadRender: ToolRenderComponent = ({ args, result, isRunning })
 
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s
-  return s.slice(0, max) + `\n\n... [${s.length - max} more characters]`
+  return `${s.slice(0, max)}\n\n... [${s.length - max} more characters]`
 }

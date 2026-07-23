@@ -14,7 +14,7 @@ export const WebSearchRender: ToolRenderComponent = ({ args, result, isRunning }
       <div className="flex items-center gap-2 text-xs">
         <Globe className="w-3.5 h-3.5 text-muted-foreground" />
         <span className="text-muted-foreground italic">
-          {query.length > 80 ? query.slice(0, 80) + '...' : query}
+          {query.length > 80 ? `${query.slice(0, 80)}...` : query}
         </span>
       </div>
 
@@ -41,7 +41,7 @@ export const WebSearchRender: ToolRenderComponent = ({ args, result, isRunning }
                     alt=""
                     className="w-4 h-4 rounded mt-0.5 shrink-0"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none'
+                      ;(e.target as HTMLImageElement).style.display = 'none'
                     }}
                   />
                 ) : (

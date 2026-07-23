@@ -56,7 +56,7 @@ export const MEMORY_CATEGORY_METADATA: MemoryCategoryMeta[] = [
   {
     key: 'preference',
     label: 'Preference',
-    description: 'Enduring choices — formats, priorities, do/don\'t',
+    description: "Enduring choices — formats, priorities, do/don't",
     icon: 'Heart',
     color: 'text-rose-500',
   },
@@ -117,7 +117,7 @@ export interface ExperienceMemory extends BaseMemoryItem {
   keyLearning?: string
   possibleOutcome?: string
   reasoning?: string
-  confidence?: number  // 0.0 - 1.0
+  confidence?: number // 0.0 - 1.0
 }
 
 // ── Preference ──
@@ -125,7 +125,7 @@ export interface ExperienceMemory extends BaseMemoryItem {
 export interface PreferenceMemory extends BaseMemoryItem {
   category: 'preference'
   topic?: string
-  conclusionDirectives?: string[]  // actionable directives
+  conclusionDirectives?: string[] // actionable directives
   suggestions?: string[]
 }
 

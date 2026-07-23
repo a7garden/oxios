@@ -18,12 +18,7 @@ export interface MessageViewProps {
   onRetry?: () => void
 }
 
-function MessageViewImpl({
-  message,
-  sessionId,
-  assistantIndex,
-  onRetry,
-}: MessageViewProps) {
+function MessageViewImpl({ message, sessionId, assistantIndex, onRetry }: MessageViewProps) {
   switch (message.role) {
     case 'user':
       return <UserMessage message={message} />

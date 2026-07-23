@@ -7,7 +7,6 @@ import { CronScheduleEditor } from '@/components/cron/cron-schedule-editor'
 import { CronTimelineView } from '@/components/cron/cron-timeline-view'
 import { EditCronDialog } from '@/components/cron/edit-cron-dialog'
 import { TaskTemplateGallery } from '@/components/cron/task-template-gallery'
-import type { TaskTemplate } from '@/types/task-templates'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -21,6 +20,7 @@ import { api } from '@/lib/api-client'
 import { DEFAULT_CRON } from '@/lib/cron-utils'
 import { cn } from '@/lib/utils'
 import type { CronJob } from '@/types'
+import type { TaskTemplate } from '@/types/task-templates'
 
 export const Route = createFileRoute('/cron-jobs')({ component: CronJobsPage })
 
@@ -92,7 +92,9 @@ function CronJobsPage() {
       {/* Task templates */}
       {jobs.length === 0 && (
         <div>
-          <h2 className="text-lg font-semibold mb-3">{t('cronJobs.templates', 'Recommended Tasks')}</h2>
+          <h2 className="text-lg font-semibold mb-3">
+            {t('cronJobs.templates', 'Recommended Tasks')}
+          </h2>
           <TaskTemplateGallery onSelectTemplate={handleSelectTemplate} />
         </div>
       )}

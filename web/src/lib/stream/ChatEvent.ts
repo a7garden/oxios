@@ -8,11 +8,7 @@
 // Phase 1 of LobeHub port (2026-07-21). See
 // docs/designs/2026-07-21-lobehub-chat-port-design.md §5.1, §6.2.
 
-import type {
-  ChatError,
-  ChatFileChunk,
-  GroundingSearch,
-} from '@/types/chat'
+import type { ChatError, ChatFileChunk, GroundingSearch } from '@/types/chat'
 
 /** Token usage for a single assistant message. */
 export interface TokenUsage {

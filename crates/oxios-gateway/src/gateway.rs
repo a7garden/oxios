@@ -615,10 +615,9 @@ impl Gateway {
                                     String::new(),
                                 );
                                 end_msg.target_conn_id = conn_id.clone();
-                                end_msg.metadata.insert(
-                                    "stream_kind".to_string(),
-                                    "reasoning.end".to_string(),
-                                );
+                                end_msg
+                                    .metadata
+                                    .insert("stream_kind".to_string(), "reasoning.end".to_string());
                                 end_msg.metadata.insert(
                                     meta::SESSION_ID.to_string(),
                                     session_id_for_collector.clone(),
@@ -638,10 +637,9 @@ impl Gateway {
                             String::new(),
                         );
                         end_msg.target_conn_id = conn_id.clone();
-                        end_msg.metadata.insert(
-                            "stream_kind".to_string(),
-                            "reasoning.end".to_string(),
-                        );
+                        end_msg
+                            .metadata
+                            .insert("stream_kind".to_string(), "reasoning.end".to_string());
                         end_msg.metadata.insert(
                             meta::SESSION_ID.to_string(),
                             session_id_for_collector.clone(),

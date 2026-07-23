@@ -2,17 +2,14 @@
 // Ported from LobeHub's memory categorization system.
 // Tabs: Identity | Activity | Context | Experience | Preference
 
-import { useState, useMemo } from 'react'
+import { Activity, Compass, GraduationCap, Heart, type LucideIcon, UserCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  UserCircle, Activity, Compass, GraduationCap, Heart,
-  type LucideIcon,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/shared/empty-state'
+import { cn } from '@/lib/utils'
 import {
-  MEMORY_CATEGORY_METADATA,
   type CategorizedMemory,
+  MEMORY_CATEGORY_METADATA,
   type MemoryCategory,
 } from '@/types/memory-categories'
 
@@ -28,7 +25,11 @@ interface CategorizedMemoryBrowserProps {
 // ── Icon map ──
 
 const ICONS: Record<string, LucideIcon> = {
-  UserCircle, Activity, Compass, GraduationCap, Heart,
+  UserCircle,
+  Activity,
+  Compass,
+  GraduationCap,
+  Heart,
 }
 
 // ── Component ──
@@ -54,9 +55,8 @@ export function CategorizedMemoryBrowser({
     }
     return c
   }, [memories])
-  const emptyMeta = activeCategory !== 'all'
-    ? MEMORY_CATEGORY_METADATA.find((m) => m.key === activeCategory)
-    : null
+  const emptyMeta =
+    activeCategory !== 'all' ? MEMORY_CATEGORY_METADATA.find((m) => m.key === activeCategory) : null
   const EmptyIcon = emptyMeta ? (ICONS[emptyMeta.icon] ?? UserCircle) : null
 
   return (
@@ -89,25 +89,31 @@ export function CategorizedMemoryBrowser({
         {filtered.length === 0 ? (
           <EmptyState
             icon={EmptyIcon && <EmptyIcon className={cn('h-8 w-8', emptyMeta?.color)} />}
-            title={emptyMeta ? t('memory.noCategoryMemories', { category: emptyMeta.label.toLowerCase() }) : t('memory.noMemoriesYet')}
+            title={
+              emptyMeta
+                ? t('memory.noCategoryMemories', { category: emptyMeta.label.toLowerCase() })
+                : t('memory.noMemoriesYet')
+            }
             description={emptyMeta?.description}
-            action={onCreateMemory ? (
-              <button
-                type="button"
-                onClick={() => onCreateMemory(activeCategory === 'all' ? 'identity' : activeCategory)}
-                className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs hover:bg-primary/90 transition-colors"
-              >
-                {emptyMeta ? t('memory.addCategoryMemory', { category: emptyMeta.label.toLowerCase() }) : t('memory.addMemory')}
-              </button>
-            ) : undefined}
+            action={
+              onCreateMemory ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onCreateMemory(activeCategory === 'all' ? 'identity' : activeCategory)
+                  }
+                  className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs hover:bg-primary/90 transition-colors"
+                >
+                  {emptyMeta
+                    ? t('memory.addCategoryMemory', { category: emptyMeta.label.toLowerCase() })
+                    : t('memory.addMemory')}
+                </button>
+              ) : undefined
+            }
           />
         ) : (
           filtered.map((memory) => (
-            <MemoryCard
-              key={memory.id}
-              memory={memory}
-              onClick={() => onSelectMemory?.(memory)}
-            />
+            <MemoryCard key={memory.id} memory={memory} onClick={() => onSelectMemory?.(memory)} />
           ))
         )}
       </div>
@@ -143,10 +149,12 @@ function CategoryTab({
     >
       {icon}
       <span>{label}</span>
-      <span className={cn(
-        'text-xs px-1.5 py-0.5 rounded-full',
-        active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
-      )}>
+      <span
+        className={cn(
+          'text-xs px-1.5 py-0.5 rounded-full',
+          active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+        )}
+      >
         {count}
       </span>
     </button>
@@ -155,13 +163,7 @@ function CategoryTab({
 
 // ── Memory card ──
 
-function MemoryCard({
-  memory,
-  onClick,
-}: {
-  memory: CategorizedMemory
-  onClick?: () => void
-}) {
+function MemoryCard({ memory, onClick }: { memory: CategorizedMemory; onClick?: () => void }) {
   const meta = MEMORY_CATEGORY_METADATA.find((m) => m.key === memory.category)
   const Icon = meta ? (ICONS[meta.icon] ?? UserCircle) : UserCircle
 
@@ -169,15 +171,19 @@ function MemoryCard({
   const primaryText = useMemo(() => {
     switch (memory.category) {
       case 'identity':
-        return (memory as { description?: string }).description
-          ?? (memory as { role?: string }).role
-          ?? 'Unnamed identity'
+        return (
+          (memory as { description?: string }).description ??
+          (memory as { role?: string }).role ??
+          'Unnamed identity'
+        )
       case 'activity':
         return (memory as { narrative?: string }).narrative ?? 'Unnamed activity'
       case 'context':
-        return (memory as { title?: string }).title
-          ?? (memory as { description?: string }).description
-          ?? 'Unnamed context'
+        return (
+          (memory as { title?: string }).title ??
+          (memory as { description?: string }).description ??
+          'Unnamed context'
+        )
       case 'experience':
         return (memory as { keyLearning?: string }).keyLearning ?? 'Unnamed experience'
       case 'preference':
@@ -198,7 +204,10 @@ function MemoryCard({
           {memory.tags && memory.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {memory.tags.slice(0, 3).map((tag) => (
-                <span key={tag} className="text-2xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                <span
+                  key={tag}
+                  className="text-2xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
+                >
                   {tag}
                 </span>
               ))}

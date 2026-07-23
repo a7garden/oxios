@@ -37,9 +37,7 @@ function visit(node: Root | ElementContent): void {
 
 function enhancePre(pre: Element): void {
   // Find inner <code> with language class.
-  const code = pre.children.find(
-    (c): c is Element => c.type === 'element' && c.tagName === 'code',
-  )
+  const code = pre.children.find((c): c is Element => c.type === 'element' && c.tagName === 'code')
   if (!code) return
 
   const langClass = (code.properties?.className as string[] | undefined)?.find((c) =>

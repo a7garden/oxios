@@ -8,9 +8,9 @@
 
 import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
+import { DefaultToolRender, getToolRender } from '@/components/chat/tool-renders'
 import { cn } from '@/lib/utils'
 import type { ChatToolPayload } from '@/types/chat'
-import { DefaultToolRender, getToolRender } from '@/components/chat/tool-renders'
 import { ToolInspector } from './ToolInspector'
 
 interface ToolCallListProps {
@@ -82,9 +82,7 @@ function ToolCallCard({
             />
           )}
           {call.error && (
-            <p className="mt-2 text-xs text-destructive">
-              {call.error.message ?? 'Tool error'}
-            </p>
+            <p className="mt-2 text-xs text-destructive">{call.error.message ?? 'Tool error'}</p>
           )}
           {call.progress && isRunning && (
             <p className="mt-1 text-xs text-muted-foreground italic">{call.progress}</p>

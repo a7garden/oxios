@@ -130,9 +130,7 @@ export class StreamProcessor {
         } else {
           this.tools.set(ev.toolCallId, {
             ...cur,
-            arguments:
-              (typeof cur.arguments === 'string' ? cur.arguments : '') +
-              ev.argsDelta,
+            arguments: (typeof cur.arguments === 'string' ? cur.arguments : '') + ev.argsDelta,
           })
         }
         return { patch: { toolCalls: this.toolsList() } }
@@ -209,7 +207,7 @@ export class StreamProcessor {
         }
         this.tools.set(ev.toolCallId, next)
         const allSettled = [...this.tools.values()].every(
-          t => t.status === 'success' || t.status === 'error' || t.status === 'aborted',
+          (t) => t.status === 'success' || t.status === 'error' || t.status === 'aborted',
         )
         return {
           patch: {
@@ -327,12 +325,12 @@ export class StreamProcessor {
 function summariseResult(result: unknown): string | undefined {
   if (result == null) return undefined
   if (typeof result === 'string') {
-    return result.length > 120 ? result.slice(0, 117) + '...' : result
+    return result.length > 120 ? `${result.slice(0, 117)}...` : result
   }
   try {
     const json = JSON.stringify(result)
     if (!json) return undefined
-    return json.length > 120 ? json.slice(0, 117) + '...' : json
+    return json.length > 120 ? `${json.slice(0, 117)}...` : json
   } catch {
     return undefined
   }

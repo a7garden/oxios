@@ -1651,7 +1651,6 @@ fn grounding_from_event(
         return None;
     }
 
-
     let citations = extract_citations(summary);
 
     if citations.is_empty() {
@@ -1676,15 +1675,26 @@ fn extract_citations(text: &str) -> Vec<serde_json::Value> {
             parsed.get("results").and_then(|v| v.as_array()).cloned()
         };
         if let Some(items) = arr {
-            let citations: Vec<serde_json::Value> = items.iter().filter_map(|item| {
-                let url = item.get("url")?.as_str()?.to_string();
-                if !url.starts_with("http") { return None; }
-                let mut c = serde_json::json!({ "url": &url, "favicon": favicon_url(&url) });
-                if let Some(t) = item.get("title").and_then(|v| v.as_str()) { c["title"] = t.into(); }
-                if let Some(s) = item.get("snippet").and_then(|v| v.as_str()) { c["snippet"] = s.into(); }
-                Some(c)
-            }).collect();
-            if !citations.is_empty() { return citations; }
+            let citations: Vec<serde_json::Value> = items
+                .iter()
+                .filter_map(|item| {
+                    let url = item.get("url")?.as_str()?.to_string();
+                    if !url.starts_with("http") {
+                        return None;
+                    }
+                    let mut c = serde_json::json!({ "url": &url, "favicon": favicon_url(&url) });
+                    if let Some(t) = item.get("title").and_then(|v| v.as_str()) {
+                        c["title"] = t.into();
+                    }
+                    if let Some(s) = item.get("snippet").and_then(|v| v.as_str()) {
+                        c["snippet"] = s.into();
+                    }
+                    Some(c)
+                })
+                .collect();
+            if !citations.is_empty() {
+                return citations;
+            }
         }
     }
     // Strategy 2: URL scan (heuristic, handles plain-text output).
@@ -1727,13 +1737,19 @@ fn extract_urls(text: &str) -> Vec<serde_json::Value> {
 
 /// Extract title from `[title](url)` markdown pattern.
 fn extract_link_title(text: &str, url_pos: usize) -> Option<String> {
-    if url_pos < 2 { return None; }
+    if url_pos < 2 {
+        return None;
+    }
     let before = &text[..url_pos];
-    if !before.ends_with("](") { return None; }
+    if !before.ends_with("](") {
+        return None;
+    }
     let title_end = before.len() - 2;
     let title_start = before[..title_end].rfind('[')?;
     let title = &before[title_start + 1..title_end];
-    if title.is_empty() { return None; }
+    if title.is_empty() {
+        return None;
+    }
     Some(title.to_string())
 }
 

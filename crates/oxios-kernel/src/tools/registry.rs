@@ -17,9 +17,10 @@ use serde::Serialize;
 
 /// Phase D: per-tool human intervention requirement (LobeHub-aligned).
 /// Drives the frontend 4-tier tool render registry's `interventions` slot.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
 pub enum HumanIntervention {
     /// Tool is safe to run without user confirmation.
+    #[default]
     None,
     /// Approval required only when args match certain criteria (path outside
     /// sandbox, etc.). The existing AccessGate path-based check remains the
@@ -27,12 +28,6 @@ pub enum HumanIntervention {
     Conditional,
     /// Approval always required before execution.
     Required,
-}
-
-impl Default for HumanIntervention {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Metadata for a single tool in the registry.

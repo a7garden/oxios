@@ -16,13 +16,7 @@
 import type { Element, ElementContent, Root } from 'hast'
 import type { Plugin } from 'unified'
 
-const THINKING_TAGS = new Set([
-  'think',
-  'thinking',
-  'lobe-thinking',
-  'lobe_thinking',
-  'reasoning',
-])
+const THINKING_TAGS = new Set(['think', 'thinking', 'lobe-thinking', 'lobe_thinking', 'reasoning'])
 
 export const rehypeThinking: Plugin<[], Root> = () => {
   return (tree) => {
@@ -74,7 +68,5 @@ function combineClass(a: string | undefined, b: string): string[] {
 }
 
 function hasSummary(node: Element): boolean {
-  return node.children.some(
-    (c): c is Element => c.type === 'element' && c.tagName === 'summary',
-  )
+  return node.children.some((c): c is Element => c.type === 'element' && c.tagName === 'summary')
 }

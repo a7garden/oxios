@@ -11,12 +11,10 @@ export const BashRender: ToolRenderComponent = ({ args, result, isRunning, durat
       <div className="flex items-center gap-2 text-xs">
         <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
         <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-          {command.length > 100 ? command.slice(0, 100) + '...' : command}
+          {command.length > 100 ? `${command.slice(0, 100)}...` : command}
         </code>
         {durationMs != null && (
-          <span className="text-muted-foreground/60 ml-auto">
-            {formatDuration(durationMs)}
-          </span>
+          <span className="text-muted-foreground/60 ml-auto">{formatDuration(durationMs)}</span>
         )}
       </div>
 
@@ -28,9 +26,7 @@ export const BashRender: ToolRenderComponent = ({ args, result, isRunning, durat
         </div>
       ) : result != null ? (
         <pre className="p-3 rounded bg-zinc-950 text-green-400 text-xs overflow-x-auto max-h-96 whitespace-pre-wrap font-mono leading-relaxed">
-          {typeof result === 'string'
-            ? result.slice(0, 10000)
-            : JSON.stringify(result, null, 2)}
+          {typeof result === 'string' ? result.slice(0, 10000) : JSON.stringify(result, null, 2)}
         </pre>
       ) : null}
     </div>

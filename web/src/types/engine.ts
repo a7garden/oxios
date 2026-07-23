@@ -116,46 +116,46 @@ export interface ProviderModelsResponse {
 // ── Provider settings ──
 
 export interface ProviderSettings {
-  enabled: boolean;
-  sortOrder: number;
-  customEndpoint?: string;
-  modelListConfig: ModelListConfig;
-  isCustom: boolean;
-  sdkType?: 'openai' | 'anthropic' | 'google' | 'openai-compatible';
+  enabled: boolean
+  sortOrder: number
+  customEndpoint?: string
+  modelListConfig: ModelListConfig
+  isCustom: boolean
+  sdkType?: 'openai' | 'anthropic' | 'google' | 'openai-compatible'
 }
 
 export interface ModelListConfig {
-  mode: 'all' | 'allowlist' | 'denylist';
-  allow: string[];
-  deny: string[];
+  mode: 'all' | 'allowlist' | 'denylist'
+  allow: string[]
+  deny: string[]
 }
 
 // ── Provider + models combined (LobeHub EnabledProviderWithModels port) ──
 
 export interface EnabledProviderWithModels {
-  provider: ProviderInfo;
-  models: ModelInfo[];
+  provider: ProviderInfo
+  models: ModelInfo[]
 }
 
 // ── API response types ──
 
 export interface ProviderConfigResponse {
-  provider: ProviderInfo;
-  settings: ProviderSettings;
-  models: string[];
+  provider: ProviderInfo
+  settings: ProviderSettings
+  models: string[]
 }
 
 export interface ConnectionCheckResult {
-  success: boolean;
-  model: string;
-  latencyMs: number;
-  error?: string;
+  success: boolean
+  model: string
+  latencyMs: number
+  error?: string
 }
 
 export interface CustomProviderInput {
-  id: string;
-  name: string;
-  sdkType: 'openai' | 'anthropic' | 'google' | 'openai-compatible';
-  baseUrl: string;
-  apiKeyEnv?: string;
+  id: string
+  name: string
+  sdkType: 'openai' | 'anthropic' | 'google' | 'openai-compatible'
+  baseUrl: string
+  apiKeyEnv?: string
 }

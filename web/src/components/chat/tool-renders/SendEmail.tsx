@@ -24,7 +24,9 @@ export const SendEmailRender: ToolRenderComponent = ({ args, result, isRunning }
       <div className="flex items-center gap-2 text-xs">
         <Mail className="w-3.5 h-3.5 text-muted-foreground" />
         <span className="font-medium truncate">{subject || '(no subject)'}</span>
-        <span className={`ml-auto shrink-0 ${status === 'sent' ? 'text-emerald-500' : 'text-amber-500'}`}>
+        <span
+          className={`ml-auto shrink-0 ${status === 'sent' ? 'text-emerald-500' : 'text-amber-500'}`}
+        >
           {status}
         </span>
       </div>

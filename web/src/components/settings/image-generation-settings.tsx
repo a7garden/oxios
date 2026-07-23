@@ -4,10 +4,10 @@
 import { Image as ImageIcon, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Slider } from '@/components/ui/slider'
 import { ModelSelect } from '@/components/engine/model-select'
-import { useModels } from '@/hooks/use-engine'
 import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { useModels } from '@/hooks/use-engine'
 import { cn } from '@/lib/utils'
 
 const MIN_DEFAULT_IMAGE_NUM = 1
@@ -51,7 +51,9 @@ export function ImageGenerationSettings({
         </div>
         <div>
           <h3 className="text-sm font-semibold">{t('settings.imageGeneration.title')}</h3>
-          <p className="text-xs text-muted-foreground">{t('settings.imageGeneration.description')}</p>
+          <p className="text-xs text-muted-foreground">
+            {t('settings.imageGeneration.description')}
+          </p>
         </div>
       </div>
 
@@ -64,7 +66,10 @@ export function ImageGenerationSettings({
           {isUpdating && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          {t('settings.imageGeneration.countHint', { min: MIN_DEFAULT_IMAGE_NUM, max: MAX_DEFAULT_IMAGE_NUM })}
+          {t('settings.imageGeneration.countHint', {
+            min: MIN_DEFAULT_IMAGE_NUM,
+            max: MAX_DEFAULT_IMAGE_NUM,
+          })}
         </p>
         <div className="flex items-center gap-4">
           <Slider
@@ -90,7 +95,9 @@ export function ImageGenerationSettings({
       {/* Image model */}
       {onImageModelChange && (
         <div className="rounded-lg border bg-card p-4">
-          <Label className="text-sm font-medium mb-2 block">{t('settings.imageGeneration.model')}</Label>
+          <Label className="text-sm font-medium mb-2 block">
+            {t('settings.imageGeneration.model')}
+          </Label>
           <p className="text-xs text-muted-foreground mb-3">
             {t('settings.imageGeneration.modelHint')}
           </p>

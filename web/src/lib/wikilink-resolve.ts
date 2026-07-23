@@ -31,7 +31,9 @@ export function buildWikilinkIndex(tree: KnowledgeTreeNode[]): WikilinkIndex {
     if (node.is_dir) continue
     if (!node.path.toLowerCase().endsWith('.md')) continue
     const basename = node.path.split('/').pop() ?? node.path
-    const stem = (basename.toLowerCase().endsWith('.md') ? basename.slice(0, -3) : basename).toLowerCase()
+    const stem = (
+      basename.toLowerCase().endsWith('.md') ? basename.slice(0, -3) : basename
+    ).toLowerCase()
     const bucket = index.get(stem)
     if (bucket) bucket.push(node.path)
     else index.set(stem, [node.path])
@@ -90,7 +92,9 @@ export function resolveWikilink(
  */
 function pathExists(path: string, index: WikilinkIndex): boolean {
   const basename = path.split('/').pop() ?? path
-  const stem = (basename.toLowerCase().endsWith('.md') ? basename.slice(0, -3) : basename).toLowerCase()
+  const stem = (
+    basename.toLowerCase().endsWith('.md') ? basename.slice(0, -3) : basename
+  ).toLowerCase()
   const bucket = index.get(stem)
-  return Boolean(bucket && bucket.includes(path))
+  return Boolean(bucket?.includes(path))
 }

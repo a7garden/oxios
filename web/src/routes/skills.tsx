@@ -922,19 +922,19 @@ function SkillCard({
         {hasMissing && skill.status === 'needs_setup' && (
           <div className="rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
             <p className="text-xs text-warning">
-                {t('skills.missingWarning', {
-                  missing: [
-                    ...skill.missing.bins.map((b) => `bin:${b}`),
-                    ...skill.missing.env.map((e) => `env:${e}`),
-                    ...skill.missing.config.map((c) => `config:${c}`),
-                    ...skill.missing.anyBins.map((b) => `any_bin:${b}`),
-                    ...skill.missing.integrations.map((i) => `integration:${i}`),
-                    ...skill.missing.anyIntegrations.map((i) => `any_integration:${i}`),
-                  ].join(', '),
-                })}
-              </p>
-            </div>
-          )}
+              {t('skills.missingWarning', {
+                missing: [
+                  ...skill.missing.bins.map((b) => `bin:${b}`),
+                  ...skill.missing.env.map((e) => `env:${e}`),
+                  ...skill.missing.config.map((c) => `config:${c}`),
+                  ...skill.missing.anyBins.map((b) => `any_bin:${b}`),
+                  ...skill.missing.integrations.map((i) => `integration:${i}`),
+                  ...skill.missing.anyIntegrations.map((i) => `any_integration:${i}`),
+                ].join(', '),
+              })}
+            </p>
+          </div>
+        )}
 
         {/* Inline actions */}
         <div className="flex items-center gap-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>

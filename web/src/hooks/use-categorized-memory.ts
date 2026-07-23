@@ -1,7 +1,7 @@
 // useCategorizedMemory — API hook for 5-category memory system
 // Fetches and manages memories across identity/activity/context/experience/preference.
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 import type { CategorizedMemory, MemoryCategory } from '@/types/memory-categories'
 
@@ -59,9 +59,7 @@ export function useMemoryPersona() {
   return useQuery({
     queryKey: ['memory-persona'],
     queryFn: () =>
-      api.get<{ summary: string; updatedAt: string; keyFacts?: string[] }>(
-        '/api/memory/persona',
-      ),
+      api.get<{ summary: string; updatedAt: string; keyFacts?: string[] }>('/api/memory/persona'),
     retry: false,
   })
 }

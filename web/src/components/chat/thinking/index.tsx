@@ -5,6 +5,8 @@
 //   antd-style (createStaticStyles, cssVar)
 // Replaced with: shadcn/ui Accordion, ScrollArea + Tailwind
 
+import { Brain, Loader2 } from 'lucide-react'
+import { memo, useEffect, useState } from 'react'
 import {
   Accordion,
   AccordionContent,
@@ -13,8 +15,6 @@ import {
 } from '@/components/ui/accordion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { Brain, Loader2 } from 'lucide-react'
-import { memo, useEffect, useState } from 'react'
 
 // ── Props ──
 
@@ -78,13 +78,7 @@ export const Thinking = memo(function Thinking({
 
 // ── Title ──
 
-function ThinkingTitle({
-  thinking,
-  duration,
-}: {
-  thinking: boolean
-  duration?: number
-}) {
+function ThinkingTitle({ thinking, duration }: { thinking: boolean; duration?: number }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       {thinking ? (

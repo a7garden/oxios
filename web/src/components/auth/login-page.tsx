@@ -55,9 +55,9 @@ export function LoginPage() {
    *  after the mount-time request completes. `'available'` means the
    *  user can press the auto-issue button; the other two mean the
    *  form is the only path. */
-  const [autoIssue, setAutoIssue] = useState<'probing' | 'available' | 'unavailable' | 'denied' | 'idle'>(
-    'probing',
-  )
+  const [autoIssue, setAutoIssue] = useState<
+    'probing' | 'available' | 'unavailable' | 'denied' | 'idle'
+  >('probing')
 
   // Mount-time auto-issue probe. Runs once on first render. The server
   // rejects non-loopback callers with 403; that case is treated as
@@ -220,9 +220,7 @@ export function LoginPage() {
           {autoIssue !== 'denied' && autoIssue !== 'available' && (
             <>
               {autoIssue === 'unavailable' && (
-                <p className="text-xs text-muted-foreground">
-                  {t('auth.autoIssueUnavailable')}
-                </p>
+                <p className="text-xs text-muted-foreground">{t('auth.autoIssueUnavailable')}</p>
               )}
               <form onSubmit={submit} className="space-y-4">
                 <div className="space-y-2">

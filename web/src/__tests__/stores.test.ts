@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { useAuthStore } from '@/stores/auth'
 import {
+  __clearStreamProcessorsForTesting,
   appendActivityToMessages,
   appendTokenToMessages,
   chunkToActivity,
   ensureLastAssistant,
   mergeOrAppendActivity,
   patchAssistantModel,
-  __clearStreamProcessorsForTesting,
   useChatStore,
 } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'

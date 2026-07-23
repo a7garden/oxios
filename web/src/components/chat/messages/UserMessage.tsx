@@ -2,12 +2,12 @@
 
 import { Pencil, Trash2 } from 'lucide-react'
 import { memo, useCallback, useState } from 'react'
-import type { ChatMessage } from '@/types'
-import { useChatStore } from '@/stores/chat'
-import { ChatItem } from '@/components/chat/chat-item'
 import type { ChatItemAvatar } from '@/components/chat/chat-item'
-import { MessageActionBar } from './components/MessageActionBar'
+import { ChatItem } from '@/components/chat/chat-item'
+import { useChatStore } from '@/stores/chat'
+import type { ChatMessage } from '@/types'
 import type { MessageAction } from './components/MessageActionBar'
+import { MessageActionBar } from './components/MessageActionBar'
 
 interface UserMessageProps {
   message: ChatMessage

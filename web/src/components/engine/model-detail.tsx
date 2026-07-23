@@ -1,7 +1,7 @@
 // ModelDetail — compact info card for a model's capabilities + pricing
 // Shown on click of an info icon in the model picker.
 
-import { Brain, Eye, Zap, Maximize, DollarSign } from 'lucide-react'
+import { Brain, DollarSign, Eye, Maximize, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ModelInfo } from '@/types/engine'
 
@@ -75,24 +75,18 @@ export function ModelDetail({ model, className }: ModelDetailProps) {
         <div className="space-y-1 text-xs">
           <div className="flex items-center gap-1.5">
             <DollarSign className="w-3 h-3 text-muted-foreground" />
-            <span className="tabular-nums font-medium">
-              ${formatCost(model.costInput)}
-            </span>
+            <span className="tabular-nums font-medium">${formatCost(model.costInput)}</span>
             <span className="text-muted-foreground">/ 1M input tokens</span>
           </div>
           <div className="flex items-center gap-1.5">
             <DollarSign className="w-3 h-3 text-muted-foreground" />
-            <span className="tabular-nums font-medium">
-              ${formatCost(model.costOutput)}
-            </span>
+            <span className="tabular-nums font-medium">${formatCost(model.costOutput)}</span>
             <span className="text-muted-foreground">/ 1M output tokens</span>
           </div>
           {model.costCacheRead > 0 && (
             <div className="flex items-center gap-1.5">
               <DollarSign className="w-3 h-3 text-muted-foreground" />
-              <span className="tabular-nums font-medium">
-                ${formatCost(model.costCacheRead)}
-              </span>
+              <span className="tabular-nums font-medium">${formatCost(model.costCacheRead)}</span>
               <span className="text-muted-foreground">/ 1M cache read</span>
             </div>
           )}

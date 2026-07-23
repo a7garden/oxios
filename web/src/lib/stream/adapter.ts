@@ -51,9 +51,7 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
       }
       // Regular reasoning delta (accumulated text).
       const text = raw.content ?? ''
-      return text
-        ? { events: [{ kind: 'reasoning.delta', messageId: mid, text }] }
-        : { events: [] }
+      return text ? { events: [{ kind: 'reasoning.delta', messageId: mid, text }] } : { events: [] }
     }
     case 'grounding':
       return raw.citations && raw.citations.length > 0
@@ -111,8 +109,7 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
       const err: ChatError | undefined = raw.is_error
         ? {
             type: 'tool_error',
-            message:
-              typeof raw.tool_result === 'string' ? raw.tool_result : undefined,
+            message: typeof raw.tool_result === 'string' ? raw.tool_result : undefined,
             severity: 'error',
           }
         : undefined
@@ -158,9 +155,7 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
             reason: 'done',
             phase: raw.phase,
             evaluationPassed:
-              typeof raw.evaluation_passed === 'boolean'
-                ? raw.evaluation_passed
-                : undefined,
+              typeof raw.evaluation_passed === 'boolean' ? raw.evaluation_passed : undefined,
             durationMs: raw.duration_ms,
           },
         ],
@@ -200,9 +195,7 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
             messageId: mid,
             phase: raw.phase ?? '',
             evaluationPassed:
-              typeof raw.evaluation_passed === 'boolean'
-                ? raw.evaluation_passed
-                : undefined,
+              typeof raw.evaluation_passed === 'boolean' ? raw.evaluation_passed : undefined,
           },
         ],
         passthrough: raw,

@@ -1,20 +1,32 @@
 // Task page — list + create + manage tasks (RFC-043)
 
 import { createFileRoute } from '@tanstack/react-router'
+import { Clock, Play, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useTasks, useCreateTask, useDeleteTask, useUpdateTaskStatus, useRunTask } from '@/hooks/use-tasks'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { PageHeader } from '@/components/shared/page-header'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { TASK_STATUS_META, TASK_STATUSES, type Task, type TaskStatus } from '@/types/task'
-import { Plus, Trash2, Play, Clock } from 'lucide-react'
+import {
+  useCreateTask,
+  useDeleteTask,
+  useRunTask,
+  useTasks,
+  useUpdateTaskStatus,
+} from '@/hooks/use-tasks'
 import { cn } from '@/lib/utils'
+import { TASK_STATUS_META, TASK_STATUSES, type Task, type TaskStatus } from '@/types/task'
 
 export const Route = createFileRoute('/tasks')({ component: TasksPage })
 
@@ -28,7 +40,8 @@ function TasksPage() {
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const allTasks = data?.tasks ?? []
-  const tasks = statusFilter === 'all' ? allTasks : allTasks.filter((t) => t.status === statusFilter)
+  const tasks =
+    statusFilter === 'all' ? allTasks : allTasks.filter((t) => t.status === statusFilter)
 
   return (
     <div className="space-y-6">
@@ -50,7 +63,12 @@ function TasksPage() {
 
       {/* Status filter chips */}
       <div className="flex items-center gap-1 overflow-x-auto pb-1">
-        <StatusChip label={t('tasks.all')} count={allTasks.length} active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} />
+        <StatusChip
+          label={t('tasks.all')}
+          count={allTasks.length}
+          active={statusFilter === 'all'}
+          onClick={() => setStatusFilter('all')}
+        />
         {TASK_STATUSES.map((status) => {
           const count = allTasks.filter((tk) => tk.status === status).length
           if (count === 0) return null
@@ -74,7 +92,11 @@ function TasksPage() {
           icon={<Plus className="h-8 w-8" />}
           title={t('tasks.noTasks')}
           description={t('tasks.noTasksDescription')}
-          action={<Button size="sm" onClick={() => setShowCreate(true)}>{t('tasks.createTask')}</Button>}
+          action={
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              {t('tasks.createTask')}
+            </Button>
+          }
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -108,14 +130,18 @@ function StatusChip({
       onClick={onClick}
       className={cn(
         'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors',
-        active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+        active
+          ? 'bg-primary text-primary-foreground'
+          : 'bg-muted text-muted-foreground hover:bg-muted/80',
       )}
     >
       <span className={cn(!active && colorClass)}>{label}</span>
-      <span className={cn(
-        'text-xs px-1.5 py-0.5 rounded-full',
-        active ? 'bg-primary-foreground/20' : 'bg-background/50',
-      )}>
+      <span
+        className={cn(
+          'text-xs px-1.5 py-0.5 rounded-full',
+          active ? 'bg-primary-foreground/20' : 'bg-background/50',
+        )}
+      >
         {count}
       </span>
     </button>
@@ -143,7 +169,13 @@ function TaskCard({ task }: { task: Task }) {
           <h3 className="text-sm font-semibold truncate">{task.name}</h3>
           <p className="text-xs text-muted-foreground font-mono truncate">{task.identifier}</p>
         </div>
-        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium shrink-0', meta.bgColor, meta.color)}>
+        <span
+          className={cn(
+            'text-xs px-2 py-0.5 rounded-full font-medium shrink-0',
+            meta.bgColor,
+            meta.color,
+          )}
+        >
           {meta.label}
         </span>
       </div>
@@ -159,7 +191,7 @@ function TaskCard({ task }: { task: Task }) {
           <Clock className="h-3 w-3" />
           <span>
             {task.automationMode === 'schedule'
-              ? task.schedulePattern ?? 'cron'
+              ? (task.schedulePattern ?? 'cron')
               : t('tasks.every', { secs: task.heartbeatIntervalSecs ?? 0 })}
           </span>
           {task.executionCount > 0 && (
@@ -173,7 +205,13 @@ function TaskCard({ task }: { task: Task }) {
       {/* Actions */}
       <div className="flex items-center gap-1 mt-auto pt-2">
         {task.status !== 'completed' && task.status !== 'running' && (
-          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={handleRun} disabled={runMutation.isPending}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs gap-1"
+            onClick={handleRun}
+            disabled={runMutation.isPending}
+          >
             <Play className="h-3 w-3" />
             {t('tasks.run')}
           </Button>
@@ -183,7 +221,13 @@ function TaskCard({ task }: { task: Task }) {
             {t('tasks.complete')}
           </Button>
         )}
-        <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-destructive ml-auto" onClick={handleDelete} disabled={deleteMutation.isPending}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs text-muted-foreground hover:text-destructive ml-auto"
+          onClick={handleDelete}
+          disabled={deleteMutation.isPending}
+        >
           <Trash2 className="h-3 w-3" />
         </Button>
       </div>
@@ -203,7 +247,11 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
   const handleSubmit = () => {
     if (!name.trim() || !instruction.trim()) return
     createMutation.mutate(
-      { name: name.trim(), instruction: instruction.trim(), description: description.trim() || undefined },
+      {
+        name: name.trim(),
+        instruction: instruction.trim(),
+        description: description.trim() || undefined,
+      },
       { onSuccess: onClose },
     )
   }
@@ -216,11 +264,19 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
       <div className="space-y-3">
         <div>
           <label className="text-sm font-medium mb-1 block">{t('tasks.nameLabel')}</label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('tasks.namePlaceholder')} />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('tasks.namePlaceholder')}
+          />
         </div>
         <div>
           <label className="text-sm font-medium mb-1 block">{t('tasks.descriptionLabel')}</label>
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('tasks.descriptionPlaceholder')} />
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={t('tasks.descriptionPlaceholder')}
+          />
         </div>
         <div>
           <label className="text-sm font-medium mb-1 block">{t('tasks.instructionLabel')}</label>
@@ -232,8 +288,14 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>{t('tasks.cancel')}</Button>
-          <Button size="sm" onClick={handleSubmit} disabled={!name.trim() || !instruction.trim() || createMutation.isPending}>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t('tasks.cancel')}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSubmit}
+            disabled={!name.trim() || !instruction.trim() || createMutation.isPending}
+          >
             {createMutation.isPending ? t('tasks.creating') : t('tasks.createTask')}
           </Button>
         </div>

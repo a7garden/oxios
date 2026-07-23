@@ -8,6 +8,7 @@ import type {
   GroundingSearch,
   ModelReasoning,
 } from './chat'
+
 export type {
   ChatError,
   ChatErrorAttribution,
@@ -752,5 +753,5 @@ export interface LogResponse {
   total: number
 }
 
-export * from './chat'
 export * from './calendar'
+export * from './chat'

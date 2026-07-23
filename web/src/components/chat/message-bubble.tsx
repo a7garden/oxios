@@ -7,8 +7,8 @@
 //
 // See docs/designs/2026-07-21-lobehub-chat-port-design.md §7 Phase 2.
 
-import { MessageView } from './messages/MessageView'
 import type { MessageViewProps } from './messages/MessageView'
+import { MessageView } from './messages/MessageView'
 
 export type MessageBubbleProps = MessageViewProps
 

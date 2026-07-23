@@ -45,9 +45,10 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     id: 'weekly-design-inspiration',
     identifier: 'weekly-design-inspiration',
     title: 'Weekly Design Inspiration',
-    description: 'Every Wednesday, get 3 font pairings and 3 color palettes worth saving to your inspiration library.',
+    description:
+      'Every Wednesday, get 3 font pairings and 3 color palettes worth saving to your inspiration library.',
     category: 'creative',
-    cronPattern: '0 10 * * 3',  // Wed 10am
+    cronPattern: '0 10 * * 3', // Wed 10am
     scheduleLabel: 'Every Wednesday at 10:00',
     instruction: `You are a design curator. Every week, provide:
 1. **3 font pairings** — a heading font + body font combination, with use-case suggestions
@@ -64,7 +65,7 @@ For each, explain why it works and when to use it. Save the best ones to the ins
     title: 'Daily Creator Tracking',
     description: 'Every morning, track what 3-5 creators you follow posted and how they performed.',
     category: 'monitoring',
-    cronPattern: '0 9 * * *',  // Daily 9am
+    cronPattern: '0 9 * * *', // Daily 9am
     scheduleLabel: 'Every day at 09:00',
     instruction: `You are a creator performance analyst. Track the creators the user follows:
 1. Check their latest posts across platforms (YouTube, Twitter/X, blog)
@@ -81,9 +82,10 @@ Present as a morning briefing with actionable insights.`,
     id: 'weekly-youtube-summary',
     identifier: 'weekly-youtube-summary',
     title: 'Weekly YouTube Summary',
-    description: 'Every Monday, summarize last week\'s channel performance: views, CTR, retention — flag follow-up topics.',
+    description:
+      "Every Monday, summarize last week's channel performance: views, CTR, retention — flag follow-up topics.",
     category: 'analytics',
-    cronPattern: '0 9 * * 1',  // Mon 9am
+    cronPattern: '0 9 * * 1', // Mon 9am
     scheduleLabel: 'Every Monday at 09:00',
     instruction: `You are a YouTube channel analyst. Provide a weekly summary:
 1. **Performance overview** — total views, watch time, subscriber change
@@ -101,9 +103,10 @@ Format as a clear report with numbers and recommendations.`,
     id: 'daily-news-digest',
     identifier: 'daily-news-digest',
     title: 'Daily News Digest',
-    description: 'Every morning, get a curated summary of the top 5 news stories in your areas of interest.',
+    description:
+      'Every morning, get a curated summary of the top 5 news stories in your areas of interest.',
     category: 'research',
-    cronPattern: '0 8 * * *',  // Daily 8am
+    cronPattern: '0 8 * * *', // Daily 8am
     scheduleLabel: 'Every day at 08:00',
     instruction: `You are a news curator. Provide a daily digest:
 1. Find the top 5 most important news stories in the user's interest areas
@@ -122,7 +125,7 @@ Keep it concise — the user should be able to read this in 2 minutes.`,
     title: 'Weekly Project Review',
     description: 'Every Friday, review what you accomplished this week and plan next week.',
     category: 'productivity',
-    cronPattern: '0 17 * * 5',  // Fri 5pm
+    cronPattern: '0 17 * * 5', // Fri 5pm
     scheduleLabel: 'Every Friday at 17:00',
     instruction: `You are a project review assistant. Provide a weekly review:
 1. **Accomplishments** — what was completed this week
@@ -140,9 +143,10 @@ Use the workspace files and git history to ground the review in reality.`,
     id: 'hourly-social-listening',
     identifier: 'hourly-social-listening',
     title: 'Hourly Social Listening',
-    description: 'Every hour, check for mentions of your brand or keywords across social platforms.',
+    description:
+      'Every hour, check for mentions of your brand or keywords across social platforms.',
     category: 'monitoring',
-    cronPattern: '0 * * * *',  // Every hour
+    cronPattern: '0 * * * *', // Every hour
     scheduleLabel: 'Every hour',
     instruction: `You are a social listening monitor. Check for:
 1. Brand mentions across platforms
@@ -159,11 +163,12 @@ Alert immediately for negative sentiment or viral mentions. Otherwise, batch int
 
 // ── Categories ──
 
-export const TASK_TEMPLATE_CATEGORIES: { id: TaskTemplateCategory; label: string; icon: string }[] = [
-  { id: 'creative', label: 'Creative', icon: 'Palette' },
-  { id: 'monitoring', label: 'Monitoring', icon: 'Radar' },
-  { id: 'analytics', label: 'Analytics', icon: 'BarChart' },
-  { id: 'research', label: 'Research', icon: 'Search' },
-  { id: 'productivity', label: 'Productivity', icon: 'CheckCircle' },
-  { id: 'content-creation', label: 'Content', icon: 'PenTool' },
-]
+export const TASK_TEMPLATE_CATEGORIES: { id: TaskTemplateCategory; label: string; icon: string }[] =
+  [
+    { id: 'creative', label: 'Creative', icon: 'Palette' },
+    { id: 'monitoring', label: 'Monitoring', icon: 'Radar' },
+    { id: 'analytics', label: 'Analytics', icon: 'BarChart' },
+    { id: 'research', label: 'Research', icon: 'Search' },
+    { id: 'productivity', label: 'Productivity', icon: 'CheckCircle' },
+    { id: 'content-creation', label: 'Content', icon: 'PenTool' },
+  ]

@@ -61,7 +61,11 @@ function isLinkOnlyParagraph(p: Element): boolean {
       c.type === 'element' ||
       (c.type === 'text' && (c as { value: string }).value.trim().length > 0),
   )
-  return meaningful.length === 1 && meaningful[0]!.type === 'element' && (meaningful[0] as Element).tagName === 'a'
+  return (
+    meaningful.length === 1 &&
+    meaningful[0]!.type === 'element' &&
+    (meaningful[0] as Element).tagName === 'a'
+  )
 }
 
 function isExternalUrl(href: string): boolean {

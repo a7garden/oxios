@@ -7,9 +7,9 @@
 // via registerToolInspector — they replace this default entirely.
 
 import { memo } from 'react'
+import { getToolInspector } from '@/components/chat/tool-renders'
 import { cn } from '@/lib/utils'
 import type { ChatToolPayload } from '@/types/chat'
-import { getToolInspector } from '@/components/chat/tool-renders'
 
 interface ToolInspectorProps {
   call: ChatToolPayload
@@ -26,12 +26,7 @@ function ToolInspectorImpl({ call }: ToolInspectorProps) {
   return (
     <div className="flex items-center gap-2 min-w-0">
       <StatusIndicator status={call.status} />
-      <span
-        className={cn(
-          'font-mono text-xs font-medium truncate',
-          isError && 'text-destructive',
-        )}
-      >
+      <span className={cn('font-mono text-xs font-medium truncate', isError && 'text-destructive')}>
         {call.apiName}
       </span>
       <ArgsPreview call={call} />
@@ -69,10 +64,8 @@ function ArgsPreview({ call }: { call: ChatToolPayload }) {
   for (const field of candidateFields) {
     const v = (args as Record<string, unknown>)[field]
     if (typeof v === 'string' && v) {
-      const truncated = v.length > 60 ? v.slice(0, 57) + '...' : v
-      return (
-        <span className="text-2xs text-muted-foreground truncate font-mono">{truncated}</span>
-      )
+      const truncated = v.length > 60 ? `${v.slice(0, 57)}...` : v
+      return <span className="text-2xs text-muted-foreground truncate font-mono">{truncated}</span>
     }
   }
   return null

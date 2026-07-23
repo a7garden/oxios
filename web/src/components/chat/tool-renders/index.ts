@@ -13,8 +13,8 @@ import { FileReadRender } from './FileRead'
 import { GlobRender } from './Glob'
 import { GrepRender } from './Grep'
 import { ListFilesRender } from './ListFiles'
-import { SendEmailRender } from './SendEmail'
 import { registerToolRender } from './registry'
+import { SendEmailRender } from './SendEmail'
 import { WebFetchRender } from './WebFetch'
 import { WebSearchRender } from './WebSearch'
 
@@ -82,6 +82,16 @@ registerToolRender('marketplace', ActionToolRender)
 registerToolRender('skill_forge', ActionToolRender)
 registerToolRender('kernel_agent', ActionToolRender)
 
+export type {
+  ToolInspectorComponent,
+  ToolInspectorProps,
+  ToolInterventionComponent,
+  ToolInterventionProps,
+  ToolRenderComponent,
+  ToolRenderProps,
+  ToolStreamingComponent,
+  ToolStreamingProps,
+} from './registry'
 export {
   DefaultToolRender,
   getToolInspector,
@@ -92,14 +102,4 @@ export {
   registerToolIntervention,
   registerToolRender,
   registerToolStreaming,
-} from './registry'
-export type {
-  ToolInspectorComponent,
-  ToolInspectorProps,
-  ToolInterventionComponent,
-  ToolInterventionProps,
-  ToolRenderComponent,
-  ToolRenderProps,
-  ToolStreamingComponent,
-  ToolStreamingProps,
 } from './registry'

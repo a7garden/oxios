@@ -151,9 +151,7 @@ export function SkillDetail({
                     </span>
                     <ul className="flex flex-col gap-1">
                       {skill.requirements.integrations.map((id) => {
-                        const status = skill.integration_status?.find(
-                          (s) => s.id === id,
-                        )
+                        const status = skill.integration_status?.find((s) => s.id === id)
                         const ok = status?.satisfied ?? false
                         return (
                           <li
@@ -168,23 +166,15 @@ export function SkillDetail({
                               )}
                               <span className="font-mono text-xs">{id}</span>
                               {status && !status.installed && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] text-warning"
-                                >
+                                <Badge variant="outline" className="text-[10px] text-warning">
                                   {t('skills.integrationNotInstalled')}
                                 </Badge>
                               )}
-                              {status &&
-                                status.installed &&
-                                !status.configured && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] text-warning"
-                                  >
-                                    {t('skills.integrationNotConfigured')}
-                                  </Badge>
-                                )}
+                              {status?.installed && !status.configured && (
+                                <Badge variant="outline" className="text-[10px] text-warning">
+                                  {t('skills.integrationNotConfigured')}
+                                </Badge>
+                              )}
                             </div>
                             {!ok && (
                               <a
