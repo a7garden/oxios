@@ -1,10 +1,10 @@
 # LobeHub Chat Port — Remaining Work
 
-> **Last updated:** 2026-07-21 (20 commits on `main` + 1 commit on `oxi`)
+> **Last updated:** 2026-07-23 (oxi-sdk 0.58.0 연동 — §A-D 완료)
 > **Companion to:**
 > - `docs/designs/2026-07-21-lobehub-chat-port-design.md` (frontend, 6 phases — shipped)
 > - `docs/designs/2026-07-21-lobehub-backend-streaming-design.md` (backend, A/B/E/D — shipped)
-> - `oxi/docs/designs/2026-07-21-expose-streaming-lifecycle-events.md` (oxi request — filed)
+> - oxi 0.58.0 — `AgentEvent::ToolCallDelta` (P0) + `AgentEvent::ThinkingEnd` (P1) **shipped**
 
 ---
 
@@ -30,12 +30,25 @@
 - 14개 kernel tool render (knowledge, send_email, a2a, calendar, ActionTool generic) (`fb59cecf3`)
 - Markdown plugins: artifact cards + link previews (`f53a59400`)
 
+### oxi-sdk 0.58.0 연동 (§A-D, 2026-07-23)
+- **§A 버전 bump:** `oxi-sdk` + `oxi-agent` 0.56.0 → 0.58.0 (workspace `Cargo.toml` + kernel)
+- **§B ThinkingEnd:** `StreamDelta::ThinkingEnd` variant → gateway collector `reasoning.end` + `was_reasoning=false`
+- **§C ToolCallDelta:** `AgentEvent::ToolCallDelta` → `KernelEvent::ToolArgsDelta` → WS `tool_call_delta` chunk → frontend StreamProcessor (placeholder + args 누적)
+- 프론트엔드: `tool_call_delta` chunk 타입, `tool.args_delta` ChatEvent, adapter case, StreamProcessor handler + 통합 테스트 2건
+- 검증: `cargo check --workspace` clean, kernel/gateway/binary 테스트 전통과, frontend typecheck+build+44 stores 테스트 통과
+
 ---
 
-## 🔴 oxi 구현 완료 후 해야 할 일 (oxi PR merge 대기)
+## ✅ oxi 0.58.0 연동 — 완료 (아래는 구현 상세 참고용 보존)
 
-> oxi 측 요청서: `oxi/docs/designs/2026-07-21-expose-streaming-lifecycle-events.md`
-> 필요한 변경: `AgentEvent::ToolCallDelta` (P0), `AgentEvent::ThinkingEnd` (P1)
+> oxi 0.58.0에서 `AgentEvent::ToolCallDelta` (P0) + `AgentEvent::ThinkingEnd` (P1)이 publish됨.
+> 아래 §A-D는 구현 당시 계획 상세이며, 실제 구현에서 **두 곳이 원안에서 변경**됨:
+>
+> 1. **ThinkingEnd (§B):** `was_reasoning`-on-TextChunk 휴리스틱을 **제거하지 않고 유지**.
+>    reasoning_content 모델(GLM/DeepSeek/Qwen, openai.rs 경로)은 ThinkingEnd를 절대 emit하지 않으므로
+>    Text 도착 시 휴리스틱이 필수 fallback. 공유 `was_reasoning` 플래그가 중복을 자동 제거.
+> 2. **ToolArgsDelta (§C):** per-token 이벤트이므로 `attach_audit_trail`에 guard를 추가해
+>    Merkle 감사 추적에서 제외. 또한 `events.rs`의 exhaustive `sanitize_event` match에 arm 추가.
 
 ### A. oxi 버전 업데이트
 
