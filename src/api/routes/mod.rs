@@ -73,7 +73,7 @@ pub(crate) use calendar_routes::{
 pub(crate) use chat::{
     handle_ask_user_respond, handle_chat, handle_chat_seed, handle_chat_stream, handle_chat_ticket,
     handle_knowledge_saves, handle_remove_knowledge_save, handle_save_to_knowledge,
-    handle_session_tool_calls, handle_tool_approval_respond,
+    handle_tool_approval_respond,
 };
 pub(crate) use cost_routes::{
     handle_cost_by_model, handle_cost_by_project, handle_cost_daily, handle_cost_providers,
@@ -92,10 +92,9 @@ pub(crate) use engine_routes::{
     handle_engine_delete_api_key, handle_engine_follow_up, handle_engine_models,
     handle_engine_providers, handle_engine_roles, handle_engine_routing_fallbacks,
     handle_engine_routing_stats, handle_engine_set_api_key, handle_engine_set_model,
-    handle_engine_set_provider_options, handle_engine_set_quick_ask_model,
-    handle_engine_set_roles, handle_engine_set_routing, handle_engine_validate_key,
-    handle_get_provider_config, handle_remove_custom_provider, handle_set_model_list,
-    handle_set_provider_config,
+    handle_engine_set_provider_options, handle_engine_set_quick_ask_model, handle_engine_set_roles,
+    handle_engine_set_routing, handle_engine_validate_key, handle_get_provider_config,
+    handle_remove_custom_provider, handle_set_model_list, handle_set_provider_config,
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
@@ -478,7 +477,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/sessions/{id}/project", patch(handle_session_move))
         // RFC-035: Threads (sub-sessions)
         .route("/api/sessions/{id}/threads", get(handle_session_threads))
-        .route("/api/sessions/{id}/threads", post(handle_session_create_thread))
+        .route(
+            "/api/sessions/{id}/threads",
+            post(handle_session_create_thread),
+        )
         // Cron Jobs
         .route("/api/cron-jobs", get(handle_cron_jobs_list))
         .route("/api/cron-jobs", post(handle_cron_job_create))

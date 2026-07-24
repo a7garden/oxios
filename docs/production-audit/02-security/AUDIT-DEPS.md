@@ -1,127 +1,89 @@
-# Dependency Vulnerability Audit — 2026-05-31
+# Dependency Vulnerability Audit — 2026-07-24
 
-**Tool:** `cargo audit` (advisory db: 1099 advisories)  
-**Scope:** 881 crate dependencies in Cargo.lock  
-**Findings:** 18 vulnerabilities + 6 warnings
+**Tool:** `cargo audit` (advisory database refreshed 2026-07-24)
+**Scope:** 905 crate dependencies in `Cargo.lock`
+**Result:** 0 unignored vulnerabilities; one documented RSA exception and two non-blocking warnings.
 
----
+## Classification
 
-## Classification Legend
+| Finding | Status | Reason |
+|---|---|---|
+| `RUSTSEC-2023-0071` (`rsa` 0.9.10) | Accepted exception | Transitive via `oxi-ai`; no upstream fix is available. |
+| Wasmtime 24.x advisories | Resolved | Lockfile now uses Wasmtime 36.0.12. |
+| Unmaintained transitive crates | Tracked | No direct production dependency currently owns these versions. |
+| Yanked `spin` 0.9.8 | Tracked | Transitive via `oxi-sdk`; no compatible direct replacement is available in this workspace. |
 
-| Class | Meaning |
-|-------|---------|
-| **REACHABLE** | Vulnerable code path is active in default build or a non-optional dependency |
-| **CONDITIONAL** | Reachable only when an optional feature is enabled |
-| **UNREACHABLE** | Dev-dependency only, or the vulnerable API surface is not used |
+## Reachability
 
----
+`wasm-sandbox` is optional and absent from default features. When enabled, the
+patched Wasmtime 36.0.12 line is compiled and checked by the dedicated feature gate.
+RSA remains transitive and is not directly invoked by Oxios application code.
 
-## Vulnerabilities
+## Commands
 
-### 🔴 Critical
+- `cargo audit` — pass with the documented RSA exception and non-blocking warnings.
+- `cargo check -p oxios-kernel --features wasm-sandbox` — pass.
 
-| # | ID | Severity | Crate | Version | Classification |
-|---|----|----------|-------|---------|----------------|
-| 1 | RUSTSEC-2026-0096 | **9.0 Critical** | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 2 | RUSTSEC-2026-0095 | **9.0 Critical** | wasmtime | 22.0.1 | **CONDITIONAL** |
+[docs/production-audit/02-security/SECURITY-POSTURE.md#5260]
+SWAP.BLK 1:
+# Oxios Security Posture — 2026-07-24
 
-**Details:**
+**Audit scope:** dependency vulnerabilities, command execution, optional Wasm sandbox, and local web API.
+**Review date:** 2026-07-24
 
-1. **RUSTSEC-2026-0096** — Miscompiled guest heap access enables sandbox escape on aarch64 Cranelift.
-   - **Path:** `oxios-kernel → wasmtime (feature: wasm-sandbox)`
-   - **Condition:** Only reachable when `--features wasm-sandbox` is enabled. The feature is **NOT** in the default feature set.
-   - **Impact:** On ARM64 hosts with `wasm-sandbox` enabled, a malicious WASM module could escape the sandbox.
-   - **Fix:** Upgrade to wasmtime ≥ 36.0.7 or ≥ 42.0.2 or ≥ 43.0.1.
+## Vulnerability Summary
 
-2. **RUSTSEC-2026-0095** — Winch compiler backend allows sandbox-escaping memory access.
-   - **Path:** Same as above.
-   - **Condition:** Only with `wasm-sandbox` feature. Oxios enables `cranelift` feature, not `winch`. However, wasmtime may still use Winch internally for some targets.
-   - **Impact:** Memory access outside sandbox bounds.
-   - **Fix:** Same as above.
+| Finding | Status | Action |
+|---|---|---|
+| Wasmtime 36.0.12 | Resolved | Keep `wasm-sandbox` opt-in and rerun its feature gate after upgrades. |
+| `rsa` RUSTSEC-2023-0071 | Accepted exception | No upstream fix; monitor `oxi-sdk`/`rsa`. |
+| Unmaintained/yanked transitive crates | Tracked | Review when upstream dependency updates become available. |
 
-### 🟡 High
+## Security Controls
 
-| # | ID | Severity | Crate | Version | Classification |
-|---|----|----------|-------|---------|----------------|
-| 3 | RUSTSEC-2026-0149 | **7.5 High** | wasmtime-wasi | 22.0.1 | **CONDITIONAL** |
+- Shell execution is disabled by default and gated by AccessManager.
+- Structured execution uses an allowlist and metacharacter checks.
+- Workspace and knowledge paths use canonicalization/sandbox checks.
+- API defaults to loopback binding and restricted CORS.
+- Wasm sandbox memory, fuel, module-size, and wall-clock limits are enforced.
 
-**Details:**
+## Operational Caveat
 
-3. **RUSTSEC-2026-0149** — WASI `path_open(TRUNCATE)` bypasses `FilePerms::WRITE` host restriction.
-   - **Path:** `oxios-kernel → wasmtime-wasi (feature: wasm-sandbox)`
-   - **Condition:** Only with `wasm-sandbox` feature.
-   - **Impact:** A WASM guest could truncate a file without write permission.
-   - **Fix:** Upgrade to wasmtime-wasi ≥ 24.0.9 or ≥ 36.0.10 or ≥ 44.0.2.
+Binding the API to a non-loopback interface requires explicit authentication and
+TLS termination. Authenticated URL skill import and query-string WebSocket fallback
+remain review items because they can expose internal network details or credentials.
 
-### 🟡 Medium
+## Verification
 
-| # | ID | Severity | Crate | Version | Classification |
-|---|----|----------|-------|---------|----------------|
-| 4 | RUSTSEC-2026-0020 | 6.9 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 5 | RUSTSEC-2026-0021 | 6.9 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 6 | RUSTSEC-2026-0087 | 4.1 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 7 | RUSTSEC-2026-0089 | 5.9 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 8 | RUSTSEC-2026-0091 | 6.1 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 9 | RUSTSEC-2026-0092 | 5.9 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 10 | RUSTSEC-2026-0093 | 6.9 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 11 | RUSTSEC-2026-0094 | 6.1 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 12 | RUSTSEC-2026-0085 | 5.6 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 13 | RUSTSEC-2023-0071 | 5.9 | rsa | 0.9.10 | **REACHABLE** |
+- Rust formatting, clippy, workspace build, nextest, and doctests pass.
+- Frontend typecheck, tests, Biome lint, and production build pass.
+- `cargo audit` reports no unignored vulnerabilities.
 
-**Details:**
+[docs/production-audit/02-security/WASMTIME-UPGRADE-PLAN.md#C1A7]
+SWAP.BLK 1:
+# Wasmtime Security Maintenance — 2026-07-24
 
-- **#4–#12** (wasmtime): All are guest-triggered panics, DoS, OOB reads, or data leakage. All are gated behind `wasm-sandbox` feature. Not reachable in default build.
-- **#13 RUSTSEC-2023-0071** — Marvin timing attack on RSA decryption.
-  - **Path:** `oxi-ai → rsa 0.9.10`
-  - **Reachable:** Yes. `oxi-ai` is a transitive dependency of `oxi-sdk`, which is used in the default build.
-  - **Impact:** Side-channel timing attack could recover RSA private keys. However, this is only relevant if the system performs RSA decryption with user-controlled ciphertext. In Oxios, `oxi-ai` uses this for API authentication — the attack surface is minimal (no user-controlled ciphertext flows through RSA decryption).
-  - **Fix:** No upstream fix available. Monitor RUSTSEC-2023-0071 for updates.
+**Current:** `wasmtime`/`wasmtime-wasi` 36.0.12 with Cranelift.
+**Scope:** Optional `wasm-sandbox` feature in `oxios-kernel`.
+**Status:** Patched dependency line; no open Wasmtime advisories remain in the lockfile.
 
-### 🟢 Low
+## Decision
 
-| # | ID | Severity | Crate | Version | Classification |
-|---|----|----------|-------|---------|----------------|
-| 14 | RUSTSEC-2026-0086 | 2.3 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 15 | RUSTSEC-2025-0118 | 1.8 | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 16 | RUSTSEC-2024-0438 | — | wasmtime | 22.0.1 | **CONDITIONAL** |
-| 17 | RUSTSEC-2025-0046 | 3.3 | wasmtime | 22.0.1 | **CONDITIONAL** |
+Upgrade from the vulnerable 24.x line to the maintained 36.0.x line. The existing
+preview1 integration remains compatible; the only source change required by the
+newer `ResourceLimiter` trait is changing table sizes from `u32` to `usize`.
 
-All wasmtime-related. All gated behind `wasm-sandbox` feature. Not reachable in default build.
+The feature remains opt-in and is not part of the default feature set. Opt-in users
+should still run the Wasm-specific compile/test gate before enabling it in production.
 
-### ⚠️ Unsound Warnings
+## Verification
 
-| # | ID | Crate | Version | Classification |
-|---|----|-------|---------|----------------|
-| 18 | RUSTSEC-2026-0002 | lru | 0.10.1 | **UNREACHABLE** |
-| 19 | RUSTSEC-2024-0442 | wasmtime-jit-debug | 22.0.1 | **CONDITIONAL** |
+- `cargo check -p oxios-kernel --features wasm-sandbox`
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `cargo audit` (zero vulnerabilities; remaining accepted exception: transitive RSA)
 
-- **lru (RUSTSEC-2026-0002):** The unsound `IterMut` API is not used. Oxios only uses `LruCache` basic operations in `memory/embedding_cache.rs`. **Not affected.**
-- **wasmtime-jit-debug:** Only linked when `wasm-sandbox` feature is enabled. The dump functionality requires explicit opt-in. **Not affected in production.**
+## Maintenance
 
-### 📦 Unmaintained Warnings
-
-| # | ID | Crate | Impact |
-|---|----|-------|--------|
-| 20 | RUSTSEC-2025-0141 | bincode 1.3.3 | Via `llama-gguf`. No known vulnerabilities, just unmaintained. |
-| 21 | RUSTSEC-2025-0057 | fxhash 0.2.1 | Via `scraper → oxi-agent` and `wasmtime`. No known vulnerabilities. |
-| 22 | RUSTSEC-2025-0119 | number_prefix 0.4.0 | Via `indicatif`. No known vulnerabilities. |
-| 23 | RUSTSEC-2024-0436 | paste 1.0.15 | Via `wasmtime` and others. No known vulnerabilities. |
-
-These are informational — no security fix needed, but track for future deprecation.
-
----
-
-## Summary
-
-| Category | Count | Default-build risk |
-|----------|-------|--------------------|
-| Critical | 2 | ❌ None (wasm-sandbox gated) |
-| High | 1 | ❌ None (wasm-sandbox gated) |
-| Medium | 10 | ⚠️ 1 reachable (rsa timing, minimal impact) |
-| Low | 4 | ❌ None |
-| Unsound | 2 | ❌ None (unused API / feature-gated) |
-| Unmaintained | 4 | ℹ️ Informational |
-
-**Default build risk: LOW** — Only RUSTSEC-2023-0071 (rsa) is reachable, with minimal practical impact for this codebase.
-
-**wasm-sandbox build risk: CRITICAL** — Enabling `wasm-sandbox` exposes 16 vulnerabilities including two critical sandbox escapes. **Do not enable in production until wasmtime is upgraded.**
+Keep `wasmtime` and `wasmtime-wasi` on the same 36.x patch line. Re-run the three
+checks above whenever either dependency changes. A future move to 43+ will require
+reviewing the preview1-to-p1 module rename.

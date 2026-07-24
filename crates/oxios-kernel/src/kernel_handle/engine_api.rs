@@ -1676,7 +1676,7 @@ impl EngineApi {
             }
         }
     }
- }
+}
 
 impl std::fmt::Debug for EngineApi {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -2083,7 +2083,8 @@ mod tests {
 
     #[test]
     fn test_parse_follow_up_markdown_fence() {
-        let raw = "```json\n{\"chips\": [{\"label\": \"Hello\", \"message\": \"Hello world\"}]}\n```";
+        let raw =
+            "```json\n{\"chips\": [{\"label\": \"Hello\", \"message\": \"Hello world\"}]}\n```";
         let chips = parse_follow_up_chips(raw).unwrap();
         assert_eq!(chips.len(), 1);
         assert_eq!(chips[0].label, "Hello");

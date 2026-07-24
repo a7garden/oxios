@@ -918,8 +918,17 @@ async fn run_agent(
         model_id: config.model_id.clone(),
         system_prompt: Some(system_prompt.clone()),
         timeout_seconds: 300,
-        temperature: config.model_params.as_ref().and_then(|p| p.temperature).or(Some(0.7)),
-        max_tokens: config.model_params.as_ref().and_then(|p| p.max_tokens).map(|v| v as usize).or(Some(8192)),
+        temperature: config
+            .model_params
+            .as_ref()
+            .and_then(|p| p.temperature)
+            .or(Some(0.7)),
+        max_tokens: config
+            .model_params
+            .as_ref()
+            .and_then(|p| p.max_tokens)
+            .map(|v| v as usize)
+            .or(Some(8192)),
         compaction_strategy: CompactionStrategy::Threshold(0.8),
         compaction_instruction: None,
         context_window: 128_000,

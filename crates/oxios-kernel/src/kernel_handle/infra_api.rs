@@ -28,6 +28,8 @@ pub struct InfraApi {
 
 impl InfraApi {
     /// Create a new InfraApi.
+    // Facade construction gathers the independent infrastructure services.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         git_layer: Arc<GitLayer>,
         cron_scheduler: Arc<CronScheduler>,

@@ -125,7 +125,7 @@ impl StateApi {
     ) -> anyhow::Result<bool> {
         self.state_store
             .move_session_to_project(id, project_id)
-        .await
+            .await
     }
 
     /// RFC-035: List child sessions (threads) of the given parent.
@@ -137,11 +137,7 @@ impl StateApi {
     }
 
     /// RFC-035: Create a thread (sub-session) under the given parent.
-    pub async fn create_thread(
-        &self,
-        parent_id: &str,
-        user_id: &str,
-    ) -> anyhow::Result<Session> {
+    pub async fn create_thread(&self, parent_id: &str, user_id: &str) -> anyhow::Result<Session> {
         self.state_store.create_thread(parent_id, user_id).await
     }
 

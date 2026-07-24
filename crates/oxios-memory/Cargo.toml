@@ -21,9 +21,8 @@ parking_lot = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-lru = "0.10"
+lru = "0.16.3"
 usearch = "2.25"
-
 # Optional: SQLite backend
 rusqlite = { version = "0.34", features = ["bundled"], optional = true }
 sqlite-vec = { version = "0.1", optional = true }

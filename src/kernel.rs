@@ -1431,8 +1431,7 @@ impl KernelBuilder {
         // Without this, exec_tool registers in one PendingToolApprovals
         // instance while /api/chat/tool-approval/{id}/respond resolves from
         // another → 404 on every click, no matter how fast.
-        let pending_tool_approvals =
-            Arc::new(oxios_kernel::tools::PendingToolApprovals::new());
+        let pending_tool_approvals = Arc::new(oxios_kernel::tools::PendingToolApprovals::new());
         let pending_ask_user = Arc::new(oxios_kernel::tools::PendingAskUser::new());
 
         // Build AgentApi with HNSW index attached

@@ -182,7 +182,7 @@ pub struct MsgCtx {
     /// Per-message model params. Carried into ExecEnv::model_params.
     /// Populated by the gateway from the WS payload.
     pub model_params: Option<ModelParams>,
- }
+}
 
 /// Per-message model generation params. Wired from WS payload through
 /// `MsgCtx` → `ExecEnv` → `AgentRuntimeConfig` → `AgentConfig`. Each

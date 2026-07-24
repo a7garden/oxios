@@ -52,7 +52,7 @@ pub(crate) struct ChatRequest {
     /// when `None`, the agent runtime falls back to its 8192 default.
     #[serde(default)]
     max_tokens: Option<u32>,
- }
+}
 
 pub(crate) fn default_user() -> String {
     "default".into()
@@ -1045,9 +1045,8 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             .unwrap_or(false);
                         // Per-message model params. Optional. Threaded via
                         // gateway metadata to ExecEnv::model_params.
-                        let incoming_temperature = parsed
-                            .get("temperature")
-                            .and_then(|v| v.as_f64());
+                        let incoming_temperature =
+                            parsed.get("temperature").and_then(|v| v.as_f64());
                         let incoming_max_tokens = parsed
                             .get("max_tokens")
                             .and_then(|v| v.as_u64())
@@ -1129,10 +1128,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                     incoming.metadata.insert("model_override".into(), m.clone());
                                 }
                                 if let Some(t) = incoming_temperature {
-                                    incoming.metadata.insert("temperature".into(), t.to_string());
+                                    incoming
+                                        .metadata
+                                        .insert("temperature".into(), t.to_string());
                                 }
                                 if let Some(mt) = incoming_max_tokens {
-                                    incoming.metadata.insert("max_tokens".into(), mt.to_string());
+                                    incoming
+                                        .metadata
+                                        .insert("max_tokens".into(), mt.to_string());
                                 }
                                 incoming
                                     .metadata
@@ -1184,10 +1187,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                     incoming.metadata.insert("model_override".into(), m.clone());
                                 }
                                 if let Some(t) = incoming_temperature {
-                                    incoming.metadata.insert("temperature".into(), t.to_string());
+                                    incoming
+                                        .metadata
+                                        .insert("temperature".into(), t.to_string());
                                 }
                                 if let Some(mt) = incoming_max_tokens {
-                                    incoming.metadata.insert("max_tokens".into(), mt.to_string());
+                                    incoming
+                                        .metadata
+                                        .insert("max_tokens".into(), mt.to_string());
                                 }
                                 incoming
                                     .metadata
@@ -1787,20 +1794,6 @@ fn extract_link_title(text: &str, url_pos: usize) -> Option<String> {
         return None;
     }
     Some(title.to_string())
-}
-
-/// GET /api/sessions/{id}/tool-calls — Get tool call timeline for a session.
-pub(crate) async fn handle_session_tool_calls(
-    _state: State<Arc<AppState>>,
-    Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    // Session tool calls are not yet stored persistently.
-    // Return empty array for now — will be populated when trajectory_steps
-    // are persisted to sessions.
-    Ok(Json(serde_json::json!({
-        "session_id": id,
-        "tool_calls": []
-    })))
 }
 
 // ---------------------------------------------------------------------------

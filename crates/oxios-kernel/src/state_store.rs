@@ -903,7 +903,7 @@ impl StateStore {
         self.save_session(&session).await?;
         Ok(session)
     }
- }
+}
 
 /// Summary of a session for listing (without full message history).
 #[derive(Debug, Clone, Serialize, Deserialize)]

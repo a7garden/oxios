@@ -28,7 +28,7 @@ pub(crate) struct SessionListItem {
     title: Option<String>,
     created_at: String,
     updated_at: String,
- }
+}
 
 /// RFC-025: Body for moving a session to a Project (drag-to-reparent).
 #[derive(Debug, Deserialize)]
@@ -161,7 +161,6 @@ pub(crate) async fn handle_session_create_thread(
         Err(e) => Err(AppError::Internal(format!("Failed to create thread: {e}"))),
     }
 }
-
 
 /// PATCH /api/sessions/:id/project — Move a session to a different Project
 /// (RFC-025 drag-to-reparent). Body: `{ "project_id": "<uuid>" | null }`.

@@ -125,9 +125,9 @@ impl wasmtime::ResourceLimiter for StoreLimiter {
     /// regress any module that imports a table.
     fn table_growing(
         &mut self,
-        _current: u32,
-        _desired: u32,
-        _maximum: Option<u32>,
+        _current: usize,
+        _desired: usize,
+        _maximum: Option<usize>,
     ) -> std::result::Result<bool, anyhow::Error> {
         Ok(true)
     }

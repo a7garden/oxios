@@ -438,7 +438,6 @@ pub(crate) async fn handle_remove_custom_provider(
     Ok(Json(serde_json::json!({"deleted": true})))
 }
 
-
 /// Request body for POST /api/engine/follow-up
 #[derive(Debug, Deserialize)]
 pub struct FollowUpRequest {
