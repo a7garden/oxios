@@ -12,6 +12,7 @@ import { FileEditRender } from './FileEdit'
 import { FileReadRender } from './FileRead'
 import { GlobRender } from './Glob'
 import { GrepRender } from './Grep'
+import { ImageGenerationRender } from './ImageGeneration'
 import { ListFilesRender } from './ListFiles'
 import { registerToolRender } from './registry'
 import { SendEmailRender } from './SendEmail'
@@ -57,6 +58,10 @@ registerToolRender('fetch', WebFetchRender)
 // ── Communication ──
 registerToolRender('send_email', SendEmailRender)
 registerToolRender('sendEmail', SendEmailRender)
+
+// ── Image generation ──
+registerToolRender('image_generation', ImageGenerationRender)
+registerToolRender('imageGeneration', ImageGenerationRender)
 
 // ── A2A (agent-to-agent) ──
 registerToolRender('a2a_delegate', A2aDelegateRender)

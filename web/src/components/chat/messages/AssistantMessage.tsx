@@ -1,3 +1,16 @@
+import { useEffect, useState } from 'react'
+import { ReactionsBar } from './components/reactions-bar'
+
+function MessageReactionsRow({ messageId }: { messageId: string }) {
+  const [version, setVersion] = useState(0)
+  useEffect(() => {
+    const onChange = () => setVersion((v) => v + 1)
+    window.addEventListener('reactions-changed', onChange)
+    return () => window.removeEventListener('reactions-changed', onChange)
+  }, [])
+  return <ReactionsBar messageId={messageId} version={version} />
+}
+
 // messages/AssistantMessage — pipeline renderer for assistant role.
 //
 // LobeHub analogue: src/features/Conversation/Messages/Assistant/ +
@@ -90,17 +103,21 @@ function AssistantMessageImpl({
         {hasSearch && message.search && <SearchGrounding search={message.search} />}
         {hasChunks && <FileChunksPlaceholder chunks={message.chunksList!} />}
         {showLoading && <ContentLoading id={`loading-${message.id}`} />}
-        {hasContent && !isError && <MarkdownMessage>{message.content}</MarkdownMessage>}
+        {hasContent && !isError && (
+          <MarkdownMessage messageId={message.id} isStreaming={!!message.generating}>
+            {message.content}
+          </MarkdownMessage>
+        )}
         {isError && chatError && <ErrorCard error={chatError} onRetry={onRetry} />}
         {hasToolCalls && <ToolCallList calls={message.toolCalls!} />}
         {hasContent && !isError && (
           <FollowUpChips
-            sessionId={sessionId}
-            messageId={message.id}
             content={message.content}
+            generating={message.generating}
             onSelect={(s) => sendMessage(s)}
           />
         )}
+        <MessageReactionsRow messageId={message.id} />
       </div>
     </ChatItem>
   )

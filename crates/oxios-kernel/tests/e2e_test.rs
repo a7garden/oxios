@@ -181,6 +181,7 @@ async fn test_orchestrator_happy_path() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await
@@ -215,6 +216,7 @@ async fn test_session_continuation() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await
@@ -231,6 +233,7 @@ async fn test_session_continuation() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await
@@ -253,6 +256,7 @@ async fn test_multiple_sessions_independent() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await
@@ -266,6 +270,7 @@ async fn test_multiple_sessions_independent() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await
@@ -294,6 +299,7 @@ async fn test_session_cleaned_after_completion() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await
@@ -309,6 +315,7 @@ async fn test_session_cleaned_after_completion() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await
@@ -333,6 +340,7 @@ async fn test_phase_events_published() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await

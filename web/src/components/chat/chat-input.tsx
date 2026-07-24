@@ -2,16 +2,22 @@ import Placeholder from '@tiptap/extension-placeholder'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import {
+  Bold,
   BookOpen,
   Brain,
   Clock,
+  Code,
+  Code2,
   FileText,
   HardDrive,
   Image,
+  Italic,
+  List,
   Paperclip,
   Send,
   Sparkles,
   Square,
+  Strikethrough,
   X,
 } from 'lucide-react'
 import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react'
@@ -21,6 +27,7 @@ import { useIsTouch } from '@/hooks/use-is-touch'
 import { useKnowledgeSearch } from '@/hooks/use-knowledge'
 import { useMemorySemanticSearch } from '@/hooks/use-memory'
 import { useMounts } from '@/hooks/use-mounts'
+import { getInputHistory } from '@/lib/input-history-storage'
 import { cn } from '@/lib/utils'
 import { ModelPickerContainer } from './model-picker'
 
@@ -187,6 +194,8 @@ export function ChatInput({
   const [mentionIndex, setMentionIndex] = useState(0)
   const [mentionResults, setMentionResults] = useState<MentionResult[]>([])
   const mentionSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [isEditorFocused, setIsEditorFocused] = useState(false)
+  const [hasEditorContent, setHasEditorContent] = useState(Boolean(value.trim()))
 
   // Search hooks
   const knowledgeSearch = useKnowledgeSearch()
@@ -254,10 +263,26 @@ export function ChatInput({
     [knowledgeSearch, memorySearch, mountsData, roles],
   )
 
+  // Enter-to-send runs through ProseMirror's handleKeyDown (it fires before the
+  // keymap, so the newline never lands in the doc). editorProps is bound once at
+  // editor creation, so the changing values are mirrored into a ref and read fresh
+  // on each keypress.
+  const sendGate = useRef({ isTouch, showSlashMenu, mentionQuery, handleSend: () => {} })
+  // Input history — terminal-style ArrowUp/Down navigation through past prompts.
+  // Mirrors the sendGate ref pattern: the editorProps handler is bound once, so
+  // mutable state is read fresh from a ref.
+  const [historyPopup, setHistoryPopup] = useState<{ items: string[]; index: number } | null>(null)
+  const historyGate = useRef({
+    items: [] as string[],
+    index: -1,
+    original: '',
+    applyingHistory: false,
+    apply: (_text: string) => {},
+  })
   // Editor
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: false, codeBlock: false }),
+      StarterKit.configure({ heading: false }),
       Placeholder.configure({
         placeholder:
           placeholder ?? (connected ? t('chat.inputPlaceholder') : t('chat.waitingForConnection')),
@@ -265,9 +290,79 @@ export function ChatInput({
     ],
     content: value,
     editable: !disabled && !!connected,
+    editorProps: {
+      handleKeyDown: (_view, event) => {
+        // Shift+Enter → newline; IME-composition Enter confirms a candidate
+        // (Korean/CJK) instead of sending.
+        const composing = event.isComposing || event.keyCode === 229
+        if (
+          event.key === 'Enter' &&
+          !event.shiftKey &&
+          !composing &&
+          !sendGate.current.isTouch &&
+          !sendGate.current.showSlashMenu &&
+          sendGate.current.mentionQuery === null
+        ) {
+          event.preventDefault()
+          sendGate.current.handleSend()
+          return true
+        }
+        // ArrowUp/Down — input history navigation (terminal-style), only when
+        // no slash/mention menu is open and not composing.
+        const hg = historyGate.current
+        const menusOpen = sendGate.current.showSlashMenu || sendGate.current.mentionQuery !== null
+        if (!composing && !menusOpen) {
+          if (event.key === 'ArrowUp') {
+            const text = _view.state.doc.textBetween(0, _view.state.doc.content.size, '\n')
+            if (text.length === 0 || hg.index >= 0) {
+              event.preventDefault()
+              if (hg.index < 0) {
+                hg.items = getInputHistory()
+                if (hg.items.length === 0) return true
+                hg.original = text
+              }
+              hg.index = Math.min(hg.index + 1, hg.items.length - 1)
+              hg.apply(hg.items[hg.index]!)
+              setHistoryPopup({ items: [...hg.items], index: hg.index })
+              return true
+            }
+          }
+          if (event.key === 'ArrowDown' && hg.index >= 0) {
+            event.preventDefault()
+            hg.index -= 1
+            if (hg.index < 0) {
+              hg.apply(hg.original)
+              setHistoryPopup(null)
+            } else {
+              hg.apply(hg.items[hg.index]!)
+              setHistoryPopup({ items: [...hg.items], index: hg.index })
+            }
+            return true
+          }
+          if (event.key === 'Escape' && hg.index >= 0) {
+            event.preventDefault()
+            hg.index = -1
+            hg.apply(hg.original)
+            setHistoryPopup(null)
+            return true
+          }
+        }
+        return false
+      },
+    },
+    onFocus: () => setIsEditorFocused(true),
+    onBlur: () => setIsEditorFocused(false),
     onUpdate: ({ editor }) => {
       const text = editor.getText()
-      onChange(text)
+      setHasEditorContent(Boolean(text.trim()))
+      // Send HTML so formatting (bold/italic/code/lists) survives — MarkdownMessage
+      // renders HTML via rehype-raw, and setContent parses HTML natively.
+      onChange(editor.getHTML())
+      // Exit input-history mode when the user types normally (not via apply).
+      if (!historyGate.current.applyingHistory && historyGate.current.index >= 0) {
+        historyGate.current.index = -1
+        setHistoryPopup(null)
+      }
       const anchor = editor.state.selection.anchor
       const textBefore = text.slice(0, anchor)
       // /commands
@@ -294,9 +389,27 @@ export function ChatInput({
   }, [editor, connected, disabled])
 
   // Sync
+  // Sync external value (draft restore, history nav) into the editor.
+  // Compare against getHTML() since onChange now emits HTML. Normalise the
+  // empty edge: value "" ↔ editor getHTML() "<p></p>".
   useEffect(() => {
-    if (editor && value !== editor.getText()) editor.commands.setContent(value)
+    if (!editor) return
+    const current = editor.getHTML()
+    const normalizedValue = value || ''
+    const normalizedCurrent = current === '<p></p>' ? '' : current
+    if (normalizedValue !== normalizedCurrent) editor.commands.setContent(value || '')
   }, [value, editor])
+
+  // Wire the input-history apply callback now that the editor exists.
+  useEffect(() => {
+    if (!editor) return
+    historyGate.current.apply = (text: string) => {
+      historyGate.current.applyingHistory = true
+      editor.commands.setContent(text)
+      editor.commands.focus('end')
+      historyGate.current.applyingHistory = false
+    }
+  }, [editor])
 
   // Mention search effect
   useEffect(() => {
@@ -386,23 +499,10 @@ export function ChatInput({
     setContextAttachments([])
     setAttachedFiles([])
   }, [getContent, connected, contextAttachments, attachedFiles, onSend, editor])
+  sendGate.current = { isTouch, showSlashMenu, mentionQuery, handleSend }
 
   const canSend = editor?.getText().trim() && connected
-
-  // Enter to send
-  useEffect(() => {
-    if (!editor) return
-    const el = editor.view.dom
-    const h = (e: Event) => {
-      const ke = e as KeyboardEvent
-      if (ke.key === 'Enter' && !ke.shiftKey && !isTouch && !showSlashMenu && !mentionQuery) {
-        e.preventDefault()
-        handleSend()
-      }
-    }
-    el.addEventListener('keydown', h)
-    return () => el.removeEventListener('keydown', h)
-  }, [editor, isTouch, showSlashMenu, mentionQuery, handleSend])
+  const showTypoBar = isEditorFocused || hasEditorContent
 
   const filteredCommands = SLASH_COMMANDS.filter(
     (c) => c.id.includes(slashFilter) || c.label.includes(slashFilter),
@@ -590,13 +690,102 @@ export function ChatInput({
             <span className="text-sm text-primary font-medium">Drop files to attach</span>
           </div>
         )}
-        <div className="px-4 py-3">
+        {historyPopup && (
+          <div className="absolute bottom-full left-0 right-0 z-20 mb-1 max-h-56 overflow-y-auto rounded-lg border bg-popover p-1 shadow-md">
+            {historyPopup.items.slice(0, 8).map((item, i) => (
+              <button
+                key={i}
+                type="button"
+                className={cn(
+                  'block w-full truncate rounded px-2 py-1.5 text-left text-xs transition-colors',
+                  i === historyPopup.index
+                    ? 'bg-accent font-medium text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-muted',
+                )}
+              >
+                {item.replace(/<[^>]+>/g, '').slice(0, 120)}
+              </button>
+            ))}
+          </div>
+        )}
+        {showTypoBar && (
+          <div
+            className="flex items-center gap-0.5 border-b px-2 py-1.5"
+            role="toolbar"
+            aria-label={t('chatInput.formattingToolbar')}
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            {[
+              {
+                key: 'bold',
+                label: t('chatInput.bold'),
+                icon: Bold,
+                active: editor?.isActive('bold'),
+                action: () => editor?.chain().focus().toggleBold().run(),
+              },
+              {
+                key: 'italic',
+                label: t('chatInput.italic'),
+                icon: Italic,
+                active: editor?.isActive('italic'),
+                action: () => editor?.chain().focus().toggleItalic().run(),
+              },
+              {
+                key: 'strike',
+                label: t('chatInput.strikethrough'),
+                icon: Strikethrough,
+                active: editor?.isActive('strike'),
+                action: () => editor?.chain().focus().toggleStrike().run(),
+              },
+              {
+                key: 'bulletList',
+                label: t('chatInput.bulletList'),
+                icon: List,
+                active: editor?.isActive('bulletList'),
+                action: () => editor?.chain().focus().toggleBulletList().run(),
+              },
+              {
+                key: 'code',
+                label: t('chatInput.inlineCode'),
+                icon: Code,
+                active: editor?.isActive('code'),
+                action: () => editor?.chain().focus().toggleCode().run(),
+              },
+              {
+                key: 'codeBlock',
+                label: t('chatInput.codeBlock'),
+                icon: Code2,
+                active: editor?.isActive('codeBlock'),
+                action: () => editor?.chain().focus().toggleCodeBlock().run(),
+              },
+            ].map(({ key, label, icon: Icon, active, action }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={action}
+                disabled={!editor?.isEditable}
+                aria-label={label}
+                aria-pressed={Boolean(active)}
+                title={label}
+                className={cn(
+                  'inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors',
+                  'hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                  'disabled:pointer-events-none disabled:opacity-40',
+                  active && 'bg-accent text-accent-foreground',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="px-4 pt-3 pb-2.5">
           <EditorContent
             editor={editor}
             className="prose prose-sm dark:prose-invert max-w-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[1.5em] [&_.ProseMirror]:max-h-[280px] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground/70 [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0"
           />
         </div>
-        <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5">
+        <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-1">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <ModelPickerContainer
               activeModelId={activeModelId}

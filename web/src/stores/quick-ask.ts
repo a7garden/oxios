@@ -103,6 +103,26 @@ function discardPendingTokens(): void {
   }
   _pendingTokens = ''
 }
+// Tool-approval ids the user has already acted on. QuickAsk opens its own
+// short-lived WS, so it keeps a separate set from chat.ts. A reconnect replay
+// can re-deliver a tool_approval chunk for an approval already resolved on
+// the backend; without dedup the replay re-arms a dead card whose every click
+// returns 404. Bounded so a long session cannot grow it without limit.
+const _resolvedApprovalIds = new Set<string>()
+const RESOLVED_APPROVAL_IDS_MAX = 64
+function markApprovalResolved(id: string): void {
+  _resolvedApprovalIds.add(id)
+  while (_resolvedApprovalIds.size > RESOLVED_APPROVAL_IDS_MAX) {
+    const first = _resolvedApprovalIds.values().next().value
+    if (first === undefined) break
+    _resolvedApprovalIds.delete(first)
+  }
+}
+/** Test-only: clear resolved-approval ids so module state doesn't leak
+ *  between tests. */
+export function __clearResolvedApprovalIdsForTesting(): void {
+  _resolvedApprovalIds.clear()
+}
 
 export const useQuickAskStore = create<QuickAskState>((set, get) => ({
   open: false,
@@ -223,8 +243,13 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
   },
 
   resolveToolApproval: async (id, approved) => {
+    // Record as resolved before the fetch so a WS replay cannot re-arm the
+    // card with this id. 404 "already resolved" is benign (prior click,
+    // replay re-arm, or the exec_tool 120 s timeout auto-denying it) — leave
+    // the card dismissed; only genuine errors warrant a retry.
+    markApprovalResolved(id)
     try {
-      await fetch(`/api/chat/tool-approval/${encodeURIComponent(id)}/respond`, {
+      const res = await fetch(`/api/chat/tool-approval/${encodeURIComponent(id)}/respond`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -232,8 +257,12 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
         },
         body: JSON.stringify({ approved }),
       })
-    } catch {
+      if (!res.ok && res.status !== 404) {
+        console.warn('[quick-ask] tool approval respond failed:', res.status)
+      }
+    } catch (e) {
       // Non-blocking — the backend oneshot times out on its own.
+      console.warn('[quick-ask] tool approval respond error:', e)
     }
     set({ activeToolApproval: null })
   },
@@ -353,21 +382,30 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
       }
       break
     }
-    case 'tool_approval':
-      // Backend sends `id` (chat.rs:1479), NOT tool_call_id — that field is
-      // reserved for RFC-015 tool-activity chunks (types/index.ts). Reading
-      // tool_call_id here always yielded undefined → random-UUID fallback →
-      // resolveToolApproval 404. Mirrors chat's tool_approval handler; also
-      // pauses streaming while approval is pending.
-      set({
-        activeToolApproval: {
-          id: chunk.id || crypto.randomUUID(),
-          toolName: chunk.tool_name || 'tool',
-          reason: chunk.reason ?? '',
-        },
-        isStreaming: false,
-      })
+    case 'tool_approval': {
+      // Backend sends `id` (chat.rs), NOT tool_call_id. Dedup: a WS replay
+      // can re-deliver a tool_approval chunk for an approval already resolved
+      // on the backend; re-arming it guarantees a 404 on the next click. Skip
+      // ids already acted on, already active, or missing a real id (the former
+      // crypto.randomUUID() fallback guaranteed a 404 since no backend entry
+      // ever matched it).
+      const approvalId = chunk.id
+      if (
+        approvalId &&
+        !_resolvedApprovalIds.has(approvalId) &&
+        get().activeToolApproval?.id !== approvalId
+      ) {
+        set({
+          activeToolApproval: {
+            id: approvalId,
+            toolName: chunk.tool_name || 'tool',
+            reason: chunk.reason ?? '',
+          },
+          isStreaming: false,
+        })
+      }
       break
+    }
     case 'interview':
       // Rare for one-shot; surface as a plain message and stop streaming.
       appendError(set, '이 질문은 추가 정보가 필요합니다. 채팅에서 다시 시도해 주세요.')

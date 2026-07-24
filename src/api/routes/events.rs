@@ -22,11 +22,13 @@ pub(crate) struct SessionListItem {
     id: String,
     user_id: String,
     project_id: Option<String>,
+    /// RFC-035: parent session ID for thread sub-conversations.
+    parent_session_id: Option<String>,
     message_count: usize,
     title: Option<String>,
     created_at: String,
     updated_at: String,
-}
+ }
 
 /// RFC-025: Body for moving a session to a Project (drag-to-reparent).
 #[derive(Debug, Deserialize)]
@@ -48,6 +50,7 @@ pub(crate) async fn handle_sessions_list(
                     id: s.id,
                     user_id: s.user_id,
                     project_id: s.project_id,
+                    parent_session_id: s.parent_session_id,
                     message_count: s.message_count,
                     title: s.title,
                     created_at: s.created_at.to_rfc3339(),
@@ -78,6 +81,7 @@ pub(crate) async fn handle_session_get(
            "project_id": session.project_id.clone()
                .or_else(|| session.metadata.get("project_id").and_then(|v| v.as_str()).map(String::from))
                .or_else(|| session.metadata.get("project_ids").and_then(|v| v.as_str()).map(String::from)),
+           "parent_session_id": session.parent_session_id,
            "user_messages": session.user_messages,
            "agent_responses": session.agent_responses,
            "active_persona_id": session.active_persona_id,
@@ -110,6 +114,54 @@ pub(crate) async fn handle_session_delete(
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
+
+/// RFC-035: List child sessions (threads) of the given parent.
+/// GET /api/sessions/:id/threads
+pub(crate) async fn handle_session_threads(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    match state.kernel.state.list_child_sessions(&id).await {
+        Ok(threads) => {
+            let items: Vec<SessionListItem> = threads
+                .into_iter()
+                .map(|s| SessionListItem {
+                    id: s.id,
+                    user_id: s.user_id,
+                    project_id: s.project_id,
+                    parent_session_id: s.parent_session_id,
+                    message_count: s.message_count,
+                    title: s.title,
+                    created_at: s.created_at.to_rfc3339(),
+                    updated_at: s.updated_at.to_rfc3339(),
+                })
+                .collect();
+            Ok(Json(serde_json::json!({ "threads": items })))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "list_child_sessions failed");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// RFC-035: Create a new thread under the given parent session.
+/// POST /api/sessions/:id/threads → { thread_id, session_id }
+pub(crate) async fn handle_session_create_thread(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    match state.kernel.state.create_thread(&id, "default").await {
+        Ok(session) => Ok(Json(serde_json::json!({
+            "status": "created",
+            "thread_id": session.id.0,
+            "session_id": session.id.0,
+            "parent_session_id": session.parent_session_id,
+        }))),
+        Err(e) => Err(AppError::Internal(format!("Failed to create thread: {e}"))),
+    }
+}
+
 
 /// PATCH /api/sessions/:id/project — Move a session to a different Project
 /// (RFC-025 drag-to-reparent). Body: `{ "project_id": "<uuid>" | null }`.

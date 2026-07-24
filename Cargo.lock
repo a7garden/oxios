@@ -5629,6 +5629,7 @@ version = "1.25.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "blake3",
  "chrono",
  "console",

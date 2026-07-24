@@ -1,4 +1,28 @@
 {
+  "artifact": {
+    "openPreview": "Open preview",
+    "chars": "chars",
+    "copyPng": "Copy PNG",
+    "mermaidError": "Diagram error",
+    "loading": "Loading…",
+    "close": "Close panel",
+    "code": "Code",
+    "preview": "Preview",
+    "copy": "Copy",
+    "download": "Download"
+  },
+  "portal": {
+    "back": "Back",
+    "close": "Close",
+    "threadCreating": "Creating thread…",
+    "threadFrom": "Thread from",
+    "threadEmpty": "(no messages yet)",
+    "createThread": "Create thread from this message",
+    "loading": "Loading…",
+    "filePreview": {
+      "loading": "Loading…"
+    }
+  },
   "agentMonitor": {
     "canvas": "Canvas",
     "table": "Table",
@@ -190,7 +214,21 @@
     "conflictTitle": "{{count}} event(s) overlap",
     "conflictDetail": "{{minutes}} min overlap"
   },
+  "chatInput": {
+    "formattingToolbar": "Text formatting",
+    "bold": "Bold",
+    "italic": "Italic",
+    "strikethrough": "Strikethrough",
+    "bulletList": "Bullet list",
+    "inlineCode": "Inline code",
+    "codeBlock": "Code block"
+  },
   "chat": {
+    "minimap": {
+      "ariaLabel": "Message overview",
+      "jumpToMessage": "Jump to message {{index}}",
+      "emptyMessage": "(empty)"
+    },
     "toolApproval": {
       "title": "Tool Approval",
       "description": "Allow this tool for the current session?",
@@ -353,6 +391,16 @@
     "roleYou": "You",
     "interviewTitle": "Interview",
     "retry": "Retry",
+    "scrollToBottom": "Scroll to bottom",
+    "regenerate": "Regenerate",
+    "compressedCollapsed": "{{count}} earlier messages (click to expand)",
+    "addReaction": "Add reaction",
+    "modelParams": "Model parameters",
+    "temperature": "Temperature",
+    "maxTokens": "Max tokens",
+    "default": "default",
+    "reset": "Reset",
+    "compressedExpanded": "Hide earlier messages",
     "error": {
       "quotaExceeded": "The selected provider has no remaining tokens.",
       "authFailed": "Provider authentication failed.",
@@ -478,6 +526,8 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
+    "copy": "Copy",
+    "copied": "Copied",
     "delete": "Delete",
     "edit": "Edit",
     "create": "Create",
@@ -1931,7 +1981,14 @@
       "countHint": "Number of images generated per task by default (range: {{min}}-{{max}})",
       "model": "Image generation model",
       "modelHint": "Model used when generating images (DALL-E, Stable Diffusion, etc.)",
-      "noImageModels": "No image-specific models detected. Showing all models."
+      "noImageModels": "No image-specific models detected. Showing all models.",
+      "enable": "Enable image generation",
+      "enableHint": "Registers the image_generation tool for agents. The API key is resolved from the same source as the chat engine.",
+      "defaultModel": "Default model",
+      "defaultModelHint": "OpenAI-compatible model id. Used when the agent does not specify one.",
+      "provider": "Provider",
+      "baseUrl": "Base URL",
+      "saving": "Saving…"
     },
     "sectionAppearance": "Appearance",
     "appearanceDescription": "Theme mode and accent color customization",

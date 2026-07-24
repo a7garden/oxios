@@ -82,6 +82,13 @@ pub struct ExecEnv {
     /// failed directive with a fallback model. `None` for normal runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_override: Option<String>,
+
+    /// Per-message model params (temperature / max_tokens). When set, the
+    /// agent runtime uses these instead of its defaults. Populated by the
+    /// gateway from the WS `temperature` / `max_tokens` fields. `None` →
+    /// the agent runtime falls back to its built-in defaults (0.7 / 8192).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_params: Option<ModelParams>,
     /// RFC-032: Role hint (optional). When set, the agent runtime consults
     /// `engine.role_routing[role]` to choose a model ID. Precedence:
     /// `model_override` (recovery retry) > `role_routing[role]` > default.
@@ -165,7 +172,30 @@ pub struct MsgCtx {
     /// field. `None` for normal runs.
     pub model_override: Option<String>,
     /// User identifier.
+    /// Per-message model override (optional). When set, the orchestrator
+    /// carries it into [`ExecEnv::model_override`] so the agent runtime
+    /// uses this model instead of `role_routing[role]` or the engine
+    /// default. Populated by the gateway from the WS / POST `model`
+    /// field. `None` for normal runs.
     pub user_id: String,
+
+    /// Per-message model params. Carried into ExecEnv::model_params.
+    /// Populated by the gateway from the WS payload.
+    pub model_params: Option<ModelParams>,
+ }
+
+/// Per-message model generation params. Wired from WS payload through
+/// `MsgCtx` → `ExecEnv` → `AgentRuntimeConfig` → `AgentConfig`. Each
+/// field is `None` when the client did not supply a value, so the agent
+/// runtime can apply per-field defaults independently.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ModelParams {
+    /// Sampling temperature (0.0–2.0). Typical: 0.0–1.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    /// Maximum tokens to generate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
 }
 
 /// Timestamp of directive creation (used for session metadata, not stored on the directive itself).

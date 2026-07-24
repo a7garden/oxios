@@ -48,6 +48,8 @@ tempfile = { workspace = true }
 lettre = { workspace = true }
 # HTTP client for ClawHub API
 reqwest = { workspace = true }
+# Base64 decoding for image generation (b64_json response normalization)
+base64 = "0.22"
 # ZIP extraction for ClawHub skill archives
 zip = { workspace = true }
 # tar.gz extraction for host-tool downloads (RFC-041 provisioner)

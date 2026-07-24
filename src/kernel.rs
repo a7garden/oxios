@@ -49,6 +49,14 @@ pub struct Kernel {
     /// RFC-031: the TokenMaxer orchestrator (drain loop).
     token_maxer: Arc<oxios_kernel::TokenMaxer>,
     resource_monitor: Arc<ResourceMonitor>,
+    /// Shared HitL approval registry — the SAME instance must back both the
+    /// preliminary handle (AgentRuntime/tools register here) and the cached
+    /// handle (HTTP resolver looks up here). Without sharing, the agent
+    /// registers an approval in one map while /api/chat/tool-approval/{id}/respond
+    /// resolves from another → 404 on every click.
+    pending_tool_approvals: Arc<oxios_kernel::tools::PendingToolApprovals>,
+    /// Shared ask_user registry (RFC-027) — same cross-handle sharing rule.
+    pending_ask_user: Arc<oxios_kernel::tools::PendingAskUser>,
     project_manager: Option<Arc<ProjectManager>>,
     /// Mount manager (RFC-025 path aliases). `None` when SQLite memory is off.
     /// Wired into the lazily-cached handle so `/api/mounts` and the mount tool
@@ -228,6 +236,8 @@ impl Kernel {
                         self.event_bus.clone(),
                         self.config.clone(),
                         self.start_time,
+                        self.pending_tool_approvals.clone(),
+                        self.pending_ask_user.clone(),
                     ),
                     self.project_manager
                         .clone()
@@ -513,6 +523,7 @@ impl Kernel {
                 None,
                 None,
                 None,
+                None, // model_params
                 "cli-direct",
             )
             .await
@@ -535,7 +546,8 @@ impl Kernel {
                 None,
                 None,
                 None,
-                None,
+                None, // model_override
+                None, // model_params
                 "cli-direct",
             )
             .await
@@ -1413,6 +1425,16 @@ impl KernelBuilder {
             .expect("HNSW index init failed"),
         );
 
+        // Shared HitL registries — created ONCE so the preliminary handle
+        // (used by AgentRuntime to register tool approvals) and the cached
+        // handle (used by the HTTP API to resolve them) see the same map.
+        // Without this, exec_tool registers in one PendingToolApprovals
+        // instance while /api/chat/tool-approval/{id}/respond resolves from
+        // another → 404 on every click, no matter how fast.
+        let pending_tool_approvals =
+            Arc::new(oxios_kernel::tools::PendingToolApprovals::new());
+        let pending_ask_user = Arc::new(oxios_kernel::tools::PendingAskUser::new());
+
         // Build AgentApi with HNSW index attached
         let mut agent_api = oxios_kernel::AgentApi::new(
             // Placeholder supervisor — the real one needs AgentRuntime which needs this handle.
@@ -1447,6 +1469,8 @@ impl KernelBuilder {
                     event_bus.clone(),
                     config.clone(),
                     std::time::Instant::now(),
+                    pending_tool_approvals.clone(),
+                    pending_ask_user.clone(),
                 ),
                 project_manager.clone().map(oxios_kernel::ProjectApi::new),
                 oxios_kernel::ExecApi::new(
@@ -1714,6 +1738,8 @@ impl KernelBuilder {
             quota_tracker,
             token_maxer,
             resource_monitor,
+            pending_tool_approvals,
+            pending_ask_user,
             project_manager,
             mount_manager,
             start_time: std::time::Instant::now(),

@@ -377,6 +377,7 @@ async fn test_orchestrator_happy_path() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await
@@ -414,6 +415,7 @@ async fn test_orchestrator_events_published() {
                 None,
                 None, // RFC-032: role
                 None, // model_override
+                None, // model_params
                 "test-req",
             )
             .await
@@ -678,6 +680,7 @@ async fn test_orchestrator_routes_to_supervisor() {
             None,
             None, // RFC-032: role
             None, // model_override
+            None, // model_params
             "test-req",
         )
         .await

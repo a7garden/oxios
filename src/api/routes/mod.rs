@@ -20,6 +20,7 @@ mod engine_routes;
 mod events;
 mod git_routes;
 mod host_tools_routes;
+mod image_routes;
 mod infra;
 pub(crate) use host_tools_routes::{handle_host_tools, handle_host_tools_detect};
 mod integrations_routes;
@@ -88,17 +89,18 @@ pub(crate) use email_routes::{
 };
 pub(crate) use engine_routes::{
     handle_add_custom_provider, handle_check_provider_connection, handle_engine_config,
-    handle_engine_delete_api_key, handle_engine_models, handle_engine_providers,
-    handle_engine_roles, handle_engine_routing_fallbacks, handle_engine_routing_stats,
-    handle_engine_set_api_key, handle_engine_set_model, handle_engine_set_provider_options,
-    handle_engine_set_quick_ask_model, handle_engine_set_roles, handle_engine_set_routing,
-    handle_engine_validate_key, handle_get_provider_config, handle_remove_custom_provider,
-    handle_set_model_list, handle_set_provider_config,
+    handle_engine_delete_api_key, handle_engine_follow_up, handle_engine_models,
+    handle_engine_providers, handle_engine_roles, handle_engine_routing_fallbacks,
+    handle_engine_routing_stats, handle_engine_set_api_key, handle_engine_set_model,
+    handle_engine_set_provider_options, handle_engine_set_quick_ask_model,
+    handle_engine_set_roles, handle_engine_set_routing, handle_engine_validate_key,
+    handle_get_provider_config, handle_remove_custom_provider, handle_set_model_list,
+    handle_set_provider_config,
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
-    handle_session_delete, handle_session_get, handle_session_move, handle_sessions_list,
-    handle_sessions_prune,
+    handle_session_create_thread, handle_session_delete, handle_session_get, handle_session_move,
+    handle_session_threads, handle_sessions_list, handle_sessions_prune,
 };
 pub(crate) use git_routes::{
     handle_git_log, handle_git_restore, handle_git_tag_delete, handle_git_tags, handle_git_verify,
@@ -237,7 +239,8 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/api/marketplace/skills-sh/skill/{id}/audit",
             get(handle_skills_sh_skill_audit),
-        );
+        )
+        .route("/api/images/{name}", get(image_routes::handle_image_get));
 
     // Protected API routes (auth middleware applied)
     let api = Router::new()
@@ -283,6 +286,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/config", patch(handle_config_patch))
         .route("/api/config/meta", get(handle_config_meta))
         // Engine
+        .route("/api/engine/follow-up", post(handle_engine_follow_up))
         .route("/api/engine/providers", get(handle_engine_providers))
         .route("/api/engine/models", get(handle_engine_models))
         .route("/api/engine/config", get(handle_engine_config))
@@ -472,10 +476,9 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
         .route("/api/sessions/{id}/project", patch(handle_session_move))
-        .route(
-            "/api/sessions/{id}/tool-calls",
-            get(handle_session_tool_calls),
-        )
+        // RFC-035: Threads (sub-sessions)
+        .route("/api/sessions/{id}/threads", get(handle_session_threads))
+        .route("/api/sessions/{id}/threads", post(handle_session_create_thread))
         // Cron Jobs
         .route("/api/cron-jobs", get(handle_cron_jobs_list))
         .route("/api/cron-jobs", post(handle_cron_job_create))

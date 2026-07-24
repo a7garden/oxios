@@ -2,6 +2,7 @@ import { BookOpen, Globe, GlobeOff, Paperclip, X } from 'lucide-react'
 import { type ChangeEvent, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { AttachedFile } from './chat-input'
+import { ModelParamsPopover } from './model-params-popover'
 
 export type { AttachedFile }
 export interface ChatInputActionBarProps {
@@ -133,6 +134,7 @@ export function ChatInputActionBar({
             </button>
           </>
         )}
+        <ModelParamsPopover />
       </div>
     </div>
   )

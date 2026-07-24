@@ -30,6 +30,10 @@ interface PersistedState {
   activeRole: string | null
   /** Model override id (null = follow default / role). Persisted across reloads. */
   activeModelId: string | null
+  /** Per-message sampling temperature. Persisted. `null` = use provider default. */
+  temperature: number | null
+  /** Per-message max output tokens. Persisted. `null` = use provider default. */
+  maxTokens: number | null
 }
 
 const PERSIST_KEY = 'oxios-chat-persist'
@@ -129,6 +133,10 @@ interface ChatActions {
   setActiveRole: (role: string | null) => void
   /** Set the per-message model override id (null = no override). */
   setActiveModelId: (modelId: string | null) => void
+  /** Set the per-message sampling temperature (null = provider default). */
+  setTemperature: (temperature: number | null) => void
+  /** Set the per-message max output tokens (null = provider default). */
+  setMaxTokens: (maxTokens: number | null) => void
   /** RFC-025: accept detected mount IDs into the active binding. */
   setActiveMountIds: (mountIds: string[] | null) => void
   /** RFC-025: Clear detected mount tag and IDs (e.g. on badge accept/dismiss). */
@@ -621,6 +629,26 @@ function markSeen(id: string, ring: string[]): boolean {
   if (ring.length > DEDUP_RING_MAX) ring.length = DEDUP_RING_MAX
   return true
 }
+// Tool-approval ids the user has already acted on (approved/denied). A WS
+// reconnect replay (RFC-024 SP2 C2) can re-deliver a `tool_approval` chunk
+// for an approval already resolved on the backend; without this set, the
+// replay re-arms a dead card whose every click returns 404. Bounded so a
+// long session cannot grow it without limit.
+const _resolvedApprovalIds = new Set<string>()
+const RESOLVED_APPROVAL_IDS_MAX = 64
+function markApprovalResolved(id: string): void {
+  _resolvedApprovalIds.add(id)
+  while (_resolvedApprovalIds.size > RESOLVED_APPROVAL_IDS_MAX) {
+    const first = _resolvedApprovalIds.values().next().value
+    if (first === undefined) break
+    _resolvedApprovalIds.delete(first)
+  }
+}
+/** Test-only: clear resolved-approval ids so module state doesn't leak
+ *  between tests. */
+export function __clearResolvedApprovalIdsForTesting(): void {
+  _resolvedApprovalIds.clear()
+}
 // F9: Token-streaming batching
 // ---------------------------------------------------------------------------
 // Each incoming token chunk previously rebuilt the entire messages array
@@ -818,6 +846,8 @@ export const useChatStore = create<ChatStore>()(
       activeMountIds: null,
       activeRole: null,
       activeModelId: null,
+      temperature: null,
+      maxTokens: null,
 
       // ── Runtime ──
       messages: [],
@@ -1049,6 +1079,8 @@ export const useChatStore = create<ChatStore>()(
           activeMountIds,
           activeRole,
           activeModelId,
+          temperature,
+          maxTokens,
           connected,
           connect,
           _ws,
@@ -1098,6 +1130,8 @@ export const useChatStore = create<ChatStore>()(
           // Per-message model override (or last-picked persistent one).
           model: activeModelId ?? '',
         }
+        if (temperature != null) payload.temperature = temperature
+        if (maxTokens != null) payload.max_tokens = maxTokens
         _ws.send(JSON.stringify(payload))
       },
 
@@ -1250,6 +1284,14 @@ export const useChatStore = create<ChatStore>()(
         set({ activeModelId: modelId })
       },
 
+      setTemperature(temperature: number | null) {
+        set({ temperature })
+      },
+
+      setMaxTokens(maxTokens: number | null) {
+        set({ maxTokens })
+      },
+
       removeMessage(id: string) {
         // F9: discard any buffered tokens so they don't leak into the next
         // streaming turn when the user retries an errored message.
@@ -1292,6 +1334,8 @@ export const useChatStore = create<ChatStore>()(
           activeMountIds: null,
           activeRole: null,
           activeModelId: null,
+          temperature: null,
+          maxTokens: null,
           messages: [],
           _pendingQueue: [],
           activeInterview: null,
@@ -1374,6 +1418,10 @@ export const useChatStore = create<ChatStore>()(
       async resolveToolApproval(id: string, approved: boolean) {
         const { activeToolApproval } = get()
         if (!activeToolApproval || activeToolApproval.id !== id) return
+        // Record as resolved BEFORE the fetch so a concurrent WS replay of
+        // the same approval cannot re-arm the card. Cleared only on a genuine
+        // error below so the user can retry.
+        markApprovalResolved(id)
         set({ activeToolApproval: null, isStreaming: true })
         try {
           const token = useAuthStore.getState().token
@@ -1385,13 +1433,26 @@ export const useChatStore = create<ChatStore>()(
             },
             body: JSON.stringify({ approved }),
           })
-          if (!res.ok) {
+          if (!res.ok && res.status !== 404) {
+            // 404 "not found or already resolved" is a benign idempotent
+            // outcome — the approval was handled (prior click, WS replay
+            // re-arm, or the exec_tool 120 s timeout auto-denying it).
+            // Treat it as success and leave the card dismissed; restoring a
+            // dead-id card re-arms it and every later click 404s again (the
+            // N×404 loop). Only genuine server/network errors re-arm the
+            // card for a user retry.
             const err = await res.text().catch(() => 'unknown error')
             throw new Error(`HTTP ${res.status}: ${err}`)
           }
         } catch (e) {
+          // Genuine error (network/5xx): forget the resolution and restore
+          // the card so the user can retry. Swallowed — call sites are
+          // fire-and-forget, so throwing would only surface as an unhandled
+          // promise rejection in the console. The restored card is the
+          // user-facing failure signal.
+          _resolvedApprovalIds.delete(id)
           set({ activeToolApproval, isStreaming: false })
-          throw e
+          console.warn('[chat] tool approval resolve failed:', e)
         }
       },
 
@@ -1476,10 +1537,21 @@ export const useChatStore = create<ChatStore>()(
           }
 
           case 'tool_approval': {
-            if (chunk.id && chunk.tool_name) {
+            const approvalId = chunk.id as string | undefined
+            // Dedup: a WS reconnect replay (RFC-024 SP2 C2) can re-deliver a
+            // tool_approval chunk for an approval already resolved on the
+            // backend. Re-arming such a card guarantees a 404 on the next
+            // click. Skip ids already acted on, or already active (idempotent
+            // re-delivery of a still-pending approval).
+            if (
+              approvalId &&
+              chunk.tool_name &&
+              !_resolvedApprovalIds.has(approvalId) &&
+              get().activeToolApproval?.id !== approvalId
+            ) {
               set({
                 activeToolApproval: {
-                  id: chunk.id as string,
+                  id: approvalId,
                   toolName: chunk.tool_name as string,
                   reason: (chunk.reason as string) || '',
                 },
@@ -1704,6 +1776,8 @@ export const useChatStore = create<ChatStore>()(
         activeMountIds: state.activeMountIds,
         activeRole: state.activeRole,
         activeModelId: state.activeModelId,
+        temperature: state.temperature,
+        maxTokens: state.maxTokens,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return

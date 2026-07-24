@@ -8,6 +8,7 @@
 import { memo } from 'react'
 import type { ChatMessage } from '@/types'
 import { AssistantMessage } from './AssistantMessage'
+import { MessageContextMenu } from './components/message-context-menu'
 import { ToolMessage } from './ToolMessage'
 import { UserMessage } from './UserMessage'
 
@@ -19,24 +20,32 @@ export interface MessageViewProps {
 }
 
 function MessageViewImpl({ message, sessionId, assistantIndex, onRetry }: MessageViewProps) {
-  switch (message.role) {
-    case 'user':
-      return <UserMessage message={message} />
-    case 'tool':
-      return <ToolMessage message={message} />
-    case 'assistant':
-    case 'system': // system messages render like assistant prose
-      return (
-        <AssistantMessage
-          message={message}
-          sessionId={sessionId}
-          assistantIndex={assistantIndex}
-          onRetry={onRetry}
-        />
-      )
-    default:
-      return null
-  }
+  const content = (() => {
+    switch (message.role) {
+      case 'user':
+        return <UserMessage message={message} />
+      case 'tool':
+        return <ToolMessage message={message} />
+      case 'assistant':
+      case 'system':
+        return (
+          <AssistantMessage
+            message={message}
+            sessionId={sessionId}
+            assistantIndex={assistantIndex}
+            onRetry={onRetry}
+          />
+        )
+      default:
+        return null
+    }
+  })()
+
+  return (
+    <MessageContextMenu message={message} onRetry={onRetry}>
+      {content}
+    </MessageContextMenu>
+  )
 }
 
 export const MessageView = memo(MessageViewImpl)

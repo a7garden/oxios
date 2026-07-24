@@ -1,4 +1,28 @@
 {
+  "artifact": {
+    "openPreview": "미리보기 열기",
+    "chars": "자",
+    "copyPng": "PNG 복사",
+    "mermaidError": "다이어그램 오류",
+    "loading": "로드 중…",
+    "close": "패널 닫기",
+    "code": "코드",
+    "preview": "미리보기",
+    "copy": "복사",
+    "download": "다운로드"
+  },
+  "portal": {
+    "back": "뒤로",
+    "close": "닫기",
+    "threadCreating": "스레드 생성 중…",
+    "threadFrom": "스레드 출처:",
+    "threadEmpty": "(아직 메시지가 없습니다)",
+    "createThread": "이 메시지에서 스레드 만들기",
+    "loading": "로드 중…",
+    "filePreview": {
+      "loading": "불러오는 중…"
+    }
+  },
   "agentMonitor": {
     "canvas": "캔버스",
     "table": "표",
@@ -190,7 +214,21 @@
     "conflictTitle": "{{count}}개 일정과 겹침",
     "conflictDetail": "{{minutes}}분 겹침"
   },
+  "chatInput": {
+    "formattingToolbar": "텍스트 서식",
+    "bold": "굵게",
+    "italic": "기울임꼴",
+    "strikethrough": "취소선",
+    "bulletList": "글머리 기호 목록",
+    "inlineCode": "인라인 코드",
+    "codeBlock": "코드 블록"
+  },
   "chat": {
+    "minimap": {
+      "ariaLabel": "메시지 개요",
+      "jumpToMessage": "메시지 {{index}}로 이동",
+      "emptyMessage": "(비어 있음)"
+    },
     "toolApproval": {
       "title": "도구 권한 승인",
       "description": "이 세션에서 해당 도구 사용을 허용하시겠습니까?",
@@ -352,6 +390,16 @@
     "roleYou": "사용자",
     "interviewTitle": "인터뷰",
     "retry": "다시 시도",
+    "scrollToBottom": "맨 아래로",
+    "regenerate": "다시 생성",
+    "compressedCollapsed": "이전 메시지 {{count}}개 (펼치기)",
+    "addReaction": "리액션 추가",
+    "modelParams": "모델 파라미터",
+    "temperature": "온도",
+    "maxTokens": "최대 토큰",
+    "default": "기본값",
+    "reset": "초기화",
+    "compressedExpanded": "이전 메시지 숨기기",
     "error": {
       "quotaExceeded": "선택한 프로바이더에 토큰이 남아있지 않습니다.",
       "authFailed": "프로바이더 인증에 실패했습니다.",
@@ -478,6 +526,8 @@
   "common": {
     "save": "저장",
     "cancel": "취소",
+    "copy": "복사",
+    "copied": "복사됨",
     "delete": "삭제",
     "edit": "편집",
     "create": "생성",
@@ -1929,7 +1979,14 @@
       "countHint": "작업당 기본 생성 이미지 수 (범위: {{min}}-{{max}})",
       "model": "이미지 생성 모델",
       "modelHint": "이미지 생성에 사용할 모델 (DALL-E, Stable Diffusion 등)",
-      "noImageModels": "이미지 전용 모델이 감지되지 않았습니다. 전체 모델을 표시합니다."
+      "noImageModels": "이미지 전용 모델이 감지되지 않았습니다. 전체 모델을 표시합니다.",
+      "enable": "이미지 생성 활성화",
+      "enableHint": "에이전트에 image_generation 툴을 등록합니다. API 키는 채팅 엔진과 동일한 소스에서 해결됩니다.",
+      "defaultModel": "기본 모델",
+      "defaultModelHint": "OpenAI 호환 모델 id. 에이전트가 지정하지 않을 때 사용됩니다.",
+      "provider": "Provider",
+      "baseUrl": "Base URL",
+      "saving": "저장 중…"
     },
     "systemAgents": {
       "system": "시스템 에이전트",

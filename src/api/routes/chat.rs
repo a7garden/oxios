@@ -43,7 +43,16 @@ pub(crate) struct ChatRequest {
     /// metadata so the orchestrator forwards it as `ExecEnv::model_override`.
     #[serde(default)]
     model: Option<String>,
-}
+    /// Per-message sampling temperature (0.0–2.0). Inserted into gateway
+    /// metadata and threaded through `MsgCtx` → `ExecEnv::model_params`.
+    #[serde(default)]
+    temperature: Option<f64>,
+    /// Per-message max output tokens. Inserted into gateway metadata and
+    /// threaded through `MsgCtx` → `ExecEnv::model_params`. Optional;
+    /// when `None`, the agent runtime falls back to its 8192 default.
+    #[serde(default)]
+    max_tokens: Option<u32>,
+ }
 
 pub(crate) fn default_user() -> String {
     "default".into()
@@ -140,6 +149,12 @@ pub(crate) async fn handle_chat(
             .validate_model(m)
             .map_err(AppError::BadRequest)?;
         msg.metadata.insert("model_override".to_owned(), m.clone());
+    }
+    if let Some(t) = body.temperature {
+        msg.metadata.insert("temperature".to_owned(), t.to_string());
+    }
+    if let Some(mt) = body.max_tokens {
+        msg.metadata.insert("max_tokens".to_owned(), mt.to_string());
     }
 
     let msg_id = msg.id.to_string();
@@ -1028,6 +1043,15 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             .get("ephemeral")
                             .and_then(|v| v.as_bool())
                             .unwrap_or(false);
+                        // Per-message model params. Optional. Threaded via
+                        // gateway metadata to ExecEnv::model_params.
+                        let incoming_temperature = parsed
+                            .get("temperature")
+                            .and_then(|v| v.as_f64());
+                        let incoming_max_tokens = parsed
+                            .get("max_tokens")
+                            .and_then(|v| v.as_u64())
+                            .and_then(|v| u32::try_from(v).ok());
 
                         match msg_type {
                             // RFC-024 SP2 / C2 (replay): client announces its
@@ -1104,6 +1128,12 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 if let Some(m) = &incoming_model {
                                     incoming.metadata.insert("model_override".into(), m.clone());
                                 }
+                                if let Some(t) = incoming_temperature {
+                                    incoming.metadata.insert("temperature".into(), t.to_string());
+                                }
+                                if let Some(mt) = incoming_max_tokens {
+                                    incoming.metadata.insert("max_tokens".into(), mt.to_string());
+                                }
                                 incoming
                                     .metadata
                                     .insert("conn_id".into(), conn_id_for_send.clone());
@@ -1152,6 +1182,12 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 }
                                 if let Some(m) = &incoming_model {
                                     incoming.metadata.insert("model_override".into(), m.clone());
+                                }
+                                if let Some(t) = incoming_temperature {
+                                    incoming.metadata.insert("temperature".into(), t.to_string());
+                                }
+                                if let Some(mt) = incoming_max_tokens {
+                                    incoming.metadata.insert("max_tokens".into(), mt.to_string());
                                 }
                                 incoming
                                     .metadata

@@ -317,7 +317,33 @@ preset = "balanced"
 # enabled = true
 #
 # [system_agents.follow_up_action]
-# enabled = false  # disabled by default — opt in
+# model = ""  # empty = inherit engine default_model
+# enabled = true
 #
 # [system_agents.input_completion]
 # enabled = false  # disabled by default — opt in
+# ── Image Generation ────────────────────────────────────────────────────────
+# Lets agents generate images via the `image_generation` tool. Opt-in.
+# Uses an OpenAI-compatible /v1/images/generations endpoint — the API key is
+# resolved through the SAME chain as the chat engine (env → [engine].api_key
+# → ~/.oxios/auth.json → ~/.oxi/auth.json), so no separate credential is needed.
+# Disabled by default; uncomment and set enabled = true to opt in.
+#
+# [image-gen]
+# enabled = true
+# provider = "openai"                          # OpenAI-compatible provider id
+# base_url = "https://api.openai.com/v1"       # or any OpenAI-compatible endpoint
+# default_model = "gpt-image-1"                # REQUIRED when enabled
+# default_num = 1                              # images per call (1-8)
+#
+# fal.ai provider (model variety: Flux, Seedream, Nano Banana, …). Uses the
+# async queue API — the tool submits and polls internally (up to ~175s).
+# base_url defaults to https://queue.fal.run when omitted or left as the
+# OpenAI endpoint. The key resolves via OXIOS_FAL_API_KEY or the "fal" entry
+# in ~/.oxios/auth.json.
+#
+# [image-gen]
+# enabled = true
+# provider = "fal"
+# default_model = "fal-ai/flux/schnell"
+# default_num = 1

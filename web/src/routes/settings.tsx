@@ -485,7 +485,7 @@ import { Bot, ChevronRight } from 'lucide-react'
 import { StatsDashboard } from '@/components/dashboard/stats-dashboard'
 import { AllowedToolsPicker } from '@/components/settings/allowed-tools-picker'
 import { AppearanceSettings } from '@/components/settings/appearance-settings'
-import { ImageGenerationSettings } from '@/components/settings/image-generation-settings'
+import { ImageGenerationPanel } from '@/components/settings/image-gen-panel'
 import { SystemAgentSettings } from '@/components/settings/system-agent-settings'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -865,7 +865,7 @@ function renderActiveSection(
   if (sectionId === 'image') {
     return (
       <SectionCard sectionId="image" title={t('settings.sectionImage')}>
-        <ImageGenerationSettings defaultImageNum={4} onDefaultImageNumChange={() => {}} />
+        <ImageGenerationPanel />
       </SectionCard>
     )
   }

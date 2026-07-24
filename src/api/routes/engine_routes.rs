@@ -437,3 +437,23 @@ pub(crate) async fn handle_remove_custom_provider(
     state.kernel.engine.remove_custom_provider(&id)?;
     Ok(Json(serde_json::json!({"deleted": true})))
 }
+
+
+/// Request body for POST /api/engine/follow-up
+#[derive(Debug, Deserialize)]
+pub struct FollowUpRequest {
+    /// The last assistant message text to extract suggestions from.
+    pub content: String,
+}
+
+/// POST /api/engine/follow-up — Generate context-aware follow-up suggestion
+/// chips from the last assistant message. Ported from LobeHub's
+/// FollowUpActionService: runs a lightweight LLM "sidecar" call that extracts
+/// 0-4 clickable reply chips.
+pub(crate) async fn handle_engine_follow_up(
+    state: State<Arc<AppState>>,
+    Json(body): Json<FollowUpRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let chips = state.kernel.engine.generate_follow_up(&body.content).await;
+    Ok(Json(serde_json::json!({ "suggestions": chips })))
+}

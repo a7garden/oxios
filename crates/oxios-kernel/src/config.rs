@@ -1088,6 +1088,60 @@ pub struct OxiosConfig {
     /// Token Maxing mode configuration (RFC-031).
     #[serde(default)]
     pub token_maxing: crate::token_maxing::TokenMaxingConfig,
+    /// Image generation configuration (OpenAI-compatible providers).
+    #[serde(default)]
+    pub image_gen: ImageGenConfig,
+}
+
+/// Image generation configuration.
+///
+/// Opt-in (`enabled = false` by default). When enabled, the
+/// `image_generation` tool is registered and agents can generate images via
+/// an OpenAI-compatible `/v1/images/generations` endpoint. The API key is
+/// resolved via [`CredentialStore`](crate::credential::CredentialStore) — the
+/// same provider key used for chat — so no separate credential is needed.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ImageGenConfig {
+    /// Enable the image generation tool.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Provider id. Currently only `"openai"` (OpenAI-compatible).
+    #[serde(default = "default_image_gen_provider")]
+    pub provider: String,
+    /// Base URL for the image API. Defaults to the OpenAI endpoint.
+    #[serde(default = "default_image_gen_base_url")]
+    pub base_url: String,
+    /// Default model when the agent doesn't specify one. Empty = error
+    /// (the provider requires a model; set one in config).
+    #[serde(default)]
+    pub default_model: String,
+    /// Default number of images per call (1-8).
+    #[serde(default = "default_image_gen_num")]
+    pub default_num: u8,
+}
+
+impl Default for ImageGenConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_image_gen_provider(),
+            base_url: default_image_gen_base_url(),
+            default_model: String::new(),
+            default_num: default_image_gen_num(),
+        }
+    }
+}
+
+fn default_image_gen_provider() -> String {
+    "openai".into()
+}
+
+fn default_image_gen_base_url() -> String {
+    "https://api.openai.com/v1".into()
+}
+
+fn default_image_gen_num() -> u8 {
+    1
 }
 
 /// Kernel configuration.

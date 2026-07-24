@@ -90,6 +90,7 @@ pub mod task;
 // 엔진, 에러, 타입, 메트릭, 텔레메트리, 옵저버빌리티.
 pub mod engine;
 pub mod error;
+pub mod image_gen;
 pub mod metrics;
 pub mod observability;
 pub mod types;

@@ -20,6 +20,7 @@ pub mod budget_tool;
 pub mod calendar_tool;
 pub mod cron_tool;
 pub mod email_tool;
+pub mod image_generation_tool;
 pub mod knowledge_tool;
 pub mod marketplace_tool;
 pub mod mount_tool;
@@ -34,6 +35,7 @@ pub use budget_tool::BudgetTool;
 pub use calendar_tool::CalendarTool;
 pub use cron_tool::CronTool;
 pub use email_tool::EmailTool;
+pub use image_generation_tool::ImageGenerationTool;
 pub use knowledge_tool::KnowledgeTool;
 pub use marketplace_tool::MarketplaceTool;
 pub use mount_tool::MountTool;
@@ -122,4 +124,8 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     // The shared RwLock<Option<EmailApi>> slot is swapped in at runtime via the
     // web UI setup endpoint, so no daemon restart is needed to activate email.
     registry.register(EmailTool::from_kernel(kernel));
+    // Image generation (opt-in — only when [image-gen].enabled = true).
+    if kernel.infra.config().image_gen.enabled {
+        registry.register(ImageGenerationTool::from_kernel(kernel));
+    }
 }

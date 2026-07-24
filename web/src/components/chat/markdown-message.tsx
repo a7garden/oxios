@@ -1,13 +1,22 @@
-// MarkdownMessage — enhanced markdown renderer with syntax highlighting + copy button.
+// MarkdownMessage — enhanced markdown renderer with syntax highlighting +
+// copy button AND interactive artifact previews.
 //
-// Pipeline (Phase 6, 2026-07-21):
-//   remark-gfm → rehype-raw → rehype-sanitize → rehype-highlight → rehype-thinking
+// Pipeline:
+//   remark-gfm → rehype-raw → rehypeArtifactExtract → rehype-sanitize
+//     → rehype-highlight → rehype-thinking → rehype-link-card
 //
-// Security: rehype-raw parses model output as HTML (needed so <think> tags work).
-// rehype-sanitize then strips dangerous constructs (event handlers, scripts,
-// iframes) using a schema that still permits formatting + our thinking-block
-// details/summary. Without sanitize, model output could execute arbitrary JS.
+// Security: rehype-raw parses model output as HTML (needed so <think> tags and
+// the <lobeArtifact> protocol work). rehype-sanitize then strips dangerous
+// constructs (event handlers, scripts, iframes). rehypeArtifactExtract runs
+// BEFORE sanitize so it can pull artifact code out of the sanitizable tree as
+// a plain text node (sanitize would otherwise mangle the code's children).
+//
+// Artifacts: a fenced ```html / ```svg / ```mermaid / ```jsx block (or a
+// <lobeArtifact> tag, normalised by the extract plugin into the same shape)
+// renders as an interactive ArtifactCard that opens a sandboxed preview panel
+// — NOT as a plain code listing. See components/chat/artifact/.
 
+import type { Element, ElementContent } from 'hast'
 import type { Schema } from 'hast-util-sanitize'
 import { Check, Copy } from 'lucide-react'
 import { type ComponentPropsWithoutRef, memo, useCallback, useState } from 'react'
@@ -16,10 +25,12 @@ import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
+import { ArtifactCard, ArtifactContext } from '@/components/chat/artifact/artifact-card'
+import { rehypeLinkCard } from '@/components/chat/markdown-plugins/rehype-link-card'
+import { rehypeThinking } from '@/components/chat/markdown-plugins/rehype-thinking'
 import { cn } from '@/lib/utils'
-import { rehypeArtifact } from './markdown-plugins/rehype-artifact'
-import { rehypeLinkCard } from './markdown-plugins/rehype-link-card'
-import { rehypeThinking } from './markdown-plugins/rehype-thinking'
+import { languageToArtifactType } from '@/types/artifact'
+import { preprocessArtifacts } from './markdown-plugins/preprocess-artifacts'
 
 // ── Code block with language label + copy button ──────────────────
 
@@ -87,9 +98,13 @@ function InlineCode({ children }: ComponentPropsWithoutRef<'code'>) {
 // ── Sanitize schema (extending default) ───────────────────────────
 //
 // defaultSchema already strips scripts/event handlers. We extend it to:
-//   • allow class names on code/pre (for syntax highlight + our CodeBlock)
+//   • allow class names on code/pre/span (syntax highlight + CodeBlock)
 //   • allow summary/details (for thinking-block rewrite)
 //   • keep the safe-by-default denylist for iframes, embeds, etc.
+//
+// Artifact code needs NO extra allowance here: rehypeArtifactExtract converts
+// <lobeArtifact> into a normal <pre><code class="language-*"> whose child is a
+// text node, and text + className are already permitted by default.
 
 const sanitizeSchema: Schema = {
   ...defaultSchema,
@@ -101,20 +116,48 @@ const sanitizeSchema: Schema = {
     div: [...(defaultSchema.attributes?.div ?? []), ['className']],
     details: [...(defaultSchema.attributes?.details ?? []), ['className']],
     summary: [...(defaultSchema.attributes?.summary ?? []), ['className']],
+    img: [...(defaultSchema.attributes?.img ?? []), ['alt']],
   },
   tagNames: [...(defaultSchema.tagNames ?? []), 'details', 'summary'],
 }
 
 // ── Component map for react-markdown ──────────────────────────────
 
+/** Recursively extract raw text from a hast node (immune to highlight spans). */
+function hastToText(node: ElementContent | undefined | null): string {
+  if (!node) return ''
+  if (node.type === 'text') return node.value
+  if (node.type === 'element') return node.children.map((c) => hastToText(c)).join('')
+  // comment / doctype / raw carry no printable code text we want.
+  return ''
+}
+
 const markdownComponents = {
   pre: ({ children }: ComponentPropsWithoutRef<'pre'>) => <>{children}</>,
-  code({ className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
-    const inline = 'inline' in props ? (props as { inline?: boolean }).inline : false
+  code({
+    node,
+    className,
+    children,
+    inline,
+  }: ComponentPropsWithoutRef<'code'> & { node?: Element; inline?: boolean }) {
     if (inline) return <InlineCode>{children}</InlineCode>
 
     const langMatch = /language-(\w+)/.exec(className ?? '')
     const language = langMatch ? langMatch[1] : undefined
+
+    // Renderable language → interactive artifact preview card.
+    const artifactType = languageToArtifactType(language)
+    if (artifactType) {
+      // Read raw text from the hast node so syntax-highlight spans never
+      // corrupt the artifact content.
+      const raw = hastToText(node) || extractText(children)
+      return (
+        <ArtifactCard type={artifactType} language={language} source="language">
+          {raw}
+        </ArtifactCard>
+      )
+    }
+
     return <CodeBlock language={language}>{extractText(children)}</CodeBlock>
   },
   a: ExternalLink,
@@ -125,29 +168,36 @@ const markdownComponents = {
 interface MarkdownMessageProps {
   children: string
   className?: string
+  /** Owning message id — lets artifact cards coordinate with the panel store. */
+  messageId?: string
+  /** Whether the owning message is still streaming (drives live preview). */
+  isStreaming?: boolean
 }
 
 export const MarkdownMessage = memo(function MarkdownMessage({
   children,
   className,
+  messageId = '',
+  isStreaming = false,
 }: MarkdownMessageProps) {
   return (
-    <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[
-          [rehypeRaw, { allowDangerousHtml: true }],
-          [rehypeSanitize, sanitizeSchema],
-          rehypeHighlight,
-          rehypeThinking,
-          rehypeArtifact,
-          rehypeLinkCard,
-        ]}
-        components={markdownComponents}
-      >
-        {children}
-      </ReactMarkdown>
-    </div>
+    <ArtifactContext.Provider value={{ messageId, isStreaming }}>
+      <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[
+            [rehypeRaw, { allowDangerousHtml: true }],
+            [rehypeSanitize, sanitizeSchema],
+            rehypeHighlight,
+            rehypeThinking,
+            rehypeLinkCard,
+          ]}
+          components={markdownComponents}
+        >
+          {preprocessArtifacts(children)}
+        </ReactMarkdown>
+      </div>
+    </ArtifactContext.Provider>
   )
 })
 

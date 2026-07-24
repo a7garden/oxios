@@ -655,10 +655,27 @@ impl Gateway {
                 (sender_arc, handle)
             });
 
-            // RFC-027: unified path. Falls back to handle_message internally
-            // if IntentEngine is not wired.
             let role = msg.metadata.get("role").map(String::as_str);
             let model_override = msg.metadata.get("model_override").map(String::as_str);
+            // Parse optional per-message model params from metadata. Strings
+            // are used so the WS layer doesn't need a structured payload
+            // change — the gateway translates them to typed ModelParams here.
+            let temperature = msg
+                .metadata
+                .get("temperature")
+                .and_then(|v| v.parse::<f64>().ok());
+            let max_tokens = msg
+                .metadata
+                .get("max_tokens")
+                .and_then(|v| v.parse::<u32>().ok());
+            let model_params = if temperature.is_some() || max_tokens.is_some() {
+                Some(oxios_ouroboros::ModelParams {
+                    temperature,
+                    max_tokens,
+                })
+            } else {
+                None
+            };
             let result = orchestrator
                 .handle_unified(
                     &msg.user_id,
@@ -668,6 +685,7 @@ impl Gateway {
                     mount_ids.as_deref(),
                     role,
                     model_override,
+                    model_params,
                     &request_id,
                 )
                 .await;

@@ -35,6 +35,8 @@ impl InfraApi {
         event_bus: EventBus,
         config: OxiosConfig,
         start_time: Instant,
+        pending_tool_approvals: Arc<PendingToolApprovals>,
+        pending_ask_user: Arc<PendingAskUser>,
     ) -> Self {
         Self {
             git_layer,
@@ -46,8 +48,8 @@ impl InfraApi {
             orchestrator_config: parking_lot::RwLock::new(
                 crate::config::OrchestratorConfig::default(),
             ),
-            pending_tool_approvals: Arc::new(PendingToolApprovals::new()),
-            pending_ask_user: Arc::new(PendingAskUser::new()),
+            pending_tool_approvals,
+            pending_ask_user,
         }
     }
     /// Get a reference to the GitLayer.

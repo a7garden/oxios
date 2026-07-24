@@ -134,6 +134,8 @@ mod tests {
                 crate::event_bus::EventBus::new(256),
                 crate::OxiosConfig::default(),
                 std::time::Instant::now(),
+                std::sync::Arc::new(crate::tools::PendingToolApprovals::new()),
+                std::sync::Arc::new(crate::tools::PendingAskUser::new()),
             ),
             None,
             crate::ExecApi::new(

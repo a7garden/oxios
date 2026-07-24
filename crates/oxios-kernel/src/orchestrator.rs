@@ -501,6 +501,7 @@ impl Orchestrator {
         mount_ids: Option<&str>,
         role: Option<&str>,
         model_override: Option<&str>,
+        model_params: Option<oxios_ouroboros::ModelParams>,
         request_id: &str,
     ) -> Result<OrchestrationResult> {
         // Get the IntentEngine (always wired by the kernel assembler).
@@ -521,6 +522,7 @@ impl Orchestrator {
             role: role.map(String::from),
             model_override: model_override.map(String::from),
             user_id: user_id.to_string(),
+            model_params,
         };
 
         // Call the unified path.
@@ -662,6 +664,7 @@ impl Orchestrator {
             role: ctx.role.clone(),
             restore_state: None,
             session_id: Some(ctx.session_id.clone()),
+            model_params: ctx.model_params.clone(),
         }
     }
 

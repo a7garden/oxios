@@ -1,21 +1,28 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { RefreshCw } from 'lucide-react'
+import { ArrowDown, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AttachedFile, ContextAttachment } from '@/components/chat/chat-input'
 import { ChatInputWithTools } from '@/components/chat/chat-input-with-tools'
+import { ChatMiniMap } from '@/components/chat/chat-minimap'
+import { CompressedGroup } from '@/components/chat/compressed-group'
 import { EmptyChatState } from '@/components/chat/empty-chat-state'
 import { InterviewWizard } from '@/components/chat/interview-wizard'
 import { LiveActivityBar } from '@/components/chat/live-activity-bar'
 import { MessageBubble } from '@/components/chat/message-bubble'
+import { TextSelectionBar } from '@/components/chat/text-selection-bar'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
 import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
+import { PortalPanel } from '@/components/portal/portal-panel'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useDraftPersistence } from '@/hooks/use-draft-persistence'
 import { useRoles } from '@/hooks/use-engine'
 import { useMounts } from '@/hooks/use-mounts'
+import { addInputHistory } from '@/lib/input-history-storage'
 import { useChatStore } from '@/stores/chat'
+import { usePortalStore } from '@/stores/portal'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
 
@@ -51,6 +58,7 @@ function ChatPage() {
     newSession,
   } = useChatStore()
   const queuedCount = useChatStore((s) => s._pendingQueue.length)
+  const stackOpen = usePortalStore((s) => s.stack.length > 0)
   const { data: rolesData } = useRoles()
   const roles = Object.entries(rolesData?.roles ?? {}).map(([name, model]) => ({ name, model }))
   const { data: mountsData } = useMounts()
@@ -73,9 +81,15 @@ function ChatPage() {
   }
 
   const [input, setInput] = useState('')
+  useDraftPersistence(activeSessionId, input, setInput)
   const [userScrolledUp, setUserScrolledUp] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  // Compressed groups: collapse older messages when a conversation is long.
+  const COLLAPSE_THRESHOLD = 40
+  const VISIBLE_TAIL = 20
+  const collapseCount = messages.length > COLLAPSE_THRESHOLD ? messages.length - VISIBLE_TAIL : 0
 
   // Auto-scroll to bottom on new messages, but only if user hasn't scrolled up
   useEffect(() => {
@@ -104,6 +118,12 @@ function ChatPage() {
     const el = e.currentTarget
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     setUserScrolledUp(!atBottom)
+  }
+
+  const handleMiniMapJump = (index: number) => {
+    scrollAreaRef.current
+      ?.querySelector(`[data-msg-index="${index}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   const handleSend = (
@@ -143,6 +163,7 @@ function ChatPage() {
       enrichedContent = `${enrichedContent}\n${fileContents}`
     }
 
+    addInputHistory(content)
     sendMessage(enrichedContent)
     setInput('')
     setUserScrolledUp(false)
@@ -206,62 +227,102 @@ function ChatPage() {
         <MountDetectionBadge />
 
         {/* ── Messages area ── */}
-        <ScrollArea
-          ref={scrollAreaRef as any}
-          className="flex-1 min-h-0"
-          onScroll={handleScroll}
-          role="log"
-          aria-label={t('common.chatMessages')}
-        >
-          <div className="max-w-3xl mx-auto px-4 py-6">
-            {messages.length === 0 && <EmptyChatState />}
-            <div className="space-y-1">
-              {messages.map((msg, _idx) => {
-                // Compute assistant-only index for knowledge save tracking
-                const assistantIndex =
-                  msg.role === 'assistant'
-                    ? messages.slice(0, _idx).filter((m) => m.role === 'assistant').length
-                    : undefined
-                return (
-                  <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    sessionId={activeSessionId ?? undefined}
-                    assistantIndex={assistantIndex}
-                    onRetry={msg.metadata?.isError ? () => handleRetry(msg.id) : undefined}
+        <div className="relative flex-1 min-h-0">
+          <ScrollArea
+            ref={scrollAreaRef as any}
+            className="h-full"
+            onScroll={handleScroll}
+            role="log"
+            aria-label={t('common.chatMessages')}
+          >
+            <div className="max-w-3xl mx-auto px-4 py-6">
+              {messages.length === 0 && <EmptyChatState />}
+              <div className="space-y-1">
+                {/* Collapsed older messages */}
+                {collapseCount > 0 && (
+                  <CompressedGroup count={collapseCount}>
+                    {messages.slice(0, collapseCount).map((msg, _idx) => {
+                      const assistantIndex =
+                        msg.role === 'assistant'
+                          ? messages.slice(0, _idx).filter((m) => m.role === 'assistant').length
+                          : undefined
+                      return (
+                        <div key={msg.id} data-msg-index={_idx}>
+                          <MessageBubble
+                            message={msg}
+                            sessionId={activeSessionId ?? undefined}
+                            assistantIndex={assistantIndex}
+                            onRetry={msg.metadata?.isError ? () => handleRetry(msg.id) : undefined}
+                          />
+                        </div>
+                      )
+                    })}
+                  </CompressedGroup>
+                )}
+                {/* Visible recent messages */}
+                {messages.slice(collapseCount).map((msg, i) => {
+                  const _idx = collapseCount + i
+                  const assistantIndex =
+                    msg.role === 'assistant'
+                      ? messages.slice(0, _idx).filter((m) => m.role === 'assistant').length
+                      : undefined
+                  return (
+                    <div key={msg.id} data-msg-index={_idx}>
+                      <MessageBubble
+                        message={msg}
+                        sessionId={activeSessionId ?? undefined}
+                        assistantIndex={assistantIndex}
+                        onRetry={msg.metadata?.isError ? () => handleRetry(msg.id) : undefined}
+                      />
+                    </div>
+                  )
+                })}
+
+                {/* Interview wizard */}
+                {activeInterview && activeInterview.length > 0 && (
+                  <InterviewWizard
+                    questions={activeInterview}
+                    round={interviewRound}
+                    ambiguity={interviewAmbiguity}
+                    onSubmit={submitInterviewResponse}
+                    disabled={isStreaming}
                   />
-                )
-              })}
+                )}
 
-              {/* Interview wizard */}
-              {activeInterview && activeInterview.length > 0 && (
-                <InterviewWizard
-                  questions={activeInterview}
-                  round={interviewRound}
-                  ambiguity={interviewAmbiguity}
-                  onSubmit={submitInterviewResponse}
-                  disabled={isStreaming}
-                />
-              )}
+                {/* Tool approval */}
+                {activeToolApproval && (
+                  <ToolApprovalCard
+                    toolName={activeToolApproval.toolName}
+                    reason={activeToolApproval.reason}
+                    onApprove={() => resolveToolApproval(activeToolApproval.id, true)}
+                    onDeny={() => resolveToolApproval(activeToolApproval.id, false)}
+                    disabled={isStreaming}
+                  />
+                )}
 
-              {/* Tool approval */}
-              {activeToolApproval && (
-                <ToolApprovalCard
-                  toolName={activeToolApproval.toolName}
-                  reason={activeToolApproval.reason}
-                  onApprove={() => resolveToolApproval(activeToolApproval.id, true)}
-                  onDeny={() => resolveToolApproval(activeToolApproval.id, false)}
-                  disabled={isStreaming}
-                />
-              )}
+                {/* Live activity header (replaces legacy 3-dot typing indicator) */}
+                {isStreaming && !activeInterview && !activeToolApproval && <LiveActivityBar />}
 
-              {/* Live activity header (replaces legacy 3-dot typing indicator) */}
-              {isStreaming && !activeInterview && !activeToolApproval && <LiveActivityBar />}
-
-              <div ref={bottomRef} />
+                <div ref={bottomRef} />
+              </div>
             </div>
-          </div>
-        </ScrollArea>
+          </ScrollArea>
+          {userScrolledUp && (
+            <button
+              type="button"
+              onClick={() => {
+                bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+                setUserScrolledUp(false)
+              }}
+              className="absolute bottom-4 left-1/2 z-10 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border bg-background shadow-lg transition-all hover:bg-accent"
+              aria-label={t('chat.scrollToBottom')}
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          )}
+          <ChatMiniMap messages={messages} onJump={handleMiniMapJump} />
+          <TextSelectionBar containerRef={scrollAreaRef} />
+        </div>
 
         {/* ── Input (fixed at bottom) ── */}
         {!activeInterview && (
@@ -289,6 +350,7 @@ function ChatPage() {
           </div>
         )}
       </div>
+      {stackOpen && <PortalPanel className="shrink-0" />}
     </div>
   )
 }

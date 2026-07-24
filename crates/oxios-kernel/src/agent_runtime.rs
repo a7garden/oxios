@@ -135,6 +135,11 @@ pub struct AgentRuntimeConfig {
     /// history with a `"... [truncated: N bytes omitted]"` marker.
     /// `None` = unlimited (opt-in). Threaded to `AgentConfig::max_tool_result_bytes`.
     pub max_tool_result_bytes: Option<usize>,
+    /// Per-message model params (temperature / max_tokens). When set,
+    /// these override the hardcoded defaults in AgentConfig construction.
+    /// Populated from `ExecEnv::model_params` which the gateway fills
+    /// from the WS payload.
+    pub model_params: Option<oxios_ouroboros::ModelParams>,
     // NOTE: subagent_max_depth was removed — oxi-agent hardcodes the
     // in-process recursion cap to 3 (subagent.rs:649). `AgentConfig.subagent_depth`
     // is the CURRENT depth (always 0 for top-level agents), not a max.
@@ -154,6 +159,7 @@ impl Default for AgentRuntimeConfig {
             audit_tool_calls: false,
             provider_rpm: 0,
             max_tool_result_bytes: None,
+            model_params: None,
         }
     }
 }
@@ -912,8 +918,8 @@ async fn run_agent(
         model_id: config.model_id.clone(),
         system_prompt: Some(system_prompt.clone()),
         timeout_seconds: 300,
-        temperature: Some(0.7),
-        max_tokens: Some(8192),
+        temperature: config.model_params.as_ref().and_then(|p| p.temperature).or(Some(0.7)),
+        max_tokens: config.model_params.as_ref().and_then(|p| p.max_tokens).map(|v| v as usize).or(Some(8192)),
         compaction_strategy: CompactionStrategy::Threshold(0.8),
         compaction_instruction: None,
         context_window: 128_000,
@@ -1666,6 +1672,33 @@ fn build_directive_system_prompt(
     )
 }
 
+/// Output protocol for the Web UI Artifact feature. Appended to every system
+/// prompt so the model emits `<lobeArtifact>` tags the frontend can preview.
+///
+/// The `type` values are pinned to the EXACT strings the frontend matches in
+/// `tagTypeToArtifactType` (web/src/types/artifact.ts). Unrecognized types
+/// silently render as a plain code listing — so do not paraphrase them.
+const ARTIFACT_PROTOCOL: &str = "\n\n\
+    ## Artifacts\n\
+    When you produce substantial, self-contained content the user will want to\n\
+    view or interact with separately — a complete HTML page, an SVG graphic, a\n\
+    Mermaid diagram, or an interactive React component — wrap it in an artifact\n\
+    tag so the UI shows a live preview panel:\n\n\
+    <lobeArtifact type=\"...\" title=\"...\" identifier=\"...\">\n\
+    ...the full content...\n\
+    </lobeArtifact>\n\n\
+    Use exactly one of these `type` values (others are not recognised):\n\
+    - `text/html`                       → an HTML document or fragment\n\
+    - `image/svg+xml`                   → an SVG graphic\n\
+    - `application/lobe.artifacts.mermaid` → a Mermaid diagram\n\
+    - `application/lobe.artifacts.react`   → a React component (JSX/TSX)\n\n\
+    - `title` — a short human title for the panel.\n\
+    - `identifier` — a unique kebab-case id, e.g. `sales-dashboard`.\n\
+    Put the full, runnable content INSIDE the tag (not in a separate fence).\n\n\
+    Do NOT wrap non-visual code. Shell commands, Python, Rust, JSON, config, or\n\
+    short snippets that are part of an explanation belong in a normal fenced\n\
+    code block. Use an artifact only for content the user would open to view,\n\
+    not copy-and-paste. Limit one artifact per self-contained piece.\n";
 /// Shared system-prompt builder for the directive path.
 ///
 /// Composes the static agent prelude, goal/constraints/criteria sections,
@@ -1791,6 +1824,7 @@ fn build_system_prompt_inner(
          Do not write 50 lines when 5 would do.\n\
          Use `exec` for all command execution (git, gh, osascript, etc.).",
     );
+    prompt.push_str(ARTIFACT_PROTOCOL);
 
     prompt
 }
@@ -1933,5 +1967,25 @@ mod tests {
         let domain = infer_domain("optimize performance metrics");
         // Should fall back to first 2 meaningful words
         assert!(!domain.is_empty());
+    }
+    #[test]
+    fn test_system_prompt_includes_artifact_protocol() {
+        let prompt = build_system_prompt_inner(
+            "build a dashboard",
+            "build a dashboard",
+            &[],
+            &[],
+            None,
+            None,
+            None,
+            None,
+        );
+        // The four pinned type values must appear verbatim (the frontend
+        // matches these exact substrings — paraphrasing breaks the preview).
+        assert!(prompt.contains("<lobeArtifact"));
+        assert!(prompt.contains("text/html"));
+        assert!(prompt.contains("image/svg+xml"));
+        assert!(prompt.contains("application/lobe.artifacts.mermaid"));
+        assert!(prompt.contains("application/lobe.artifacts.react"));
     }
 }

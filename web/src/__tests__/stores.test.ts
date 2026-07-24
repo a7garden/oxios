@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { useAuthStore } from '@/stores/auth'
 import {
+  __clearResolvedApprovalIdsForTesting,
   __clearStreamProcessorsForTesting,
   appendActivityToMessages,
   appendTokenToMessages,
@@ -753,5 +754,100 @@ describe('useChatStore message queueing (while streaming)', () => {
     useChatStore.getState().sendMessage('ghost')
     useChatStore.getState().disconnect()
     expect(useChatStore.getState()._pendingQueue).toEqual([])
+  })
+})
+
+// Tool approval (RFC-017): resolveToolApproval must treat a 404 "already
+// resolved" as benign idempotent success and NEVER re-arm a dead card. The
+// prior code restored activeToolApproval on ANY non-OK and re-threw, so a
+// single 404 re-armed the card → the next click 404ed again → the N×404
+// cascade seen in the Web UI. A WS reconnect replay re-delivering a resolved
+// approval id was the trigger; the restore-on-error was the amplifier.
+describe('useChatStore tool approval (RFC-017)', () => {
+  let fetchSpy: Mock
+
+  beforeEach(() => {
+    localStorage.clear()
+    __clearStreamProcessorsForTesting()
+    __clearResolvedApprovalIdsForTesting()
+    fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    useChatStore.setState({
+      messages: [],
+      activeToolApproval: { id: 'approval-1', toolName: 'exec', reason: 'shell command' },
+      isStreaming: false,
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('dismisses the card on 200 success', async () => {
+    fetchSpy.mockResolvedValueOnce({ ok: true, status: 200 })
+    await useChatStore.getState().resolveToolApproval('approval-1', true)
+    const s = useChatStore.getState()
+    expect(s.activeToolApproval).toBeNull()
+    expect(s.isStreaming).toBe(true)
+  })
+
+  it('treats 404 "already resolved" as benign — card stays dismissed, no throw', async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: () =>
+        Promise.resolve('{"error":"tool approval approval-1 not found or already resolved"}'),
+    })
+    // Must not reject — a 404 is idempotent success (approval already gone).
+    await expect(
+      useChatStore.getState().resolveToolApproval('approval-1', true),
+    ).resolves.toBeUndefined()
+    const s = useChatStore.getState()
+    // Card NOT restored — the old code set it back here, re-arming the loop.
+    expect(s.activeToolApproval).toBeNull()
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores the card on a genuine server error (500) for retry, without throwing', async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('internal error'),
+    })
+    // Swallowed — no unhandled promise rejection.
+    await expect(
+      useChatStore.getState().resolveToolApproval('approval-1', true),
+    ).resolves.toBeUndefined()
+    const s = useChatStore.getState()
+    expect(s.activeToolApproval?.id).toBe('approval-1')
+    expect(s.isStreaming).toBe(false)
+  })
+
+  it('does not re-arm an already-resolved approval on WS replay', async () => {
+    fetchSpy.mockResolvedValueOnce({ ok: true, status: 200 })
+    await useChatStore.getState().resolveToolApproval('approval-1', true)
+    expect(useChatStore.getState().activeToolApproval).toBeNull()
+    // Reconnect replay re-delivers the same approval id.
+    useChatStore.getState().handleChunk({
+      type: 'tool_approval',
+      id: 'approval-1',
+      tool_name: 'exec',
+      reason: 'shell command',
+    })
+    // Still dismissed — the dead card is NOT re-armed.
+    expect(useChatStore.getState().activeToolApproval).toBeNull()
+  })
+
+  it('arms the card for a fresh tool_approval chunk', () => {
+    useChatStore.setState({ activeToolApproval: null })
+    useChatStore.getState().handleChunk({
+      type: 'tool_approval',
+      id: 'approval-2',
+      tool_name: 'exec',
+      reason: 'rm -rf',
+    })
+    const s = useChatStore.getState()
+    expect(s.activeToolApproval?.id).toBe('approval-2')
+    expect(s.isStreaming).toBe(false)
   })
 })

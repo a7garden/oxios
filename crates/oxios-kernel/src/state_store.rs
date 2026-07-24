@@ -169,6 +169,12 @@ pub struct Session {
     /// Set by the sidebar/drag-to-reparent; consumed for Project-tree view.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
+    /// Parent session ID (RFC-035 threads). When `Some`, this session
+    /// is a sub-conversation of the referenced parent. `None` for
+    /// top-level sessions. The parent is unaware of the child; children
+    /// are spawned explicitly and cannot affect the parent's history.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_session_id: Option<String>,
     /// Timestamp when the session was created.
     pub created_at: DateTime<Utc>,
     /// Timestamp when the session was last updated.
@@ -187,10 +193,11 @@ impl Session {
             user_id: user_id.into(),
             user_messages: Vec::new(),
             agent_responses: Vec::new(),
+            project_id: None,
+            parent_session_id: None,
             trajectory_steps: Vec::new(),
             reasoning_records: Vec::new(),
             active_persona_id: None,
-            project_id: None,
             created_at: now,
             updated_at: now,
             metadata: SessionMetadata::new(),
@@ -209,6 +216,7 @@ impl Session {
             reasoning_records: Vec::new(),
             active_persona_id: None,
             project_id: None,
+            parent_session_id: None,
             created_at: now,
             updated_at: now,
             metadata: SessionMetadata::new(),
@@ -657,6 +665,7 @@ impl StateStore {
                                     .and_then(|v| v.as_str())
                                     .and_then(|s| s.split(',').next().map(String::from))
                             }),
+                        parent_session_id: session.parent_session_id.clone(),
                         created_at: session.created_at,
                         updated_at: session.updated_at,
                     });
@@ -852,7 +861,49 @@ impl StateStore {
 
         Ok(pruned)
     }
-}
+
+    /// List child sessions of the given parent (RFC-035 threads).
+    /// Returns thread SessionSummary records ordered by `created_at` desc.
+    pub async fn list_child_sessions(
+        &self,
+        parent_session_id: &str,
+    ) -> Result<Vec<SessionSummary>> {
+        let mut all = self.list_sessions().await?;
+        all.retain(|s| s.parent_session_id.as_deref() == Some(parent_session_id));
+        // list_sessions already sorts by updated_at desc; re-sort by created_at
+        // so threads appear in the order they were spawned.
+        all.sort_by_key(|b| std::cmp::Reverse(b.created_at));
+        Ok(all)
+    }
+
+    /// Create a new session that is a sub-conversation (thread) of `parent_id`.
+    /// Inherits parent's `project_id`. Persisted and returned.
+    pub async fn create_thread(
+        &self,
+        parent_id: &str,
+        user_id: impl Into<String>,
+    ) -> Result<Session> {
+        // Read parent to inherit project_id. Missing parent is non-fatal:
+        // the thread is still created (orphaned, but recoverable).
+        let project_id = if let Ok(Some(parent)) = self
+            .load_json::<Session>("sessions", &format!("{parent_id}.json"))
+            .await
+        {
+            parent.project_id
+        } else {
+            tracing::warn!(
+                parent_id = %parent_id,
+                "Thread parent session not found; thread will be orphaned"
+            );
+            None
+        };
+        let mut session = Session::new(user_id);
+        session.parent_session_id = Some(parent_id.to_string());
+        session.project_id = project_id;
+        self.save_session(&session).await?;
+        Ok(session)
+    }
+ }
 
 /// Summary of a session for listing (without full message history).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -870,6 +921,10 @@ pub struct SessionSummary {
     /// Active project ID(s) this session belongs to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,
+    /// Parent session ID for threads (RFC-035). `Some` = this is a
+    /// sub-conversation spawned from the named parent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_session_id: Option<String>,
     /// When the session was created.
     pub created_at: DateTime<Utc>,
     /// When the session was last updated.
