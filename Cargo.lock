@@ -5609,7 +5609,6 @@ dependencies = [
  "oxi-agent",
  "oxi-sdk",
  "oxios-calendar",
- "oxios-gateway",
  "oxios-markdown",
  "oxios-mcp",
  "oxios-memory",
