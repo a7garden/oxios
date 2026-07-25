@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.26.0] - 2026-07-25
+
+### Changed
+- **Runtime and dependency maintenance** — upgraded the Wasmtime stack, refreshed
+  policy configuration, and removed an obsolete route.
+- **Release gate hardening** — feature-gated the GGUF-only `Path` import so the
+  documented default-feature Clippy gate remains warning-free.
+
 ## [1.25.0] - 2026-07-23
 
 ### Fixed

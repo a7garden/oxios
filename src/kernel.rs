@@ -17,7 +17,9 @@ use oxios_kernel::{
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
 
-use std::path::{Path, PathBuf};
+#[cfg(feature = "embedding-gguf")]
+use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
