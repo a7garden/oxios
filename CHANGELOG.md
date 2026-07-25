@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+## [1.27.0] - 2026-07-25
+
+### Fixed
+- **Workspace publish cycle** — Removed `oxios-gateway` and `oxios-ouroboros`
+  from `oxios-kernel`'s `[dev-dependencies]`, breaking a `kernel → gateway → kernel`
+  dependency cycle that blocked crates.io publishing. The gateway-mock integration
+  test that required it was removed.
+- **Crates.io publish topology** — Restored strict topological publish order
+  (markdown → mcp → ouroboros → memory → calendar → kernel → gateway → oxios) in
+  the publish workflow so each crate's internal dependencies are on the registry
+  before the dependent is published.
+- **Mention-search render loop (Web)** — `searchMentions` listed `useMutation`
+  results and the `roles` array as `useCallback` deps; since `useMutation` returns
+  a fresh object each render and `roles` is rebuilt every parent render, the
+  callback was recreated every render — re-running the mention effect, whose
+  `setMentionResults([])` (new array ref) never bailed, producing a
+  `setState → render` loop. Inputs are now mirrored in a ref and read inside a
+  stable callback; the results-clear bails out when already empty.
+
 ## [1.26.0] - 2026-07-25
 
 ### Changed
