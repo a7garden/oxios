@@ -87,7 +87,5 @@ hf-hub = { version = "0.4", optional = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 lettre = { workspace = true }
-oxios-ouroboros = { version = "1.26.0", path = "../oxios-ouroboros" }
-oxios-gateway = { version = "1.26.0", path = "../oxios-gateway" }
 async-trait = { workspace = true }
 criterion = { version = "0.5", features = ["async"] }

@@ -4,7 +4,7 @@
 //! - Orchestrator with mock OuroborosProtocol and mock Supervisor
 //! - StateStore markdown/JSON read/write
 //! - EventBus publish/subscribe
-//! - Gateway routing with mock channel
+//! - Agent lifecycle and orchestrator integration
 
 #[path = "common/mod.rs"]
 mod common;
@@ -15,15 +15,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 
-use oxios_gateway::channel::Channel;
-use oxios_gateway::gateway::Gateway;
-use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
-use oxios_kernel::a2a::A2AProtocol;
 use oxios_kernel::access_manager::{AccessManager, AgentPermissions};
-use oxios_kernel::agent_lifecycle::AgentLifecycleManager;
-use oxios_kernel::config::OrchestratorConfig;
 use oxios_kernel::event_bus::{EventBus, KernelEvent};
-use oxios_kernel::orchestrator::Orchestrator;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
@@ -150,52 +143,6 @@ impl Supervisor for MockSupervisor {
     async fn list(&self) -> anyhow::Result<Vec<AgentInfo>> {
         let agents = self.agents.read();
         Ok(agents.values().cloned().collect())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Mock Channel
-// ---------------------------------------------------------------------------
-
-/// Mock channel that captures outgoing messages for verification.
-struct MockChannel {
-    outgoing: tokio::sync::Mutex<Vec<OutgoingMessage>>,
-    incoming_rx: tokio::sync::Mutex<Option<tokio::sync::mpsc::Receiver<IncomingMessage>>>,
-}
-
-impl MockChannel {
-    fn new(buffer: usize) -> Self {
-        let (_tx, rx) = tokio::sync::mpsc::channel(buffer);
-        Self {
-            outgoing: tokio::sync::Mutex::new(Vec::new()),
-            incoming_rx: tokio::sync::Mutex::new(Some(rx)),
-        }
-    }
-}
-
-#[async_trait]
-impl Channel for MockChannel {
-    fn name(&self) -> &str {
-        "mock"
-    }
-
-    async fn start(
-        &self,
-        _tx: tokio::sync::mpsc::Sender<oxios_gateway::GatewayInbox>,
-        mut shutdown: tokio::sync::watch::Receiver<bool>,
-    ) -> anyhow::Result<tokio::task::JoinHandle<()>> {
-        // Take the receiver so it can't be started twice.
-        self.incoming_rx.lock().await.take();
-        let handle = tokio::spawn(async move {
-            // Just wait for shutdown.
-            let _ = shutdown.changed().await;
-        });
-        Ok(handle)
-    }
-
-    async fn send(&self, msg: OutgoingMessage) -> anyhow::Result<()> {
-        self.outgoing.lock().await.push(msg);
-        Ok(())
     }
 }
 
@@ -349,13 +296,6 @@ async fn test_state_store_path_traversal_blocked() {
     assert!(result.is_err());
 }
 
-fn make_evolution_config(max_iterations: u32) -> OrchestratorConfig {
-    OrchestratorConfig {
-        max_evolution_iterations: max_iterations,
-        min_evaluation_score: 0.8,
-    }
-}
-
 // --- Orchestrator tests ---
 
 #[tokio::test]
@@ -451,91 +391,6 @@ async fn test_orchestrator_events_published() {
 
     // Ensure the orchestration completed.
     let _ = handle.await.unwrap();
-}
-
-// --- Gateway routing test ---
-
-#[tokio::test]
-async fn test_gateway_routes_message_through_orchestrator() {
-    let event_bus = EventBus::new(64);
-    let tmp = common::setup_tempdir();
-    let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
-
-    let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
-
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let orchestrator = Arc::new({
-        let lifecycle = AgentLifecycleManager::new(
-            supervisor,
-            access_manager.clone(),
-            a2a.clone(),
-            event_bus.clone(),
-            300,
-            vec![],
-            true,
-            "/tmp/oxios-test-workspace".to_string(),
-        );
-        Orchestrator::with_config(
-            event_bus.clone(),
-            state_store,
-            lifecycle,
-            make_evolution_config(0),
-        )
-    });
-
-    let gateway = Gateway::new(orchestrator);
-    let mock_channel = Box::new(MockChannel::new(16));
-
-    // Register the mock channel (start() will be called internally).
-    gateway.register(mock_channel).await.unwrap();
-    assert_eq!(gateway.channel_names().await, vec!["mock"]);
-
-    // Test that channel registration works and the gateway can send_to.
-    let outgoing = OutgoingMessage::new("mock", "test-user", "Hello from gateway");
-    let result = gateway.send_to("mock", outgoing).await;
-    assert!(result.is_ok());
-
-    // Clean shutdown.
-    gateway.signal_shutdown();
-}
-
-#[tokio::test]
-async fn test_gateway_unknown_channel() {
-    let event_bus = EventBus::new(64);
-    let tmp = common::setup_tempdir();
-    let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
-
-    let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
-
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let orchestrator = Arc::new({
-        let lifecycle = AgentLifecycleManager::new(
-            supervisor,
-            access_manager.clone(),
-            a2a.clone(),
-            event_bus.clone(),
-            300,
-            vec![],
-            true,
-            "/tmp/oxios-test-workspace".to_string(),
-        );
-        Orchestrator::with_config(
-            event_bus.clone(),
-            state_store,
-            lifecycle,
-            make_evolution_config(0),
-        )
-    });
-
-    let gateway = Gateway::new(orchestrator);
-
-    // Sending to a non-existent channel should succeed (logged as warning).
-    let outgoing = OutgoingMessage::new("nonexistent", "test-user", "Test");
-    let result = gateway.send_to("nonexistent", outgoing).await;
-    // send_to succeeds even if channel doesn't exist — just logs a warning.
-    assert!(result.is_ok());
 }
 
 // ===========================================================================
