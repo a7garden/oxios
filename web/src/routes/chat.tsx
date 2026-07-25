@@ -323,8 +323,6 @@ function ChatPage() {
           <ChatMiniMap messages={messages} onJump={handleMiniMapJump} />
           <TextSelectionBar containerRef={scrollAreaRef} />
         </div>
-
-        {/* ── Input (fixed at bottom) ── */}
         {!activeInterview && (
           <div className="border-t bg-background/95 backdrop-blur-sm shrink-0">
             <ChatInputWithTools

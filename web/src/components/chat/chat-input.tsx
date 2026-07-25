@@ -203,65 +203,78 @@ export function ChatInput({
   const { data: mountsData } = useMounts()
 
   // Mention search
-  const searchMentions = useCallback(
-    async (query: string): Promise<MentionResult[]> => {
-      const results: MentionResult[] = []
-      try {
-        const kRes = await knowledgeSearch.mutateAsync({ query, limit: 5 })
-        for (const hit of kRes.results)
-          results.push({
-            type: 'knowledge',
-            id: hit.path,
-            label: hit.name,
-            snippet: hit.snippet.slice(0, 80),
-          })
-      } catch {
-        /* offline */
+  // searchMentions must stay referentially stable: it is a dependency of the
+  // mention effect below. useMutation() returns a NEW result object every
+  // render, and `roles` is a fresh array each parent render — so listing them
+  // as useCallback deps recreated searchMentions every render, re-running the
+  // effect every render. Its `setMentionResults([])` (a new array ref) then
+  // never bailed, producing a setState→render loop (React #185). Mirror the
+  // latest inputs in a ref and read them inside a stable callback.
+  const searchInputsRef = useRef({ knowledgeSearch, memorySearch, mountsData, roles })
+  searchInputsRef.current = { knowledgeSearch, memorySearch, mountsData, roles }
+
+  const searchMentions = useCallback(async (query: string): Promise<MentionResult[]> => {
+    const {
+      knowledgeSearch: k,
+      memorySearch: mem,
+      mountsData: mounts,
+      roles: roleList,
+    } = searchInputsRef.current
+    const results: MentionResult[] = []
+    try {
+      const kRes = await k.mutateAsync({ query, limit: 5 })
+      for (const hit of kRes.results)
+        results.push({
+          type: 'knowledge',
+          id: hit.path,
+          label: hit.name,
+          snippet: hit.snippet.slice(0, 80),
+        })
+    } catch {
+      /* offline */
+    }
+    try {
+      const mRes = await mem.mutateAsync({ query, limit: 5 })
+      for (const entry of mRes.entries)
+        results.push({
+          type: 'memory',
+          id: entry.id,
+          label: entry.key || entry.id.slice(0, 12),
+          snippet: (entry.summary || entry.content).slice(0, 80),
+          score: entry.score,
+        })
+    } catch {
+      /* offline */
+    }
+    const mq = query.toLowerCase()
+    for (const m of mounts?.items ?? []) {
+      if (m.name.toLowerCase().includes(mq) || m.auto_description.toLowerCase().includes(mq))
+        results.push({
+          type: 'mount',
+          id: m.id,
+          label: m.name,
+          snippet: m.auto_description.slice(0, 80),
+        })
+    }
+    for (const r of roleList) {
+      if (r.name.toLowerCase().includes(mq))
+        results.push({ type: 'role', id: r.model, label: r.name, snippet: r.model })
+    }
+    const kindRank = (t: MentionResult['type']) => {
+      switch (t) {
+        case 'role':
+          return 0
+        case 'mount':
+          return 1
+        case 'knowledge':
+          return 2
+        default:
+          return 3
       }
-      try {
-        const mRes = await memorySearch.mutateAsync({ query, limit: 5 })
-        for (const entry of mRes.entries)
-          results.push({
-            type: 'memory',
-            id: entry.id,
-            label: entry.key || entry.id.slice(0, 12),
-            snippet: (entry.summary || entry.content).slice(0, 80),
-            score: entry.score,
-          })
-      } catch {
-        /* offline */
-      }
-      const mq = query.toLowerCase()
-      for (const m of mountsData?.items ?? []) {
-        if (m.name.toLowerCase().includes(mq) || m.auto_description.toLowerCase().includes(mq))
-          results.push({
-            type: 'mount',
-            id: m.id,
-            label: m.name,
-            snippet: m.auto_description.slice(0, 80),
-          })
-      }
-      for (const r of roles) {
-        if (r.name.toLowerCase().includes(mq))
-          results.push({ type: 'role', id: r.model, label: r.name, snippet: r.model })
-      }
-      const kindRank = (t: MentionResult['type']) => {
-        switch (t) {
-          case 'role':
-            return 0
-          case 'mount':
-            return 1
-          case 'knowledge':
-            return 2
-          default:
-            return 3
-        }
-      }
-      results.sort((a, b) => kindRank(a.type) - kindRank(b.type) || (b.score ?? 0) - (a.score ?? 0))
-      return results.slice(0, 8)
-    },
-    [knowledgeSearch, memorySearch, mountsData, roles],
-  )
+    }
+    results.sort((a, b) => kindRank(a.type) - kindRank(b.type) || (b.score ?? 0) - (a.score ?? 0))
+    return results.slice(0, 8)
+  }, [])
 
   // Enter-to-send runs through ProseMirror's handleKeyDown (it fires before the
   // keymap, so the newline never lands in the doc). editorProps is bound once at
@@ -414,7 +427,7 @@ export function ChatInput({
   // Mention search effect
   useEffect(() => {
     if (mentionQuery === null) {
-      setMentionResults([])
+      setMentionResults((prev) => (prev.length === 0 ? prev : []))
       return
     }
     clearTimeout(mentionSearchTimer.current!)
