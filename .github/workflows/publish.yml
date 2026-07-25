@@ -89,8 +89,9 @@ jobs:
   #      oxios-ouroboros  (no oxios deps, depends on oxi-sdk — external)
   #      oxios-memory     (no oxios deps)
   #   ② oxios-calendar   → oxios-markdown
-  #   ③ oxios-kernel     → {ouroboros, markdown, calendar, mcp, memory}
-  #   ④ oxios-gateway    → oxios-kernel (+ oxios-ouroboros)
+  #   ③ oxios-gateway    → oxios-ouroboros
+  #   ④ oxios-kernel     → {ouroboros, markdown, calendar, mcp, memory, gateway}
+  #   ⑤ oxios            → {kernel, gateway, markdown, ouroboros, calendar}
   #
   # max-parallel: 1 enforces sequential publish. Each job polls for
   # its heaviest dependency's new version to clear the crates.io index
@@ -111,8 +112,8 @@ jobs:
           - oxios-ouroboros
           - oxios-memory
           - oxios-calendar
-          - oxios-kernel
           - oxios-gateway
+          - oxios-kernel
           - oxios
     steps:
       - uses: actions/checkout@v5
@@ -128,12 +129,12 @@ jobs:
               WAIT=""; exit 0 ;;
             oxios-calendar)
               WAIT="oxios-markdown" ;;
-            oxios-kernel)
-              WAIT="oxios-calendar" ;;
             oxios-gateway)
-              WAIT="oxios-kernel" ;;
-            oxios)
+              WAIT="oxios-ouroboros" ;;
+            oxios-kernel)
               WAIT="oxios-gateway" ;;
+            oxios)
+              WAIT="oxios-kernel" ;;
             *)
               WAIT=""; exit 0 ;;
           esac
