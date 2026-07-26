@@ -31,6 +31,7 @@ pub mod orchestrator;
 pub mod resilience;
 
 // ─── Security ───────────────────────────────────────────────────────
+pub mod approval;
 // 접근 제어, 인증, 권한, 감사.
 pub mod access_manager;
 pub mod auth;
