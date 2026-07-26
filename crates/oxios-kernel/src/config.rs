@@ -8,6 +8,7 @@ use cron::Schedule;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+use crate::approval::ApprovalConfig;
 use crate::email::{SmtpProvider, SmtpTls};
 use crate::types::Priority;
 
@@ -1696,6 +1697,9 @@ pub struct SecurityConfig {
     /// Whether agents can fork sub-agents by default.
     #[serde(default)]
     pub can_fork: bool,
+    /// Tool approval mode system configuration (RFC-035).
+    #[serde(default)]
+    pub approval: ApprovalConfig,
     /// Maximum audit log entries to retain.
     #[serde(default = "default_max_audit")]
     pub max_audit_entries: usize,
@@ -1765,6 +1769,7 @@ impl Default for SecurityConfig {
             max_execution_time_secs: default_max_exec_time(),
             max_memory_mb: default_max_memory(),
             can_fork: false,
+            approval: ApprovalConfig::default(),
             max_audit_entries: default_max_audit(),
             auth_enabled: false,
             cors_origins: default_cors_origins(),
@@ -2254,6 +2259,43 @@ mod tests {
             "Default config should have no errors: {:?}",
             errors
         );
+    }
+
+    #[test]
+    fn security_config_parses_approval_section() {
+        let toml = r#"
+[kernel]
+
+[security.approval]
+mode = "auto-run"
+allow_list = ["exec:curl", "web_search"]
+
+[security.approval.tool_overrides]
+exec = "always"
+"#;
+        let cfg: OxiosConfig = toml::from_str(toml).unwrap();
+        assert_eq!(
+            cfg.security.approval.mode,
+            crate::approval::ApprovalMode::AutoRun
+        );
+        assert_eq!(
+            cfg.security.approval.allow_list,
+            vec!["exec:curl", "web_search"]
+        );
+        assert_eq!(
+            cfg.security.approval.tool_overrides.get("exec"),
+            Some(&crate::approval::ToolPolicy::Always)
+        );
+    }
+
+    #[test]
+    fn security_config_defaults_approval_to_manual() {
+        let cfg = OxiosConfig::default();
+        assert_eq!(
+            cfg.security.approval.mode,
+            crate::approval::ApprovalMode::Manual
+        );
+        assert!(cfg.security.approval.allow_list.is_empty());
     }
 
     #[test]
