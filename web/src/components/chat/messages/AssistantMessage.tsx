@@ -25,7 +25,6 @@ import { memo } from 'react'
 import type { ChatItemAvatar } from '@/components/chat/chat-item'
 import { ChatItem } from '@/components/chat/chat-item'
 import { ChatMetadata } from '@/components/chat/chat-metadata'
-import { ContentLoading } from '@/components/chat/content-loading'
 import { FollowUpChips } from '@/components/chat/follow-up-chips'
 import { KnowledgeSaveIndicator } from '@/components/chat/knowledge-save-indicator'
 import { MarkdownMessage } from '@/components/chat/markdown-message'
@@ -74,9 +73,6 @@ function AssistantMessageImpl({
       }
     : null
 
-  // Stream just started — no content yet, still generating. Show ContentLoading.
-  const showLoading = !!message.generating && !hasContent && !hasReasoning && !hasToolCalls
-
   return (
     <ChatItem
       avatar={avatar}
@@ -102,12 +98,6 @@ function AssistantMessageImpl({
         )}
         {hasSearch && message.search && <SearchGrounding search={message.search} />}
         {hasChunks && <FileChunksPlaceholder chunks={message.chunksList!} />}
-        {showLoading && (
-          <ContentLoading
-            id={`loading-${message.id}`}
-            startTime={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
-          />
-        )}
         {hasContent && !isError && (
           <MarkdownMessage messageId={message.id} isStreaming={!!message.generating}>
             {message.content}

@@ -46,6 +46,11 @@ interface ChatRuntimeState {
   /** All messages in the current session (restored from /api/sessions/:id). */
   messages: ChatMessage[]
   isStreaming: boolean
+  /** Epoch-ms when the current assistant turn started (set in sendMessage).
+   *  Read by the LiveActivityBar holder to render an elapsed timer. Stale
+   *  values are harmless — it's only consulted while isStreaming is true, and
+   *  the next send overwrites it. */
+  streamStartedAt: number | null
   /** Buffer for the backend model-announcement chunk (`type: 'model'`) that
    *  arrives before the first token; consumed when the assistant placeholder
    *  is created. Null when no turn is in flight. */
@@ -872,6 +877,7 @@ export const useChatStore = create<ChatStore>()(
       // ── Runtime ──
       messages: [],
       isStreaming: false,
+      streamStartedAt: null as number | null,
       pendingModel: null as string | null,
       connected: false,
       _sendQueue: [],
@@ -1132,32 +1138,23 @@ export const useChatStore = create<ChatStore>()(
           return
         }
 
-        // Optimistic: add user message + an assistant placeholder immediately.
-        // The placeholder (generating: true) is what lets the chat-transparency
-        // pipeline (LiveActivityBar header + ContentLoading/Thinking/ToolCallList
-        // in the bubble) render DURING the assess→crystallize→execute gap before
-        // the first chunk arrives. Without it `last` is the user message, the
-        // LiveActivityBar gate returns null, and nothing shows until the first
-        // token — which then fades the bar instantly. Real-time chunks patch
-        // this placeholder in place; `done`/`error` merge into it. Abnormal
-        // termination (onclose/disconnect) drops it via finalizeStreamingMessage.
+        // Optimistic: add the user message immediately and mark the turn live.
+        // No assistant placeholder is created here — the LiveActivityBar holder
+        // (pinned above the input) owns the "what's happening" indicator for the
+        // whole turn, including the assess→crystallize→execute gap before the
+        // first chunk, so an empty bubble would only duplicate it. The assistant
+        // message is created lazily on the first reasoning/tool/token chunk and
+        // patched in place thereafter; `done`/`error` merge into it.
         const userMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'user',
           content,
           timestamp: new Date().toISOString(),
         }
-        const assistantPlaceholder: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: '',
-          timestamp: new Date().toISOString(),
-          model: activeModelId ?? undefined,
-          generating: true,
-        }
         set((s) => ({
-          messages: [...s.messages, userMsg, assistantPlaceholder],
+          messages: [...s.messages, userMsg],
           isStreaming: true,
+          streamStartedAt: Date.now(),
         }))
 
         // Send via WebSocket with session context.
@@ -1542,8 +1539,21 @@ export const useChatStore = create<ChatStore>()(
             // Phase 1: route through StreamProcessor (toolCalls[], reasoning,
             // generating state) for first-class fields; processor also emits
             // backward-compat activity entries for the timeline.
-            const msgId = lastAssistantMessageId(get().messages)
-            if (!msgId) break
+            // Ensure an assistant message exists. A reasoning model streams
+            // reasoning BEFORE the first token, so without this the opening
+            // reasoning/tool deltas would be dropped (no message to attach
+            // to). The LiveActivityBar holder owns the pre-chunk gap
+            // indicator, so the message is created lazily here on the first
+            // real chunk — never optimistically on send (no empty bubble).
+            let msgId = lastAssistantMessageId(get().messages)
+            if (!msgId) {
+              const ensured = ensureLastAssistant(get().messages, {
+                placeholderModel: get().pendingModel ?? get().activeModelId,
+              })
+              if (ensured.index < 0) break
+              set({ messages: ensured.messages })
+              msgId = ensured.messages[ensured.index]!.id
+            }
             const processor = getOrCreateProcessor(msgId)
             const { events } = adaptChunk(chunk, { msgId })
             for (const ev of events) {

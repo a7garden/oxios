@@ -300,9 +300,6 @@ function ChatPage() {
                   />
                 )}
 
-                {/* Live activity header (replaces legacy 3-dot typing indicator) */}
-                {isStreaming && !activeInterview && !activeToolApproval && <LiveActivityBar />}
-
                 <div ref={bottomRef} />
               </div>
             </div>
@@ -323,6 +320,10 @@ function ChatPage() {
           <ChatMiniMap messages={messages} onJump={handleMiniMapJump} />
           <TextSelectionBar containerRef={scrollAreaRef} />
         </div>
+        {/* LiveActivityBar — lobehub-style "what's happening" holder pinned
+            above the input. Visible for the whole turn (gap → reasoning →
+            tools → writing), stays until the turn ends. */}
+        {isStreaming && !activeInterview && !activeToolApproval && <LiveActivityBar />}
         {!activeInterview && (
           <div className="border-t bg-background/95 backdrop-blur-sm shrink-0">
             <ChatInputWithTools

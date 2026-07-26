@@ -1,79 +1,109 @@
 import { Loader2, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { deriveCurrentActivity, describeLiveActivity } from '@/lib/live-activity'
-import { cn } from '@/lib/utils'
+import { describeLiveActivity, deriveCurrentActivity } from '@/lib/live-activity'
 import { useChatStore } from '@/stores/chat'
 
+const ELAPSED_THRESHOLD_MS = 2000
+
 /**
- * RFC-015 §4.3 — LiveActivityBar.
+ * LiveActivityBar — lobehub-style "what's happening" holder pinned above the
+ * chat input. Visible for the ENTIRE assistant turn (`isStreaming`), across
+ * every phase, and never fades when text starts:
  *
- * Replaces the legacy 3-dot typing indicator with a header that reflects
- * the single most recent in-flight activity for the assistant turn.
- * Instead of a generic "Thinking…" the bar now shows a sentence-level
- * description of what is actually happening:
+ *   gap (no chunk yet) → "생각하는 중… · 3s"
+ *   reasoning          → "추론 중 · 5s"
+ *   tool running       → "웹 검색 중 · rust async · 8s"
+ *   text streaming     → "응답 작성 중… · 12s"
  *
- *   thinking      → pulse + "Thinking…"
- *   tool_running  → spinner + "Searching the web · rust async"
- *                             "Reading file · …/src/main.rs"
- *                             "Running command · cargo build"
- *   reasoning     → pulse  + "Reasoning…"
- *
- * Activity cards below remain as the historical timeline (see
- * `ActivityTimeline`). The bar fades out the moment the assistant starts
- * streaming text, so the typewriter takes over.
- *
- * Mounted only while an assistant turn is being built — i.e. `isStreaming`
- * is true AND the most recent message in the store is an assistant
- * message. This matches the live-activity UX table in the design doc.
+ * Phase priority: running tool → text streaming (writing) → reasoning →
+ * thinking. The in-bubble Thinking / ToolCallList panels carry the detail;
+ * this holder is the single always-on one-line status + elapsed timer, so the
+ * user can tell the agent is still working even while reading the streamed
+ * response. Reads `streamStartedAt` (set in sendMessage) for the timer.
  */
 export function LiveActivityBar() {
   const { t } = useTranslation()
   const isStreaming = useChatStore((s) => s.isStreaming)
+  const startedAt = useChatStore((s) => s.streamStartedAt)
   const last = useChatStore((s) => s.messages.at(-1))
 
-  if (!isStreaming || last?.role !== 'assistant') return null
+  const [elapsedMs, setElapsedMs] = useState(0)
+  useEffect(() => {
+    if (!isStreaming || !startedAt) {
+      setElapsedMs(0)
+      return
+    }
+    const tick = () => setElapsedMs(Math.max(0, Date.now() - startedAt))
+    tick()
+    const handle = window.setInterval(tick, 1000)
+    return () => window.clearInterval(handle)
+  }, [isStreaming, startedAt])
 
-  const descriptor = deriveCurrentActivity(last.activities)
-  // The pure-thinking gap (no running tool, no reasoning yet) is owned by the
-  // in-bubble ContentLoading indicator — showing "Thinking…" here too would
-  // duplicate it. This bar only mounts once there is a concrete activity
-  // (tool_running / reasoning) to describe, and fades out when text streams.
-  if (descriptor.kind === 'thinking') return null
-  const streamingTextStarted = (last.content ?? '').trim().length > 0
-  const { label, detail } = describeLiveActivity(descriptor, t)
+  if (!isStreaming) return null
+
+  // Only the trailing assistant message carries this turn's activities/content.
+  const lastAssistant = last?.role === 'assistant' ? last : undefined
+  const descriptor = deriveCurrentActivity(lastAssistant?.activities)
+  const streamingText = !!(
+    lastAssistant?.generating && (lastAssistant?.content ?? '').trim()
+  )
+
+  let label: string
+  let detail: string | undefined
+  let icon: 'spinner' | 'sparkles' | 'pulse'
+
+  if (descriptor.kind === 'tool_running') {
+    const desc = describeLiveActivity(descriptor, t)
+    label = desc.label
+    detail = desc.detail
+    icon = 'spinner'
+  } else if (streamingText) {
+    label = t('chat.liveActivity.writing')
+    icon = 'spinner'
+  } else if (descriptor.kind === 'reasoning') {
+    label = t('chat.liveActivity.reasoning')
+    icon = 'sparkles'
+  } else {
+    label = t('chat.liveActivity.thinking')
+    icon = 'pulse'
+  }
 
   return (
     <div
-      className={cn(
-        'flex my-1.5 animate-fade-in-up transition-opacity duration-300',
-        streamingTextStarted && 'opacity-0 pointer-events-none',
-      )}
+      className="flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground border-t bg-background/95 backdrop-blur-sm animate-fade-in-up"
       aria-live="polite"
-      data-state={streamingTextStarted ? 'fading' : 'live'}
     >
-      <div className="max-w-[80%]">
-        <div className="rounded-lg px-4 py-2.5 bg-muted">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            {descriptor.kind === 'tool_running' ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
-            ) : descriptor.kind === 'reasoning' ? (
-              <Sparkles className="h-3.5 w-3.5 animate-pulse shrink-0" aria-hidden />
-            ) : (
-              <span
-                className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-pulse shrink-0"
-                aria-hidden
-              />
-            )}
-            <span className="truncate">{label}</span>
-            {detail && (
-              <>
-                <span className="text-muted-foreground/40 shrink-0">·</span>
-                <span className="text-muted-foreground/70 truncate max-w-[40ch]">{detail}</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      {icon === 'spinner' ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
+      ) : icon === 'sparkles' ? (
+        <Sparkles className="h-3.5 w-3.5 animate-pulse shrink-0" aria-hidden />
+      ) : (
+        <span
+          className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-pulse shrink-0"
+          aria-hidden
+        />
+      )}
+      <span className="truncate">{label}</span>
+      {detail && (
+        <>
+          <span className="text-muted-foreground/40 shrink-0">·</span>
+          <span className="truncate text-muted-foreground/70 max-w-[40ch]">{detail}</span>
+        </>
+      )}
+      {elapsedMs >= ELAPSED_THRESHOLD_MS && (
+        <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/60">
+          {formatElapsed(elapsedMs)}
+        </span>
+      )}
     </div>
   )
+}
+
+function formatElapsed(ms: number): string {
+  const seconds = ms / 1000
+  if (seconds < 60) return `${seconds.toFixed(0)}s`
+  const minutes = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${minutes}m ${secs}s`
 }
