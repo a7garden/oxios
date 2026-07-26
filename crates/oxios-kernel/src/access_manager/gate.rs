@@ -306,16 +306,33 @@ impl AccessGate {
     // ─── Layer Implementations ───────────────────────────────────────
 
     fn check_tool(&self, ctx: &AgentContext, tool: &str) -> Result<(), AccessDenied> {
-        // Layer 0: CSpace capability
         let resource = ResourceRef::KernelDomain {
             domain: tool.to_string(),
         };
         if !ctx.cspace.can(&resource, Rights::EXECUTE) {
-            // CSpace check is advisory only for the always-on local file
-            // tools (read/write/edit/grep/find/ls). Network and script tools
-            // (web_search, browse*, knowledge_*) require an explicit EXECUTE
-            // capability in the agent's Seed — they must not bypass Layer 0.
-            let always_on = ["read", "write", "edit", "grep", "find", "ls"];
+            // The always-on tier — registered unconditionally for every
+            // agent by `tools::registration::register_always_on` (file ops
+            // + web search). CSpace capability is advisory for these tools:
+            // they are part of the baseline agent contract documented in
+            // ARCHITECTURE.md §"Tier 1" and enumerated in
+            // `OxiosKernelBridge::tool_names`, so Layer 0 must not gate
+            // them. Without web_search/get_search_results in this list,
+            // every default agent hits a catch-22: the tool is registered
+            // (so the LLM calls it) but no capability template grants the
+            // matching EXECUTE right, so Layer 0 hard-denies. See RFC-017
+            // Q3 ("the bug where web_search was denied despite being
+            // always-on is fixed separately — adding it to the gate's
+            // skip list"). This is that fix.
+            //
+            // CSpace-driven tools (exec, memory_*, knowledge, browse*,
+            // a2a, persona, ...) still require an explicit EXECUTE
+            // capability in the agent's Seed and are denied here when
+            // absent. RFC-017 covers the per-session escalation flow
+            // (GatedTool → PendingToolApprovals → user dialog) for that
+            // case.
+            let always_on = [
+                "read", "write", "edit", "grep", "find", "ls", "web_search", "get_search_results",
+            ];
             if !always_on.contains(&tool) {
                 return Err(AccessDenied {
                     agent: ctx.agent_name.clone(),
@@ -742,6 +759,32 @@ mod tests {
             tool_name: "bash",
         });
         assert!(result.is_ok(), "bash should be allowed: {:?}", result);
+    }
+
+    #[test]
+    fn test_tool_access_web_search_always_on() {
+        // Regression: web_search + get_search_results are registered
+        // unconditionally for every agent (register_always_on) and must
+        // pass Layer 0 even when the agent's CSpace carries no matching
+        // capability. Before this fix, the test_fixture CSpace (which
+        // grants no web_search cap) caused a hard deny — the
+        // triple-deadlock described in RFC-017 Q3.
+        let (gate, ctx) = make_gate();
+        let result = gate.check(CheckRequest::Tool {
+            context: &ctx,
+            tool_name: "web_search",
+        });
+        assert!(result.is_ok(), "web_search is always-on: {:?}", result);
+
+        let result = gate.check(CheckRequest::Tool {
+            context: &ctx,
+            tool_name: "get_search_results",
+        });
+        assert!(
+            result.is_ok(),
+            "get_search_results is always-on: {:?}",
+            result
+        );
     }
 
     #[test]

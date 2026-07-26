@@ -41,12 +41,22 @@ impl Default for AgentPermissions {
     fn default() -> Self {
         Self {
             agent_name: String::new(),
-            // By default, agents get basic file tools.
-            // Network access is denied by default.
-            allowed_tools: ["read", "write", "edit", "bash", "grep", "find", "exec"]
-                .iter()
-                .map(|s| s.to_string())
-                .collect(),
+            // Always-on tier — must match the `always_on` skip list in
+            // `gate.rs::check_tool` and the registration in
+            // `tools::registration::register_always_on`. Without
+            // web_search/get_search_results here, Layer 1+2 denies them
+            // even after Layer 0 lets them through — the second half of
+            // the catch-22 from RFC-017 Q3. "ls" was also missing, leaving
+            // it dead-registered for default agents.
+            allowed_tools: [
+                "read", "write", "edit", "grep", "find", "ls",
+                "web_search", "get_search_results",
+                // Shell execution (legacy "bash" alias + "exec").
+                "bash", "exec",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
             allowed_paths: vec![],
             denied_paths: vec![
                 "/etc/**".to_string(),
