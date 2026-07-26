@@ -1,8 +1,7 @@
-// messages/UserMessage — right-aligned bubble with edit + delete.
+// messages/UserMessage — right-aligned, faintly tinted panel with edit + delete.
 
 import { Pencil, Trash2 } from 'lucide-react'
 import { memo, useCallback, useState } from 'react'
-import type { ChatItemAvatar } from '@/components/chat/chat-item'
 import { ChatItem } from '@/components/chat/chat-item'
 import { useChatStore } from '@/stores/chat'
 import type { ChatMessage } from '@/types'
@@ -46,11 +45,8 @@ function UserMessageImpl({ message }: UserMessageProps) {
     },
   ]
 
-  const avatar: ChatItemAvatar = { name: 'You' }
-
   return (
     <ChatItem
-      avatar={avatar}
       placement="right"
       time={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
       showTitle={false}
@@ -89,7 +85,7 @@ function UserMessageImpl({ message }: UserMessageProps) {
           </div>
         </div>
       ) : (
-        <div className="inline-block max-w-[85%] rounded-lg bg-muted/50 px-3 py-2 text-sm">
+        <div className="inline-block max-w-[80%] rounded-lg bg-muted/40 px-3 py-1.5 text-sm">
           {message.content}
         </div>
       )}

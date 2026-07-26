@@ -18,27 +18,6 @@ export type ChatItemProps = _ChatItemProps
 
 // ── Sub-components ──
 
-function Avatar({ name, avatar, color }: ChatItemAvatar) {
-  if (avatar) {
-    return <img src={avatar} alt={name ?? 'agent'} className="w-7 h-7 rounded-full shrink-0 mt-1" />
-  }
-  // Fallback: initials circle
-  const fallbackName = name ?? '?'
-  const initial = fallbackName.charAt(0).toUpperCase()
-  const bg = color ?? 'bg-muted'
-  return (
-    <div
-      className={cn(
-        'w-7 h-7 rounded-full shrink-0 mt-1 flex items-center justify-center text-xs font-semibold',
-        bg,
-        'text-muted-foreground',
-      )}
-    >
-      {initial}
-    </div>
-  )
-}
-
 function TitleRow({
   name,
   time,
@@ -98,7 +77,6 @@ export const ChatItem = memo(function ChatItem({
   time,
   durationMs,
   showTitle = true,
-  showAvatar = true,
   actions,
   messageExtra,
   children,
@@ -107,23 +85,15 @@ export const ChatItem = memo(function ChatItem({
   const isRight = placement === 'right'
 
   return (
-    <div
-      id={id}
-      className={cn('group flex gap-3 px-4 py-2', isRight && 'flex-row-reverse', className)}
-    >
-      {/* Avatar column */}
-      {showAvatar ? (
-        <Avatar {...avatar} />
-      ) : (
-        <div className="w-7 shrink-0" /> // spacer to keep alignment
-      )}
-
-      {/* Content column */}
-      <div className="flex-1 min-w-0">
-        {/* Title row — hidden until hover */}
+    <div id={id} className={cn('group px-4 py-2', className)}>
+      {/* No avatar column — user vs agent is distinguished by alignment
+          (placement) plus a faint user tint. items-end right-aligns the
+          user's content; the agent column stretches full-width. */}
+      <div className={cn('flex flex-col min-w-0', isRight && 'items-end')}>
+        {/* Title row — hidden until hover (assistant model name + time + duration) */}
         {showTitle && (
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-            <TitleRow name={avatar.name} time={time} durationMs={durationMs} />
+            <TitleRow name={avatar?.name} time={time} durationMs={durationMs} />
           </div>
         )}
 
@@ -133,7 +103,7 @@ export const ChatItem = memo(function ChatItem({
         {/* Loading or message body */}
         {loading ? <LoadingBlock /> : children}
 
-        {/* Message extra (e.g. usage stats) */}
+        {/* Message extra (e.g. review outcome) */}
         {messageExtra && <div className="mt-1">{messageExtra}</div>}
 
         {/* Actions bar — hidden until hover */}

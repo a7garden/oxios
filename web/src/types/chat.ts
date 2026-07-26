@@ -153,21 +153,21 @@ export interface ChatMessageExtensions {
 // ── Chat item props (ported from LobeHub ChatItem) ──
 
 export interface ChatItemAvatar {
+  /** Display name shown in the hover title row (assistant model name). */
   name?: string
-  avatar?: string // URL or emoji
-  color?: string
 }
 
 export interface ChatItemProps {
   id?: string
-  avatar: ChatItemAvatar
+  /** Optional name for the hover TitleRow. No avatar is rendered — user vs
+   *  agent is distinguished by alignment (placement) + a faint user tint. */
+  avatar?: ChatItemAvatar
   placement?: 'left' | 'right'
   loading?: boolean
   error?: ChatError | null
   time?: number // unix ms
   durationMs?: number // assistant turn duration, shown subtly in the title row
   showTitle?: boolean
-  showAvatar?: boolean
   actions?: React.ReactNode
   messageExtra?: React.ReactNode
   children: React.ReactNode
