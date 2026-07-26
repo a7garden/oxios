@@ -424,6 +424,26 @@ export function patchAssistantModel(
   }
   return { messages, pendingModel: modelId }
 }
+/**
+ * Finalize the trailing assistant message when a turn ends abnormally
+ * (WS close, cancel/disconnect). A placeholder that never received any
+ * chunk (no content/reasoning/toolCalls/activities) is a ghost — drop it.
+ * A placeholder with partial data is kept with `generating` cleared so its
+ * spinner stops. Pure. Pairs with the optimistic placeholder `sendMessage`
+ * appends: without this, a cancel before the first chunk would leave an
+ * empty "Thinking…" bubble stuck on screen.
+ */
+export function finalizeStreamingMessage(messages: ChatMessage[]): ChatMessage[] {
+  const last = messages[messages.length - 1]
+  if (!last || last.role !== 'assistant' || !last.generating) return messages
+  const isEmpty =
+    !(last.content ?? '').trim() &&
+    !(last.reasoning?.content ?? '').trim() &&
+    !(last.toolCalls && last.toolCalls.length > 0) &&
+    !(last.activities && last.activities.length > 0)
+  if (isEmpty) return messages.slice(0, -1)
+  return messages.map((m, i) => (i === messages.length - 1 ? { ...m, generating: false } : m))
+}
 
 function trajectoryToActivity(step: {
   tool_name: string
@@ -1006,7 +1026,13 @@ export const useChatStore = create<ChatStore>()(
           // connect()).
           get().stopPingTimer()
 
-          set({ connected: false, isStreaming: false, _ws: null, _pendingQueue: [] })
+          set((s) => ({
+            connected: false,
+            isStreaming: false,
+            _ws: null,
+            _pendingQueue: [],
+            messages: finalizeStreamingMessage(s.messages),
+          }))
 
           // Auto-reconnect with exponential backoff.
           const attempt = get()._reconnectAttempts
@@ -1062,14 +1088,15 @@ export const useChatStore = create<ChatStore>()(
         // F9: flush any buffered tokens before tearing down the connection so
         // the final streamed content is committed to the message.
         flushPendingTokens()
-        set({
+        set((s) => ({
           connected: false,
           isStreaming: false,
           _pendingQueue: [],
           _ws: null,
           _reconnectTimer: null,
           _reconnectAttempts: 0,
-        })
+          messages: finalizeStreamingMessage(s.messages),
+        }))
       },
 
       sendMessage(content: string) {
@@ -1105,14 +1132,33 @@ export const useChatStore = create<ChatStore>()(
           return
         }
 
-        // Optimistic: add user message immediately
+        // Optimistic: add user message + an assistant placeholder immediately.
+        // The placeholder (generating: true) is what lets the chat-transparency
+        // pipeline (LiveActivityBar header + ContentLoading/Thinking/ToolCallList
+        // in the bubble) render DURING the assess→crystallize→execute gap before
+        // the first chunk arrives. Without it `last` is the user message, the
+        // LiveActivityBar gate returns null, and nothing shows until the first
+        // token — which then fades the bar instantly. Real-time chunks patch
+        // this placeholder in place; `done`/`error` merge into it. Abnormal
+        // termination (onclose/disconnect) drops it via finalizeStreamingMessage.
         const userMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'user',
           content,
           timestamp: new Date().toISOString(),
         }
-        set((s) => ({ messages: [...s.messages, userMsg], isStreaming: true }))
+        const assistantPlaceholder: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toISOString(),
+          model: activeModelId ?? undefined,
+          generating: true,
+        }
+        set((s) => ({
+          messages: [...s.messages, userMsg, assistantPlaceholder],
+          isStreaming: true,
+        }))
 
         // Send via WebSocket with session context.
         // The backend WS handler reads `model` and writes it into

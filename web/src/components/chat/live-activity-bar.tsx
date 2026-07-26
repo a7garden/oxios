@@ -34,6 +34,11 @@ export function LiveActivityBar() {
   if (!isStreaming || last?.role !== 'assistant') return null
 
   const descriptor = deriveCurrentActivity(last.activities)
+  // The pure-thinking gap (no running tool, no reasoning yet) is owned by the
+  // in-bubble ContentLoading indicator — showing "Thinking…" here too would
+  // duplicate it. This bar only mounts once there is a concrete activity
+  // (tool_running / reasoning) to describe, and fades out when text streams.
+  if (descriptor.kind === 'thinking') return null
   const streamingTextStarted = (last.content ?? '').trim().length > 0
   const { label, detail } = describeLiveActivity(descriptor, t)
 

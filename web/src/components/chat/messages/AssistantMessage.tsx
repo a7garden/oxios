@@ -102,7 +102,12 @@ function AssistantMessageImpl({
         )}
         {hasSearch && message.search && <SearchGrounding search={message.search} />}
         {hasChunks && <FileChunksPlaceholder chunks={message.chunksList!} />}
-        {showLoading && <ContentLoading id={`loading-${message.id}`} />}
+        {showLoading && (
+          <ContentLoading
+            id={`loading-${message.id}`}
+            startTime={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
+          />
+        )}
         {hasContent && !isError && (
           <MarkdownMessage messageId={message.id} isStreaming={!!message.generating}>
             {message.content}

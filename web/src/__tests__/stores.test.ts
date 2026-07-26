@@ -7,6 +7,7 @@ import {
   appendTokenToMessages,
   chunkToActivity,
   ensureLastAssistant,
+  finalizeStreamingMessage,
   mergeOrAppendActivity,
   patchAssistantModel,
   useChatStore,
@@ -704,6 +705,33 @@ describe('message-transform primitives (shared by chat + quick-ask stores)', () 
     expect(out.messages).toBe(input)
     expect(out.pendingModel).toBe('m')
   })
+
+  it('finalizeStreamingMessage drops an empty generating placeholder', () => {
+    const msgs: ChatMessage[] = [
+      userMsg(),
+      assistant({ id: 'a1', generating: true }),
+    ]
+    // No content/reasoning/tools/activities → ghost → removed.
+    expect(finalizeStreamingMessage(msgs)).toEqual([userMsg()])
+  })
+
+  it('finalizeStreamingMessage keeps a partial placeholder with generating cleared', () => {
+    const msgs: ChatMessage[] = [
+      userMsg(),
+      assistant({ id: 'a1', content: 'partial answer', generating: true }),
+    ]
+    const out = finalizeStreamingMessage(msgs)
+    expect(out).toHaveLength(2)
+    expect(out[1]!.content).toBe('partial answer')
+    expect(out[1]!.generating).toBe(false)
+  })
+
+  it('finalizeStreamingMessage is a no-op when the last message is not a generating assistant', () => {
+    const done = [assistant({ id: 'a1', content: 'finished' })]
+    expect(finalizeStreamingMessage(done)).toBe(done)
+    const onlyUser = [userMsg()]
+    expect(finalizeStreamingMessage(onlyUser)).toBe(onlyUser)
+  })
 })
 
 describe('useChatStore message queueing (while streaming)', () => {
@@ -754,6 +782,76 @@ describe('useChatStore message queueing (while streaming)', () => {
     useChatStore.getState().sendMessage('ghost')
     useChatStore.getState().disconnect()
     expect(useChatStore.getState()._pendingQueue).toEqual([])
+  })
+})
+
+// Optimistic assistant placeholder (chat-transparency gap fix): sendMessage
+// must append a generating assistant placeholder immediately so the
+// LiveActivityBar / ContentLoading pipeline renders during the
+// assess→crystallize→execute gap before the first chunk. Real-time chunks
+// patch it in place; an abnormal end (disconnect) drops it if still empty.
+describe('useChatStore sendMessage optimistic placeholder', () => {
+  let sendSpy: Mock
+  const mockWs = (): WebSocket =>
+    ({ readyState: 1, send: sendSpy, close: vi.fn() }) as unknown as WebSocket
+
+  beforeEach(() => {
+    localStorage.clear()
+    __clearStreamProcessorsForTesting()
+    sendSpy = vi.fn()
+    useChatStore.setState({
+      messages: [],
+      isStreaming: false,
+      connected: true,
+      _ws: mockWs(),
+      _pendingQueue: [],
+      _reconnectTimer: null,
+      _pingTimer: null,
+      activeSessionId: 's1',
+      activeModelId: 'gpt-test',
+    })
+  })
+
+  it('appends a user message + a generating assistant placeholder on send', () => {
+    useChatStore.getState().sendMessage('hello')
+    const s = useChatStore.getState()
+    expect(s.isStreaming).toBe(true)
+    expect(s.messages).toHaveLength(2)
+    expect(s.messages[0]).toMatchObject({ role: 'user', content: 'hello' })
+    expect(s.messages[1]).toMatchObject({
+      role: 'assistant',
+      content: '',
+      generating: true,
+      model: 'gpt-test',
+    })
+    // Actually dispatched over the wire (not queued).
+    expect(sendSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('streamed chunks patch the optimistic placeholder in place (no third message)', () => {
+    useChatStore.getState().sendMessage('hello')
+    const placeholderId = useChatStore.getState().messages[1]!.id
+    // reasoning is processed immediately (not RAF-buffered like tokens).
+    useChatStore.getState().handleChunk({
+      type: 'reasoning',
+      content: 'thinking…',
+      source: 'thinking',
+    })
+    const msgs = useChatStore.getState().messages
+    expect(msgs).toHaveLength(2)
+    expect(msgs[1]!.id).toBe(placeholderId)
+    expect(msgs[1]!.reasoning?.content).toBe('thinking…')
+  })
+
+  it('disconnect drops the empty generating placeholder so no ghost bubble remains', () => {
+    useChatStore.getState().sendMessage('hello')
+    expect(useChatStore.getState().messages).toHaveLength(2)
+    useChatStore.getState().disconnect()
+    const msgs = useChatStore.getState().messages
+    // User message kept; the empty assistant placeholder is removed.
+    expect(msgs).toHaveLength(1)
+    expect(msgs[0]!.role).toBe('user')
+    expect(useChatStore.getState().isStreaming).toBe(false)
   })
 })
 
