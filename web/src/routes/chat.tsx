@@ -3,7 +3,7 @@ import { ArrowDown, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AttachedFile, ContextAttachment } from '@/components/chat/chat-input'
-import { ChatInputWithTools } from '@/components/chat/chat-input-with-tools'
+import { ChatInput } from '@/components/chat/chat-input'
 import { ChatMiniMap } from '@/components/chat/chat-minimap'
 import { CompressedGroup } from '@/components/chat/compressed-group'
 import { EmptyChatState } from '@/components/chat/empty-chat-state'
@@ -321,7 +321,7 @@ function ChatPage() {
         </div>
         {!activeInterview && (
           <div className="bg-background/95 backdrop-blur-sm shrink-0">
-            <ChatInputWithTools
+            <ChatInput
               value={input}
               onChange={setInput}
               onSend={handleSend}
@@ -337,9 +337,6 @@ function ChatPage() {
               queuedCount={queuedCount}
               onAttachMount={handleAttachMount}
               onRemoveMount={handleRemoveMount}
-              enableSearchToggle
-              enableKnowledgeToggle
-              enableFileUpload
             />
           </div>
         )}

@@ -229,6 +229,7 @@
     "title": "채팅",
     "placeholder": "메시지 보내기...",
     "send": "보내기",
+    "attachFiles": "파일 첨부",
     "newConversation": "새 대화",
     "selectAgent": "에이전트 선택",
     "selectSpace": "공간 선택",

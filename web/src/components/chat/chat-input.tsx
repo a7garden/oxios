@@ -14,7 +14,7 @@ import {
   Square,
   X,
 } from 'lucide-react'
-import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type ChangeEvent, type DragEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useIsTouch } from '@/hooks/use-is-touch'
@@ -24,6 +24,7 @@ import { useMounts } from '@/hooks/use-mounts'
 import { getInputHistory } from '@/lib/input-history-storage'
 import { cn } from '@/lib/utils'
 import { LiveActivityBar } from './live-activity-bar'
+import { ModelParamsPopover } from './model-params-popover'
 import { ModelPickerContainer } from './model-picker'
 
 // ── Types ──
@@ -69,7 +70,6 @@ interface ChatInputProps {
   onAttachMount?: (id: string) => void
   onRemoveMount?: (id: string) => void
   placeholder?: string
-  showNewChatHint?: boolean
 }
 
 // ── Slash commands ──
@@ -185,7 +185,6 @@ export function ChatInput({
   onAttachMount = () => {},
   onRemoveMount = () => {},
   placeholder,
-  showNewChatHint = true,
 }: ChatInputProps) {
   const { t } = useTranslation()
   const isTouch = useIsTouch()
@@ -195,6 +194,7 @@ export function ChatInput({
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
   const dragCounter = useRef(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const maxFileSize = 10 * 1024 * 1024
   const [showSlashMenu, setShowSlashMenu] = useState(false)
   const [slashFilter, setSlashFilter] = useState('')
@@ -507,6 +507,14 @@ export function ChatInput({
     (index: number) => setAttachedFiles((prev) => prev.filter((_, i) => i !== index)),
     [],
   )
+  const handleFilePick = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) addFiles(e.target.files)
+      // Reset so the same file can be re-selected
+      e.target.value = ''
+    },
+    [addFiles],
+  )
 
   // Drag-drop
   const handleDragEnter = useCallback((e: DragEvent) => {
@@ -765,7 +773,8 @@ export function ChatInput({
           />
         </div>
         <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-1">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {/* Left: model + context tools */}
+          <div className="flex items-center gap-1 min-w-0 flex-1">
             <ModelPickerContainer
               activeModelId={activeModelId}
               setActiveModelId={setActiveModelId}
@@ -773,7 +782,25 @@ export function ChatInput({
               activeRole={activeRole}
               setActiveRole={setActiveRole}
             />
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFilePick}
+              className="hidden"
+              aria-label={t('chat.attachFiles')}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              title={t('chat.attachFiles')}
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+            </button>
+            <ModelParamsPopover />
           </div>
+          {/* Right: queue + send */}
           <div className="flex items-center shrink-0 gap-1.5">
             {queuedCount > 0 && (
               <span className="mr-0.5 flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-2xs text-muted-foreground">
@@ -781,7 +808,7 @@ export function ChatInput({
                 {t('chat.queued', { count: queuedCount, defaultValue: '{{count}} queued' })}
               </span>
             )}
-            {isStreaming && (
+            {isStreaming ? (
               <Button
                 onClick={onCancel}
                 variant="destructive"
@@ -791,6 +818,16 @@ export function ChatInput({
                 <Square className="h-3 w-3 fill-current" />
                 {t('chat.stop')}
               </Button>
+            ) : (
+              canSend &&
+              !isTouch && (
+                <kbd
+                  className="hidden h-5 items-center rounded border bg-muted/60 px-1.5 font-mono text-2xs text-muted-foreground/70 sm:inline-flex"
+                  title={t('chat.send')}
+                >
+                  ⏎
+                </kbd>
+              )
             )}
             <Button
               onClick={handleSend}
@@ -808,22 +845,6 @@ export function ChatInput({
           </div>
         </div>
       </div>
-      <div className="mt-1.5 flex items-center justify-center gap-3 text-2xs text-muted-foreground/70 hidden sm:flex">
-        <Hint kbd="Enter" label={t('chat.send')} />
-        <Hint kbd="Shift+Enter" label={t('chat.input.newline')} />
-        {showNewChatHint && <Hint kbd="⌘⇧N" label={t('chat.newConversation')} />}
-      </div>
     </div>
-  )
-}
-
-function Hint({ kbd, label }: { kbd: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      <kbd className="rounded border bg-muted/60 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground">
-        {kbd}
-      </kbd>
-      <span>{label}</span>
-    </span>
   )
 }

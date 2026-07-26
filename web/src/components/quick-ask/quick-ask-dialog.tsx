@@ -205,7 +205,6 @@ export function QuickAskDialog() {
             activeModelId={quickAskModel}
             setActiveModelId={setQuickAskModel}
             placeholder={t('quickAsk.placeholder')}
-            showNewChatHint={false}
           />
         </div>
       </DialogContent>
