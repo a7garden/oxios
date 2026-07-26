@@ -8,7 +8,6 @@ import { ChatMiniMap } from '@/components/chat/chat-minimap'
 import { CompressedGroup } from '@/components/chat/compressed-group'
 import { EmptyChatState } from '@/components/chat/empty-chat-state'
 import { InterviewWizard } from '@/components/chat/interview-wizard'
-import { LiveActivityBar } from '@/components/chat/live-activity-bar'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { TextSelectionBar } from '@/components/chat/text-selection-bar'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
@@ -320,12 +319,8 @@ function ChatPage() {
           <ChatMiniMap messages={messages} onJump={handleMiniMapJump} />
           <TextSelectionBar containerRef={scrollAreaRef} />
         </div>
-        {/* LiveActivityBar — lobehub-style "what's happening" holder pinned
-            above the input. Visible for the whole turn (gap → reasoning →
-            tools → writing), stays until the turn ends. */}
-        {isStreaming && !activeInterview && !activeToolApproval && <LiveActivityBar />}
         {!activeInterview && (
-          <div className="border-t bg-background/95 backdrop-blur-sm shrink-0">
+          <div className="bg-background/95 backdrop-blur-sm shrink-0">
             <ChatInputWithTools
               value={input}
               onChange={setInput}

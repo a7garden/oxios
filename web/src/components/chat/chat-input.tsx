@@ -23,6 +23,7 @@ import { useMemorySemanticSearch } from '@/hooks/use-memory'
 import { useMounts } from '@/hooks/use-mounts'
 import { getInputHistory } from '@/lib/input-history-storage'
 import { cn } from '@/lib/utils'
+import { LiveActivityBar } from './live-activity-bar'
 import { ModelPickerContainer } from './model-picker'
 
 // ── Types ──
@@ -756,6 +757,7 @@ export function ChatInput({
             ))}
           </div>
         )}
+        <LiveActivityBar />
         <div className="px-4 pt-3 pb-2.5">
           <EditorContent
             editor={editor}

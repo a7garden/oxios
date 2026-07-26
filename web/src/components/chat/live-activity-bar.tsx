@@ -1,14 +1,14 @@
 import { Loader2, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { describeLiveActivity, deriveCurrentActivity } from '@/lib/live-activity'
+import { deriveCurrentActivity, describeLiveActivity } from '@/lib/live-activity'
 import { useChatStore } from '@/stores/chat'
 
 const ELAPSED_THRESHOLD_MS = 2000
 
 /**
- * LiveActivityBar — lobehub-style "what's happening" holder pinned above the
- * chat input. Visible for the ENTIRE assistant turn (`isStreaming`), across
+ * LiveActivityBar — in-input status row embedded at the top of the chat input
+ * box. Visible for the ENTIRE assistant turn (`isStreaming`), across
  * every phase, and never fades when text starts:
  *
  *   gap (no chunk yet) → "생각하는 중… · 3s"
@@ -18,7 +18,7 @@ const ELAPSED_THRESHOLD_MS = 2000
  *
  * Phase priority: running tool → text streaming (writing) → reasoning →
  * thinking. The in-bubble Thinking / ToolCallList panels carry the detail;
- * this holder is the single always-on one-line status + elapsed timer, so the
+ * this row is the single always-on one-line status + elapsed timer, so the
  * user can tell the agent is still working even while reading the streamed
  * response. Reads `streamStartedAt` (set in sendMessage) for the timer.
  */
@@ -27,6 +27,8 @@ export function LiveActivityBar() {
   const isStreaming = useChatStore((s) => s.isStreaming)
   const startedAt = useChatStore((s) => s.streamStartedAt)
   const last = useChatStore((s) => s.messages.at(-1))
+  const activeInterview = useChatStore((s) => s.activeInterview)
+  const activeToolApproval = useChatStore((s) => s.activeToolApproval)
 
   const [elapsedMs, setElapsedMs] = useState(0)
   useEffect(() => {
@@ -40,14 +42,12 @@ export function LiveActivityBar() {
     return () => window.clearInterval(handle)
   }, [isStreaming, startedAt])
 
-  if (!isStreaming) return null
+  if (!isStreaming || activeInterview || activeToolApproval) return null
 
   // Only the trailing assistant message carries this turn's activities/content.
   const lastAssistant = last?.role === 'assistant' ? last : undefined
   const descriptor = deriveCurrentActivity(lastAssistant?.activities)
-  const streamingText = !!(
-    lastAssistant?.generating && (lastAssistant?.content ?? '').trim()
-  )
+  const streamingText = !!(lastAssistant?.generating && (lastAssistant?.content ?? '').trim())
 
   let label: string
   let detail: string | undefined
@@ -71,7 +71,7 @@ export function LiveActivityBar() {
 
   return (
     <div
-      className="flex items-center gap-2 px-4 py-1.5 text-xs text-muted-foreground border-t bg-background/95 backdrop-blur-sm animate-fade-in-up"
+      className="flex items-center gap-2 px-4 pt-2.5 pb-1.5 text-xs text-muted-foreground border-b border-border/50 animate-fade-in-up"
       aria-live="polite"
     >
       {icon === 'spinner' ? (
