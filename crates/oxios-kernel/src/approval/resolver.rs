@@ -14,16 +14,11 @@ pub trait ToolPolicyResolver: Send + Sync {
     fn resolve(&self, args: &Value) -> Option<ToolPolicy>;
 }
 
-/// Pipeline-wide resolver (Phase 4 of the evaluation). Security blacklist,
+/// Pipeline-wide resolver (Phase 3 of the evaluation). Security blacklist,
 /// audit, rate-limit, etc. Return `Some(policy)` to escalate; the gate adopts
 /// it via `ToolPolicy::max`, so it can only strengthen — never weaken.
-///
-/// NOTE (temporary signature): the design specifies
-/// `fn resolve(&self, call: &super::gate::ToolCall)`. Until Task 4 creates
-/// `ToolCall`, this takes `args: &Value` directly. Task 4 refactors this trait
-/// and all implementors to take `&ToolCall`.
 pub trait GlobalResolver: Send + Sync {
-    fn resolve(&self, args: &Value) -> Option<ToolPolicy>;
+    fn resolve(&self, call: &super::gate::ToolCall<'_>) -> Option<ToolPolicy>;
 }
 
 /// ExecTool dynamic policy. Preserves current behavior:

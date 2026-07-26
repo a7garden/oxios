@@ -1,3 +1,4 @@
+
 //! Security blacklist — always-enforced dangerous-command patterns.
 
 use glob::Pattern;
@@ -90,8 +91,8 @@ impl SecurityBlacklist {
 }
 
 impl GlobalResolver for SecurityBlacklist {
-    fn resolve(&self, args: &Value) -> Option<ToolPolicy> {
-        self.policy_for(args)
+    fn resolve(&self, call: &super::gate::ToolCall<'_>) -> Option<ToolPolicy> {
+        self.policy_for(call.args)
     }
 }
 
@@ -136,8 +137,10 @@ pub fn default_blacklist_rules() -> Vec<BlacklistRule> {
 }
 
 #[cfg(test)]
+
 mod tests {
     use super::*;
+    use super::super::gate::ToolCall;
     use serde_json::json;
 
     #[test]
@@ -173,21 +176,16 @@ mod tests {
     #[test]
     fn global_resolver_impl_returns_always_on_match() {
         let bl = SecurityBlacklist::new(default_blacklist_rules());
-        // GlobalResolver (Task 2 temporary signature: args: &Value)
-        let policy = super::super::resolver::GlobalResolver::resolve(
-            &bl,
-            &json!({"command": "rm -rf /etc"}),
-        );
-        assert_eq!(policy, Some(ToolPolicy::Always));
+        let args = json!({"command": "rm -rf /etc"});
+        let call = ToolCall { tool: "exec", binary: None, args: &args };
+        assert_eq!(super::super::resolver::GlobalResolver::resolve(&bl, &call), Some(ToolPolicy::Always));
     }
 
     #[test]
     fn global_resolver_impl_returns_none_on_safe_command() {
         let bl = SecurityBlacklist::new(default_blacklist_rules());
-        let policy = super::super::resolver::GlobalResolver::resolve(
-            &bl,
-            &json!({"command": "curl https://example.com"}),
-        );
-        assert_eq!(policy, None);
+        let args = json!({"command": "curl https://example.com"});
+        let call = ToolCall { tool: "exec", binary: None, args: &args };
+        assert_eq!(super::super::resolver::GlobalResolver::resolve(&bl, &call), None);
     }
 }
