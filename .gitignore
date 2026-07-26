@@ -48,3 +48,6 @@ report-*.json
 # sccache: local Rust compilation cache (SCCACHE_DIR). Regenerable, never commit.
 /.sccache/
 .worktrees/
+
+# Visual brainstorming companion
+.superpowers/
