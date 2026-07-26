@@ -165,6 +165,7 @@ export interface ChatItemProps {
   loading?: boolean
   error?: ChatError | null
   time?: number // unix ms
+  durationMs?: number // assistant turn duration, shown subtly in the title row
   showTitle?: boolean
   showAvatar?: boolean
   actions?: React.ReactNode

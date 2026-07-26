@@ -78,6 +78,7 @@ function AssistantMessageImpl({
       avatar={avatar}
       error={chatError}
       time={message.timestamp ? new Date(message.timestamp).getTime() : undefined}
+      durationMs={message.metadata?.duration_ms}
       actions={<MessageActionBar actions={actions} />}
       messageExtra={
         <>

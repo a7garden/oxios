@@ -39,12 +39,23 @@ function Avatar({ name, avatar, color }: ChatItemAvatar) {
   )
 }
 
-function TitleRow({ name, time }: { name?: string; time?: number }) {
+function TitleRow({
+  name,
+  time,
+  durationMs,
+}: {
+  name?: string
+  time?: number
+  durationMs?: number
+}) {
   return (
     <div className="flex items-center gap-2 mb-1">
       {name && <span className="text-sm font-medium">{name}</span>}
       {time != null && (
         <span className="text-xs text-muted-foreground">{formatChatTime(time)}</span>
+      )}
+      {durationMs != null && durationMs > 0 && (
+        <span className="text-xs text-muted-foreground/70">· {formatDuration(durationMs)}</span>
       )}
     </div>
   )
@@ -85,6 +96,7 @@ export const ChatItem = memo(function ChatItem({
   loading = false,
   error,
   time,
+  durationMs,
   showTitle = true,
   showAvatar = true,
   actions,
@@ -111,7 +123,7 @@ export const ChatItem = memo(function ChatItem({
         {/* Title row — hidden until hover */}
         {showTitle && (
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-            <TitleRow name={avatar.name} time={time} />
+            <TitleRow name={avatar.name} time={time} durationMs={durationMs} />
           </div>
         )}
 
@@ -146,4 +158,11 @@ function formatChatTime(ms: number): string {
 
   if (isToday) return `${hh}:${mm}`
   return `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`
+}
+
+/** Compact turn-duration string: ms under 1s, "X.Xs" under 1m, else "Xm Ys". */
+function formatDuration(ms: number): string {
+  if (ms >= 60000) return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`
+  return `${ms}ms`
 }
