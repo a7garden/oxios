@@ -67,11 +67,6 @@ pub struct ExecTool {
     config: crate::kernel_handle::SharedExecConfig,
     access: Arc<Mutex<AccessManager>>,
     context: Option<AgentContext>,
-    /// Phase D: pending approvals registry for human-in-the-loop approval.
-    /// When Some, shell-mode exec requests user approval before running.
-    pending_approvals: Option<Arc<crate::tools::PendingToolApprovals>>,
-    /// Phase D: event bus for publishing ApprovalRequested events.
-    event_bus: Option<crate::event_bus::EventBus>,
 }
 
 impl ExecTool {
@@ -85,24 +80,23 @@ impl ExecTool {
             config,
             access,
             context: Some(context),
-            pending_approvals: None,
-            event_bus: None,
         }
     }
 
     /// Create an `ExecTool` from a [`KernelHandle`] with an agent context.
+    ///
+    /// Note (RFC-035): human-in-the-loop approval for shell exec now lives
+    /// in `GatedTool::execute` (Step 2.5) — the bespoke Phase D approval
+    /// fields previously set here have moved up.
     pub fn from_kernel_with_context(
         kernel: &crate::kernel_handle::KernelHandle,
         context: AgentContext,
     ) -> Self {
-        let mut tool = Self::new(
+        Self::new(
             Arc::new(parking_lot::RwLock::new(kernel.exec.config_snapshot())),
             kernel.exec.access_manager().clone(),
             context,
-        );
-        tool.pending_approvals = Some(kernel.infra.pending_tool_approvals());
-        tool.event_bus = Some(kernel.infra.event_bus_clone());
-        tool
+        )
     }
 
     /// Create an `ExecTool` from a [`KernelHandle`] (legacy, no context).
@@ -111,8 +105,6 @@ impl ExecTool {
             config: Arc::new(parking_lot::RwLock::new(kernel.exec.config_snapshot())),
             access: kernel.exec.access_manager().clone(),
             context: None,
-            pending_approvals: Some(kernel.infra.pending_tool_approvals()),
-            event_bus: Some(kernel.infra.event_bus_clone()),
         }
     }
 
@@ -126,8 +118,6 @@ impl ExecTool {
             config,
             access,
             context: None,
-            pending_approvals: None,
-            event_bus: None,
         }
     }
 
@@ -143,8 +133,6 @@ impl ExecTool {
             config,
             access,
             context: None,
-            pending_approvals: None,
-            event_bus: None,
         }
     }
 
@@ -594,32 +582,12 @@ impl AgentTool for ExecTool {
                         ));
                     }
                 };
-
-                // Phase D: request user approval before executing shell commands.
-                if let (Some(approvals), Some(bus)) = (&self.pending_approvals, &self.event_bus) {
-                    let (approval_id, rx) = approvals.register("exec".to_string());
-                    let reason = format!("Execute: {}", &command[..command.len().min(80)]);
-                    let _ = bus.publish(crate::event_bus::KernelEvent::ApprovalRequested {
-                        id: approval_id,
-                        tool_name: "exec".to_string(),
-                        action: "shell_exec".to_string(),
-                        resource: command.chars().take(200).collect(),
-                        reason,
-                        session_id: None,
-                    });
-                    match tokio::time::timeout(std::time::Duration::from_secs(120), rx).await {
-                        Ok(Ok(crate::tools::ToolApprovalResult::Approved)) => {
-                            tracing::info!(approval_id = %approval_id, "exec approved by user");
-                        }
-                        _ => {
-                            let _ = approvals
-                                .resolve(approval_id, crate::tools::ToolApprovalResult::Denied);
-                            return Ok(AgentToolResult::error(
-                                "Shell execution was denied or timed out (120s).",
-                            ));
-                        }
-                    }
-                }
+                // RFC-035 Step 2.5 in `GatedTool::execute` now handles exec
+                // approval uniformly with all other tools. The bespoke
+                // shell-only approval block that previously lived here has
+                // been removed; exec has `ToolPolicy::OnDemand` by default,
+                // so prompts/auto-runs are governed by the kernel's
+                // `[security.approval]` config via `ApprovalGate`.
                 match self.shell_exec(command, timeout_ms, shutdown).await {
                     Ok(result) => {
                         let output = format_exec_output(&result);

@@ -58,51 +58,87 @@ pub fn register_always_on(registry: &ToolRegistry, search_cache: Arc<SearchCache
     registry.register(GetSearchResultsTool::new(search_cache));
 }
 
-/// Register always-on tools with access gate wrapping.
+/// Register always-on tools with access gate and (RFC-035) approval wrapping.
 ///
-/// Same as [`register_always_on`] but wraps each tool in [`GatedTool`]
-/// so that all file operations pass through the access gate.
+/// Same as [`register_always_on`] but wraps each tool in [`GatedTool`] so that
+/// all file operations pass through the access gate and approval gate.
+///
+/// `approval_gate`, `event_bus`, and `pending_approvals` may all be `None`
+/// for headless / test paths; the gated tool still honors the access gate
+/// but skips the approval step.
+#[allow(clippy::too_many_arguments)]
 pub fn register_always_on_gated(
     registry: &ToolRegistry,
     search_cache: Arc<SearchCache>,
     gate: Arc<AccessGate>,
     context: AgentContext,
+    approval_gate: Option<Arc<crate::approval::ApprovalGate>>,
+    event_bus: Option<crate::event_bus::EventBus>,
+    pending_approvals: Option<Arc<crate::tools::PendingToolApprovals>>,
 ) {
-    registry.register(GatedTool::new(
+    registry.register(GatedTool::with_approval(
         ReadTool::new(),
         gate.clone(),
         context.clone(),
+        approval_gate.clone(),
+        event_bus.clone(),
+        pending_approvals.clone(),
     ));
-    registry.register(GatedTool::new(
+    registry.register(GatedTool::with_approval(
         WriteTool::new(),
         gate.clone(),
         context.clone(),
+        approval_gate.clone(),
+        event_bus.clone(),
+        pending_approvals.clone(),
     ));
-    registry.register(GatedTool::new(
+    registry.register(GatedTool::with_approval(
         EditTool::new(),
         gate.clone(),
         context.clone(),
+        approval_gate.clone(),
+        event_bus.clone(),
+        pending_approvals.clone(),
     ));
-    registry.register(GatedTool::new(
+    registry.register(GatedTool::with_approval(
         GrepTool::new(),
         gate.clone(),
         context.clone(),
+        approval_gate.clone(),
+        event_bus.clone(),
+        pending_approvals.clone(),
     ));
-    registry.register(GatedTool::new(
+    registry.register(GatedTool::with_approval(
         FindTool::new(),
         gate.clone(),
         context.clone(),
+        approval_gate.clone(),
+        event_bus.clone(),
+        pending_approvals.clone(),
     ));
-    registry.register(GatedTool::new(LsTool::new(), gate.clone(), context.clone()));
-    registry.register(GatedTool::new(
+    registry.register(GatedTool::with_approval(
+        LsTool::new(),
+        gate.clone(),
+        context.clone(),
+        approval_gate.clone(),
+        event_bus.clone(),
+        pending_approvals.clone(),
+    ));
+    registry.register(GatedTool::with_approval(
         WebSearchTool::new(search_cache.clone()),
         gate.clone(),
         context.clone(),
+        approval_gate.clone(),
+        event_bus.clone(),
+        pending_approvals.clone(),
     ));
-    registry.register(GatedTool::new(
+    registry.register(GatedTool::with_approval(
         GetSearchResultsTool::new(search_cache),
         gate,
         context,
+        approval_gate,
+        event_bus,
+        pending_approvals,
     ));
 }
 
@@ -192,11 +228,13 @@ pub fn register_tools_from_cspace(
     }
 }
 
-/// Register tools into `registry` with access gate enforcement.
+/// Register tools into `registry` with access gate + approval gate enforcement.
 ///
 /// Same as [`register_tools_from_cspace`] but:
-/// - Always-on tools are wrapped in [`GatedTool`] for permission checks
-/// - ExecTool is created with `AgentContext`
+/// - Always-on tools are wrapped in [`GatedTool`] for permission + approval checks
+/// - ExecTool is created with `AgentContext` and wrapped in [`GatedTool`] so
+///   RFC-035 Step 2.5 also covers shell + structured exec calls (replacing
+///   the bespoke exec-only shell approval block)
 ///
 /// Use this in production. The ungated version exists for backward compatibility.
 ///
@@ -209,6 +247,12 @@ pub fn register_tools_from_cspace(
 /// * `agent_id` — The agent's ID (used by A2A tools for routing).
 /// * `gate` — The unified access gate for permission checks.
 /// * `context` — The agent's security context.
+/// * `approval_gate` — RFC-035 approval gate; consults declared policy,
+///   config overrides, and global resolvers per tool call.
+/// * `event_bus` — Publishes `KernelEvent::ApprovalRequested` when
+///   `RequireApproval` is returned.
+/// * `pending_approvals` — Shared registry of pending user decisions.
+#[allow(clippy::too_many_arguments)]
 pub fn register_tools_from_cspace_gated(
     registry: &ToolRegistry,
     kernel: &KernelHandle,
@@ -217,16 +261,37 @@ pub fn register_tools_from_cspace_gated(
     agent_id: AgentId,
     gate: Arc<AccessGate>,
     context: AgentContext,
+    approval_gate: Option<Arc<crate::approval::ApprovalGate>>,
+    event_bus: Option<crate::event_bus::EventBus>,
+    pending_approvals: Option<Arc<crate::tools::PendingToolApprovals>>,
 ) {
     // ── Tier 1: Always-on tools (gated) ──────────────────────────────
-    register_always_on_gated(registry, search_cache, gate, context);
+    register_always_on_gated(
+        registry,
+        search_cache,
+        gate.clone(),
+        context.clone(),
+        approval_gate.clone(),
+        event_bus.clone(),
+        pending_approvals.clone(),
+    );
 
     // ── Tier 2: CSpace-driven tools ─────────────────────────────────
     for cap in cspace.iter() {
         match &cap.resource {
-            // Command execution — use from_kernel_with_context for full security
+            // Command execution — wrap in GatedTool so Step 2.5 (RFC-035)
+            // also fires for exec. The inner ExecTool retains its own
+            // context, binary allowlist + access manager checks; the outer
+            // GatedTool runs the unified access gate + approval pipeline.
             ResourceRef::Exec { .. } if cap.rights.contains(Rights::EXECUTE) => {
-                registry.register(ExecTool::from_kernel(kernel));
+                registry.register(GatedTool::with_approval(
+                    ExecTool::from_kernel_with_context(kernel, context.clone()),
+                    gate.clone(),
+                    context.clone(),
+                    approval_gate.clone(),
+                    event_bus.clone(),
+                    pending_approvals.clone(),
+                ));
             }
 
             // Headless browser

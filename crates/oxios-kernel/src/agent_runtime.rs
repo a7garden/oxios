@@ -881,13 +881,28 @@ async fn run_agent(
     } else {
         Arc::new(TracingAuditSink)
     };
-
     // Build access gate from kernel's security infrastructure
     let access_gate = Arc::new(AccessGate::new(
         kernel_handle.exec.access_manager().clone(),
         Arc::new(kernel_handle.exec.config_snapshot()),
         audit_sink,
     ));
+
+    // Build the RFC-035 ApprovalGate: declared policies + config overrides +
+    // the always-on SecurityBlacklist as the single global resolver. Tool
+    // registration threads this into every `GatedTool`, so Step 2.5 picks
+    // up `exec`, file, and web-search calls uniformly.
+    let approval_config = kernel_handle.infra.config().security.approval.clone();
+    let approval_gate = Arc::new(crate::approval::ApprovalGate::with_global_resolvers(
+        crate::approval::default_tool_policy_map(),
+        approval_config,
+        vec![Box::new(crate::approval::SecurityBlacklist::new(
+            crate::approval::default_blacklist_rules(),
+        ))],
+    ));
+    let approval_event_bus = kernel_handle.infra.event_bus_clone();
+    let approval_pending =
+        kernel_handle.infra.pending_tool_approvals();
 
     register_tools_from_cspace_gated(
         &registry,
@@ -897,6 +912,9 @@ async fn run_agent(
         agent_id,
         access_gate,
         agent_context,
+        Some(approval_gate),
+        Some(approval_event_bus),
+        Some(approval_pending),
     );
 
     tracing::info!(

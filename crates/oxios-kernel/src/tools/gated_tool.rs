@@ -7,10 +7,19 @@
 //! - No changes to individual tool code
 //! - New tools are automatically protected
 //! - oxi-sdk crate tools (ReadTool, WriteTool, etc.) are covered without modification
+//!
+//! RFC-035: After the structural `AccessGate` (CSpace / RBAC / Permissions /
+//! ExecConfig) passes, `GatedTool` consults the [`ApprovalGate`] (Step 2.5).
+//! On [`ApprovalDecision::Allow`] the call delegates; on
+//! [`ApprovalDecision::RequireApproval`] the tool requests a user decision via
+//! the kernel event bus, blocking until resolved (or until the 120s timeout).
+//! This is the unified mechanism that supersedes the bespoke exec-only shell
+//! approval.
 
 use async_trait::async_trait;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::Value;
@@ -18,6 +27,12 @@ use serde_json::Value;
 use crate::access_manager::{
     AccessDenied, AccessGate, AgentContext, CheckRequest, DenyLayer, PathMode,
 };
+use crate::approval::{ApprovalDecision, ApprovalGate, ToolCall};
+use crate::event_bus::EventBus;
+use crate::tools::{PendingToolApprovals, ToolApprovalResult};
+
+/// Default timeout for awaiting a user approval response.
+const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
 
 // ─── Path Extraction ────────────────────────────────────────────────────────
 
@@ -67,19 +82,59 @@ fn format_denied(denied: &AccessDenied) -> String {
 ///
 /// Wraps any `AgentTool` and performs access control before delegating
 /// to the inner tool's `execute` method.
+///
+/// When constructed via [`GatedTool::with_approval`], the wrapper also
+/// consults the [`ApprovalGate`] (RFC-035) after the structural `AccessGate`
+/// and surfaces `RequireApproval` decisions as user prompts on the kernel
+/// event bus.
 pub struct GatedTool<T: AgentTool> {
     inner: T,
     gate: Arc<AccessGate>,
     context: AgentContext,
+    /// RFC-035 approval gate. `None` ⇒ no approval logic, executable as soon
+    /// as `AccessGate` allows.
+    approval_gate: Option<Arc<ApprovalGate>>,
+    /// Kernel event bus used to publish `KernelEvent::ApprovalRequested`.
+    event_bus: Option<EventBus>,
+    /// Registry of pending user decisions to resolve after a prompt.
+    pending_approvals: Option<Arc<PendingToolApprovals>>,
 }
 
 impl<T: AgentTool> GatedTool<T> {
-    /// Create a new gated tool wrapping the given tool.
+    /// Create a new gated tool with no approval pipeline.
+    ///
+    /// Existing call sites that don't yet pass an approval gate still compile
+    /// — the approval pipeline is opted-in via [`GatedTool::with_approval`].
     pub fn new(inner: T, gate: Arc<AccessGate>, context: AgentContext) -> Self {
         Self {
             inner,
             gate,
             context,
+            approval_gate: None,
+            event_bus: None,
+            pending_approvals: None,
+        }
+    }
+
+    /// Construct a gated tool with the RFC-035 approval pipeline wired.
+    ///
+    /// All three opt-in arguments may be `None` (legacy callers, tests,
+    /// headless paths), but production paths always supply them.
+    pub fn with_approval(
+        inner: T,
+        gate: Arc<AccessGate>,
+        context: AgentContext,
+        approval_gate: Option<Arc<ApprovalGate>>,
+        event_bus: Option<EventBus>,
+        pending_approvals: Option<Arc<PendingToolApprovals>>,
+    ) -> Self {
+        Self {
+            inner,
+            gate,
+            context,
+            approval_gate,
+            event_bus,
+            pending_approvals,
         }
     }
 }
@@ -119,12 +174,11 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
     ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let tool_name = self.inner.name();
 
-        // Step 1: Check tool access permission
+        // Step 1: Check tool access permission (CSpace / RBAC / Permissions / ExecConfig).
         let check = CheckRequest::Tool {
             context: &self.context,
             tool_name,
         };
-
         if let Err(denied) = self.gate.check(check) {
             tracing::warn!(
                 agent = %denied.agent,
@@ -135,7 +189,7 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
             return Ok(AgentToolResult::error(format_denied(&denied)));
         }
 
-        // Step 2: For file tools, check path access permission
+        // Step 2: For file tools, check path access permission.
         if let Some(path) = extract_path_from_params(tool_name, &params) {
             let mode = path_mode_for_tool(tool_name);
             let path_check = CheckRequest::Path {
@@ -143,7 +197,6 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                 path: Path::new(&path),
                 mode,
             };
-
             if let Err(denied) = self.gate.check(path_check) {
                 tracing::warn!(
                     agent = %denied.agent,
@@ -159,10 +212,94 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
             }
         }
 
-        // Step 3: Permission granted — delegate to inner tool
+        // Step 2.5 (RFC-035): ApprovalGate evaluation — decides whether the
+        // call auto-runs or surfaces a human-in-the-loop approval card.
+        if let Some(approval_gate) = &self.approval_gate {
+            // Build the approval context. `exec` carries both a `binary`
+            // (structured) / `command` (shell) argument; other tools have
+            // neither.
+            let binary = if tool_name == "exec" {
+                params
+                    .get("binary")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| params.get("command").and_then(|v| v.as_str()))
+            } else {
+                None
+            };
+            let call = ToolCall {
+                tool: tool_name,
+                binary,
+                args: &params,
+            };
+            match approval_gate.evaluate(&call) {
+                ApprovalDecision::Allow => {
+                    // fall through to Step 3
+                }
+                ApprovalDecision::RequireApproval { reason } => {
+                    if self.event_bus.is_none() || self.pending_approvals.is_none() {
+                        tracing::warn!(
+                            tool = %tool_name,
+                            "ApprovalGate requires approval but no event bus / pending approvals \
+                             wired — allowing (headless path, tool would deadlock)"
+                        );
+                        // fall through to Step 3
+                    } else {
+                        let bus = self.event_bus.as_ref().expect("checked above");
+                        let approvals = self
+                            .pending_approvals
+                            .as_ref()
+                            .expect("checked above")
+                            .clone();
+                        let (approval_id, rx) = approvals.register(tool_name.to_string());
+                        let action = format!("tool:{tool_name}");
+                        // Resource shown on the approval card. For exec this
+                        // is the binary name (structured) or full command
+                        // (shell) — gives the user enough context to decide.
+                        // Other tools fall back to the tool name.
+                        let resource = binary
+                            .map(String::from)
+                            .unwrap_or_else(|| tool_name.to_string());
+                        // Publish using the exact KernelEvent::ApprovalRequested
+                        // field shape (event_bus.rs:83-96). The frontend uses
+                        // this to render the approval card.
+                        let _ = bus.publish(crate::event_bus::KernelEvent::ApprovalRequested {
+                            id: approval_id,
+                            tool_name: tool_name.to_string(),
+                            action,
+                            resource: resource.chars().take(200).collect(),
+                            reason: reason.clone(),
+                            session_id: None,
+                        });
+                        match tokio::time::timeout(APPROVAL_TIMEOUT, rx).await {
+                            Ok(Ok(ToolApprovalResult::Approved)) => {
+                                tracing::info!(
+                                    approval_id = %approval_id,
+                                    tool = %tool_name,
+                                    "tool call approved by user"
+                                );
+                                // fall through to Step 3
+                            }
+                            _ => {
+                                let _ = approvals.resolve(
+                                    approval_id,
+                                    ToolApprovalResult::Denied,
+                                );
+                                return Ok(AgentToolResult::error(format!(
+                                    "Tool execution was denied or timed out ({}s).",
+                                    APPROVAL_TIMEOUT.as_secs()
+                                )));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 3: Access and (RFC-035) approval both granted — delegate.
         self.inner.execute(tool_call_id, params, signal, ctx).await
     }
 }
+
 
 /// Wrap a tool with access control.
 ///
