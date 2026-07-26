@@ -1,4 +1,4 @@
-// messages/UserMessage — right-aligned, faintly tinted panel with edit + delete.
+// messages/UserMessage — right-aligned plain text (no bubble) with edit + delete.
 
 import { Pencil, Trash2 } from 'lucide-react'
 import { memo, useCallback, useState } from 'react'
@@ -85,7 +85,7 @@ function UserMessageImpl({ message }: UserMessageProps) {
           </div>
         </div>
       ) : (
-        <div className="inline-block max-w-[80%] rounded-lg bg-muted/40 px-3 py-1.5 text-sm">
+        <div className="max-w-[80%] text-sm whitespace-pre-wrap leading-relaxed">
           {message.content}
         </div>
       )}
