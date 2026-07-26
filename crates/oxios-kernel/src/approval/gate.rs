@@ -1,6 +1,7 @@
 //! ApprovalGate — runtime approval evaluation.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use serde_json::Value;
 
@@ -37,63 +38,34 @@ pub enum ApprovalDecision {
 
 pub struct ApprovalGate {
     tool_policies: HashMap<String, ToolPolicy>,
-    config: ApprovalConfig,
+    config: Arc<parking_lot::RwLock<ApprovalConfig>>,
     global_resolvers: Vec<Box<dyn GlobalResolver>>,
 }
 
 impl ApprovalGate {
     pub fn new(tool_policies: HashMap<String, ToolPolicy>, config: ApprovalConfig) -> Self {
-        Self { tool_policies, config, global_resolvers: Vec::new() }
+        Self::with_global_resolvers(tool_policies, config, Vec::new())
     }
-
-    pub fn with_global_resolvers(
-        tool_policies: HashMap<String, ToolPolicy>,
-        config: ApprovalConfig,
-        global_resolvers: Vec<Box<dyn GlobalResolver>>,
-    ) -> Self {
+    pub fn with_global_resolvers(tool_policies: HashMap<String, ToolPolicy>, config: ApprovalConfig, global_resolvers: Vec<Box<dyn GlobalResolver>>) -> Self {
+        Self { tool_policies, config: Arc::new(parking_lot::RwLock::new(config)), global_resolvers }
+    }
+    pub fn with_shared_config(tool_policies: HashMap<String, ToolPolicy>, config: Arc<parking_lot::RwLock<ApprovalConfig>>, global_resolvers: Vec<Box<dyn GlobalResolver>>) -> Self {
         Self { tool_policies, config, global_resolvers }
     }
 
-    pub fn config(&self) -> &ApprovalConfig {
-        &self.config
-    }
-
     pub fn evaluate(&self, call: &ToolCall<'_>) -> ApprovalDecision {
-        // Phase 1: declared policy (DEFAULT_TOOL_POLICIES via tool_policies map)
-        let mut policy = self
-            .tool_policies
-            .get(call.tool)
-            .copied()
-            .unwrap_or(ToolPolicy::OnDemand);
-
-        // Phase 2: config tool_overrides — user override replaces declared
-        if let Some(&override_p) = self.config.tool_overrides.get(call.tool) {
-            policy = override_p;
-        }
-
-        // Phase 3: global resolvers — max-merge, can only escalate.
-        // (Security blacklist → Always beats any user weakening.)
-        for resolver in &self.global_resolvers {
-            if let Some(p) = resolver.resolve(call) {
-                policy = policy.max(p);
-            }
-        }
-
-        // Phase 4: user mode × final policy
+        let config = self.config.read();
+        let mut policy = self.tool_policies.get(call.tool).copied().unwrap_or(ToolPolicy::OnDemand);
+        if let Some(&override_p) = config.tool_overrides.get(call.tool) { policy = override_p; }
+        for resolver in &self.global_resolvers { if let Some(p) = resolver.resolve(call) { policy = policy.max(p); } }
         use {ApprovalMode::*, ToolPolicy::*};
-        match (self.config.mode, policy) {
+        match (config.mode, policy) {
             (_, Auto) => ApprovalDecision::Allow,
             (_, Always) => require(call, "always-policy tool"),
             (AutoRun, OnDemand) => ApprovalDecision::Allow,
-            (AllowList, OnDemand) if self.has_grant(call) => ApprovalDecision::Allow,
-            (AllowList, OnDemand) => require(call, "not in allow-list"),
-            (Manual, OnDemand) => require(call, "manual mode"),
+            (AllowList, OnDemand) if config.allow_list.iter().any(|k| k == &call.grant_key()) => ApprovalDecision::Allow,
+            (_, OnDemand) => require(call, "approval required"),
         }
-
-    }
-
-    fn has_grant(&self, call: &ToolCall<'_>) -> bool {
-        self.config.allow_list.iter().any(|k| k == &call.grant_key())
     }
 }
 
@@ -202,5 +174,21 @@ mod tests {
         assert_eq!(call("exec", Some("curl")).grant_key(), "exec:curl");
         assert_eq!(call("exec", None).grant_key(), "exec:shell");
         assert_eq!(call("read", None).grant_key(), "read");
+    }
+    #[test]
+    fn shared_config_mutation_takes_effect_live() {
+        let shared = Arc::new(parking_lot::RwLock::new(ApprovalConfig {
+            mode: ApprovalMode::AllowList,
+            allow_list: vec![],
+            tool_overrides: HashMap::new(),
+        }));
+        let gate = ApprovalGate::with_shared_config(default_tool_policy_map(), shared.clone(), vec![]);
+        let curl = call("exec", Some("curl"));
+        assert!(matches!(gate.evaluate(&curl), ApprovalDecision::RequireApproval { .. }));
+        shared.write().allow_list.push("exec:curl".to_string());
+        assert!(matches!(gate.evaluate(&curl), ApprovalDecision::Allow));
+        shared.write().allow_list.clear();
+        shared.write().mode = ApprovalMode::AutoRun;
+        assert!(matches!(gate.evaluate(&curl), ApprovalDecision::Allow));
     }
 }

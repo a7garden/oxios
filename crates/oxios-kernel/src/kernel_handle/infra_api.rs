@@ -20,6 +20,7 @@ pub struct InfraApi {
     pub(crate) start_time: Instant,
     /// Hot-reloadable orchestrator config (evolution iterations, score threshold).
     pub(crate) orchestrator_config: parking_lot::RwLock<crate::config::OrchestratorConfig>,
+    pub(crate) approval_config: Arc<parking_lot::RwLock<crate::approval::ApprovalConfig>>,
     /// Pending tool approval requests (HitL escalation).
     pub(crate) pending_tool_approvals: Arc<PendingToolApprovals>,
     /// Pending `ask_user` requests (RFC-027 agent-driven clarification).
@@ -40,6 +41,7 @@ impl InfraApi {
         pending_tool_approvals: Arc<PendingToolApprovals>,
         pending_ask_user: Arc<PendingAskUser>,
     ) -> Self {
+        let approval_config = config.security.approval.clone();
         Self {
             git_layer,
             cron_scheduler,
@@ -50,6 +52,7 @@ impl InfraApi {
             orchestrator_config: parking_lot::RwLock::new(
                 crate::config::OrchestratorConfig::default(),
             ),
+            approval_config: Arc::new(parking_lot::RwLock::new(approval_config)),
             pending_tool_approvals,
             pending_ask_user,
         }
@@ -57,6 +60,30 @@ impl InfraApi {
     /// Get a reference to the GitLayer.
     pub fn git(&self) -> &GitLayer {
         &self.git_layer
+    }
+
+    pub fn approval_config_handle(&self) -> Arc<parking_lot::RwLock<crate::approval::ApprovalConfig>> {
+        Arc::clone(&self.approval_config)
+    }
+    pub fn approval_config(&self) -> crate::approval::ApprovalConfig {
+        self.approval_config.read().clone()
+    }
+
+    pub async fn set_approval_config(&self, config: crate::approval::ApprovalConfig) -> anyhow::Result<crate::approval::ApprovalConfig> {
+        *self.approval_config.write() = config.clone();
+        Ok(config)
+    }
+
+    pub async fn add_grant(&self, key: String) -> anyhow::Result<crate::approval::ApprovalConfig> {
+        let mut config = self.approval_config();
+        if !config.allow_list.contains(&key) { config.allow_list.push(key); }
+        self.set_approval_config(config.clone()).await
+    }
+
+    pub async fn remove_grant(&self, key: &str) -> anyhow::Result<crate::approval::ApprovalConfig> {
+        let mut config = self.approval_config();
+        config.allow_list.retain(|item| item != key);
+        self.set_approval_config(config.clone()).await
     }
 
     /// Get commit log.

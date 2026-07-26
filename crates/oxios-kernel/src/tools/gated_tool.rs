@@ -250,7 +250,7 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                             .as_ref()
                             .expect("checked above")
                             .clone();
-                        let (approval_id, rx) = approvals.register(tool_name.to_string());
+                        let (approval_id, rx) = approvals.register(tool_name.to_string(), call.grant_key());
                         let action = format!("tool:{tool_name}");
                         // Resource shown on the approval card. For exec this
                         // is the binary name (structured) or full command

@@ -22,6 +22,7 @@ pub enum ToolApprovalResult {
 
 struct PendingEntry {
     tool_name: String,
+    grant_key: String,
     sender: oneshot::Sender<ToolApprovalResult>,
 }
 
@@ -39,13 +40,14 @@ impl PendingToolApprovals {
 
     /// Register a new pending tool approval.
     /// Returns the approval ID and a receiver to await the user's decision.
-    pub fn register(&self, tool_name: String) -> (Uuid, oneshot::Receiver<ToolApprovalResult>) {
+    pub fn register(&self, tool_name: String, grant_key: String) -> (Uuid, oneshot::Receiver<ToolApprovalResult>) {
         let id = Uuid::new_v4();
         let (tx, rx) = oneshot::channel();
         self.inner.lock().insert(
             id,
             PendingEntry {
                 tool_name,
+                grant_key,
                 sender: tx,
             },
         );
@@ -59,6 +61,9 @@ impl PendingToolApprovals {
         let _ = entry.sender.send(result);
         Some(entry.tool_name)
     }
+    pub fn grant_key(&self, id: Uuid) -> Option<String> {
+        self.inner.lock().get(&id).map(|e| e.grant_key.clone())
+    }
 
     /// Cancel all pending entries (e.g., on shutdown).
     pub fn cancel_all(&self) {
@@ -66,5 +71,18 @@ impl PendingToolApprovals {
         for (_, entry) in guard.drain() {
             let _ = entry.sender.send(ToolApprovalResult::Denied);
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn grant_key_round_trip() {
+        let registry = PendingToolApprovals::new();
+        let (id, rx) = registry.register("exec".to_string(), "exec:curl".to_string());
+        assert_eq!(registry.grant_key(id), Some("exec:curl".to_string()));
+        assert_eq!(registry.resolve(id, ToolApprovalResult::Approved), Some("exec".to_string()));
+        let result = rx.blocking_recv().expect("oneshot did not deliver");
+        assert_eq!(result, ToolApprovalResult::Approved);
     }
 }

@@ -892,8 +892,8 @@ async fn run_agent(
     // the always-on SecurityBlacklist as the single global resolver. Tool
     // registration threads this into every `GatedTool`, so Step 2.5 picks
     // up `exec`, file, and web-search calls uniformly.
-    let approval_config = kernel_handle.infra.config().security.approval.clone();
-    let approval_gate = Arc::new(crate::approval::ApprovalGate::with_global_resolvers(
+    let approval_config = kernel_handle.infra.approval_config_handle();
+    let approval_gate = Arc::new(crate::approval::ApprovalGate::with_shared_config(
         crate::approval::default_tool_policy_map(),
         approval_config,
         vec![Box::new(crate::approval::SecurityBlacklist::new(
