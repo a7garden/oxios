@@ -214,15 +214,6 @@
     "conflictTitle": "{{count}}개 일정과 겹침",
     "conflictDetail": "{{minutes}}분 겹침"
   },
-  "chatInput": {
-    "formattingToolbar": "텍스트 서식",
-    "bold": "굵게",
-    "italic": "기울임꼴",
-    "strikethrough": "취소선",
-    "bulletList": "글머리 기호 목록",
-    "inlineCode": "인라인 코드",
-    "codeBlock": "코드 블록"
-  },
   "chat": {
     "minimap": {
       "ariaLabel": "메시지 개요",

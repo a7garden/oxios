@@ -2,22 +2,16 @@ import Placeholder from '@tiptap/extension-placeholder'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import {
-  Bold,
   BookOpen,
   Brain,
   Clock,
-  Code,
-  Code2,
   FileText,
   HardDrive,
   Image,
-  Italic,
-  List,
   Paperclip,
   Send,
   Sparkles,
   Square,
-  Strikethrough,
   X,
 } from 'lucide-react'
 import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react'
@@ -157,6 +151,19 @@ const SLASH_COMMANDS: SlashCommand[] = [
   },
 ]
 
+// TipTap's setContent() and the `content:` option parse their argument as
+// HTML via DOMParser.parseFromString, which collapses newlines and swallows
+// HTML-looking fragments (`a < b` → `a b`). Since onChange now carries plain
+// text, escape it and convert `\n` to <br> (hardBreak stays enabled in
+// StarterKit) before every setContent/content call.
+function plainTextToHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>')
+}
+
 // ── Component ──
 
 export function ChatInput({
@@ -194,8 +201,6 @@ export function ChatInput({
   const [mentionIndex, setMentionIndex] = useState(0)
   const [mentionResults, setMentionResults] = useState<MentionResult[]>([])
   const mentionSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [isEditorFocused, setIsEditorFocused] = useState(false)
-  const [hasEditorContent, setHasEditorContent] = useState(Boolean(value.trim()))
 
   // Search hooks
   const knowledgeSearch = useKnowledgeSearch()
@@ -292,16 +297,36 @@ export function ChatInput({
     applyingHistory: false,
     apply: (_text: string) => {},
   })
+  // Placeholder text depends on connection state and i18n. useEditor captures
+  // its config once at mount (no deps array), so the resolved string is also
+  // pushed to the Placeholder extension imperatively when it changes (below).
+  const placeholderText =
+    placeholder ?? (connected ? t('chat.inputPlaceholder') : t('chat.waitingForConnection'))
   // Editor
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: false }),
+      StarterKit.configure({
+        // Plain-text input for the AI — every formatting mark/node is
+        // disabled so the editor cannot produce bold/italic/code/list output
+        // the model would never see anyway. document/paragraph/text/hardBreak
+        // and history (undo/redo) remain. Typing ``` or ** stays literal text.
+        heading: false,
+        bold: false,
+        italic: false,
+        strike: false,
+        code: false,
+        codeBlock: false,
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        blockquote: false,
+        horizontalRule: false,
+      }),
       Placeholder.configure({
-        placeholder:
-          placeholder ?? (connected ? t('chat.inputPlaceholder') : t('chat.waitingForConnection')),
+        placeholder: placeholderText,
       }),
     ],
-    content: value,
+    content: plainTextToHtml(value),
     editable: !disabled && !!connected,
     editorProps: {
       handleKeyDown: (_view, event) => {
@@ -363,14 +388,13 @@ export function ChatInput({
         return false
       },
     },
-    onFocus: () => setIsEditorFocused(true),
-    onBlur: () => setIsEditorFocused(false),
     onUpdate: ({ editor }) => {
       const text = editor.getText()
-      setHasEditorContent(Boolean(text.trim()))
-      // Send HTML so formatting (bold/italic/code/lists) survives — MarkdownMessage
-      // renders HTML via rehype-raw, and setContent parses HTML natively.
-      onChange(editor.getHTML())
+      // Send plain text — formatting marks are disabled so getText() carries
+      // everything the model needs (slash commands, @mentions, code fences
+      // typed verbatim). getHTML() previously sent markup that getContent()
+      // below then stripped back to text on send: a zero-value round-trip.
+      onChange(text)
       // Exit input-history mode when the user types normally (not via apply).
       if (!historyGate.current.applyingHistory && historyGate.current.index >= 0) {
         historyGate.current.index = -1
@@ -400,17 +424,29 @@ export function ChatInput({
   useEffect(() => {
     if (editor) editor.setEditable(!disabled && !!connected)
   }, [editor, connected, disabled])
-
-  // Sync
-  // Sync external value (draft restore, history nav) into the editor.
-  // Compare against getHTML() since onChange now emits HTML. Normalise the
-  // empty edge: value "" ↔ editor getHTML() "<p></p>".
+  // Sync placeholder text when connection state / i18n change after mount.
+  // useEditor captures the Placeholder extension's option once at creation;
+  // without this the empty-input hint stays frozen at the mount-time value
+  // (e.g. "연결 대기 중...") even after the WebSocket connects. The Placeholder
+  // plugin only rebuilds its decoration on doc/selection change, so we mutate
+  // the option in place and touch the selection to force a rescan.
   useEffect(() => {
     if (!editor) return
-    const current = editor.getHTML()
-    const normalizedValue = value || ''
-    const normalizedCurrent = current === '<p></p>' ? '' : current
-    if (normalizedValue !== normalizedCurrent) editor.commands.setContent(value || '')
+    const ext = editor.extensionManager.extensions.find((e) => e.name === 'placeholder')
+    if (!ext || ext.options.placeholder === placeholderText) return
+    ext.options.placeholder = placeholderText
+    const { state, view } = editor
+    // setSelection marks the transaction selectionSet even when unchanged,
+    // which is what makes the placeholder state field rescan decorations.
+    view.dispatch(state.tr.setSelection(state.selection))
+  }, [editor, placeholderText])
+
+  // Sync external value (draft restore, history nav) into the editor.
+  // onChange now emits plain text, so compare against getText() — comparing
+  // against getHTML() would never match and re-trigger setContent each render.
+  useEffect(() => {
+    if (!editor) return
+    if ((value || '') !== editor.getText()) editor.commands.setContent(plainTextToHtml(value || ''))
   }, [value, editor])
 
   // Wire the input-history apply callback now that the editor exists.
@@ -418,7 +454,7 @@ export function ChatInput({
     if (!editor) return
     historyGate.current.apply = (text: string) => {
       historyGate.current.applyingHistory = true
-      editor.commands.setContent(text)
+      editor.commands.setContent(plainTextToHtml(text))
       editor.commands.focus('end')
       historyGate.current.applyingHistory = false
     }
@@ -515,7 +551,6 @@ export function ChatInput({
   sendGate.current = { isTouch, showSlashMenu, mentionQuery, handleSend }
 
   const canSend = editor?.getText().trim() && connected
-  const showTypoBar = isEditorFocused || hasEditorContent
 
   const filteredCommands = SLASH_COMMANDS.filter(
     (c) => c.id.includes(slashFilter) || c.label.includes(slashFilter),
@@ -717,77 +752,6 @@ export function ChatInput({
                 )}
               >
                 {item.replace(/<[^>]+>/g, '').slice(0, 120)}
-              </button>
-            ))}
-          </div>
-        )}
-        {showTypoBar && (
-          <div
-            className="flex items-center gap-0.5 border-b px-2 py-1.5"
-            role="toolbar"
-            aria-label={t('chatInput.formattingToolbar')}
-            onMouseDown={(event) => event.preventDefault()}
-          >
-            {[
-              {
-                key: 'bold',
-                label: t('chatInput.bold'),
-                icon: Bold,
-                active: editor?.isActive('bold'),
-                action: () => editor?.chain().focus().toggleBold().run(),
-              },
-              {
-                key: 'italic',
-                label: t('chatInput.italic'),
-                icon: Italic,
-                active: editor?.isActive('italic'),
-                action: () => editor?.chain().focus().toggleItalic().run(),
-              },
-              {
-                key: 'strike',
-                label: t('chatInput.strikethrough'),
-                icon: Strikethrough,
-                active: editor?.isActive('strike'),
-                action: () => editor?.chain().focus().toggleStrike().run(),
-              },
-              {
-                key: 'bulletList',
-                label: t('chatInput.bulletList'),
-                icon: List,
-                active: editor?.isActive('bulletList'),
-                action: () => editor?.chain().focus().toggleBulletList().run(),
-              },
-              {
-                key: 'code',
-                label: t('chatInput.inlineCode'),
-                icon: Code,
-                active: editor?.isActive('code'),
-                action: () => editor?.chain().focus().toggleCode().run(),
-              },
-              {
-                key: 'codeBlock',
-                label: t('chatInput.codeBlock'),
-                icon: Code2,
-                active: editor?.isActive('codeBlock'),
-                action: () => editor?.chain().focus().toggleCodeBlock().run(),
-              },
-            ].map(({ key, label, icon: Icon, active, action }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={action}
-                disabled={!editor?.isEditable}
-                aria-label={label}
-                aria-pressed={Boolean(active)}
-                title={label}
-                className={cn(
-                  'inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors',
-                  'hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                  'disabled:pointer-events-none disabled:opacity-40',
-                  active && 'bg-accent text-accent-foreground',
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
               </button>
             ))}
           </div>

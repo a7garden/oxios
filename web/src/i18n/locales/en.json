@@ -214,15 +214,6 @@
     "conflictTitle": "{{count}} event(s) overlap",
     "conflictDetail": "{{minutes}} min overlap"
   },
-  "chatInput": {
-    "formattingToolbar": "Text formatting",
-    "bold": "Bold",
-    "italic": "Italic",
-    "strikethrough": "Strikethrough",
-    "bulletList": "Bullet list",
-    "inlineCode": "Inline code",
-    "codeBlock": "Code block"
-  },
   "chat": {
     "minimap": {
       "ariaLabel": "Message overview",
