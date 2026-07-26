@@ -49,10 +49,17 @@ impl Default for AgentPermissions {
             // the catch-22 from RFC-017 Q3. "ls" was also missing, leaving
             // it dead-registered for default agents.
             allowed_tools: [
-                "read", "write", "edit", "grep", "find", "ls",
-                "web_search", "get_search_results",
+                "read",
+                "write",
+                "edit",
+                "grep",
+                "find",
+                "ls",
+                "web_search",
+                "get_search_results",
                 // Shell execution (legacy "bash" alias + "exec").
-                "bash", "exec",
+                "bash",
+                "exec",
             ]
             .iter()
             .map(|s| s.to_string())

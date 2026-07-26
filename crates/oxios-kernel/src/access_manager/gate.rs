@@ -331,7 +331,14 @@ impl AccessGate {
             // (GatedTool → PendingToolApprovals → user dialog) for that
             // case.
             let always_on = [
-                "read", "write", "edit", "grep", "find", "ls", "web_search", "get_search_results",
+                "read",
+                "write",
+                "edit",
+                "grep",
+                "find",
+                "ls",
+                "web_search",
+                "get_search_results",
             ];
             if !always_on.contains(&tool) {
                 return Err(AccessDenied {

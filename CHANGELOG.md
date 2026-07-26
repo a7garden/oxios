@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.1] - 2026-07-27
+
+### Fixed
+- **Layer-0 tool gate (kernel)** — `web_search`, `get_search_results`, and `ls`
+  were absent from the default agents' Layer-0 allowed-tools list, leaving them
+  dead-registered. Restored so default agents can actually invoke these tools.
+- **Chat input placeholder (web)** — the editor placeholder was captured once at
+  mount and never updated; it now refreshes when the WebSocket connection state
+  changes, fixing the stuck "연결 대기 중…" hint after connect.
+- **Agent step visibility (web)** — intermediate agent steps are now surfaced
+  during the gap before the chat response streams, so the UI no longer appears
+  frozen while the model is working.
+- **Activity holder (web)** — added a LobeHub-style activity indicator pinned
+  above the chat input to signal in-flight work.
+- **Turn metadata (web)** — dropped the execute-phase badge and relocated the
+  turn-duration readout to hover to declutter the message row.
+- **Chat turn styling (web)** — removed avatars and now distinguish turns by
+  alignment plus a faint tint instead.
+- **User message styling (web)** — stripped the user message to plain
+  right-aligned text with no bubble for a cleaner conversation layout.
+
 ## [1.27.0] - 2026-07-25
 
 ### Fixed
