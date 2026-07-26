@@ -131,6 +131,22 @@ max_execution_time_secs = 300
 max_memory_mb = 512
 can_fork = false
 
+# Tool approval mode (RFC-035). Controls how often the agent prompts before
+# running a tool. See docs/designs/2026-07-27-approval-mode-system-design.md.
+[security.approval]
+# "manual" (default — each tool's declared policy) | "allow-list" | "auto-run"
+mode = "manual"
+# Tools auto-run in allow-list mode. Format: tool name or "exec:<binary>".
+# Filled automatically when you tick "don't ask again" on an approval card.
+# allow_list = ["exec:curl", "web_search"]
+allow_list = []
+
+# Per-tool policy overrides (optional). Replaces the tool's declared policy.
+# Values: "auto" | "ondemand" | "always".
+# [security.approval.tool_overrides]
+# exec = "always"
+# web_search = "auto"
+
 [logging]
 # Log format: "pretty" (default), "json" (for ELK/Loki/CloudWatch), "compact"
 format = "pretty"
