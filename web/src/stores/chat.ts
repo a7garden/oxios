@@ -522,6 +522,10 @@ export function getToken(): string {
  * single probe per page session is sufficient.
  */
 let authEnabledCached: boolean | null = null
+/** Test-only: reset the cached auth-enabled probe so a fresh connect re-probes. */
+export function __clearAuthCacheForTesting(): void {
+  authEnabledCached = null
+}
 
 async function isAuthEnabled(): Promise<boolean> {
   if (authEnabledCached !== null) return authEnabledCached
@@ -597,8 +601,21 @@ export async function buildWsUrl(): Promise<string> {
   return `${base}?token=${encodeURIComponent(token)}`
 }
 
-/** Max reconnect attempts before giving up. */
+/** Max fast-backoff reconnect attempts before switching to long-tail retry. */
 const MAX_RECONNECT_ATTEMPTS = 5
+/**
+ * Steady retry cadence used after the fast exponential backoff exhausts.
+ *
+ * Without this, a daemon restart that outlasted the ~31 s fast-backoff window
+ * (5 attempts: 1+2+4+8+16 s) stranded the tab permanently at
+ * `connected === false` — the chat input disabled and the reconnect banner
+ * (`chat.reconnecting`) stuck open, recoverable only by a full page refresh.
+ * The long-tail retry keeps probing at a gentle cadence so the client always recovers once
+ * the daemon returns, with no user action and no hammering (one attempt per
+ * interval; `connect()` early-returns while a socket is already open, and
+ * `onopen` resets the counter to 0).
+ */
+const RECONNECT_LONG_TAIL_MS = 10_000
 
 // RFC-024 SP2 (B4): client-side keepalive interval. Independent of the
 // server's 20 s ping — sending our own ping every 25 s means the
@@ -1054,16 +1071,20 @@ export const useChatStore = create<ChatStore>()(
             messages: finalizeStreamingMessage(s.messages),
           }))
 
-          // Auto-reconnect with exponential backoff.
+          // Auto-reconnect. Fast exponential backoff for the first
+          // MAX_RECONNECT_ATTEMPTS tries, then a steady long-tail retry so a
+          // daemon restart that outlasts the backoff window still recovers
+          // instead of stranding the tab at connected === false forever.
           const attempt = get()._reconnectAttempts
-          if (attempt >= MAX_RECONNECT_ATTEMPTS) return
-
-          const delay = 1000 * 2 ** attempt
+          const inFastBackoff = attempt < MAX_RECONNECT_ATTEMPTS
+          const delay = inFastBackoff ? 1000 * 2 ** attempt : RECONNECT_LONG_TAIL_MS
           window.setTimeout(() => {
             set({ _reconnectTimer: null })
             // Only reconnect if no new connection was established in the meantime.
             if (get()._ws === null) {
-              set({ _reconnectAttempts: attempt + 1 })
+              // Pin the counter at the cap during long-tail retry; onopen
+              // resets it to 0 once a connection finally succeeds.
+              set({ _reconnectAttempts: inFastBackoff ? attempt + 1 : attempt })
               get().connect()
             }
           }, delay)

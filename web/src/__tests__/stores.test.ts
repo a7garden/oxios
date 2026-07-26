@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import { useAuthStore } from '@/stores/auth'
 import {
+  __clearAuthCacheForTesting,
   __clearResolvedApprovalIdsForTesting,
   __clearStreamProcessorsForTesting,
   appendActivityToMessages,
@@ -730,10 +731,7 @@ describe('message-transform primitives (shared by chat + quick-ask stores)', () 
   })
 
   it('finalizeStreamingMessage drops an empty generating placeholder', () => {
-    const msgs: ChatMessage[] = [
-      userMsg(),
-      assistant({ id: 'a1', generating: true }),
-    ]
+    const msgs: ChatMessage[] = [userMsg(), assistant({ id: 'a1', generating: true })]
     // No content/reasoning/tools/activities → ghost → removed.
     expect(finalizeStreamingMessage(msgs)).toEqual([userMsg()])
   })
@@ -989,5 +987,120 @@ describe('useChatStore tool approval (RFC-017)', () => {
     const s = useChatStore.getState()
     expect(s.activeToolApproval?.id).toBe('approval-2')
     expect(s.isStreaming).toBe(false)
+  })
+})
+
+// Reconnect state machine: the client must never permanently give up. After
+// the fast exponential backoff exhausts it switches to a steady long-tail
+// retry so a daemon restart that outlasts the ~31s backoff window still
+// recovers instead of stranding the tab at connected === false forever.
+describe('useChatStore reconnect (long-tail recovery)', () => {
+  // Minimal fake WebSocket. The outcome is deferred via setTimeout(0) so fake
+  // timers drive ordering deterministically and connect() can attach its
+  // handlers before open/close fires. Statics are declared on the class body
+  // (writable) because the DOM lib types `WebSocket.OPEN` &c. as readonly,
+  // and the global is installed via vi.stubGlobal because jsdom exposes
+  // `WebSocket` as a read-only property.
+  let instances: unknown[]
+  let FakeWS: ReturnType<typeof makeFakeWebSocket>
+
+  function makeFakeWebSocket() {
+    class FakeWebSocket {
+      static OPEN = 1
+      static CLOSED = 3
+      static CONNECTING = 0
+      static CLOSING = 2
+      static mode: 'fail' | 'succeed' = 'fail'
+      url: string
+      readyState = 0
+      onopen: (() => void) | null = null
+      onclose: (() => void) | null = null
+      onmessage: ((e: { data: string }) => void) | null = null
+      onerror: (() => void) | null = null
+      constructor(url: string) {
+        this.url = url
+        instances.push(this)
+        setTimeout(() => {
+          if (FakeWebSocket.mode === 'succeed') {
+            this.readyState = 1
+            this.onopen?.()
+          } else {
+            this.readyState = 3
+            this.onclose?.()
+          }
+        }, 0)
+      }
+      close() {
+        this.readyState = 3
+      }
+      send() {}
+    }
+    return FakeWebSocket
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    __clearAuthCacheForTesting()
+    __clearStreamProcessorsForTesting()
+    __clearResolvedApprovalIdsForTesting()
+    instances = []
+    FakeWS = makeFakeWebSocket()
+    vi.stubGlobal('WebSocket', FakeWS)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ auth_enabled: false }),
+      })),
+    )
+    useChatStore.setState({
+      connected: false,
+      isStreaming: false,
+      _ws: null,
+      _sendQueue: [],
+      _pendingQueue: [],
+      _reconnectAttempts: 0,
+      _reconnectTimer: null,
+      _pingTimer: null,
+      messages: [],
+      activeSessionId: 's1',
+      activeProjectId: 'p1',
+    })
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    try {
+      useChatStore.getState().disconnect()
+    } catch {
+      // ignore — store may be mid-teardown
+    }
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps retrying past the fast-backoff cap instead of giving up forever', async () => {
+    useChatStore.getState().connect()
+    // Fast backoff is 1+2+4+8+16 = 31s across 5 attempts. Advancing 60s
+    // runs the full backoff plus two long-tail (10s) retries.
+    await vi.advanceTimersByTimeAsync(60_000)
+    // Old behaviour stopped creating sockets at the cap (6 total). Long-tail
+    // recovery must keep creating fresh sockets.
+    expect(instances.length).toBeGreaterThanOrEqual(7)
+    expect(useChatStore.getState()._reconnectAttempts).toBeGreaterThanOrEqual(5)
+    expect(useChatStore.getState().connected).toBe(false)
+  })
+
+  it('recovers and resets the counter once the connection succeeds', async () => {
+    useChatStore.getState().connect()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(useChatStore.getState().connected).toBe(false)
+    // Daemon returns — the next long-tail attempt opens.
+    FakeWS.mode = 'succeed'
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(useChatStore.getState().connected).toBe(true)
+    expect(useChatStore.getState()._reconnectAttempts).toBe(0)
   })
 })
