@@ -391,6 +391,29 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     const last = useChatStore.getState().messages.at(-1)!
     expect(last.reasoning?.content).toBe('thinking…compacting…')
   })
+  it('tool_start closes an open reasoning span (reasoning_content models)', () => {
+    // Reasoning_content providers (GLM/DeepSeek/Qwen) go straight from
+    // reasoning to a tool call with no Text, so the gateway's first-Text
+    // reasoning.end heuristic never fires. tool_start must close the
+    // reasoning span itself or the Thinking spinner runs through the whole
+    // tool execution. See StreamProcessor.closeReasoningIfOpen.
+    const store = useChatStore.getState()
+    store.handleChunk({ type: 'reasoning', content: 'Let me try a search. ' })
+    store.handleChunk({ type: 'reasoning', content: 'Querying…' })
+    expect(useChatStore.getState().messages.at(-1)!.isReasoning).toBe(true)
+    store.handleChunk({
+      type: 'tool_start',
+      tool_name: 'web_search',
+      tool_call_id: 'ws-1',
+      tool_args: { q: 'weather' },
+    })
+    const last = useChatStore.getState().messages.at(-1)!
+    // Reasoning closed by the tool transition — before any `done`.
+    expect(last.isReasoning).toBe(false)
+    expect(last.reasoning?.thinking).toBe(false)
+    expect(last.reasoning?.content).toBe('Let me try a search. Querying…')
+    expect(last.toolCalls).toHaveLength(1)
+  })
 
   it('token chunk does not add an activity', async () => {
     // F9: tokens are batched via requestAnimationFrame; wait one frame for flush.
@@ -731,6 +754,29 @@ describe('message-transform primitives (shared by chat + quick-ask stores)', () 
     expect(finalizeStreamingMessage(done)).toBe(done)
     const onlyUser = [userMsg()]
     expect(finalizeStreamingMessage(onlyUser)).toBe(onlyUser)
+  })
+  it('finalizeStreamingMessage clears isReasoning on an interrupted reasoning stream', () => {
+    // Abnormal WS close mid-reasoning must not leave the Thinking spinner
+    // stuck. Without clearing isReasoning/reasoning.thinking the block spins
+    // forever — the reported "stuck Thinking..." symptom.
+    const msgs: ChatMessage[] = [
+      userMsg(),
+      assistant({
+        id: 'a1',
+        generating: true,
+        isReasoning: true,
+        isToolCallGenerating: true,
+        reasoning: { content: 'Let me try', duration: 100, thinking: true },
+      }),
+    ]
+    const out = finalizeStreamingMessage(msgs)
+    expect(out).toHaveLength(2)
+    expect(out[1]!.generating).toBe(false)
+    expect(out[1]!.isReasoning).toBe(false)
+    expect(out[1]!.isToolCallGenerating).toBe(false)
+    expect(out[1]!.reasoning?.thinking).toBe(false)
+    // Reasoning content is preserved for display.
+    expect(out[1]!.reasoning?.content).toBe('Let me try')
   })
 })
 

@@ -685,7 +685,19 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         // emits separately on the terminal OutgoingMessage).
                         // The token chunk itself still forwards so the
                         // frontend's `flushPendingTokens` can accumulate.
-                        let is_partial = msg.partial == Some(true);
+                        // A message is "partial" (skip persist_session + the
+                        // terminal `done`) when it is either a streamed
+                        // fragment OR a transient stream-control marker.
+                        // reasoning.start / reasoning.end carry no terminal
+                        // content — without this guard each marker would
+                        // persist an empty assistant response AND emit a
+                        // premature `done`, deleting the frontend's
+                        // StreamProcessor mid-reasoning and leaving the
+                        // Thinking block stuck. (`model` is already
+                        // short-circuited via `continue` above.)
+                        let stream_kind = msg.metadata.get("stream_kind").map(|v| v.as_str());
+                        let is_partial = msg.partial == Some(true)
+                            || matches!(stream_kind, Some("reasoning.start") | Some("reasoning.end"));
                         // RFC-015 model mark: one-shot announcement emitted at
                         // stream start. Forward as a typed `model` chunk and
                         // `continue` — it carries no content, so it must NOT

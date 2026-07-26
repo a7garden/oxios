@@ -133,7 +133,7 @@ export class StreamProcessor {
             arguments: (typeof cur.arguments === 'string' ? cur.arguments : '') + ev.argsDelta,
           })
         }
-        return { patch: { toolCalls: this.toolsList() } }
+        return { patch: { toolCalls: this.toolsList(), ...this.closeReasoningIfOpen() } }
       }
 
       case 'tool.start': {
@@ -152,6 +152,7 @@ export class StreamProcessor {
             toolCalls: this.toolsList(),
             isToolCallGenerating: true,
             generating: true,
+            ...this.closeReasoningIfOpen(),
           },
           activity: {
             type: 'tool_call',
@@ -309,6 +310,27 @@ export class StreamProcessor {
     if (!this.reasoningEverSeen) {
       this.reasoningEverSeen = true
       this.reasoningStartTs = Date.now()
+    }
+  }
+  /**
+   * Close an open reasoning span when the stream transitions to tool
+   * execution. Reasoning_content providers (GLM/DeepSeek/Qwen) that never
+   * emit ThinkingEnd go straight from reasoning to a tool call with no Text,
+   * so the gateway's first-Text `reasoning.end` heuristic never fires — the
+   * Thinking spinner would otherwise run through the entire tool run.
+   * Returns the patch fragment to merge, or `{}` if no reasoning was open.
+   * Idempotent: reasoningText/reasoningStartTs are kept so a reasoning span
+   * that resumes after the tool continues accumulating.
+   */
+  private closeReasoningIfOpen(): Partial<ChatMessage> {
+    if (!this.reasoningEverSeen) return {}
+    return {
+      isReasoning: false,
+      reasoning: {
+        content: this.reasoningText,
+        duration: this.reasoningDuration(),
+        thinking: false,
+      },
     }
   }
 
