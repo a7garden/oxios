@@ -70,6 +70,27 @@ pub struct ExecutionResult {
     /// persist it alongside `tool_calls` and restore on session reopen.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub reasoning_text: String,
+    /// Block-stream transparency (2026-07-27): positioned reasoning spans,
+    /// interleaved with tool calls by `before_step` on reopen. Empty for
+    /// pre-block-stream runs (frontend falls back to `reasoning_text`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasoning_segments: Vec<ReasoningSegment>,
+}
+
+/// One positioned reasoning span within a turn (block-stream transparency).
+///
+/// `before_step` is the number of tool calls that STARTED in this turn before
+/// this span — used to interleave reasoning with tools when rendering a
+/// reopened session. A trailing span (after the last tool) has `before_step`
+/// equal to the turn's tool count.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ReasoningSegment {
+    #[serde(default)]
+    /// Number of tool calls that started in this turn before this span.
+    pub before_step: usize,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    /// The reasoning text for this span (may be appended to across deltas).
+    pub text: String,
 }
 
 /// Single option for a structured interview question.

@@ -754,6 +754,13 @@ impl Gateway {
                             orchestration.reasoning_text.clone(),
                         );
                     }
+                    // Block-stream transparency: positioned reasoning spans
+                    // so chat.rs can persist them for reopen fidelity.
+                    if !orchestration.reasoning_segments.is_empty()
+                        && let Ok(json) = serde_json::to_string(&orchestration.reasoning_segments)
+                    {
+                        channel_meta.insert("reasoning_segments".to_owned(), json);
+                    }
                     // Typed orchestration metadata (RFC-014)
                     let response_meta = ResponseMeta {
                         session_id: orchestration.session_id,

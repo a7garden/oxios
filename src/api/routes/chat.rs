@@ -231,6 +231,16 @@ pub(crate) async fn handle_chat(
                             content: rt,
                             source: "thinking".to_string(),
                             timestamp: chrono::Utc::now(),
+                            segments: response
+                                .metadata
+                                .get("reasoning_segments")
+                                .and_then(|s| {
+                                    serde_json::from_str::<Vec<oxios_ouroboros::ReasoningSegment>>(
+                                        s,
+                                    )
+                                    .ok()
+                                })
+                                .unwrap_or_default(),
                         });
                     }
                     let traj_end = session.trajectory_steps.len();
@@ -276,6 +286,16 @@ pub(crate) async fn handle_chat(
                             content: rt,
                             source: "thinking".to_string(),
                             timestamp: chrono::Utc::now(),
+                            segments: response
+                                .metadata
+                                .get("reasoning_segments")
+                                .and_then(|s| {
+                                    serde_json::from_str::<Vec<oxios_ouroboros::ReasoningSegment>>(
+                                        s,
+                                    )
+                                    .ok()
+                                })
+                                .unwrap_or_default(),
                         });
                     }
                     let traj_end = session.trajectory_steps.len();
@@ -430,6 +450,7 @@ pub(crate) async fn handle_chat_seed(
             content: rt,
             source: "thinking".to_string(),
             timestamp: chrono::Utc::now(),
+            segments: Vec::new(),
         });
     }
 
@@ -1428,6 +1449,12 @@ async fn persist_session(
                     content: rt,
                     source: "thinking".to_string(),
                     timestamp: chrono::Utc::now(),
+                    segments: metadata
+                        .get("reasoning_segments")
+                        .and_then(|s| {
+                            serde_json::from_str::<Vec<oxios_ouroboros::ReasoningSegment>>(s).ok()
+                        })
+                        .unwrap_or_default(),
                 });
             }
             let traj_end = session.trajectory_steps.len();
@@ -1473,6 +1500,12 @@ async fn persist_session(
                     content: rt,
                     source: "thinking".to_string(),
                     timestamp: chrono::Utc::now(),
+                    segments: metadata
+                        .get("reasoning_segments")
+                        .and_then(|s| {
+                            serde_json::from_str::<Vec<oxios_ouroboros::ReasoningSegment>>(s).ok()
+                        })
+                        .unwrap_or_default(),
                 });
             }
             let traj_end = session.trajectory_steps.len();

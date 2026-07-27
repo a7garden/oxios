@@ -336,6 +336,7 @@ impl Supervisor for BasicSupervisor {
                     failure_class: None, // cancellation, not a provider failure
                     restore_state: None,
                     reasoning_text: String::new(),
+                    reasoning_segments: Vec::new(),
                 })
             } else {
                 // Snapshot recall_timing under a brief read lock, execute
@@ -393,6 +394,7 @@ impl Supervisor for BasicSupervisor {
                     failure_class: None, // abort (kill/panic), not a provider failure
                     restore_state: None,
                     reasoning_text: String::new(),
+                    reasoning_segments: Vec::new(),
                 })
             }
         };
@@ -498,6 +500,7 @@ impl Supervisor for BasicSupervisor {
                     tokens_output: 0,
                     model_id: String::new(),
                     reasoning_text: String::new(),
+                    reasoning_segments: Vec::new(),
                     // (P2 RecoveryCoordinator, gateway user-facing
                     // messages) can see whether this is a transient
                     // retry, a quota/auth that needs provider swap,

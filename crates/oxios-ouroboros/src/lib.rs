@@ -23,4 +23,7 @@ pub use engine::{IntentEngine, IntentEngineOps};
 pub use model_resolver::{ModelResolver, ResolvedModel, StaticModelResolver};
 pub use prompts::REVIEW_SYSTEM_PROMPT;
 pub use resilience::FailureClass;
-pub use types::{ExecutionResult, InterviewOptionOutput, InterviewQuestionOutput, ToolCallRecord};
+pub use types::{
+    ExecutionResult, InterviewOptionOutput, InterviewQuestionOutput, ReasoningSegment,
+    ToolCallRecord,
+};

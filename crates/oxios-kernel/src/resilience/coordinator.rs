@@ -398,6 +398,7 @@ mod tests {
             failure_class: None,
             restore_state: None,
             reasoning_text: String::new(),
+            reasoning_segments: Vec::new(),
         };
         let fail = ExecutionResult {
             success: false,
@@ -422,6 +423,7 @@ mod tests {
             failure_class: Some(FailureClass::Transient),
             restore_state: None,
             reasoning_text: String::new(),
+            reasoning_segments: Vec::new(),
         };
         let more = ExecutionResult {
             steps_completed: 3,

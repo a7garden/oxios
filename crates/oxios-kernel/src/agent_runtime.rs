@@ -175,6 +175,10 @@ struct ExecuteState {
     /// `AgentEvent::ThinkingDelta { text }`. Surfaced via `ExecutionResult`
     /// metadata on turn completion, capped at ~4 KB to bound storage.
     reasoning_text: String,
+    /// Block-stream transparency: positioned reasoning spans for reopen
+    /// fidelity. `reasoning_bytes` bounds total captured text (char-safe).
+    reasoning_segments: Vec<oxios_ouroboros::ReasoningSegment>,
+    reasoning_bytes: usize,
     /// Ordered by insertion — parallel tools get their final position
     /// resolved when they complete, preserving approximate execution order.
     trajectory_steps: Vec<oxios_memory::memory::sona::TrajectoryStep>,
@@ -543,6 +547,7 @@ impl AgentRuntime {
             total_input_tokens,
             total_output_tokens,
             reasoning_text,
+            reasoning_segments,
         ) = {
             run_agent(
                 &config,
@@ -661,6 +666,7 @@ impl AgentRuntime {
             tokens_output: total_output_tokens,
             model_id: self.engine_handle.get().default_model_id().to_string(),
             reasoning_text,
+            reasoning_segments,
         };
 
         // RFC-016: Autonomous persistence hook.
@@ -750,6 +756,7 @@ async fn run_agent(
     u64,
     u64,
     String,
+    Vec<oxios_ouroboros::ReasoningSegment>,
 )> {
     // Extract workspace.
     // RFC-025: the primary Mount's first path is the CWD; otherwise the
@@ -1427,6 +1434,41 @@ async fn run_agent(
                             s.reasoning_text.truncate(REASONING_CAP);
                         }
                     }
+                    // Block-stream transparency (2026-07-27): capture this
+                    // delta into a positioned segment keyed by the number of
+                    // tools started so far (`trajectory_steps.len()`), so a
+                    // reopened session can interleave reasoning with tools.
+                    // Char-safe cap shared with `reasoning_text`.
+                    if s.reasoning_bytes < REASONING_CAP {
+                        let budget = REASONING_CAP - s.reasoning_bytes;
+                        let mut chunk = String::new();
+                        for ch in text.chars() {
+                            if chunk.len() + ch.len_utf8() > budget {
+                                break;
+                            }
+                            chunk.push(ch);
+                        }
+                        if !chunk.is_empty() {
+                            s.reasoning_bytes += chunk.len();
+                            let pos = s.trajectory_steps.len();
+                            if s.reasoning_segments
+                                .last()
+                                .is_some_and(|l| l.before_step == pos)
+                            {
+                                s.reasoning_segments
+                                    .last_mut()
+                                    .unwrap()
+                                    .text
+                                    .push_str(&chunk);
+                            } else {
+                                s.reasoning_segments
+                                    .push(oxios_ouroboros::ReasoningSegment {
+                                        before_step: pos,
+                                        text: chunk,
+                                    });
+                            }
+                        }
+                    }
                     if let Some(ref sid) = transparency_session
                         && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
                     {
@@ -1535,6 +1577,7 @@ async fn run_agent(
         s.total_input_tokens,
         s.total_output_tokens,
         s.reasoning_text.clone(),
+        s.reasoning_segments.clone(),
     ))
 }
 

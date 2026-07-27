@@ -607,6 +607,7 @@ impl Orchestrator {
             interview_questions: None,
             interview_round: None,
             reasoning_text: result.reasoning_text.clone(),
+            reasoning_segments: result.reasoning_segments.clone(),
         }
     }
     ///
@@ -839,6 +840,10 @@ pub struct OrchestrationResult {
     /// `tool_calls` and restore on session reopen.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub reasoning_text: String,
+    /// Block-stream transparency: positioned reasoning spans, interleaved
+    /// with tool calls on session reopen. Threaded from ExecutionResult.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasoning_segments: Vec<oxios_ouroboros::ReasoningSegment>,
     /// Provider failure classification (RFC-029). `Some` when execution
     /// failed with a classifiable provider/infra error; `None` on success,
     /// interview, clarify, or unclassified failure.

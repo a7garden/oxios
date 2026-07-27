@@ -130,6 +130,10 @@ pub struct ReasoningRecord {
     pub source: String,
     /// Timestamp when the record was captured.
     pub timestamp: DateTime<Utc>,
+    /// Block-stream transparency: positioned reasoning spans for reopen
+    /// fidelity. Empty for legacy records — frontend falls back to `content`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub segments: Vec<oxios_ouroboros::ReasoningSegment>,
 }
 
 /// Arbitrary key-value metadata for a session.
