@@ -33,6 +33,11 @@ use crate::tools::{PendingToolApprovals, ToolApprovalResult};
 
 /// Default timeout for awaiting a user approval response.
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
+/// How often a blocked tool call re-checks whether a policy change now lets it
+/// auto-run (e.g. the user switched to AutoRun, or added a grant, while the
+/// approval card is still showing). Short enough to feel instant; the per-poll
+/// gate evaluation is a HashMap lookup + blacklist scan, so the cost is nil.
+const APPROVAL_REEVAL_INTERVAL: Duration = Duration::from_millis(500);
 
 // ─── Path Extraction ────────────────────────────────────────────────────────
 
@@ -265,23 +270,70 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                                 reason: reason.clone(),
                                 session_id: None,
                             });
-                            match tokio::time::timeout(APPROVAL_TIMEOUT, rx).await {
-                                Ok(Ok(ToolApprovalResult::Approved)) => {
-                                    tracing::info!(
-                                        approval_id = %approval_id,
-                                        tool = %tool_name,
-                                        "tool call approved by user"
-                                    );
-                                    // fall through to Step 3
+                            // Await the user's decision, but periodically
+                            // re-evaluate the gate. Without re-evaluation a
+                            // policy change made while the card is shown
+                            // (switching to AutoRun, or granting the tool)
+                            // would strand the call — the oneshot only fires
+                            // on an explicit click, so the agent would freeze
+                            // until the 120s timeout. Polling the SAME gate
+                            // that issued the card means the live policy —
+                            // dynamic resolvers and the security blacklist
+                            // included — is applied exactly as a fresh call.
+                            let deadline = tokio::time::Instant::now() + APPROVAL_TIMEOUT;
+                            tokio::pin!(rx);
+                            let approved = loop {
+                                tokio::select! {
+                                    biased;
+                                    // Explicit user decision wins immediately.
+                                    res = &mut rx => match res {
+                                        Ok(ToolApprovalResult::Approved) => {
+                                            tracing::info!(
+                                                approval_id = %approval_id,
+                                                tool = %tool_name,
+                                                "tool call approved by user"
+                                            );
+                                            break true;
+                                        }
+                                        _ => {
+                                            let _ = approvals
+                                                .resolve(approval_id, ToolApprovalResult::Denied);
+                                            break false;
+                                        }
+                                    },
+                                    // Hard timeout — deny and surface an error.
+                                    _ = tokio::time::sleep_until(deadline) => {
+                                        let _ = approvals
+                                            .resolve(approval_id, ToolApprovalResult::Denied);
+                                        break false;
+                                    }
+                                    // Re-evaluate under the live config; if the
+                                    // call would now auto-run, approve ourselves.
+                                    _ = tokio::time::sleep(APPROVAL_REEVAL_INTERVAL) => {
+                                        if matches!(
+                                            approval_gate.evaluate(&call),
+                                            ApprovalDecision::Allow
+                                        ) {
+                                            tracing::info!(
+                                                approval_id = %approval_id,
+                                                tool = %tool_name,
+                                                "tool call auto-approved after policy change"
+                                            );
+                                            let _ = approvals
+                                                .resolve(approval_id, ToolApprovalResult::Approved);
+                                            break true;
+                                        }
+                                        // Policy still requires approval — poll again.
+                                    }
                                 }
-                                _ => {
-                                    let _ = approvals.resolve(approval_id, ToolApprovalResult::Denied);
-                                    return Ok(AgentToolResult::error(format!(
-                                        "Tool execution was denied or timed out ({}s).",
-                                        APPROVAL_TIMEOUT.as_secs()
-                                    )));
-                                }
+                            };
+                            if !approved {
+                                return Ok(AgentToolResult::error(format!(
+                                    "Tool execution was denied or timed out ({}s).",
+                                    APPROVAL_TIMEOUT.as_secs()
+                                )));
                             }
+                            // fall through to Step 3
                         }
                         _ => {
                             tracing::warn!(

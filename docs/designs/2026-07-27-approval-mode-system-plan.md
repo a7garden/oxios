@@ -46,7 +46,7 @@
 - `src/api/` (binary) — `/api/security/approval` routes; `/api/chat/tool-approval/{id}/respond` `remember` param
 
 **Modify (web):**
-- `web/src/components/chat/tool-approval-card.tsx` — "remember" checkbox (allow-list mode only)
+- `web/src/components/chat/tool-approval-card.tsx` — "remember" checkbox (manual + allow-list modes)
 - `web/src/stores/chat.ts` — `resolveToolApproval(id, approved, remember)`
 - `web/src/routes/security.tsx` — approval mode + allow_list management UI
 - `web/src/i18n/locales/{en,ko}.json` — new strings
@@ -729,9 +729,10 @@ impl ApprovalGate {
             (_, Auto) => ApprovalDecision::Allow,
             (_, Always) => require(call, "always-policy tool"),
             (AutoRun, OnDemand) => ApprovalDecision::Allow,
+            // 명시 grant는 모든 모드에서 존중 — manual에서도 "다시 묻지 않기"가 영속됨.
             (AllowList, OnDemand) if self.has_grant(call) => ApprovalDecision::Allow,
-            (AllowList, OnDemand) => require(call, "not in allow-list"),
-            (Manual, OnDemand) => require(call, "manual mode"),
+            (Manual, OnDemand) if self.has_grant(call) => ApprovalDecision::Allow,
+            (_, OnDemand) => require(call, "approval required"),
         }
     }
 
@@ -1082,7 +1083,7 @@ Locate the existing approval routes in `src/api/` (search for `tool-approval`). 
 
 - [ ] **Step 3: Add `remember` to the respond handler**
 
-In the `tool-approval/{id}/respond` handler, accept `remember: bool`. On `approved && remember && mode == AllowList`, call `add_grant(grant_key)` where `grant_key` is derived from the original `ApprovalRequested` event's tool/binary.
+In the `tool-approval/{id}/respond` handler, accept `remember: bool`. On `approved && remember`, call `add_grant(grant_key)` where `grant_key` is derived from the original `ApprovalRequested` event's tool/binary. (모든 모드에서 동작 — Manual도 grant를 존중한다.)
 
 - [ ] **Step 4: Test endpoints**
 
@@ -1196,7 +1197,7 @@ git commit -m "feat(web): add approval mode dropdown to chat input (RFC-035)"
 - Modify: `web/src/components/chat/tool-approval-card.tsx`
 - Modify: `web/src/stores/chat.ts::resolveToolApproval` (add `remember` param)
 
-- [ ] **Step 1: Add checkbox, visible only when `mode === 'allow-list'`**
+- [ ] **Step 1: Add checkbox, visible when `mode === 'manual' || mode === 'allow-list'`**
 
 Read mode via `useApprovalConfig`. Pass `remember` through `resolveToolApproval(id, approved, remember)` → POST body.
 

@@ -1747,7 +1747,11 @@ export const useChatStore = create<ChatStore>()(
                     tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
                   },
                 }
-                return { messages: [...updated, placeholder], isStreaming: false }
+                return {
+                  messages: [...updated, placeholder],
+                  isStreaming: false,
+                  activeToolApproval: null,
+                }
               }
 
               const idx = updated.length - 1 - lastAssistantIdx
@@ -1784,7 +1788,7 @@ export const useChatStore = create<ChatStore>()(
                 }
               }
 
-              return { messages: updated, isStreaming: false }
+              return { messages: updated, isStreaming: false, activeToolApproval: null }
             })
 
             if (sid) {
@@ -1850,7 +1854,11 @@ export const useChatStore = create<ChatStore>()(
                   errorKind: errKind,
                 },
               }
-              return { messages: [...updated, errorMsg], isStreaming: false }
+              return {
+                messages: [...updated, errorMsg],
+                isStreaming: false,
+                activeToolApproval: null,
+              }
             })
             // Turn ended — advance the queue (same as done).
             get()._drainPendingQueue()

@@ -1,8 +1,17 @@
 # 도구 승인 모드 시스템 (RFC-035)
 
 **날짜**: 2026-07-27
-**상태**: 설계 (구현 전)
+**상태**: 구현됨 (2026-07-27) — 구현 중 두 곳을 다듬었다(아래 Amendment).
 **참고**: [lobehub/lobe-chat](https://github.com/lobehub/lobe-chat) `ApprovalMode` / `InterventionChecker` 분석 기반
+
+> **Amendment (2026-07-27, 구현 반영)**: 구현 중 원 설계에서 두 곳을 다듬었다. 본문
+> §4.3·§5·§5.1·§10.2·§11·§12.2는 아래를 반영해 수정했다.
+> 1. **Manual 모드도 grant를 존중** — 원 설계는 Manual에서 매번 재승인한다고 했으나, 카드의
+>    "이 세션에서 허용" 약속과 모순되어 `(Manual, OnDemand) if has_grant => Allow`를 추가.
+>    "다시 묻지 않기" 체크박스·영속 grant도 모든 모드에서 동작한다.
+> 2. **승인 대기 중 정책 재평가** — `gated_tool`이 oneshot에 블로킹된 채 모드/grant 변경을
+>    놓치는(stranded approval) 문제를 막기 위해 500ms `select!` 폴링으로 동일 gate를 재평가하여
+>    새 정책이 `Allow`면 자동 승인한다.
 
 ---
 
@@ -61,7 +70,7 @@ lobehub은 3계층 평가로 도구 호출마다 "자동실행 / 승인요청 / 
 
 1. **직교 설계** — 3-tier 도구 정책 × 3-mode 사용자 오버라이드. 9개 조합이 `match` 하나로 정리.
 2. **Co-location + Override** — 도구는 자신의 기본 정책을 선언하고, 사용자는 config로 override.
-3. **계층적 우선순위** — `Always`는 모드·grant 무관. `OnDemand`는 `auto-run`/`allow-list` grant로 우회 가능.
+3. **계층적 우선순위** — `Always`는 모드·grant 무관. `OnDemand`는 `auto-run` 모드, 또는 어느 모드에서든 명시적 grant(`allow_list`)로 우회 가능.
 4. **확장 가능한 평가** — `GlobalResolver` trait로 보안·감사·rate-limit을 같은 파이프라인에 꽂음.
 5. **마이그레이션 동등성** — 동적 리졸버로 structured allowed 바이너리는 현재 동작(Auto) 유지.
 6. **안전한 기본** — `approval_mode = manual` 기본값. "다 열기"는 사용자의 명시적 선택.
@@ -146,9 +155,10 @@ pub struct ApprovalConfig {
 응집. Web UI 드롭다운이 이 섹션을 read/write.
 
 > **설계 결정 (grants 영속화)**: lobehub처럼 `allow_list`를 config에 영속화한다.
-> ephemeral로 하면 allow-list 모드가 매 세션마다 manual과 동일해져 존재 의미가 사라진다.
-> "재시작 = 안전 기본 회귀" 불변량은 `mode = manual` 기본값으로 달성한다 — manual에서는
-> `allow_list`가 무의미하므로, 두 안전장치가 불필요하다.
+> grant는 **모든 모드**에서 존중된다 — Manual에서도 "다시 묻지 않기"로 추가한 grant가
+> 재묻지 않게 한다(이것이 카드의 "이 세션에서 허용" 약속을 이행한다). Manual과 AllowList의
+> 차이는 시작점만: Manual은 모든 도구에 최소 한 번은 묻지만, AllowList는 미리 채운 목록은
+> 묻지 않고 자동 실행한다. "재시작 = 안전 기본 회귀"는 `mode = manual` 기본값으로 유지.
 
 ### 4.4 도구 호출 컨텍스트
 
@@ -195,7 +205,8 @@ flowchart TD
     I -->|OnDemand + AutoRun| J
     I -->|OnDemand + AllowList + grant hit| J
     I -->|OnDemand + AllowList miss| K
-    I -->|OnDemand + Manual| K
+    I -->|OnDemand + Manual + grant hit| J
+    I -->|OnDemand + Manual miss| K
     K --> L[ToolApprovalCard]
     L -->|approve-remember| M[allow_list에 영속 추가]
 ```
@@ -249,10 +260,13 @@ impl ApprovalGate {
         match (self.config.mode, policy) {
             (_, Auto) => ApprovalDecision::Allow,                  // Auto는 모드 무관
             (_, Always) => require(call, "always-policy tool"),    // Always는 모드 무관 강제
+            let has_grant = self.config.allow_list.iter().any(|k| k == &call.grant_key());
             (AutoRun, OnDemand) => ApprovalDecision::Allow,        // 모드가 우회
-            (AllowList, OnDemand) if self.has_grant(call) => Allow,
-            (AllowList, OnDemand) => require(call, "not in allow-list"),
-            (Manual, OnDemand) => require(call, "manual mode"),
+            (AllowList, OnDemand) if has_grant => Allow,
+            // 명시 grant("다시 묻지 않기")는 manual에서도 존중 — 카드의 "이 세션에서
+            // 허용" 약속 이행. grant가 없으면 아래 catch-all이 RequireApproval.
+            (Manual, OnDemand) if has_grant => Allow,
+            (_, OnDemand) => require(call, "approval required"),
         }
     }
 
@@ -546,7 +560,7 @@ allow_list = []
 ### 10.2 승인 카드 확장 (기존 `tool-approval-card.tsx`)
 
 기존 카드에 "다음부터 안 묻기" 체크박스 추가:
-- `allow-list` 모드에서만 노출 (lobehub와 동일 — auto-run은 애초에 카드가 안 뜨고, manual은 기본적으로 다시 묻는 게 의도)
+- manual + allow-list 모드에서 노출 (auto-run은 카드가 애초에 안 뜨므로 제외; 그 외 모드에서 "다시 묻지 않기"가 의미 있음)
 - 체크 시 `remember=true`로 `POST /api/chat/tool-approval/{id}/respond`
 - 백엔드가 `[security.approval].allow_list`에 `grant_key` 추가 → 영속
 
@@ -577,8 +591,8 @@ allow_list = []
 | `gate.rs` (4-layer AccessGate) | **역할 재정의**: 구조적 권한(CSpace/RBAC/Permissions/ExecConfig)만 담당. 런타임 승인 정책은 ApprovalGate로 이관. gate 통과 후 ApprovalGate.evaluate 호출. |
 | `exec_tool.rs:598-622` (shell approval) | **제거**. ApprovalGate가 exec 호출을 `OnDemand`로 평가 → 자동 승인 흐름 트리거. shell/structured 구분은 동적 리졸버가 담당. advisory 원인 #1 해결. |
 | `PendingToolApprovals` | **유지**. ApprovalGate가 `RequireApproval` 결정 시 사용. |
-| `KernelEvent::ApprovalRequested` | **유지**, `remember_supported: bool` 필드 추가 (allow-list 모드에서만 true). |
-| `gated_tool.rs` (GatedTool) | gate 통과 후 ApprovalGate 호출 지점. |
+| `KernelEvent::ApprovalRequested` | **유지**. grant 영속화(`POST .../respond`의 `remember`)는 모든 모드에서 동작한다. |
+| `gated_tool.rs` (GatedTool) | gate 통과 후 ApprovalGate 호출 지점. 승인 대기 중엔 500ms마다 동일 gate를 `select!` 폴링으로 재평가하여, 대기 도중 모드/grant가 바뀌면 자동 승인(정책 변경을 oneshot이 놓치는 stranded-approval 문제 방지). |
 | `SecurityConfig` | `approval: ApprovalConfig` 필드 추가. |
 | `kernel_bridge.rs::OxiosKernelBridge::register_tools` | ApprovalGate 인스턴스를 받아 각 tool 호출 시 evaluate. |
 | `builtin/mod.rs::register_all_kernel_tools` + `registration.rs` tier 헬퍼 | `registry.register_with_policy(tool, policy)`로 policy 부여. |
@@ -600,8 +614,8 @@ allow_list = []
 - 마이그레이션 후 현재 동작과 **동등**:
   - structured allowed 바이너리 → 즉시 실행 (동적 리졸버 Auto)
   - shell mode → 승인 (동적 리졸버 OnDemand + Manual)
-  - 단, advisory 원인 #1(매번 재승인)은 manual 모드에서는 여전히 존재. 사용자가
-    `auto-run` 또는 `allow-list` + approve-remember로 해결.
+  - advisory 원인 #1(매번 재승인)은 Manual에서도 해결된다 — Manual 모드가 명시적 grant를
+    존중하므로, 첫 승인 시 "다시 묻지 않기"를 체크하면 auto-run/allow-list로 갈 필요 없이 영속됨.
 
 ### 12.3 `network_access` / `allow_shell_mode` 필드
 

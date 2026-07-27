@@ -136,13 +136,18 @@ impl ApprovalGate {
         }
         // Phase 4: mode × policy table.
         use {ApprovalMode::*, ToolPolicy::*};
+        let has_grant = config.allow_list.iter().any(|k| k == &call.grant_key());
         match (config.mode, policy) {
             (_, Auto) => ApprovalDecision::Allow,
             (_, Always) => require(call, "always-policy tool"),
             (AutoRun, OnDemand) => ApprovalDecision::Allow,
-            (AllowList, OnDemand) if config.allow_list.iter().any(|k| k == &call.grant_key()) => {
-                ApprovalDecision::Allow
-            }
+            (AllowList, OnDemand) if has_grant => ApprovalDecision::Allow,
+            // An explicit user grant ("don't ask again") is honored in Manual
+            // mode too. Without this, approving a tool once never sticks —
+            // every subsequent call re-prompts, which contradicts the card's
+            // "allow in this session" promise. Always / blacklist tools still
+            // override via the arms above.
+            (Manual, OnDemand) if has_grant => ApprovalDecision::Allow,
             (_, OnDemand) => require(call, "approval required"),
         }
     }
@@ -242,6 +247,18 @@ mod tests {
         assert!(matches!(
             gate(Manual, &[]).evaluate(&call("exec", Some("curl"))),
             ApprovalDecision::RequireApproval { .. }
+        ));
+    }
+
+    // OnDemand + Manual + explicit grant → Allow. The card's "allow in this
+    // session" promise must hold: once a user grants a tool (via the
+    // "don't ask again" checkbox), Manual mode honors it instead of
+    // re-prompting on every call.
+    #[test]
+    fn ondemand_manual_grant_allows() {
+        assert!(matches!(
+            gate(Manual, &["web_search"]).evaluate(&call("web_search", None)),
+            ApprovalDecision::Allow
         ));
     }
 

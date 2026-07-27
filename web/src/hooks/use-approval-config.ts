@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
+import { useChatStore } from '@/stores/chat'
 import type { ApprovalConfig, ApprovalConfigPatch, ApprovalMode, GrantBody } from '@/types/approval'
 
 const APPROVAL_KEY = ['approval-config'] as const
@@ -30,6 +31,12 @@ export function useSetApprovalMode() {
     mutationFn: (mode: ApprovalMode) => update.mutateAsync({ mode }),
     onSuccess: (data) => {
       qc.setQueryData<ApprovalConfig>(APPROVAL_KEY, data)
+      // Switching to AutoRun auto-approves any in-flight tool call server-side
+      // (the gate re-evaluates). Drop the now-stale approval card immediately
+      // so the UI reflects the unblocked agent instead of a dead prompt.
+      if (data.mode === 'auto-run') {
+        useChatStore.setState({ activeToolApproval: null })
+      }
     },
   })
 }

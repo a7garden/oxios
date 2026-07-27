@@ -52,7 +52,7 @@ export function ToolApprovalCard({
             </p>
           </div>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
-            {mode === 'allow-list' ? (
+            {mode === 'manual' || mode === 'allow-list' ? (
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                 <Checkbox
                   checked={remember}
@@ -70,14 +70,14 @@ export function ToolApprovalCard({
               </Button>
               <Button
                 onClick={() => {
-                  onApprove(mode === 'allow-list' && remember)
+                  onApprove(remember)
                   setRemember(false)
                 }}
                 size="sm"
                 disabled={disabled}
                 className="bg-success/90 hover:bg-success text-white"
               >
-                {t('chat.toolApproval.approve')} ✅
+                {t('chat.toolApproval.approve')}
               </Button>
             </div>
           </div>
