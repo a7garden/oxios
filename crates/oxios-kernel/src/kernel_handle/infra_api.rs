@@ -30,6 +30,14 @@ pub struct InfraApi {
 impl InfraApi {
     /// Create a new InfraApi.
     // Facade construction gathers the independent infrastructure services.
+    //
+    // `approval_config` is an Arc the caller shares across ALL KernelHandle
+    // instances — the preliminary handle (AgentRuntime's ApprovalGate reads
+    // here) and the cached handle (HTTP PATCH /api/security/approval writes
+    // here). Passing it in (rather than deriving a fresh Arc from `config`
+    // inside `new`) mirrors the `pending_tool_approvals` sharing rule: without
+    // it, a mode toggle writes one instance while the gate reads another, so
+    // AutoRun never takes effect and grants never stick.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         git_layer: Arc<GitLayer>,
@@ -40,8 +48,8 @@ impl InfraApi {
         start_time: Instant,
         pending_tool_approvals: Arc<PendingToolApprovals>,
         pending_ask_user: Arc<PendingAskUser>,
+        approval_config: Arc<parking_lot::RwLock<crate::approval::ApprovalConfig>>,
     ) -> Self {
-        let approval_config = config.security.approval.clone();
         Self {
             git_layer,
             cron_scheduler,
@@ -52,7 +60,7 @@ impl InfraApi {
             orchestrator_config: parking_lot::RwLock::new(
                 crate::config::OrchestratorConfig::default(),
             ),
-            approval_config: Arc::new(parking_lot::RwLock::new(approval_config)),
+            approval_config,
             pending_tool_approvals,
             pending_ask_user,
         }
@@ -226,5 +234,65 @@ impl InfraApi {
     /// List all known tool metadata (static catalog).
     pub fn list_available_tools(&self) -> &'static [ToolMeta] {
         known_tools()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::approval::{ApprovalConfig, ApprovalMode};
+    use crate::state_store::StateStore;
+
+    fn minimal_infra(
+        approval_config: Arc<parking_lot::RwLock<ApprovalConfig>>,
+    ) -> InfraApi {
+        let dir = tempfile::tempdir().unwrap();
+        InfraApi::new(
+            Arc::new(GitLayer::new(dir.path().join("git"), false).unwrap()),
+            Arc::new(CronScheduler::new(
+                Arc::new(StateStore::new(dir.path().join("state")).unwrap()),
+                60,
+            )),
+            Arc::new(ResourceMonitor::new(60, 60)),
+            EventBus::new(64),
+            OxiosConfig::default(),
+            std::time::Instant::now(),
+            Arc::new(PendingToolApprovals::new()),
+            Arc::new(PendingAskUser::new()),
+            approval_config,
+        )
+    }
+
+    // Regression: InfraApi::new must store the PASSED approval_config Arc, not
+    // derive a fresh one from `config.security.approval`. Without sharing, the
+    // cached handle (HTTP PATCH /api/security/approval) and the preliminary
+    // handle (AgentRuntime's ApprovalGate) hold independent Arcs — a mode
+    // toggle writes one while the gate reads another, so AutoRun never takes
+    // effect and every OnDemand tool (web_search, exec, write …) re-prompts.
+    #[test]
+    fn new_stores_shared_approval_config_arc() {
+        let shared = Arc::new(parking_lot::RwLock::new(ApprovalConfig::default()));
+        let infra = minimal_infra(Arc::clone(&shared));
+        assert!(
+            Arc::ptr_eq(&infra.approval_config_handle(), &shared),
+            "InfraApi must store the passed approval_config Arc, not a fresh clone"
+        );
+    }
+
+    // Two InfraApi instances built from the same shared Arc must see each
+    // other's mutations — the cross-handle visibility contract.
+    #[tokio::test]
+    async fn shared_arc_visible_across_instances() {
+        let shared = Arc::new(parking_lot::RwLock::new(ApprovalConfig::default()));
+        let a = minimal_infra(Arc::clone(&shared));
+        let b = minimal_infra(shared);
+
+        // Simulates HTTP PATCH { mode: "auto-run" } on the cached handle.
+        let mut cfg = a.approval_config();
+        cfg.mode = ApprovalMode::AutoRun;
+        a.set_approval_config(cfg).await.unwrap();
+
+        // The AgentRuntime's gate (reading the preliminary handle) must see it.
+        assert_eq!(b.approval_config().mode, ApprovalMode::AutoRun);
     }
 }

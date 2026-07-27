@@ -78,11 +78,11 @@ pub(crate) async fn handle_approval_grant_remove(
     ))
 }
 pub(crate) async fn remember_grant(s: &AppState, key: String) -> Result<ApprovalConfig, AppError> {
-    Ok(s.kernel
+    s.kernel
         .infra
         .add_grant(key)
         .await
-        .map_err(AppError::from)?)
+        .map_err(AppError::from)
 }
 #[cfg(test)]
 mod tests {

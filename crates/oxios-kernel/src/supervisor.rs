@@ -726,6 +726,9 @@ mod tests {
                 std::time::Instant::now(),
                 std::sync::Arc::new(crate::tools::PendingToolApprovals::new()),
                 std::sync::Arc::new(crate::tools::PendingAskUser::new()),
+                std::sync::Arc::new(parking_lot::RwLock::new(
+                    crate::approval::ApprovalConfig::default(),
+                )),
             ),
             None,
             crate::kernel_handle::ExecApi::new(

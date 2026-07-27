@@ -59,6 +59,14 @@ pub struct Kernel {
     pending_tool_approvals: Arc<oxios_kernel::tools::PendingToolApprovals>,
     /// Shared ask_user registry (RFC-027) — same cross-handle sharing rule.
     pending_ask_user: Arc<oxios_kernel::tools::PendingAskUser>,
+    /// Shared approval configuration (RFC-035) — the SAME instance must back
+    /// both the preliminary handle (AgentRuntime's ApprovalGate reads mode and
+    /// grants here) and the cached handle (HTTP PATCH /api/security/approval
+    /// writes here). Without sharing, a mode toggle or grant writes one
+    /// instance while the gate reads another → AutoRun never takes effect and
+    /// every OnDemand tool (web_search, exec, write …) re-prompts forever.
+    /// Same cross-handle sharing rule as `pending_tool_approvals` above.
+    approval_config: Arc<parking_lot::RwLock<oxios_kernel::approval::ApprovalConfig>>,
     project_manager: Option<Arc<ProjectManager>>,
     /// Mount manager (RFC-025 path aliases). `None` when SQLite memory is off.
     /// Wired into the lazily-cached handle so `/api/mounts` and the mount tool
@@ -240,6 +248,7 @@ impl Kernel {
                         self.start_time,
                         self.pending_tool_approvals.clone(),
                         self.pending_ask_user.clone(),
+                        self.approval_config.clone(),
                     ),
                     self.project_manager
                         .clone()
@@ -1384,6 +1393,9 @@ impl KernelBuilder {
         // another → 404 on every click, no matter how fast.
         let pending_tool_approvals = Arc::new(oxios_kernel::tools::PendingToolApprovals::new());
         let pending_ask_user = Arc::new(oxios_kernel::tools::PendingAskUser::new());
+        let approval_config = Arc::new(parking_lot::RwLock::new(
+            config.security.approval.clone(),
+        ));
 
         // Build AgentApi with HNSW index attached
         let mut agent_api = oxios_kernel::AgentApi::new(
@@ -1421,6 +1433,7 @@ impl KernelBuilder {
                     std::time::Instant::now(),
                     pending_tool_approvals.clone(),
                     pending_ask_user.clone(),
+                    approval_config.clone(),
                 ),
                 project_manager.clone().map(oxios_kernel::ProjectApi::new),
                 oxios_kernel::ExecApi::new(
@@ -1690,6 +1703,7 @@ impl KernelBuilder {
             resource_monitor,
             pending_tool_approvals,
             pending_ask_user,
+            approval_config,
             project_manager,
             mount_manager,
             start_time: std::time::Instant::now(),
