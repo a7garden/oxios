@@ -11,6 +11,7 @@ import { InterviewWizard } from '@/components/chat/interview-wizard'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { TextSelectionBar } from '@/components/chat/text-selection-bar'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
+import { PathAccessCard } from '@/components/chat/path-access-card'
 import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { PortalPanel } from '@/components/portal/portal-panel'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
@@ -52,6 +53,8 @@ function ChatPage() {
     submitInterviewResponse,
     activeToolApproval,
     resolveToolApproval,
+    activePathAccess,
+    resolvePathAccess,
     disconnect,
     connect,
     newSession,
@@ -297,6 +300,19 @@ function ChatPage() {
                       resolveToolApproval(activeToolApproval.id, true, remember)
                     }
                     onDeny={() => resolveToolApproval(activeToolApproval.id, false)}
+                    disabled={isStreaming}
+                  />
+                )}
+                {/* Path access request */}
+                {activePathAccess && (
+                  <PathAccessCard
+                    path={activePathAccess.path}
+                    mode={activePathAccess.mode}
+                    toolName={activePathAccess.toolName}
+                    reason={activePathAccess.reason}
+                    onMount={() => resolvePathAccess(activePathAccess.id, 'mount')}
+                    onTempAllow={() => resolvePathAccess(activePathAccess.id, 'temp')}
+                    onDeny={() => resolvePathAccess(activePathAccess.id, 'deny')}
                     disabled={isStreaming}
                   />
                 )}

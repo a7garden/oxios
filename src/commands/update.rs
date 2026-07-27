@@ -334,4 +334,3 @@ pub async fn run_changelog(version: Option<&str>) -> Result<()> {
     println!("{body}");
     Ok(())
 }
-

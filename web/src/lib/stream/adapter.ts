@@ -205,6 +205,7 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
     case 'memory':
     case 'interview':
     case 'tool_approval':
+    case 'path_access':
       return { events: [], passthrough: raw }
 
     default:

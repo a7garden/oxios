@@ -1666,6 +1666,29 @@ fn kernel_event_to_ws_chunk(
                 "reason": reason,
             }))
         }
+        KernelEvent::PathAccessRequested {
+            id,
+            tool_name,
+            path,
+            mode,
+            reason,
+            session_id,
+            ..
+        } => {
+            if let (Some(eid), Some(active)) = (session_id.as_ref(), active_session_id.as_ref())
+                && eid != active.as_str()
+            {
+                return None;
+            }
+            Some(serde_json::json!({
+                "type": "path_access",
+                "id": id.to_string(),
+                "tool_name": tool_name,
+                "path": path,
+                "mode": mode,
+                "reason": reason,
+            }))
+        }
         _ => None,
     };
     // Phase A: stamp active stream's message_id on every chunk so frontend
@@ -1861,6 +1884,102 @@ pub(crate) struct ToolApprovalResponseBody {
     pub approved: bool,
     #[serde(default)]
     pub remember: bool,
+}
+
+// ---------------------------------------------------------------------------
+// path-access (interactive Mount / temp-allow / deny)
+// ---------------------------------------------------------------------------
+
+/// POST /api/chat/path-access/{id}/respond — Resolve a pending path-access
+/// request. The user chooses: create a Mount ("mount"), temporarily allow
+/// the path for this session ("temp"), or deny ("deny").
+pub(crate) async fn handle_path_access_respond(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<PathAccessResponseBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let request_id = uuid::Uuid::parse_str(&id)
+        .map_err(|e| AppError::BadRequest(format!("invalid path-access id: {e}")))?;
+
+    let (agent_name, path) = state
+        .kernel
+        .infra
+        .pending_path_access()
+        .path_context(request_id)
+        .ok_or_else(|| {
+            AppError::NotFound(format!(
+                "path-access request {id} not found or already resolved"
+            ))
+        })?;
+
+    let result = match body.action.as_str() {
+        "temp" | "mount" => {
+            let dir = std::path::Path::new(&path);
+            let parent = dir.parent().unwrap_or(dir);
+            let pattern = format!("{}/**", parent.to_string_lossy().trim_end_matches('/'));
+
+            {
+                let access = state.kernel.exec.access_manager();
+                let mut mgr = access.lock();
+                if let Some(mut perms) = mgr.get_permissions(&agent_name).cloned()
+                    && !perms.allowed_paths.iter().any(|p| p == &pattern)
+                {
+                    perms.allow_path(&pattern);
+                    mgr.set_permissions(perms);
+                }
+            }
+
+            if body.action == "mount"
+                && let Some(mounts) = &state.kernel.mounts
+            {
+                let name = parent
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "mounted-path".to_string());
+                if let Err(e) =
+                    mounts.create_mount(name, vec![parent.to_string_lossy().to_string()])
+                {
+                    tracing::warn!(
+                        error = %e,
+                        path = %path,
+                        "mount creation failed; temp-allow still active"
+                    );
+                }
+            }
+
+            tracing::info!(
+                agent = %agent_name,
+                path = %path,
+                pattern = %pattern,
+                action = %body.action,
+                "path-access granted"
+            );
+            oxios_kernel::tools::PathAccessResult::Allowed
+        }
+        _ => {
+            tracing::info!(agent = %agent_name, path = %path, "path-access denied");
+            oxios_kernel::tools::PathAccessResult::Denied
+        }
+    };
+
+    state
+        .kernel
+        .infra
+        .pending_path_access()
+        .resolve(request_id, result)
+        .ok_or_else(|| {
+            AppError::NotFound(format!(
+                "path-access request {id} not found or already resolved"
+            ))
+        })?;
+
+    Ok(Json(serde_json::json!({ "status": "ok" })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct PathAccessResponseBody {
+    /// "temp" | "mount" | "deny"
+    pub action: String,
 }
 
 // ---------------------------------------------------------------------------

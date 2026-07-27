@@ -729,6 +729,7 @@ mod tests {
                 std::sync::Arc::new(parking_lot::RwLock::new(
                     crate::approval::ApprovalConfig::default(),
                 )),
+                std::sync::Arc::new(crate::tools::PendingPathAccess::new()),
             ),
             None,
             crate::kernel_handle::ExecApi::new(

@@ -919,6 +919,7 @@ async fn run_agent(
     ));
     let approval_event_bus = kernel_handle.infra.event_bus_clone();
     let approval_pending = kernel_handle.infra.pending_tool_approvals();
+    let path_access_pending = kernel_handle.infra.pending_path_access();
 
     register_tools_from_cspace_gated(
         &registry,
@@ -931,6 +932,7 @@ async fn run_agent(
         Some(approval_gate),
         Some(approval_event_bus),
         Some(approval_pending),
+        Some(path_access_pending),
     );
 
     tracing::info!(

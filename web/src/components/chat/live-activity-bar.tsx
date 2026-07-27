@@ -29,6 +29,7 @@ export function LiveActivityBar() {
   const last = useChatStore((s) => s.messages.at(-1))
   const activeInterview = useChatStore((s) => s.activeInterview)
   const activeToolApproval = useChatStore((s) => s.activeToolApproval)
+  const activePathAccess = useChatStore((s) => s.activePathAccess)
 
   const [elapsedMs, setElapsedMs] = useState(0)
   useEffect(() => {
@@ -42,7 +43,7 @@ export function LiveActivityBar() {
     return () => window.clearInterval(handle)
   }, [isStreaming, startedAt])
 
-  if (!isStreaming || activeInterview || activeToolApproval) return null
+  if (!isStreaming || activeInterview || activeToolApproval || activePathAccess) return null
 
   // Only the trailing assistant message carries this turn's activities/content.
   const lastAssistant = last?.role === 'assistant' ? last : undefined

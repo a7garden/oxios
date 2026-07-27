@@ -377,11 +377,14 @@ export interface StreamChunk {
     | 'interview'
     // RFC-017: runtime tool capability escalation
     | 'tool_approval'
+    | 'path_access'
     // RFC-015 model mark — one-shot announcement of the responding model.
     | 'model'
   content?: string
   model?: string
   tool_name?: string
+  path?: string
+  mode?: string
   tool_args?: Record<string, unknown>
   tool_result?: unknown
   error?: string

@@ -85,6 +85,14 @@ interface ChatRuntimeState {
     toolName: string
     reason: string
   } | null
+  /** Active path-access request awaiting user response (Mount/temp/deny). */
+  activePathAccess: {
+    id: string
+    path: string
+    mode: string
+    toolName: string
+    reason: string
+  } | null
   /** Interview round number. */
   interviewRound: number
   /** Interview ambiguity score. */
@@ -157,6 +165,8 @@ interface ChatActions {
   submitInterviewResponse: (answers: InterviewAnswer[]) => void
   /** Resolve a pending tool approval (RFC-017). */
   resolveToolApproval: (id: string, approved: boolean, remember?: boolean) => Promise<void>
+  /** Resolve a pending path-access request (mount/temp/deny). */
+  resolvePathAccess: (id: string, action: 'mount' | 'temp' | 'deny') => Promise<void>
   /** Handle an incoming WS chunk. */
   handleChunk: (chunk: StreamChunk) => void
 }
@@ -187,6 +197,7 @@ const KNOWN_CHUNK_TYPES = new Set<StreamChunk['type']>([
   'interview',
   'grounding',
   'tool_approval',
+  'path_access',
   'model',
 ])
 
@@ -923,6 +934,7 @@ export const useChatStore = create<ChatStore>()(
       interviewRound: 0,
       interviewAmbiguity: 0,
       activeToolApproval: null,
+      activePathAccess: null,
       // WebSocket lifecycle
       _ws: null,
       _reconnectTimer: null,
@@ -1420,6 +1432,7 @@ export const useChatStore = create<ChatStore>()(
           interviewRound: 0,
           interviewAmbiguity: 0,
           activeToolApproval: null,
+          activePathAccess: null,
           detectedMountTag: null,
           detectedMountIds: [],
         })
@@ -1531,6 +1544,31 @@ export const useChatStore = create<ChatStore>()(
           _resolvedApprovalIds.delete(id)
           set({ activeToolApproval, isStreaming: false })
           console.warn('[chat] tool approval resolve failed:', e)
+        }
+      },
+      async resolvePathAccess(id: string, action: 'mount' | 'temp' | 'deny') {
+        const { activePathAccess } = get()
+        if (!activePathAccess || activePathAccess.id !== id) return
+        markApprovalResolved(id)
+        set({ activePathAccess: null, isStreaming: true })
+        try {
+          const token = useAuthStore.getState().token
+          const res = await fetch(`/api/chat/path-access/${encodeURIComponent(id)}/respond`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ action }),
+          })
+          if (!res.ok && res.status !== 404) {
+            const err = await res.text().catch(() => 'unknown error')
+            throw new Error(`HTTP ${res.status}: ${err}`)
+          }
+        } catch (e) {
+          _resolvedApprovalIds.delete(id)
+          set({ activePathAccess, isStreaming: false })
+          console.warn('[chat] path access resolve failed:', e)
         }
       },
 
@@ -1651,6 +1689,27 @@ export const useChatStore = create<ChatStore>()(
             }
             break
           }
+          case 'path_access': {
+            const reqId = chunk.id as string | undefined
+            if (
+              reqId &&
+              chunk.path &&
+              !_resolvedApprovalIds.has(reqId) &&
+              get().activePathAccess?.id !== reqId
+            ) {
+              set({
+                activePathAccess: {
+                  id: reqId,
+                  path: chunk.path as string,
+                  mode: (chunk.mode as string) || 'read',
+                  toolName: (chunk.tool_name as string) || '',
+                  reason: (chunk.reason as string) || '',
+                },
+                isStreaming: false,
+              })
+            }
+            break
+          }
 
           case 'done': {
             // Phase 1: route done through StreamProcessor first so reasoning.end
@@ -1751,6 +1810,7 @@ export const useChatStore = create<ChatStore>()(
                   messages: [...updated, placeholder],
                   isStreaming: false,
                   activeToolApproval: null,
+                  activePathAccess: null,
                 }
               }
 
@@ -1788,7 +1848,7 @@ export const useChatStore = create<ChatStore>()(
                 }
               }
 
-              return { messages: updated, isStreaming: false, activeToolApproval: null }
+              return { messages: updated, isStreaming: false, activeToolApproval: null, activePathAccess: null }
             })
 
             if (sid) {
@@ -1858,6 +1918,7 @@ export const useChatStore = create<ChatStore>()(
                 messages: [...updated, errorMsg],
                 isStreaming: false,
                 activeToolApproval: null,
+                activePathAccess: null,
               }
             })
             // Turn ended — advance the queue (same as done).

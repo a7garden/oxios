@@ -6,7 +6,7 @@ use crate::cron::{CronJob, CronJobUpdate, CronScheduler};
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::{GitLayer, LogEntry};
 use crate::resource_monitor::{ResourceMonitor, ResourceSnapshot};
-use crate::tools::{PendingAskUser, PendingToolApprovals, known_tools};
+use crate::tools::{PendingAskUser, PendingPathAccess, PendingToolApprovals, known_tools};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -25,6 +25,8 @@ pub struct InfraApi {
     pub(crate) pending_tool_approvals: Arc<PendingToolApprovals>,
     /// Pending `ask_user` requests (RFC-027 agent-driven clarification).
     pub(crate) pending_ask_user: Arc<PendingAskUser>,
+    /// Pending path-access requests (interactive Mount / temp-allow / deny cards).
+    pub(crate) pending_path_access: Arc<PendingPathAccess>,
 }
 
 impl InfraApi {
@@ -49,6 +51,7 @@ impl InfraApi {
         pending_tool_approvals: Arc<PendingToolApprovals>,
         pending_ask_user: Arc<PendingAskUser>,
         approval_config: Arc<parking_lot::RwLock<crate::approval::ApprovalConfig>>,
+        pending_path_access: Arc<PendingPathAccess>,
     ) -> Self {
         Self {
             git_layer,
@@ -63,6 +66,7 @@ impl InfraApi {
             approval_config,
             pending_tool_approvals,
             pending_ask_user,
+            pending_path_access,
         }
     }
     /// Get a reference to the GitLayer.
@@ -219,6 +223,10 @@ impl InfraApi {
     pub fn pending_tool_approvals(&self) -> Arc<PendingToolApprovals> {
         self.pending_tool_approvals.clone()
     }
+    /// Access the pending path-access registry.
+    pub fn pending_path_access(&self) -> Arc<PendingPathAccess> {
+        self.pending_path_access.clone()
+    }
 
     /// Access the pending `ask_user` registry (RFC-027 agent-driven clarification).
     pub fn pending_ask_user(&self) -> Arc<PendingAskUser> {
@@ -243,9 +251,7 @@ mod tests {
     use crate::approval::{ApprovalConfig, ApprovalMode};
     use crate::state_store::StateStore;
 
-    fn minimal_infra(
-        approval_config: Arc<parking_lot::RwLock<ApprovalConfig>>,
-    ) -> InfraApi {
+    fn minimal_infra(approval_config: Arc<parking_lot::RwLock<ApprovalConfig>>) -> InfraApi {
         let dir = tempfile::tempdir().unwrap();
         InfraApi::new(
             Arc::new(GitLayer::new(dir.path().join("git"), false).unwrap()),
@@ -260,6 +266,7 @@ mod tests {
             Arc::new(PendingToolApprovals::new()),
             Arc::new(PendingAskUser::new()),
             approval_config,
+            Arc::new(PendingPathAccess::new()),
         )
     }
 

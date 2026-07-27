@@ -73,8 +73,8 @@ pub(crate) use calendar_routes::{
 };
 pub(crate) use chat::{
     handle_ask_user_respond, handle_chat, handle_chat_seed, handle_chat_stream, handle_chat_ticket,
-    handle_knowledge_saves, handle_remove_knowledge_save, handle_save_to_knowledge,
-    handle_tool_approval_respond,
+    handle_knowledge_saves, handle_path_access_respond, handle_remove_knowledge_save,
+    handle_save_to_knowledge, handle_tool_approval_respond,
 };
 pub(crate) use cost_routes::{
     handle_cost_by_model, handle_cost_by_project, handle_cost_daily, handle_cost_providers,
@@ -257,6 +257,11 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/api/chat/tool-approval/{id}/respond",
             post(handle_tool_approval_respond),
+        )
+        // Interactive path-access cards (Mount / temp-allow / deny)
+        .route(
+            "/api/chat/path-access/{id}/respond",
+            post(handle_path_access_respond),
         )
         // RFC-027: ask_user agent-driven clarification
         .route(

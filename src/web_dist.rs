@@ -466,9 +466,7 @@ pub enum SyncOutcome {
     Unstamped,
     /// Check failed (network, API, extraction, inconsistent dist). The
     /// daemon keeps serving whatever it had.
-    Failed {
-        reason: String,
-    },
+    Failed { reason: String },
 }
 
 /// Read the `version` field from `<dist>/version.json`, if present.
@@ -576,10 +574,7 @@ async fn prepare_sync(target: &SyncTarget, active_path: Option<&Path>) -> Prepar
 /// keeps serving whatever it had.
 ///
 /// Used by the daily health check and the eager startup check.
-pub async fn sync(
-    web_dist: &oxios_gateway::ActiveWebDist,
-    target: SyncTarget,
-) -> SyncOutcome {
+pub async fn sync(web_dist: &oxios_gateway::ActiveWebDist, target: SyncTarget) -> SyncOutcome {
     let active = web_dist.path();
     match prepare_sync(&target, active.as_deref()).await {
         PrepareOutcome::UpToDate { active, target } => SyncOutcome::UpToDate { active, target },

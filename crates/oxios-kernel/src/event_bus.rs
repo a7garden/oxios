@@ -101,6 +101,26 @@ pub enum KernelEvent {
         /// Whether it was approved (true) or rejected (false).
         approved: bool,
     },
+    /// An agent tried to access a file path outside its allowed_paths.
+    /// The frontend renders a path-access card offering: create a Mount,
+    /// temporarily allow, or deny. Mirrors `ApprovalRequested` but carries
+    /// path-specific context so the card and resolve endpoint know what to do.
+    PathAccessRequested {
+        /// The request ID (matches the PendingPathApprovals entry).
+        id: uuid::Uuid,
+        /// The tool that tried to access the path (read, write, edit …).
+        tool_name: String,
+        /// The denied path (absolute).
+        path: String,
+        /// Access mode: "read" or "write".
+        mode: String,
+        /// The agent whose `allowed_paths` would need updating.
+        agent_name: String,
+        /// Human-readable denial reason from the AccessGate.
+        reason: String,
+        /// The session ID that triggered this request.
+        session_id: Option<String>,
+    },
     /// A memory entry was stored.
     MemoryStored {
         /// Memory entry ID.
@@ -420,6 +440,14 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         },
         KernelEvent::ApprovalResolved { id, approved } => AuditAction::Other {
             detail: format!("approval_resolved:{id}:{approved}"),
+        },
+        KernelEvent::PathAccessRequested {
+            id,
+            path,
+            tool_name,
+            ..
+        } => AuditAction::Other {
+            detail: format!("path_access_requested:{id}:{tool_name}:{path}"),
         },
         KernelEvent::MemoryStored {
             id, memory_type, ..

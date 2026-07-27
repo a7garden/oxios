@@ -67,6 +67,11 @@ pub struct Kernel {
     /// every OnDemand tool (web_search, exec, write …) re-prompts forever.
     /// Same cross-handle sharing rule as `pending_tool_approvals` above.
     approval_config: Arc<parking_lot::RwLock<oxios_kernel::approval::ApprovalConfig>>,
+    /// Shared path-access registry — same cross-handle sharing rule as
+    /// `pending_tool_approvals`. The GatedTool registers here when an agent
+    /// tries to access a path outside `allowed_paths`; the HTTP respond
+    /// endpoint resolves from the same map.
+    pending_path_access: Arc<oxios_kernel::tools::PendingPathAccess>,
     project_manager: Option<Arc<ProjectManager>>,
     /// Mount manager (RFC-025 path aliases). `None` when SQLite memory is off.
     /// Wired into the lazily-cached handle so `/api/mounts` and the mount tool
@@ -249,6 +254,7 @@ impl Kernel {
                         self.pending_tool_approvals.clone(),
                         self.pending_ask_user.clone(),
                         self.approval_config.clone(),
+                        self.pending_path_access.clone(),
                     ),
                     self.project_manager
                         .clone()
@@ -818,9 +824,7 @@ async fn daily_health_check(web_dist: oxios_gateway::ActiveWebDist) -> anyhow::R
             tracing::info!(version = %to, "Daily health check: web UI updated");
         }
         SyncOutcome::Unstamped => {
-            tracing::debug!(
-                "Daily health check: active dist is unstamped, skipping download"
-            );
+            tracing::debug!("Daily health check: active dist is unstamped, skipping download");
         }
         SyncOutcome::Failed { reason } => {
             anyhow::bail!(reason);
@@ -1393,9 +1397,8 @@ impl KernelBuilder {
         // another → 404 on every click, no matter how fast.
         let pending_tool_approvals = Arc::new(oxios_kernel::tools::PendingToolApprovals::new());
         let pending_ask_user = Arc::new(oxios_kernel::tools::PendingAskUser::new());
-        let approval_config = Arc::new(parking_lot::RwLock::new(
-            config.security.approval.clone(),
-        ));
+        let approval_config = Arc::new(parking_lot::RwLock::new(config.security.approval.clone()));
+        let pending_path_access = Arc::new(oxios_kernel::tools::PendingPathAccess::new());
 
         // Build AgentApi with HNSW index attached
         let mut agent_api = oxios_kernel::AgentApi::new(
@@ -1434,6 +1437,7 @@ impl KernelBuilder {
                     pending_tool_approvals.clone(),
                     pending_ask_user.clone(),
                     approval_config.clone(),
+                    pending_path_access.clone(),
                 ),
                 project_manager.clone().map(oxios_kernel::ProjectApi::new),
                 oxios_kernel::ExecApi::new(
@@ -1704,6 +1708,7 @@ impl KernelBuilder {
             pending_tool_approvals,
             pending_ask_user,
             approval_config,
+            pending_path_access,
             project_manager,
             mount_manager,
             start_time: std::time::Instant::now(),

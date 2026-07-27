@@ -75,6 +75,7 @@ pub fn register_always_on_gated(
     approval_gate: Option<Arc<crate::approval::ApprovalGate>>,
     event_bus: Option<crate::event_bus::EventBus>,
     pending_approvals: Option<Arc<crate::tools::PendingToolApprovals>>,
+    pending_path_access: Option<Arc<crate::tools::PendingPathAccess>>,
 ) {
     registry.register(GatedTool::with_approval(
         ReadTool::new(),
@@ -83,6 +84,7 @@ pub fn register_always_on_gated(
         approval_gate.clone(),
         event_bus.clone(),
         pending_approvals.clone(),
+        pending_path_access.clone(),
     ));
     registry.register(GatedTool::with_approval(
         WriteTool::new(),
@@ -91,6 +93,7 @@ pub fn register_always_on_gated(
         approval_gate.clone(),
         event_bus.clone(),
         pending_approvals.clone(),
+        pending_path_access.clone(),
     ));
     registry.register(GatedTool::with_approval(
         EditTool::new(),
@@ -99,6 +102,7 @@ pub fn register_always_on_gated(
         approval_gate.clone(),
         event_bus.clone(),
         pending_approvals.clone(),
+        pending_path_access.clone(),
     ));
     registry.register(GatedTool::with_approval(
         GrepTool::new(),
@@ -107,6 +111,7 @@ pub fn register_always_on_gated(
         approval_gate.clone(),
         event_bus.clone(),
         pending_approvals.clone(),
+        pending_path_access.clone(),
     ));
     registry.register(GatedTool::with_approval(
         FindTool::new(),
@@ -115,6 +120,7 @@ pub fn register_always_on_gated(
         approval_gate.clone(),
         event_bus.clone(),
         pending_approvals.clone(),
+        pending_path_access.clone(),
     ));
     registry.register(GatedTool::with_approval(
         LsTool::new(),
@@ -123,6 +129,7 @@ pub fn register_always_on_gated(
         approval_gate.clone(),
         event_bus.clone(),
         pending_approvals.clone(),
+        pending_path_access.clone(),
     ));
     registry.register(GatedTool::with_approval(
         WebSearchTool::new(search_cache.clone()),
@@ -131,6 +138,7 @@ pub fn register_always_on_gated(
         approval_gate.clone(),
         event_bus.clone(),
         pending_approvals.clone(),
+        pending_path_access.clone(),
     ));
     registry.register(GatedTool::with_approval(
         GetSearchResultsTool::new(search_cache),
@@ -139,6 +147,7 @@ pub fn register_always_on_gated(
         approval_gate,
         event_bus,
         pending_approvals,
+        pending_path_access.clone(),
     ));
 }
 
@@ -264,6 +273,7 @@ pub fn register_tools_from_cspace_gated(
     approval_gate: Option<Arc<crate::approval::ApprovalGate>>,
     event_bus: Option<crate::event_bus::EventBus>,
     pending_approvals: Option<Arc<crate::tools::PendingToolApprovals>>,
+    pending_path_access: Option<Arc<crate::tools::PendingPathAccess>>,
 ) {
     // ── Tier 1: Always-on tools (gated) ──────────────────────────────
     register_always_on_gated(
@@ -274,6 +284,7 @@ pub fn register_tools_from_cspace_gated(
         approval_gate.clone(),
         event_bus.clone(),
         pending_approvals.clone(),
+        pending_path_access.clone(),
     );
 
     // ── Tier 2: CSpace-driven tools ─────────────────────────────────
@@ -291,6 +302,7 @@ pub fn register_tools_from_cspace_gated(
                     approval_gate.clone(),
                     event_bus.clone(),
                     pending_approvals.clone(),
+                    pending_path_access.clone(),
                 ));
             }
 

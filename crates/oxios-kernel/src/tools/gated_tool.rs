@@ -29,7 +29,7 @@ use crate::access_manager::{
 };
 use crate::approval::{ApprovalDecision, ApprovalGate, ToolCall};
 use crate::event_bus::EventBus;
-use crate::tools::{PendingToolApprovals, ToolApprovalResult};
+use crate::tools::{PathAccessResult, PendingPathAccess, PendingToolApprovals, ToolApprovalResult};
 
 /// Default timeout for awaiting a user approval response.
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
@@ -38,6 +38,10 @@ const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
 /// approval card is still showing). Short enough to feel instant; the per-poll
 /// gate evaluation is a HashMap lookup + blacklist scan, so the cost is nil.
 const APPROVAL_REEVAL_INTERVAL: Duration = Duration::from_millis(500);
+/// Default timeout for a path-access card. Same window as tool approval.
+const PATH_ACCESS_TIMEOUT: Duration = Duration::from_secs(120);
+/// Re-eval interval for path-access cards — mirrors APPROVAL_REEVAL_INTERVAL.
+const PATH_ACCESS_REEVAL_INTERVAL: Duration = Duration::from_millis(500);
 
 // ─── Path Extraction ────────────────────────────────────────────────────────
 
@@ -99,10 +103,16 @@ pub struct GatedTool<T: AgentTool> {
     /// RFC-035 approval gate. `None` ⇒ no approval logic, executable as soon
     /// as `AccessGate` allows.
     approval_gate: Option<Arc<ApprovalGate>>,
-    /// Kernel event bus used to publish `KernelEvent::ApprovalRequested`.
+    /// Kernel event bus used to publish `KernelEvent::ApprovalRequested`
+    /// and `KernelEvent::PathAccessRequested`.
     event_bus: Option<EventBus>,
-    /// Registry of pending user decisions to resolve after a prompt.
+    /// Registry of pending tool-approval decisions (RFC-035).
     pending_approvals: Option<Arc<PendingToolApprovals>>,
+    /// Registry of pending path-access requests. When an agent tries to
+    /// read/write outside its `allowed_paths`, the denial is surfaced as
+    /// an interactive card (create Mount / temp-allow / deny) instead of
+    /// a hard error. `None` ⇒ headless, returns the error immediately.
+    pending_path_access: Option<Arc<PendingPathAccess>>,
 }
 
 impl<T: AgentTool> GatedTool<T> {
@@ -118,6 +128,7 @@ impl<T: AgentTool> GatedTool<T> {
             approval_gate: None,
             event_bus: None,
             pending_approvals: None,
+            pending_path_access: None,
         }
     }
 
@@ -132,6 +143,7 @@ impl<T: AgentTool> GatedTool<T> {
         approval_gate: Option<Arc<ApprovalGate>>,
         event_bus: Option<EventBus>,
         pending_approvals: Option<Arc<PendingToolApprovals>>,
+        pending_path_access: Option<Arc<PendingPathAccess>>,
     ) -> Self {
         Self {
             inner,
@@ -140,6 +152,7 @@ impl<T: AgentTool> GatedTool<T> {
             approval_gate,
             event_bus,
             pending_approvals,
+            pending_path_access,
         }
     }
 }
@@ -194,7 +207,10 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
             return Ok(AgentToolResult::error(format_denied(&denied)));
         }
 
-        // Step 2: For file tools, check path access permission.
+        // Step 2: For file tools, check path access permission. On denial,
+        // surface an interactive path-access card (create Mount / temp-allow /
+        // deny) when the event bus and path-access registry are wired;
+        // otherwise return the hard error (headless / test path).
         if let Some(path) = extract_path_from_params(tool_name, &params) {
             let mode = path_mode_for_tool(tool_name);
             let path_check = CheckRequest::Path {
@@ -210,10 +226,76 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                     layer = ?denied.layer,
                     "GatedTool: path access denied"
                 );
-                return Ok(AgentToolResult::error(format!(
-                    "🔒 Path access denied: {}",
-                    denied.reason
-                )));
+                match (self.event_bus.as_ref(), self.pending_path_access.as_ref()) {
+                    (Some(bus), Some(registry)) => {
+                        let mode_str = match mode {
+                            PathMode::Read => "read",
+                            PathMode::Write => "write",
+                        };
+                        let (request_id, rx) = registry.register(
+                            tool_name.to_string(),
+                            path.clone(),
+                            mode_str.to_string(),
+                            self.context.agent_name.clone(),
+                        );
+                        let _ = bus.publish(crate::event_bus::KernelEvent::PathAccessRequested {
+                            id: request_id,
+                            tool_name: tool_name.to_string(),
+                            path: path.chars().take(200).collect(),
+                            mode: mode_str.to_string(),
+                            agent_name: self.context.agent_name.clone(),
+                            reason: denied.reason.clone(),
+                            session_id: None,
+                        });
+                        tracing::info!(
+                            request_id = %request_id,
+                            path = %path,
+                            tool = %tool_name,
+                            "path access requested — awaiting user decision"
+                        );
+                        let deadline = tokio::time::Instant::now() + PATH_ACCESS_TIMEOUT;
+                        tokio::pin!(rx);
+                        let allowed = loop {
+                            tokio::select! {
+                                biased;
+                                res = &mut rx => match res {
+                                    Ok(PathAccessResult::Allowed) => break true,
+                                    _ => break false,
+                                },
+                                _ = tokio::time::sleep_until(deadline) => {
+                                    let _ = registry
+                                        .resolve(request_id, PathAccessResult::Denied);
+                                    break false;
+                                }
+                                _ = tokio::time::sleep(PATH_ACCESS_REEVAL_INTERVAL) => {
+                                    if self.gate.check(CheckRequest::Path {
+                                        context: &self.context,
+                                        path: Path::new(&path),
+                                        mode,
+                                    }).is_ok() {
+                                        let _ = registry
+                                            .resolve(request_id, PathAccessResult::Allowed);
+                                        break true;
+                                    }
+                                }
+                            }
+                        };
+                        if !allowed {
+                            return Ok(AgentToolResult::error(format!(
+                                "🔒 Path access denied: {}",
+                                denied.reason
+                            )));
+                        }
+                        // Path now granted — fall through to Step 2.5.
+                    }
+                    _ => {
+                        // Headless: no event bus / registry — hard deny.
+                        return Ok(AgentToolResult::error(format!(
+                            "🔒 Path access denied: {}",
+                            denied.reason
+                        )));
+                    }
+                }
             }
         }
 
