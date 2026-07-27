@@ -131,6 +131,18 @@ export function buildDecorations(state: EditorState): DecorationSet {
         return
       }
       switch (node.name) {
+        case 'HeaderMark': {
+          // Inline title: always hide the `#` on line 1 so the document
+          // title reads clean even while the cursor is on lines 1–2.
+          // (tokenHide only hides markup outside the ±1 active region, so
+          // without this the `#` would flicker back in near the top.) The
+          // headingEnforcer still keeps `# ` in the source; the user edits
+          // the title text directly and never sees the marker.
+          if (doc.lineAt(node.from).number === 1) {
+            builder.push(Decoration.replace({}).range(node.from, node.to))
+          }
+          return
+        }
         case 'HorizontalRule':
           if (!inActiveRegion(node.from, node.to)) {
             builder.push(Decoration.replace({ widget: new HrWidget() }).range(node.from, node.to))
@@ -216,8 +228,16 @@ export const livePreviewExtension = ViewPlugin.fromClass(
           paddingBottom: '0.25rem',
         },
         '.ox-md-h1.ox-md-first': {
-          paddingTop: '0',
-          paddingBottom: '1rem',
+          // Document title (Obsidian-style inline title). The note's
+          // first H1 IS its title — render it larger than in-body H1s
+          // so it reads as the document title. tokenHide strips the
+          // `#` on inactive lines, and editing it renames the note on
+          // save (see note-rename flow in editor-panel).
+          fontSize: '2.5rem',
+          fontWeight: '800',
+          lineHeight: '3rem',
+          paddingTop: '0.5rem',
+          paddingBottom: '1.25rem',
         },
         '.ox-md-h2': {
           fontSize: '1.5rem',
