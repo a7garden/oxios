@@ -451,7 +451,7 @@ export function patchAssistantModel(
  */
 export function finalizeStreamingMessage(messages: ChatMessage[]): ChatMessage[] {
   const last = messages[messages.length - 1]
-  if (!last || last.role !== 'assistant' || !last.generating) return messages
+  if (last?.role !== 'assistant' || !last.generating) return messages
   const isEmpty =
     !(last.content ?? '').trim() &&
     !(last.reasoning?.content ?? '').trim() &&
@@ -1848,7 +1848,12 @@ export const useChatStore = create<ChatStore>()(
                 }
               }
 
-              return { messages: updated, isStreaming: false, activeToolApproval: null, activePathAccess: null }
+              return {
+                messages: updated,
+                isStreaming: false,
+                activeToolApproval: null,
+                activePathAccess: null,
+              }
             })
 
             if (sid) {

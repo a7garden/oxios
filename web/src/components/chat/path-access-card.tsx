@@ -44,9 +44,7 @@ export function PathAccessCard({
         <div className="rounded-xl border bg-card shadow-sm">
           <div className="flex items-center gap-2 px-4 py-3 border-b">
             <ShieldCheck className="h-4 w-4 text-warning shrink-0" />
-            <span className="text-sm font-medium">
-              {isKo ? '경로 접근 권한' : 'Path Access'}
-            </span>
+            <span className="text-sm font-medium">{isKo ? '경로 접근 권한' : 'Path Access'}</span>
             <span className="ml-auto px-2 py-0.5 rounded bg-muted text-xs font-mono">
               {mode === 'write' ? 'write' : 'read'}
             </span>
