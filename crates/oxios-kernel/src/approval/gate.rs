@@ -119,14 +119,14 @@ impl ApprovalGate {
         // "always prompt for this tool" via a `tool_overrides` entry (or a
         // Phase 1 declaration), the dynamic resolver must NOT relax it to
         // `OnDemand`/`Auto` — that would silently bypass the user's intent.
-        if let Some(resolver) = self.dynamic_resolvers.get(call.tool) {
-            if let Some(p) = resolver.resolve(call.args) {
-                policy = if policy == ToolPolicy::Always {
-                    ToolPolicy::Always
-                } else {
-                    p
-                };
-            }
+        if let Some(resolver) = self.dynamic_resolvers.get(call.tool)
+            && let Some(p) = resolver.resolve(call.args)
+        {
+            policy = if policy == ToolPolicy::Always {
+                ToolPolicy::Always
+            } else {
+                p
+            };
         }
         // Phase 3: pipeline-wide global resolvers (blacklist, audit, ...).
         for resolver in &self.global_resolvers {

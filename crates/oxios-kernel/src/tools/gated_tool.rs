@@ -237,61 +237,59 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                     // fall through to Step 3
                 }
                 ApprovalDecision::RequireApproval { reason } => {
-                    if self.event_bus.is_none() || self.pending_approvals.is_none() {
-                        tracing::warn!(
-                            tool = %tool_name,
-                            "ApprovalGate requires approval but no event bus / pending approvals \
-                             wired — allowing (headless path, tool would deadlock)"
-                        );
-                        // fall through to Step 3
-                    } else {
-                        let bus = self.event_bus.as_ref().expect("checked above");
-                        let approvals = self
-                            .pending_approvals
-                            .as_ref()
-                            .expect("checked above")
-                            .clone();
-                        let (approval_id, rx) =
-                            approvals.register(tool_name.to_string(), call.grant_key());
-                        let action = format!("tool:{tool_name}");
-                        // Resource shown on the approval card. Prefer the
-                        // shell `command` (most informative), fall back to
-                        // the structured `binary`, then the bare tool name.
-                        // Independent of `binary` because shell exec has
-                        // `binary = None` after the Task 14 overload fix.
-                        let resource = params
-                            .get("command")
-                            .and_then(|v| v.as_str())
-                            .map(String::from)
-                            .or_else(|| binary.map(String::from))
-                            .unwrap_or_else(|| tool_name.to_string());
-                        // Publish using the exact KernelEvent::ApprovalRequested
-                        // field shape (event_bus.rs:83-96). The frontend uses
-                        // this to render the approval card.
-                        let _ = bus.publish(crate::event_bus::KernelEvent::ApprovalRequested {
-                            id: approval_id,
-                            tool_name: tool_name.to_string(),
-                            action,
-                            resource: resource.chars().take(200).collect(),
-                            reason: reason.clone(),
-                            session_id: None,
-                        });
-                        match tokio::time::timeout(APPROVAL_TIMEOUT, rx).await {
-                            Ok(Ok(ToolApprovalResult::Approved)) => {
-                                tracing::info!(
-                                    approval_id = %approval_id,
-                                    tool = %tool_name,
-                                    "tool call approved by user"
-                                );
-                                // fall through to Step 3
+                    match (self.event_bus.as_ref(), self.pending_approvals.as_ref()) {
+                        (Some(bus), Some(pending)) => {
+                            let approvals = pending.clone();
+                            let (approval_id, rx) =
+                                approvals.register(tool_name.to_string(), call.grant_key());
+                            let action = format!("tool:{tool_name}");
+                            // Resource shown on the approval card. Prefer the
+                            // shell `command` (most informative), fall back to
+                            // the structured `binary`, then the bare tool name.
+                            // Independent of `binary` because shell exec has
+                            // `binary = None` after the Task 14 overload fix.
+                            let resource = params
+                                .get("command")
+                                .and_then(|v| v.as_str())
+                                .map(String::from)
+                                .or_else(|| binary.map(String::from))
+                                .unwrap_or_else(|| tool_name.to_string());
+                            // Publish using the exact KernelEvent::ApprovalRequested
+                            // field shape (event_bus.rs:83-96). The frontend uses
+                            // this to render the approval card.
+                            let _ = bus.publish(crate::event_bus::KernelEvent::ApprovalRequested {
+                                id: approval_id,
+                                tool_name: tool_name.to_string(),
+                                action,
+                                resource: resource.chars().take(200).collect(),
+                                reason: reason.clone(),
+                                session_id: None,
+                            });
+                            match tokio::time::timeout(APPROVAL_TIMEOUT, rx).await {
+                                Ok(Ok(ToolApprovalResult::Approved)) => {
+                                    tracing::info!(
+                                        approval_id = %approval_id,
+                                        tool = %tool_name,
+                                        "tool call approved by user"
+                                    );
+                                    // fall through to Step 3
+                                }
+                                _ => {
+                                    let _ = approvals.resolve(approval_id, ToolApprovalResult::Denied);
+                                    return Ok(AgentToolResult::error(format!(
+                                        "Tool execution was denied or timed out ({}s).",
+                                        APPROVAL_TIMEOUT.as_secs()
+                                    )));
+                                }
                             }
-                            _ => {
-                                let _ = approvals.resolve(approval_id, ToolApprovalResult::Denied);
-                                return Ok(AgentToolResult::error(format!(
-                                    "Tool execution was denied or timed out ({}s).",
-                                    APPROVAL_TIMEOUT.as_secs()
-                                )));
-                            }
+                        }
+                        _ => {
+                            tracing::warn!(
+                                tool = %tool_name,
+                                "ApprovalGate requires approval but no event bus / pending approvals \
+                                 wired — allowing (headless path, tool would deadlock)"
+                            );
+                            // fall through to Step 3
                         }
                     }
                 }
