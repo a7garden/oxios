@@ -18,6 +18,15 @@ describe('extractH1', () => {
   it('ignores content after the first line', () => {
     expect(extractH1('# Title\n# Other')).toBe('Title')
   })
+  it('skips a leading frontmatter block to find the title', () => {
+    expect(extractH1('---\ntitle: Foo\ntags: [a]\n---\n# Real Title\nbody')).toBe('Real Title')
+  })
+  it('returns null when only frontmatter is present (no title)', () => {
+    expect(extractH1('---\ntitle: Foo\n---\n\nbody without heading')).toBeNull()
+  })
+  it('skips a nested oxios frontmatter block', () => {
+    expect(extractH1('---\noxios:\n  author: agent\n---\n# Agent Note\nbody')).toBe('Agent Note')
+  })
 })
 
 describe('sanitizeFilenameStem', () => {

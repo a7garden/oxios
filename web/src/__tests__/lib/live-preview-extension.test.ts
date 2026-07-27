@@ -1,10 +1,10 @@
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { ensureSyntaxTree, syntaxTree } from '@codemirror/language'
-import { EditorState } from '@codemirror/state'
+import { EditorSelection, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { Strikethrough, Table, TaskList } from '@lezer/markdown'
 import { describe, expect, it, vi } from 'vitest'
-import { buildDecorations } from '@/lib/live-preview-extension'
+import { buildDecorations, buildFrontmatterDecorations } from '@/lib/live-preview-extension'
 
 /**
  * Parse `doc` (GFM-enabled, matching the editor config) and collect, per line:
@@ -61,6 +61,70 @@ describe('live-preview-extension buildDecorations — headings', () => {
     expect(lines.get(4)).toBe('ox-md-h4')
     expect(lines.get(5)).toBe('ox-md-h5')
     expect(lines.get(6)).toBe('ox-md-h6')
+  })
+})
+
+describe('live-preview-extension buildDecorations — frontmatter', () => {
+  it('does not inflate frontmatter into a heading (the big-text bug)', () => {
+    const { lines } = inspect('---\ntitle: Foo\ntags: [a]\n---\n\n# Body\n')
+    // The closing `---` would otherwise promote `title: Foo` into a Setext
+    // heading. Every frontmatter line must stay untagged.
+    expect(lines.has(1)).toBe(false)
+    expect(lines.has(2)).toBe(false)
+    expect(lines.has(3)).toBe(false)
+  })
+
+  it('tags the first H1 after frontmatter as the document title', () => {
+    const { lines } = inspect('---\ntitle: Foo\n---\n# Real Title\nbody')
+    expect(lines.get(4)).toBe('ox-md-h1 ox-md-first')
+  })
+})
+
+describe('frontmatterExtension — properties widget', () => {
+  function inspectFm(doc: string, selAnchor = Number.MAX_SAFE_INTEGER) {
+    const anchor = Math.min(selAnchor, doc.length)
+    const state = EditorState.create({
+      doc,
+      selection: EditorSelection.single(anchor),
+      extensions: [
+        markdown({ base: markdownLanguage, extensions: [Strikethrough, Table, TaskList] }),
+      ],
+    })
+    expect(ensureSyntaxTree(state, state.doc.length)).toBeTruthy()
+    const set = buildFrontmatterDecorations(state)
+    const widgets: string[] = []
+    const rawLines: number[] = []
+    const cursor = set.iter()
+    while (cursor.value) {
+      const spec = cursor.value.spec
+      const name = spec?.widget?.constructor?.name
+      if (typeof name === 'string') widgets.push(name)
+      if (typeof spec?.class === 'string' && spec.class.includes('frontmatter-raw')) {
+        rawLines.push(state.doc.lineAt(cursor.from).number)
+      }
+      cursor.next()
+    }
+    return { widgets, rawLines }
+  }
+
+  it('replaces the frontmatter block with a PropertiesWidget when cursor is outside', () => {
+    const { widgets, rawLines } = inspectFm('---\ntitle: Foo\ntags: [a, b]\n---\n\n# Body\n')
+    expect(widgets).toContain('PropertiesWidget')
+    expect(rawLines).toHaveLength(0)
+  })
+
+  it('shows raw YAML (no widget) when the cursor is inside the block', () => {
+    const doc = '---\ntitle: Foo\n---\n\n# Body\n'
+    // anchor on line 2 (inside the frontmatter)
+    const { widgets, rawLines } = inspectFm(doc, doc.indexOf('Foo'))
+    expect(widgets).not.toContain('PropertiesWidget')
+    expect(rawLines).toEqual([1, 2, 3])
+  })
+
+  it('renders nothing when there is no frontmatter', () => {
+    const { widgets, rawLines } = inspectFm('# Just a title\nbody')
+    expect(widgets).toHaveLength(0)
+    expect(rawLines).toHaveLength(0)
   })
 })
 

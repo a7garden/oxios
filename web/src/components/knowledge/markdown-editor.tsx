@@ -44,8 +44,13 @@ import { useKnowledgeRecursiveTree, useKnowledgeTree } from '@/hooks/use-knowled
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
 import { emojiFoldExtension } from '@/lib/emoji-fold-extension'
 import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
+import { findFrontmatterRange } from '@/lib/frontmatter'
 import { createImageFoldExtension } from '@/lib/image-fold-extension'
-import { livePreviewExtension, livePreviewHighlight } from '@/lib/live-preview-extension'
+import {
+  frontmatterExtension,
+  livePreviewExtension,
+  livePreviewHighlight,
+} from '@/lib/live-preview-extension'
 import { mathFoldExtension } from '@/lib/math-fold-extension'
 import { mermaidDarkObserver, mermaidExtension } from '@/lib/mermaid-extension'
 import { tableFoldExtension } from '@/lib/table-fold-extension'
@@ -127,12 +132,26 @@ const _headingEnforcerSuspended = new WeakSet<EditorView>()
 const headingEnforcer = EditorView.updateListener.of((update) => {
   if (!update.docChanged) return
   if (_headingEnforcerSuspended.has(update.view)) return
-  const firstLine = update.state.doc.line(1)
-  const text = firstLine.text
+  const { state } = update
+  // The title is the first line AFTER any leading frontmatter (line 1 when
+  // there is none) — mirroring the backend's frontmatter-at-byte-0 rule so a
+  // note carrying `oxios:`/Obsidian metadata still gets a renameable title
+  // instead of the enforcer clobbering the `---` delimiter.
+  const fm = findFrontmatterRange(state.sliceDoc(0, Math.min(state.doc.length, 8192)))
+  // Edge case: while the user edits frontmatter in raw mode they may
+  // temporarily delete the closing `---`, so `findFrontmatterRange` returns
+  // null. Don't then fall back to line 1 (which is the opening `---`) and
+  // rewrite it into `# ---` — bail until the block is well-formed again.
+  if (!fm && state.doc.line(1).text.trimEnd() === '---') return
+  const fmEndLine = fm ? state.doc.lineAt(Math.max(0, fm.to - 1)).number : 0
+  const titleLineNum = fmEndLine + 1
+  if (titleLineNum > state.doc.lines) return // frontmatter swallows the whole doc
+  const titleLine = state.doc.line(titleLineNum)
+  const text = titleLine.text
   if (!text.startsWith('# ')) {
     const content = text.replace(/^#*\s*/, '')
     update.view.dispatch({
-      changes: { from: firstLine.from, to: firstLine.to, insert: `# ${content}` },
+      changes: { from: titleLine.from, to: titleLine.to, insert: `# ${content}` },
     })
   }
 })
@@ -391,6 +410,7 @@ export function MarkdownEditor({
       }),
       baseTheme,
       statsTracker,
+      frontmatterExtension,
     ]
     if (prefs.bracketMatching) exts.push(bracketMatching())
     if (prefs.mermaidFold) {
@@ -545,9 +565,13 @@ export function MarkdownEditor({
     // headings or selection drift.
     isSettingContent.current = true
     _headingEnforcerSuspended.add(view)
+    // Place the cursor at the body start (past any frontmatter) so a note
+    // with properties shows the PropertiesWidget on load rather than the
+    // raw YAML (cursor inside the block would trigger raw-edit mode).
+    const fm = findFrontmatterRange(initialContent)
     view.dispatch({
       changes: { from: 0, to: current.length, insert: initialContent },
-      selection: { anchor: 0 },
+      selection: { anchor: fm ? fm.to : 0 },
     })
     // Release on the next macrotask. `queueMicrotask` is too soon:
     // CM6 update listeners that schedule React state updates can
@@ -566,6 +590,28 @@ export function MarkdownEditor({
       _headingEnforcerSuspended.delete(view)
     }
   }, [initialContent])
+
+  // On a fresh mount, @uiw seeds the doc from `value` so the content-replace
+  // effect above early-returns and the cursor stays at its default (0) — inside
+  // any leading frontmatter, which would show raw YAML instead of the
+  // PropertiesWidget. The editor is keyed on `editorSessionId`, so it remounts
+  // on every file open: this mount effect places the cursor at the body start so
+  // a note with properties opens on the widget, not the raw block.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const fm = findFrontmatterRange(initialContent)
+    if (!fm) return
+    // Defer past @uiw/react-codemirror's own mount selection setup, which
+    // seeds the cursor at 0 from `value` after this component's effects run.
+    const hadFocus = view.hasFocus
+    const t = setTimeout(() => {
+      view.dispatch({ selection: { anchor: fm.to } })
+      if (hadFocus) view.focus()
+    }, 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Report initial stats on mount and when content is loaded — the
   // updateListener only fires on *changes*, not on the initial state.

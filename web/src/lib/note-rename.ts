@@ -2,16 +2,17 @@
  * H1-driven rename helpers for the knowledge editor.
  *
  * The web editor treats the note's first `# Heading` line as the note's
- * title (the CodeMirror `headingEnforcer` keeps line 1 an H1 at all
- * times). When the user edits that H1, we rename the underlying file so
- * the sidebar file tree, search, wikilinks, and URL all stay consistent
- * with the visible title.
+ * title (the CodeMirror `headingEnforcer` keeps the first line after any
+ * leading frontmatter an H1 at all times). When the user edits that H1, we
+ * rename the underlying file so the sidebar file tree, search, wikilinks,
+ * and URL all stay consistent with the visible title.
  *
  * Mirrors the backend's special-file rules (oxios-markdown `types.rs`):
  * the chat/inbox system files, the journal/habits/archive/insights/media
  * directories, and any non-`.md` file are off-limits for H1 rename
  * because their filenames are load-bearing for other subsystems.
  */
+import { findFrontmatterRange } from '@/lib/frontmatter'
 
 /** Backend `SYSTEM_FILES` — root files with structural meaning. */
 const SYSTEM_FILES: Record<string, true> = {
@@ -36,13 +37,17 @@ const RESERVED_DIRS: Record<string, true> = {
 const MAX_STEM_LEN = 100
 
 /**
- * Extract the H1 text from a markdown document. The heading enforcer
- * guarantees line 1 starts with `# `; we still tolerate a bare `#` or a
- * missing prefix defensively. Returns `null` when there is no usable
+ * Extract the H1 title text from a markdown document. The heading enforcer
+ * guarantees the first line AFTER any leading frontmatter starts with `# `;
+ * we skip a leading YAML frontmatter block first (the backend requires it at
+ * byte 0) so a note with properties still resolves its title instead of
+ * reading the `---` delimiter. Returns `null` when there is no usable
  * (non-empty) heading text — the caller treats that as "no rename".
  */
 export function extractH1(content: string): string | null {
-  const firstLine = content.split('\n', 1)[0] ?? ''
+  const fm = findFrontmatterRange(content)
+  const body = fm ? content.slice(fm.to) : content
+  const firstLine = body.split('\n', 1)[0] ?? ''
   const match = firstLine.match(/^#{0,6}\s+(.*)$/)
   const text = match?.[1]?.trim() ?? ''
   return text.length > 0 ? text : null
