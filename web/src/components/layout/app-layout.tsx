@@ -6,7 +6,11 @@ import { MoveModal } from '@/components/knowledge/move-modal'
 import { SearchModal } from '@/components/knowledge/search-modal'
 import { CommandPalette } from '@/components/layout/command-palette'
 import { QuickAskDialog } from '@/components/quick-ask/quick-ask-dialog'
-import { useApprovalWatcher, useGlobalEvents } from '@/hooks/use-global-events'
+import {
+  useApprovalWatcher,
+  useGlobalEvents,
+  useReconnectOnVisible,
+} from '@/hooks/use-global-events'
 import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
 import { useQuickAskShortcut } from '@/hooks/use-quick-ask-shortcut'
 import { useTabShortcuts } from '@/hooks/use-tab-shortcuts'
@@ -41,6 +45,7 @@ export function AppLayout() {
   useApprovalWatcher()
   useQuickAskShortcut()
   useTabShortcuts()
+  useReconnectOnVisible()
 
   // Bootstrap singleton SSE connection on first mount
   const connectEvents = useEventStore((s) => s.connect)

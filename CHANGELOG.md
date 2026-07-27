@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-07-27
+
 ### Added
 - **Tool approval mode system (RFC-035)** — lobehub-style 3-mode approval
   (manual / allow-list / auto-run) crossed with a 3-tier tool policy
@@ -19,6 +21,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   settings panel. Removes the bespoke exec-only shell approval (root cause
   of the "every exec prompts" complaint). Design:
   `docs/designs/2026-07-27-approval-mode-system-design.md`.
+- **Portal document preview (web)** — clicking a saved-document chip in
+  chat now opens a read-only rendered preview in the portal pane instead
+  of navigating away from the chat. Toggling re-surfaces or peeks off the
+  view (matching artifact-card affordances); an "Edit in Knowledge Base"
+  action with a leave-chat warning covers edits.
+- **Inline document title (web)** — the note's first H1 renders as an
+  Obsidian-style inline title in the live-preview editor (larger than
+  in-body headings; the leading `#` is hidden).
+- **In-input thinking indicator (web)** — the activity/thinking status row
+  moved from a full-width bar above the input into the input box itself,
+  fixing the misalignment with centered chat content.
+
+### Fixed
+- **Long-tail WebSocket reconnect (web)** — after the 5-attempt fast
+  exponential backoff (~31 s) the client gave up permanently, stranding
+  the tab at `connected = false` (disabled input, stuck reconnect banner)
+  until a full page refresh. Now continues with a steady 10 s long-tail
+  retry until the socket opens.
+- **Stuck "Thinking" block (web)** — the reasoning spinner could spin
+  forever across three paths: reasoning lifecycle markers treated as
+  terminal (corrupting the stream), a reasoning→tool transition never
+  closing reasoning, and an abnormal socket close mid-reasoning leaving
+  the spinner pinned.
+
+### Changed
+- **Chat input toolbar (web)** — collapsed the three disconnected strips
+  below the chat input (in-box toolbar, detached action bar, keyboard-hint
+  row) into a single in-box toolbar and removed the no-op action bar whose
+  toggles were never wired to send.
 
 ## [1.27.1] - 2026-07-27
 

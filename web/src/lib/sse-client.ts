@@ -1,7 +1,14 @@
 import { useAuthStore } from '@/stores/auth'
 
-const MAX_RECONNECT_ATTEMPTS = 10
+// Fast exponential-backoff attempts before switching to a steady long-tail
+// retry. Mirrors the chat WebSocket strategy (stores/chat.ts): a daemon or
+// network outage that outlasts the fast-backoff window still recovers
+// instead of stranding the SSE stream at isConnected === false forever
+// (the previous hard cap gave up permanently after 10 tries).
+const MAX_RECONNECT_ATTEMPTS = 5
 const BASE_DELAY_MS = 1000
+/** Steady retry cadence after the fast exponential backoff exhausts. */
+const RECONNECT_LONG_TAIL_MS = 10_000
 
 export class SseClient {
   private controller: AbortController | null = null
@@ -65,6 +72,9 @@ export class SseClient {
       if (!reader) return
 
       // Connection established — notify caller
+      // A successful (re)connect resets the backoff counter so the next
+      // drop starts from the fast-backoff window, not the long-tail.
+      this.reconnectAttempts = 0
       onOpen?.()
 
       const decoder = new TextDecoder()
@@ -105,11 +115,15 @@ export class SseClient {
   }
 
   private scheduleReconnect() {
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return
     if (!this.currentPath) return
 
-    const delay = BASE_DELAY_MS * 2 ** this.reconnectAttempts
-    this.reconnectAttempts++
+    const inFastBackoff = this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+    const delay = inFastBackoff
+      ? BASE_DELAY_MS * 2 ** this.reconnectAttempts
+      : RECONNECT_LONG_TAIL_MS
+    // Pin the counter at the cap during long-tail retry; a successful
+    // doConnect() resets it to 0 (see the onOpen site above).
+    this.reconnectAttempts = inFastBackoff ? this.reconnectAttempts + 1 : this.reconnectAttempts
 
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null

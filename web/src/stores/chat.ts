@@ -444,8 +444,8 @@ export function finalizeStreamingMessage(messages: ChatMessage[]): ChatMessage[]
   const isEmpty =
     !(last.content ?? '').trim() &&
     !(last.reasoning?.content ?? '').trim() &&
-    !(last.toolCalls && last.toolCalls.length > 0) &&
-    !(last.activities && last.activities.length > 0)
+    !last.toolCalls?.length &&
+    !last.activities?.length
   if (isEmpty) return messages.slice(0, -1)
   return messages.map((m, i) =>
     i === messages.length - 1

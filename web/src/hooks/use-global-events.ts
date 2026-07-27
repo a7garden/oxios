@@ -5,6 +5,8 @@ import { api } from '@/lib/api-client'
 import { showDesktopNotification } from '@/lib/desktop-notify'
 import { loadNotificationPrefs } from '@/lib/notification-prefs'
 import { playNotificationSound } from '@/lib/sound'
+import { useChatStore } from '@/stores/chat'
+import { useEventStore } from '@/stores/events'
 import type { NotificationSeverity } from '@/stores/notifications'
 import { useNotificationStore } from '@/stores/notifications'
 import type { OxiosEvent } from '@/types'
@@ -99,6 +101,49 @@ export function useGlobalEvents() {
       }
     }
   }, [events, add, queryClient])
+}
+
+/**
+ * Reconnect dropped streams when the tab becomes visible or the network
+ * comes back online.
+ *
+ * Why this exists: macOS sleep and background-tab throttling can sever the
+ * WebSocket and SSE streams — the server's 60 s pong-deadline fires and
+ * closes the socket — while `onclose` either doesn't fire during the freeze
+ * or the reconnect `setTimeout` is clamped by the browser. Nothing re-ran
+ * the (already-correct, RFC-024 SP2) resume handshake on tab reactivation,
+ * so the user returned to a stuck "연결 대기 중" state. This hook supplies
+ * the missing trigger.
+ *
+ * The reconnect actions are idempotent: the chat WS `connect()` early-returns
+ * when a socket is already OPEN, and `events.reconnect()` tears down before
+ * re-establishing. Store state is read via `getState()` inside the listener
+ * to avoid stale closures, so no effect re-subscription is needed.
+ *
+ * Scope: covers the reported "shows disconnected on return" symptom
+ * (`connected === false`). It does NOT detect half-open sockets that still
+ * report OPEN (connected===true but dead) — that needs a client heartbeat
+ * timeout.
+ */
+export function useReconnectOnVisible() {
+  useEffect(() => {
+    const tryReconnect = () => {
+      const chat = useChatStore.getState()
+      // connect() is async and self-managing; fire-and-forget is fine.
+      if (!chat.connected) void chat.connect()
+      const events = useEventStore.getState()
+      if (!events.isConnected) events.reconnect()
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') tryReconnect()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('online', tryReconnect)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('online', tryReconnect)
+    }
+  }, [])
 }
 
 /**

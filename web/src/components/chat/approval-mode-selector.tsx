@@ -7,8 +7,8 @@
 // work in `web/src/i18n/locales/{en,ko}.json`. i18n-file integration is
 // deferred to a later cleanup task.
 
-import { Check, ChevronDown, Hand, ListChecks, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { Check, ChevronDown, Hand, ListChecks, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils'
 import type { ApprovalMode } from '@/types/approval'
 
 const MODE_LABELS: Record<ApprovalMode, { en: string; ko: string; icon: LucideIcon }> = {
-  'manual': { en: 'Manual approval', ko: '수동 승인', icon: Hand },
+  manual: { en: 'Manual approval', ko: '수동 승인', icon: Hand },
   'allow-list': { en: 'Allow list', ko: '허용 목록', icon: ListChecks },
   'auto-run': { en: 'Auto-run', ko: '자동 실행', icon: Zap },
 }

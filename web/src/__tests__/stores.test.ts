@@ -13,8 +13,8 @@ import {
   patchAssistantModel,
   useChatStore,
 } from '@/stores/chat'
-import { useSidebarStore } from '@/stores/sidebar'
 import { usePortalStore } from '@/stores/portal'
+import { useSidebarStore } from '@/stores/sidebar'
 import type { ChatMessage } from '@/types'
 
 describe('useAuthStore', () => {

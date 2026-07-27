@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -30,7 +30,7 @@ export function ToolApprovalCard({
   const [remember, setRemember] = useState(false)
   const rememberLabel = i18n.language?.startsWith('ko')
     ? '이 도구는 다시 묻지 않기'
-    : 'Don\'t ask again for this tool'
+    : "Don't ask again for this tool"
   return (
     <div className="flex gap-3 my-1.5">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning text-warning-foreground">

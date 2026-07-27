@@ -25,11 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import {
-  useApprovalConfig,
-  useRemoveGrant,
-  useSetApprovalMode,
-} from '@/hooks/use-approval-config'
+import { useApprovalConfig, useRemoveGrant, useSetApprovalMode } from '@/hooks/use-approval-config'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import type { ApprovalMode } from '@/types/approval'
@@ -73,10 +69,9 @@ function ApprovalConfigPanel({ isKo }: { isKo: boolean }) {
         toast.success(isKo ? '승인 모드가 변경되었습니다' : 'Approval mode updated')
       },
       onError: (err) => {
-        toast.error(
-          isKo ? '승인 모드 변경 실패' : 'Failed to update approval mode',
-          { description: String(err instanceof Error ? err.message : err) },
-        )
+        toast.error(isKo ? '승인 모드 변경 실패' : 'Failed to update approval mode', {
+          description: String(err instanceof Error ? err.message : err),
+        })
       },
     })
   }
@@ -84,15 +79,12 @@ function ApprovalConfigPanel({ isKo }: { isKo: boolean }) {
   const handleRemove = (key: string) => {
     removeGrant.mutate(key, {
       onSuccess: () => {
-        toast.success(
-          isKo ? '허용 목록에서 제거되었습니다' : 'Removed from allow list',
-        )
+        toast.success(isKo ? '허용 목록에서 제거되었습니다' : 'Removed from allow list')
       },
       onError: (err) => {
-        toast.error(
-          isKo ? '제거 실패' : 'Failed to remove entry',
-          { description: String(err instanceof Error ? err.message : err) },
-        )
+        toast.error(isKo ? '제거 실패' : 'Failed to remove entry', {
+          description: String(err instanceof Error ? err.message : err),
+        })
       },
     })
   }
@@ -123,9 +115,7 @@ function ApprovalConfigPanel({ isKo }: { isKo: boolean }) {
             {/* Mode selector */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">
-                  {isKo ? '승인 모드' : 'Approval mode'}
-                </p>
+                <p className="text-sm font-medium">{isKo ? '승인 모드' : 'Approval mode'}</p>
                 {isPending && (
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                 )}
@@ -170,9 +160,7 @@ function ApprovalConfigPanel({ isKo }: { isKo: boolean }) {
             {/* Allow list */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">
-                  {isKo ? '허용 목록' : 'Allow list'}
-                </p>
+                <p className="text-sm font-medium">{isKo ? '허용 목록' : 'Allow list'}</p>
                 <Badge variant="outline" className="text-2xs">
                   {allowList.length}
                 </Badge>
@@ -198,11 +186,7 @@ function ApprovalConfigPanel({ isKo }: { isKo: boolean }) {
                         className="h-6 w-6 text-muted-foreground hover:text-destructive"
                         disabled={isPending}
                         onClick={() => handleRemove(key)}
-                        aria-label={
-                          isKo
-                            ? `${key} 제거`
-                            : `Remove ${key}`
-                        }
+                        aria-label={isKo ? `${key} 제거` : `Remove ${key}`}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -214,9 +198,7 @@ function ApprovalConfigPanel({ isKo }: { isKo: boolean }) {
 
             {/* Tool overrides — advanced, edit config.toml */}
             <div className="space-y-1 border-t pt-4">
-              <p className="text-sm font-medium">
-                {isKo ? '도구 정책 재정의' : 'Tool overrides'}
-              </p>
+              <p className="text-sm font-medium">{isKo ? '도구 정책 재정의' : 'Tool overrides'}</p>
               <p className="text-xs text-muted-foreground">
                 {isKo
                   ? `고급 설정입니다. config.toml 에서 직접 편집하세요. (현재 ${Object.keys(toolOverrides).length}개)`
