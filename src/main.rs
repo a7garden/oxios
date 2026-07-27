@@ -9,6 +9,7 @@ mod default_skills;
 mod kernel;
 mod surface;
 mod web_dist;
+mod embedded_web;
 
 // RFC-026: HTTP API server (merged from surface/oxios-web)
 #[cfg(feature = "web")]
@@ -913,6 +914,13 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
             marker.display()
         ))
         .red(),
+        crate::web_dist::WebUiHealth::Embedded { version } => {
+            let v = version
+                .filter(|v| !v.is_empty())
+                .map(|v| format!(" (v{v})"))
+                .unwrap_or_default();
+            style(format!("✓ embedded{}", v)).green()
+        }
         crate::web_dist::WebUiHealth::NotInstalled => style(String::from("not installed")).dim(),
     };
     println!("  {:<16}  {}", "Web UI:", web_ui);

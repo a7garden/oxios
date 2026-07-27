@@ -152,8 +152,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}-
 
-      # Frontend assets must exist before Rust compilation because
-      # rust_embed::Embed generates code from web/dist/ at compile time.
+      # Build web assets before Rust compilation: build.rs emits the
+      # `web_embedded` cfg when web/dist exists, baking the UI into the binary.
       - uses: oven-sh/setup-bun@v2
 
       - name: Build web assets
@@ -202,8 +202,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # Frontend assets must exist before Rust compilation because
-      # rust_embed::Embed generates code from web/dist/ at compile time.
+      # Build web assets before Rust compilation: build.rs emits the
+      # `web_embedded` cfg when web/dist exists, baking the UI into the binary.
       - uses: oven-sh/setup-bun@v2
 
       - name: Build web assets

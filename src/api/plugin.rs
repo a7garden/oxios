@@ -29,10 +29,13 @@ use crate::api::server::AppState;
 use oxios_gateway::ReliabilityLayer;
 use tower_http::compression::CompressionLayer;
 
-// RFC-026: removed rust-embed. The web UI is now served exclusively from the
-// filesystem (`ActiveWebDist`), downloaded at runtime from GitHub Releases by
-// `src/web_dist.rs::ensure_web_dist`. At startup the daemon guarantees the
-// dist is available before the web server starts accepting requests.
+// Web UI serving. When the binary is compiled with a built `web/dist/`
+// present, `build.rs` emits `web_embedded` and `src/embedded_web.rs` bakes
+// the SPA into the binary — served with no first-run download. When absent
+// (`cargo install` from crates.io), `src/web_dist.rs::ensure_web_dist`
+// downloads `web-dist.zip` from GitHub Releases at startup. Per RFC-024 C3,
+// an active dist (downloaded/manual) is served exclusively; embedded assets
+// are used only when no active dist exists, so two build hashes never mix.
 
 // ---------------------------------------------------------------------------
 // Filesystem serving (RFC-024 SP3: atomic pointer + immutable cache)
@@ -134,80 +137,85 @@ fn is_loopback_host(host: &str) -> bool {
     false
 }
 
-/// Serve a static file.
-///
-/// **RFC-024 C3 (3-source consistency):** when an active dist is published
-/// (`Some`), we serve *only* from it and never fall back to embedded assets.
-/// This guarantees a request never mixes two build hashes. Embedded assets
-/// are used only when no active dist exists (startup download failure, etc.).
-///
-/// When `if_none_match` is provided and matches the computed ETag, returns
-/// `304 Not Modified` instead of re-sending the body. Immutable (hashed)
-/// assets skip ETag computation — their URL is the cache key.
-fn serve_file(dist: Option<&std::path::Path>, path: &str, if_none_match: Option<&str>) -> Response {
-    let clean = path.trim_start_matches('/');
-
-    // ── Active dist path ──
-    if let Some(d) = dist {
-        // Resolve the on-disk name (dist files live either at root or under assets/).
-        let data = fs_read(d, clean).or_else(|| fs_read(d, &format!("assets/{clean}")));
-        let Some(data) = data else {
-            // Real miss on the active dist — no fallback to embedded (removed
-            // per RFC-026). The active dist is self-consistent.
-            return Response::builder().status(404).body(Body::empty()).unwrap();
-        };
-        let lookup = if clean.starts_with("assets/") {
-            clean.to_string()
-        } else {
-            format!("assets/{clean}")
-        };
-        let immutable = is_immutable_asset(&lookup);
-        let cache = if immutable {
-            "public, max-age=31536000, immutable"
-        } else {
-            "no-cache"
-        };
-
-        // ETag + conditional request for non-immutable assets.
-        // Immutable (hashed) assets don't need ETag — their URL changes
-        // when content changes, and the Cache-Control: immutable directive
-        // tells the browser never to revalidate.
-        if !immutable {
-            let etag = compute_etag(&data);
-            if let Some(client_etag) = if_none_match {
-                // Accept both weak and strong comparison (RFC 7232 §2.3.2).
-                let client_etag = client_etag.trim().trim_start_matches("W/");
-                let our_etag = etag.trim_matches('"');
-                if client_etag.trim_matches('"') == our_etag {
-                    return Response::builder()
-                        .status(304)
-                        .header("Cache-Control", cache)
-                        .header("ETag", &etag)
-                        .body(Body::empty())
-                        .unwrap();
-                }
+/// Build a cache-correct response for asset bytes. Shared by the active-dist
+/// and embedded serving paths so MIME, ETag, and immutability semantics stay
+/// identical (RFC-024 C3).
+fn asset_response(data: Vec<u8>, clean: &str, if_none_match: Option<&str>) -> Response {
+    // Dist files live either at root or under assets/ — normalize so
+    // is_immutable_asset and mime_type resolve the same regardless of which
+    // lookup path found the bytes.
+    let lookup = if clean.starts_with("assets/") {
+        clean.to_string()
+    } else {
+        format!("assets/{clean}")
+    };
+    let immutable = is_immutable_asset(&lookup);
+    let cache = if immutable {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-cache"
+    };
+    // ETag + conditional request for non-immutable assets. Immutable (hashed)
+    // assets skip ETag — their URL changes when content changes, and the
+    // Cache-Control: immutable directive forbids revalidation.
+    if !immutable {
+        let etag = compute_etag(&data);
+        if let Some(client_etag) = if_none_match {
+            // Accept both weak and strong comparison (RFC 7232 §2.3.2).
+            let client_etag = client_etag.trim().trim_start_matches("W/");
+            let our_etag = etag.trim_matches('"');
+            if client_etag.trim_matches('"') == our_etag {
+                return Response::builder()
+                    .status(304)
+                    .header("Cache-Control", cache)
+                    .header("ETag", &etag)
+                    .body(Body::empty())
+                    .unwrap();
             }
-            return Response::builder()
-                .status(200)
-                .header("Content-Type", mime_type(&lookup))
-                .header("Cache-Control", cache)
-                .header("ETag", &etag)
-                .body(Body::from(data))
-                .unwrap();
         }
-
         return Response::builder()
             .status(200)
             .header("Content-Type", mime_type(&lookup))
             .header("Cache-Control", cache)
+            .header("ETag", &etag)
             .body(Body::from(data))
             .unwrap();
     }
+    Response::builder()
+        .status(200)
+        .header("Content-Type", mime_type(&lookup))
+        .header("Cache-Control", cache)
+        .body(Body::from(data))
+        .unwrap()
+}
 
-    // ── No active dist ──
-    // Should not happen — `src/web_dist.rs::ensure_web_dist` guarantees a
-    // dist is available before the web server starts. Return 503 so a
-    // transient race window fails loudly.
+/// Serve a static file.
+///
+/// **RFC-024 C3 (3-source consistency):** when an active dist is published
+/// (`Some`), we serve *only* from it and never fall back to embedded assets,
+/// so a request never mixes two build hashes. Embedded assets are used only
+/// when no active dist exists (binary compiled with `web/dist/` present and
+/// no download/manual override on disk).
+fn serve_file(dist: Option<&std::path::Path>, path: &str, if_none_match: Option<&str>) -> Response {
+    let clean = path.trim_start_matches('/');
+
+    // Active dist: serve ONLY from it (C3 — no embedded fallback on miss).
+    if let Some(d) = dist {
+        if let Some(data) = fs_read(d, clean).or_else(|| fs_read(d, &format!("assets/{clean}"))) {
+            return asset_response(data, clean, if_none_match);
+        }
+        return Response::builder().status(404).body(Body::empty()).unwrap();
+    }
+
+    // No active dist → embedded assets (authoritative when compiled in).
+    if let Some(data) = crate::embedded_web::get(clean)
+        .or_else(|| crate::embedded_web::get(&format!("assets/{clean}")))
+    {
+        return asset_response(data.to_vec(), clean, if_none_match);
+    }
+
+    // No embedded assets either (crates.io build, download not yet complete) →
+    // 503 so the client retries. `ensure_web_dist` makes this transient.
     Response::builder()
         .status(503)
         .header("Retry-After", "5")
@@ -273,8 +281,37 @@ async fn spa_handler(
             .unwrap();
     }
 
-    // No active dist — startup race or download failure. `web_dist.rs`
-    // guarantees the dist exists before this handler runs. Return 503.
+    // No active dist → embedded assets (authoritative when compiled in).
+    if let Some(data) = crate::embedded_web::get("index.html") {
+        let version = crate::embedded_web::version();
+        let etag = compute_etag(&data);
+        if let Some(client_etag) = headers
+            .get(axum::http::header::IF_NONE_MATCH)
+            .and_then(|v| v.to_str().ok())
+        {
+            let client_etag = client_etag.trim().trim_start_matches("W/");
+            if client_etag.trim_matches('"') == etag.trim_matches('"') {
+                return Response::builder()
+                    .status(304)
+                    .header("Cache-Control", "no-cache")
+                    .header("ETag", &etag)
+                    .header("X-Web-Version", version)
+                    .body(Body::empty())
+                    .unwrap();
+            }
+        }
+        return Response::builder()
+            .status(200)
+            .header("Content-Type", "text/html; charset=utf-8")
+            .header("Cache-Control", "no-cache")
+            .header("ETag", &etag)
+            .header("X-Web-Version", version)
+            .body(Body::from(data.to_vec()))
+            .unwrap();
+    }
+
+    // No active dist and no embedded assets (crates.io build whose startup
+    // download hasn't completed). `web_dist.rs` makes this transient; 503.
     Response::builder()
         .status(503)
         .header("Retry-After", "5")

@@ -164,6 +164,10 @@ jobs:
           done
           echo "::error::Timeout waiting for $WAIT $TARGET on crates.io"
           exit 1
+      - name: Build web assets (for embedded binary)
+        if: matrix.crate == 'oxios'
+        working-directory: web
+        run: bun install --frozen-lockfile && bun run build
       - name: Publish ${{ matrix.crate }}
         working-directory: ${{ matrix.crate == 'oxios' && '.' || format('crates/{0}', matrix.crate) }}
         env:

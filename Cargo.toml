@@ -1,9 +1,27 @@
 [package]
 name = "oxios"
-version = "1.28.0"
+version = "1.29.0"
 edition = "2024"
 description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
 license = "MIT"
+include = [
+    # Source — Rust
+    "/src/**/*.rs",
+    "/build.rs",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/rust-toolchain.toml",
+    "/.cargo/config.toml",
+    # Built web UI — embedded via include_dir! (build.rs emits cfg when present)
+    "/web/dist/**",
+    # Default skills, config template
+    "/share/**",
+    # Docs
+    "/README.md",
+    "/LICENSE",
+    "/AGENTS.md",
+    "/CHANGELOG.md",
+]
 repository = "https://github.com/a7garden/oxios"
 readme = "README.md"
 keywords = ["agent", "ai", "os", "automation"]
