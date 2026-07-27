@@ -758,10 +758,13 @@ pub fn unsanitize_filename(filename: &str) -> String {
     result
 }
 
-/// Get display name from filename: capitalized, without `.md` extension.
+/// Get display name from filename: capitalized, without `.md` or `.html` extension.
 pub fn display_name(filename: &str) -> String {
     let trimmed = filename.trim();
-    let without_ext = trimmed.strip_suffix(".md").unwrap_or(trimmed);
+    let without_ext = trimmed
+        .strip_suffix(".md")
+        .or_else(|| trimmed.strip_suffix(".html"))
+        .unwrap_or(trimmed);
     let mut chars = without_ext.chars();
     match chars.next() {
         None => String::new(),
@@ -822,12 +825,14 @@ pub fn only_files(files: &[FileEntry]) -> Vec<FileEntry> {
     files.iter().filter(|f| !f.is_dir).cloned().collect()
 }
 
-/// Filter: only user markdown files (exclude system files, dirs, non-md).
-pub fn only_user_md_files(files: &[FileEntry]) -> Vec<FileEntry> {
+/// Filter: only user content files (exclude system files, dirs, non-md/non-html).
+pub fn only_user_text_files(files: &[FileEntry]) -> Vec<FileEntry> {
     files
         .iter()
         .filter(|f| {
-            !f.is_dir && f.name.ends_with(".md") && !SYSTEM_FILES.contains(&f.name.as_str())
+            !f.is_dir
+                && (f.name.ends_with(".md") || f.name.ends_with(".html"))
+                && !SYSTEM_FILES.contains(&f.name.as_str())
         })
         .cloned()
         .collect()
@@ -967,6 +972,7 @@ mod tests {
     #[test]
     fn test_display_name() {
         assert_eq!(display_name("rust.md"), "Rust");
+        assert_eq!(display_name("design.html"), "Design");
         assert_eq!(display_name(" filename "), "Filename");
     }
 

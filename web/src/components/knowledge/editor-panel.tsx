@@ -15,6 +15,7 @@ import { type EditorStats, EditorStatusBar } from './editor-status-bar'
 import { EditorToolbar } from './editor-toolbar'
 import { MarkdownEditor } from './markdown-editor'
 import { SplitEditor } from './split-editor'
+import { HtmlRenderer } from './html-renderer'
 
 export function EditorPanel() {
   const { t } = useTranslation()
@@ -45,6 +46,12 @@ export function EditorPanel() {
             <div className="flex items-center justify-center h-full text-muted-foreground">
               {t('knowledge.loading')}
             </div>
+          ) : currentFilePath?.endsWith('.html') ? (
+            <HtmlRenderer
+              key={editorSessionId}
+              filePath={currentFilePath}
+              content={content ?? ''}
+            />
           ) : currentFilePath ? (
             <div className="mx-auto max-w-4xl h-full px-4 sm:px-8 lg:px-16">
               <MarkdownEditor

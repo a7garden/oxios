@@ -363,6 +363,7 @@ function FileTreeNode({
         {renaming ? (
           <InlineRenameInput
             currentName={node.display_name || node.name}
+            extension={node.name.match(/\.(md|html)$/)?.[0] ?? '.md'}
             onSubmit={submitRename}
             onCancel={cancelRename}
           />
@@ -427,6 +428,7 @@ function FileTreeFlatRow({
         {renaming ? (
           <InlineRenameInput
             currentName={node.display_name || node.name}
+            extension={node.name.match(/\.(md|html)$/)?.[0] ?? '.md'}
             onSubmit={(newName) => {
               setRenaming(false)
               onRename(node.path, newName)
@@ -469,10 +471,12 @@ function QualityBadge({ quality }: { quality: 'raw' | 'curated' | 'refined' }) {
 
 function InlineRenameInput({
   currentName,
+  extension,
   onSubmit,
   onCancel,
 }: {
   currentName: string
+  extension: string
   onSubmit: (newName: string) => void
   onCancel: () => void
 }) {
@@ -485,7 +489,9 @@ function InlineRenameInput({
       onCancel()
       return
     }
-    const newName = trimmed.endsWith('.md') ? trimmed : `${trimmed}.md`
+    // Preserve the original extension unless the user typed .md or .html explicitly.
+    const hasExplicitExt = /\.(md|html)$/i.test(trimmed)
+    const newName = hasExplicitExt ? trimmed : `${trimmed}${extension}`
     onSubmit(newName)
   }
 
