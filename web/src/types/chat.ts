@@ -17,16 +17,7 @@ export interface ChatError {
   type: string // ErrorType from model-runtime
 }
 
-// ── Reasoning (ported from @lobechat/types message/common/base.ts) ──
 
-export interface ModelReasoning {
-  content: string
-  duration?: number // milliseconds
-  /** Whether this turn is still streaming its reasoning block. */
-  thinking?: boolean
-}
-
-// ── Search grounding (ported from @lobechat/types search.ts) ──
 
 export interface CitationItem {
   favicon?: string
@@ -161,9 +152,8 @@ export interface ToolRenderProps {
 
 /** LobeHub-ported fields to add to ChatMessage. */
 export interface ChatMessageExtensions {
-  /** Thinking/reasoning block. Displayed before the answer prose. */
-  reasoning?: ModelReasoning | null
   /** Web search grounding with citation cards. */
+
   search?: GroundingSearch | null
   /** RAG reference chunks from knowledge base. */
   chunksList?: ChatFileChunk[]
@@ -175,9 +165,8 @@ export interface ChatMessageExtensions {
   error?: ChatError | null
   /** Whether this message is currently generating. */
   generating?: boolean
-  /** Whether this message is in reasoning phase. */
-  isReasoning?: boolean
   /** Whether tool calls are being generated. */
+
   isToolCallGenerating?: boolean
   /** Whether this message is collapsed (compressed context). */
   isCollapsed?: boolean

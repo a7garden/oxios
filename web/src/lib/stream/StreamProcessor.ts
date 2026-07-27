@@ -58,10 +58,8 @@ export class StreamProcessor {
   readonly messageId: string
 
   private text = ''
-  private reasoningText = ''
-  private reasoningStartTs: number | null = null
-  private reasoningEverSeen = false
   private tools = new Map<string, ChatToolPayload>()
+
   private search: ChatMessage['search'] = null
   private chunks: ChatFileChunk[] = []
   private lastUsage: TokenUsage | null = null
@@ -98,38 +96,16 @@ export class StreamProcessor {
 
       case 'reasoning.start':
         this.openReasoning()
-        return { patch: { isReasoning: true, generating: true } }
+        return { patch: { generating: true } }
 
       case 'reasoning.delta': {
-        if (!this.reasoningEverSeen) this.beginReasoning()
-        this.reasoningText += ev.text
         this.appendReasoning(ev.text)
-        return {
-          patch: {
-            isReasoning: true,
-            generating: true,
-            reasoning: {
-              content: this.reasoningText,
-              duration: this.reasoningDuration(),
-              thinking: true,
-            },
-          },
-        }
+        return { patch: { generating: true } }
       }
 
       case 'reasoning.end': {
-        const duration = ev.durationMs ?? this.reasoningDuration()
         this.closeReasoningBlock()
-        return {
-          patch: {
-            isReasoning: false,
-            reasoning: {
-              content: this.reasoningText,
-              duration,
-              thinking: false,
-            },
-          },
-        }
+        return { patch: { generating: true } }
       }
 
       case 'tool.args_delta': {
@@ -155,7 +131,7 @@ export class StreamProcessor {
         }
         this.closeReasoningBlock()
         this.upsertToolBlock(this.tools.get(ev.toolCallId)!)
-        return { patch: { toolCalls: this.toolsList(), ...this.closeReasoningIfOpen() } }
+        return { patch: { toolCalls: this.toolsList() } }
       }
 
       case 'tool.start': {
@@ -176,7 +152,6 @@ export class StreamProcessor {
             toolCalls: this.toolsList(),
             isToolCallGenerating: true,
             generating: true,
-            ...this.closeReasoningIfOpen(),
           },
           activity: {
             type: 'tool_call',
@@ -290,7 +265,6 @@ export class StreamProcessor {
         return {
           patch: {
             generating: false,
-            isReasoning: false,
             isToolCallGenerating: false,
             error: ev.error ?? undefined,
           },
@@ -312,14 +286,6 @@ export class StreamProcessor {
       id: this.messageId,
       blocks: [...this.blocks],
       content: this.text || base.content,
-      reasoning:
-        this.reasoningText || base.reasoning
-          ? {
-              content: this.reasoningText || base.reasoning?.content || '',
-              duration: this.reasoningDuration() ?? base.reasoning?.duration,
-              thinking: false,
-            }
-          : null,
       toolCalls: this.tools.size ? this.toolsList() : base.toolCalls,
       search: this.search ?? base.search,
       chunksList: this.chunks.length ? this.chunks : base.chunksList,
@@ -327,44 +293,11 @@ export class StreamProcessor {
       totalOutputTokens: this.lastUsage?.outputTokens ?? base.totalOutputTokens,
       error: this.error ?? base.error ?? null,
       generating: false,
-      isReasoning: false,
       isToolCallGenerating: false,
     }
   }
 
   // ── Internals ──
-
-  private beginReasoning() {
-    if (!this.reasoningEverSeen) {
-      this.reasoningEverSeen = true
-      this.reasoningStartTs = Date.now()
-    }
-  }
-  /**
-   * Close an open reasoning span when the stream transitions to tool
-   * execution. Reasoning_content providers (GLM/DeepSeek/Qwen) that never
-   * emit ThinkingEnd go straight from reasoning to a tool call with no Text,
-   * so the gateway's first-Text `reasoning.end` heuristic never fires — the
-   * Thinking spinner would otherwise run through the entire tool run.
-   * Returns the patch fragment to merge, or `{}` if no reasoning was open.
-   * Idempotent: reasoningText/reasoningStartTs are kept so a reasoning span
-   * that resumes after the tool continues accumulating.
-   */
-  private closeReasoningIfOpen(): Partial<ChatMessage> {
-    if (!this.reasoningEverSeen) return {}
-    return {
-      isReasoning: false,
-      reasoning: {
-        content: this.reasoningText,
-        duration: this.reasoningDuration(),
-        thinking: false,
-      },
-    }
-  }
-
-  private reasoningDuration(): number | undefined {
-    return this.reasoningStartTs ? Date.now() - this.reasoningStartTs : undefined
-  }
 
   private toolsList(): ChatToolPayload[] {
     return [...this.tools.values()]

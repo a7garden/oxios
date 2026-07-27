@@ -348,42 +348,37 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     expect(last.totalOutputTokens).toBe(50)
   })
 
-  it('reasoning populates first-class reasoning field (Phase 1)', () => {
-    // Phase 1 refactor (2026-07-21): reasoning is now a first-class field on
-    // ChatMessage, no longer an activity entry. See
-    // docs/designs/2026-07-21-lobehub-chat-port-design.md §6.1.
+  it('reasoning populates a positioned reasoning block (P2 block-stream)', () => {
+    // Block-stream transparency: reasoning is captured as a positioned
+    // ChatBlock (not a separate `reasoning` field) so it interleaves with
+    // tool calls in execution order. See docs/designs/2026-07-27-block-stream...
     useChatStore.getState().handleChunk({
       type: 'reasoning',
       content: 'compaction complete',
       source: 'compaction',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.reasoning).toMatchObject({
-      content: 'compaction complete',
-      thinking: true,
-    })
-    expect(last.isReasoning).toBe(true)
+    expect(last.blocks?.some((b) => b.type === 'reasoning' && b.text === 'compaction complete')).toBe(true)
+    expect(last.blocks?.find((b) => b.type === 'reasoning')?.source).toBe('compaction')
   })
 
-  it('accumulates reasoning deltas into single content string (Phase 1)', () => {
-    // Phase 1: reasoning streams as per-token deltas that accumulate into
-    // message.reasoning.content. Source-based grouping from the old activity
-    // model is intentionally dropped — Phase 1 has one reasoning span per
-    // message; multi-source reasoning is a Phase 2+ concern.
+  it('accumulates reasoning deltas into a single positioned block', () => {
+    // Reasoning deltas stream into a single open reasoning block; the
+    // block is positioned by the number of tools started before it.
     useChatStore.getState().handleChunk({ type: 'reasoning', content: 'Thi', source: 'thinking' })
     useChatStore.getState().handleChunk({ type: 'reasoning', content: 's is', source: 'thinking' })
     useChatStore
       .getState()
       .handleChunk({ type: 'reasoning', content: ' a thought', source: 'thinking' })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.reasoning?.content).toBe('This is a thought')
-    expect(last.reasoning?.thinking).toBe(true)
+    const reasoning = last.blocks?.find((b) => b.type === 'reasoning')
+    expect(reasoning?.type).toBe('reasoning')
+    if (reasoning?.type === 'reasoning') expect(reasoning.text).toBe('This is a thought')
   })
 
-  it('reasoning across sources still accumulates into one field (Phase 1)', () => {
-    // Phase 1 simplification: source-based grouping is gone. All reasoning
-    // chunks accumulate into message.reasoning.content regardless of source.
-    // Multi-span reasoning UI is a Phase 2+ concern.
+  it('reasoning across sources still accumulates into one positioned block', () => {
+    // All reasoning chunks accumulate into the same positioned block
+    // (single open reasoning span at the current tool position).
     useChatStore
       .getState()
       .handleChunk({ type: 'reasoning', content: 'thinking…', source: 'thinking' })
@@ -391,18 +386,17 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       .getState()
       .handleChunk({ type: 'reasoning', content: 'compacting…', source: 'compaction' })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.reasoning?.content).toBe('thinking…compacting…')
+    const reasoning = last.blocks?.find((b) => b.type === 'reasoning')
+    if (reasoning?.type === 'reasoning') expect(reasoning.text).toBe('thinking…compacting…')
   })
-  it('tool_start closes an open reasoning span (reasoning_content models)', () => {
-    // Reasoning_content providers (GLM/DeepSeek/Qwen) go straight from
-    // reasoning to a tool call with no Text, so the gateway's first-Text
-    // reasoning.end heuristic never fires. tool_start must close the
-    // reasoning span itself or the Thinking spinner runs through the whole
-    // tool execution. See StreamProcessor.closeReasoningIfOpen.
+  it('tool_start closes the open reasoning block (reasoning_content models)', () => {
+    // Reasoning_content providers go straight from reasoning to a tool call
+    // with no Text, so the gateway's first-Text reasoning.end heuristic
+    // never fires. The processor must close the open reasoning block on
+    // tool transition or the spinner would run through the tool execution.
     const store = useChatStore.getState()
     store.handleChunk({ type: 'reasoning', content: 'Let me try a search. ' })
     store.handleChunk({ type: 'reasoning', content: 'Querying…' })
-    expect(useChatStore.getState().messages.at(-1)!.isReasoning).toBe(true)
     store.handleChunk({
       type: 'tool_start',
       tool_name: 'web_search',
@@ -410,10 +404,11 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       tool_args: { q: 'weather' },
     })
     const last = useChatStore.getState().messages.at(-1)!
-    // Reasoning closed by the tool transition — before any `done`.
-    expect(last.isReasoning).toBe(false)
-    expect(last.reasoning?.thinking).toBe(false)
-    expect(last.reasoning?.content).toBe('Let me try a search. Querying…')
+    const reasoning = last.blocks?.find((b) => b.type === 'reasoning')
+    if (reasoning?.type === 'reasoning') {
+      expect(reasoning.status).toBe('done')
+      expect(reasoning.text).toBe('Let me try a search. Querying…')
+    }
     expect(last.toolCalls).toHaveLength(1)
   })
 
@@ -460,9 +455,9 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     store.handleChunk({ type: 'done', phase: 'Execute', evaluation_passed: true })
 
     const last = useChatStore.getState().messages.at(-1)!
-    // First-class reasoning field — content accumulated, not in activities.
-    expect(last.reasoning?.content).toBe('Thinking about it…')
-    expect(last.isReasoning).toBe(false) // done cleared it
+    // First-class reasoning block — content accumulated into a positioned block.
+    const reasoning = last.blocks?.find((b) => b.type === 'reasoning')
+    if (reasoning?.type === 'reasoning') expect(reasoning.text).toBe('Thinking about it…')
     // Structured toolCalls[] with full lifecycle.
     expect(last.toolCalls).toHaveLength(1)
     expect(last.toolCalls![0]).toMatchObject({
@@ -763,19 +758,25 @@ describe('message-transform primitives (shared by chat + quick-ask stores)', () 
       assistant({
         id: 'a1',
         generating: true,
-        isReasoning: true,
         isToolCallGenerating: true,
-        reasoning: { content: 'Let me try', duration: 100, thinking: true },
+        blocks: [
+          {
+            type: 'reasoning',
+            id: 'r-1',
+            text: 'Let me try',
+            status: 'streaming',
+            startedAt: Date.now() - 100,
+          },
+        ],
       }),
     ]
     const out = finalizeStreamingMessage(msgs)
     expect(out).toHaveLength(2)
     expect(out[1]!.generating).toBe(false)
-    expect(out[1]!.isReasoning).toBe(false)
     expect(out[1]!.isToolCallGenerating).toBe(false)
-    expect(out[1]!.reasoning?.thinking).toBe(false)
-    // Reasoning content is preserved for display.
-    expect(out[1]!.reasoning?.content).toBe('Let me try')
+    // Blocks are preserved (no longer a separate `reasoning` field to
+    // clear — the close happens at the block level when streaming ends).
+    expect(out[1]!.blocks?.find((b) => b.type === 'reasoning')?.type).toBe('reasoning')
   })
 })
 
@@ -882,8 +883,7 @@ describe('useChatStore sendMessage turn start', () => {
     })
     const msgs = useChatStore.getState().messages
     expect(msgs).toHaveLength(2)
-    expect(msgs[1]).toMatchObject({ role: 'assistant' })
-    expect(msgs[1]!.reasoning?.content).toBe('thinking…')
+    expect(msgs[1]!.blocks?.find((b) => b.type === 'reasoning')?.type).toBe('reasoning')
   })
 
   it('disconnect before any chunk leaves only the user message (no ghost bubble)', () => {

@@ -7,7 +7,7 @@ import type {
   ChatImageItem,
   ChatToolPayload,
   GroundingSearch,
-  ModelReasoning,
+
 } from './chat'
 
 export type {
@@ -26,8 +26,8 @@ export type {
   CitationItem,
   GroundingSearch,
   ImageCitationItem,
-  ModelReasoning,
   ReasoningBlock,
+
   TextBlock,
   ToolBlock,
   ToolRenderProps,
@@ -244,9 +244,8 @@ export interface ChatMessage {
   _interviewRound?: number
   // ── LobeHub-aligned fields (Phase 1 streaming foundation, 2026-07-21) ──
   // Named types imported from './chat'. Old inline anonymous types removed.
-  /** Thinking/reasoning block content + metadata. First-class (not an activity). */
-  reasoning?: ModelReasoning | null
   /** Web search grounding with citation cards. */
+
   search?: GroundingSearch | null
   /** RAG reference chunks from knowledge base. */
   chunksList?: ChatFileChunk[]
@@ -261,9 +260,8 @@ export interface ChatMessage {
   error?: ChatError | null
   /** Whether this message is currently generating (streaming). */
   generating?: boolean
-  /** Whether this message is in reasoning phase. */
-  isReasoning?: boolean
   /** Whether tool calls are being generated. */
+
   isToolCallGenerating?: boolean
   /** Whether this message is collapsed. */
   isCollapsed?: boolean

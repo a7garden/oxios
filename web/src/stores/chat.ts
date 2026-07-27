@@ -453,24 +453,19 @@ export function patchAssistantModel(
 export function finalizeStreamingMessage(messages: ChatMessage[]): ChatMessage[] {
   const last = messages[messages.length - 1]
   if (last?.role !== 'assistant' || !last.generating) return messages
+  // Blocks are the single source of truth; a turn with non-empty blocks is
+  // not empty even if `content`/legacy fields are blank.
   const isEmpty =
     !(last.content ?? '').trim() &&
-    !(last.reasoning?.content ?? '').trim() &&
-    !last.toolCalls?.length &&
-    !last.activities?.length
+    !(last.blocks && last.blocks.length > 0) &&
+    !(last.toolCalls && last.toolCalls.length > 0)
   if (isEmpty) return messages.slice(0, -1)
   return messages.map((m, i) =>
     i === messages.length - 1
       ? {
           ...m,
           generating: false,
-          // Abnormal end (WS close / cancel): clear any in-flight phase flags
-          // so the Thinking block stops spinning and tool spinners stop too.
-          // Without this, a socket drop mid-reasoning leaves `isReasoning`
-          // true forever — the exact "stuck Thinking..." symptom.
-          isReasoning: false,
           isToolCallGenerating: false,
-          reasoning: m.reasoning ? { ...m.reasoning, thinking: false } : m.reasoning,
         }
       : m,
   )

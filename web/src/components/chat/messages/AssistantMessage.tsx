@@ -27,15 +27,12 @@ import { ChatItem } from '@/components/chat/chat-item'
 import { ChatMetadata } from '@/components/chat/chat-metadata'
 import { FollowUpChips } from '@/components/chat/follow-up-chips'
 import { KnowledgeSaveIndicator } from '@/components/chat/knowledge-save-indicator'
-import { MarkdownMessage } from '@/components/chat/markdown-message'
 import { SearchGrounding } from '@/components/chat/search-grounding'
-import { Thinking } from '@/components/chat/thinking'
 import { useChatStore } from '@/stores/chat'
 import type { ChatMessage } from '@/types'
+import { BlockStream } from './components/BlockStream'
 import { ErrorCard } from './components/ErrorCard'
 import { MessageActionBar } from './components/MessageActionBar'
-import { BlockStream } from './components/BlockStream'
-import { ToolCallList } from './components/ToolCallList'
 import { useAssistantActions } from './useAssistantActions'
 
 interface AssistantMessageProps {
@@ -60,12 +57,9 @@ function AssistantMessageImpl({
   const { sendMessage } = useChatStore()
   const avatar: ChatItemAvatar = { name: modelDisplayName(message.model) ?? 'Oxios' }
 
-  const hasReasoning = !!(message.reasoning?.content || message.isReasoning)
   const hasSearch = !!(message.search?.citations?.length || message.search?.imageResults?.length)
   const hasContent = !!message.content
-  const hasToolCalls = !!(message.toolCalls && message.toolCalls.length > 0)
   const hasChunks = !!(message.chunksList && message.chunksList.length > 0)
-  const hasBlocks = !!(message.blocks && message.blocks.length > 0)
   const isError = !!message.metadata?.isError
   const chatError = isError
     ? {
@@ -92,25 +86,7 @@ function AssistantMessageImpl({
       }
     >
       <div className="flex flex-col gap-2">
-        {hasBlocks ? (
-          <BlockStream blocks={message.blocks!} messageId={message.id} />
-        ) : (
-          <>
-            {hasReasoning && (
-              <Thinking
-                content={message.reasoning?.content ?? ''}
-                thinking={message.isReasoning ?? false}
-                duration={message.reasoning?.duration}
-              />
-            )}
-            {hasContent && !isError && (
-              <MarkdownMessage messageId={message.id} isStreaming={!!message.generating}>
-                {message.content}
-              </MarkdownMessage>
-            )}
-            {hasToolCalls && <ToolCallList calls={message.toolCalls!} />}
-          </>
-        )}
+        <BlockStream blocks={message.blocks!} messageId={message.id} />
         {hasSearch && message.search && <SearchGrounding search={message.search} />}
         {hasChunks && <FileChunksPlaceholder chunks={message.chunksList!} />}
         {isError && chatError && <ErrorCard error={chatError} onRetry={onRetry} />}
