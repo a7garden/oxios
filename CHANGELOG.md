@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tool approval mode system (RFC-035)** — lobehub-style 3-mode approval
+  (manual / allow-list / auto-run) crossed with a 3-tier tool policy
+  (Auto / OnDemand / Always). A new `ApprovalGate` runs after the existing
+  4-layer `AccessGate` and decides whether a tool call auto-runs or surfaces
+  an approval card. Security-blacklist patterns (`rm -rf /`, `sudo *`, fork
+  bomb, etc.) always escalate to `Always` and prompt regardless of mode.
+  `[security.approval]` config section + `/api/security/approval` HTTP API +
+  Web UI dropdown (chat input), "remember" checkbox (allow-list), and
+  settings panel. Removes the bespoke exec-only shell approval (root cause
+  of the "every exec prompts" complaint). Design:
+  `docs/designs/2026-07-27-approval-mode-system-design.md`.
+
 ## [1.27.1] - 2026-07-27
 
 ### Fixed
