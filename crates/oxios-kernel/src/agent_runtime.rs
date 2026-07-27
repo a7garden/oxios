@@ -889,16 +889,31 @@ async fn run_agent(
     ));
 
     // Build the RFC-035 ApprovalGate: declared policies + config overrides +
-    // the always-on SecurityBlacklist as the single global resolver. Tool
-    // registration threads this into every `GatedTool`, so Step 2.5 picks
-    // up `exec`, file, and web-search calls uniformly.
+    // the always-on SecurityBlacklist as the single global resolver, plus
+    // the ExecPolicyResolver as a dynamic resolver for `exec` so structured
+    // exec with an allowed binary auto-runs without approval in Manual mode.
+    // The resolver takes a SNAPSHOT of `ExecConfig.allowed_commands` at
+    // construction time; runtime reloads via `PUT /api/config` do NOT
+    // propagate. Sharing the live `Arc<RwLock<Vec<String>>>` would require
+    // touching `config.rs` (off-staging), so the brief sanctions snapshot
+    // + note the limitation. Reload takes effect on next agent run.
     let approval_config = kernel_handle.infra.approval_config_handle();
-    let approval_gate = Arc::new(crate::approval::ApprovalGate::with_shared_config(
+    let exec_snapshot = kernel_handle.exec.config_snapshot();
+    let exec_resolver = crate::approval::ExecPolicyResolver {
+        allowed_commands: Arc::new(parking_lot::RwLock::new(exec_snapshot.allowed_commands.clone())),
+    };
+    let mut dynamic_resolvers = std::collections::HashMap::new();
+    dynamic_resolvers.insert(
+        "exec".to_string(),
+        Box::new(exec_resolver) as Box<dyn crate::approval::ToolPolicyResolver>,
+    );
+    let approval_gate = Arc::new(crate::approval::ApprovalGate::with_dynamic_resolvers(
         crate::approval::default_tool_policy_map(),
         approval_config,
         vec![Box::new(crate::approval::SecurityBlacklist::new(
             crate::approval::default_blacklist_rules(),
         ))],
+        dynamic_resolvers,
     ));
     let approval_event_bus = kernel_handle.infra.event_bus_clone();
     let approval_pending =

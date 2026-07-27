@@ -215,14 +215,15 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
         // Step 2.5 (RFC-035): ApprovalGate evaluation — decides whether the
         // call auto-runs or surfaces a human-in-the-loop approval card.
         if let Some(approval_gate) = &self.approval_gate {
-            // Build the approval context. `exec` carries both a `binary`
-            // (structured) / `command` (shell) argument; other tools have
-            // neither.
+            // `binary` is the binary field ONLY (RFC-035 Task 14). The
+            // `command` field is the full shell string and would pollute
+            // `grant_key()` (which uses `binary`) in allow-list mode. The
+            // approval card's display `resource` derives a richer string
+            // from `command` separately (below), but `ToolCall.binary`
+            // must stay binary-only so `exec:<binary>` / `exec:shell`
+            // grant keys are correct.
             let binary = if tool_name == "exec" {
-                params
-                    .get("binary")
-                    .and_then(|v| v.as_str())
-                    .or_else(|| params.get("command").and_then(|v| v.as_str()))
+                params.get("binary").and_then(|v| v.as_str())
             } else {
                 None
             };
@@ -252,12 +253,16 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                             .clone();
                         let (approval_id, rx) = approvals.register(tool_name.to_string(), call.grant_key());
                         let action = format!("tool:{tool_name}");
-                        // Resource shown on the approval card. For exec this
-                        // is the binary name (structured) or full command
-                        // (shell) — gives the user enough context to decide.
-                        // Other tools fall back to the tool name.
-                        let resource = binary
+                        // Resource shown on the approval card. Prefer the
+                        // shell `command` (most informative), fall back to
+                        // the structured `binary`, then the bare tool name.
+                        // Independent of `binary` because shell exec has
+                        // `binary = None` after the Task 14 overload fix.
+                        let resource = params
+                            .get("command")
+                            .and_then(|v| v.as_str())
                             .map(String::from)
+                            .or_else(|| binary.map(String::from))
                             .unwrap_or_else(|| tool_name.to_string());
                         // Publish using the exact KernelEvent::ApprovalRequested
                         // field shape (event_bus.rs:83-96). The frontend uses

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use super::policy::{ApprovalConfig, ApprovalMode, ToolPolicy, DEFAULT_TOOL_POLICIES};
-use super::resolver::GlobalResolver;
+use super::resolver::{GlobalResolver, ToolPolicyResolver};
 
 /// Tool call context for approval evaluation.
 pub struct ToolCall<'a> {
@@ -40,6 +40,14 @@ pub struct ApprovalGate {
     tool_policies: HashMap<String, ToolPolicy>,
     config: Arc<parking_lot::RwLock<ApprovalConfig>>,
     global_resolvers: Vec<Box<dyn GlobalResolver>>,
+    /// Per-tool dynamic resolvers. Consulted in Phase 2.5 of the pipeline —
+    /// after `tool_overrides` (Phase 2) and before `global_resolvers`
+    /// (Phase 3). The resolver's policy replaces the base policy when
+    /// present, but an explicit `Always` (declared or override) is sticky
+    /// — the resolver must never relax it. Phase 3 global resolvers
+    /// (blacklist, audit, ...) still max-merge on top so they can always
+    /// escalate back to `Always`.
+    dynamic_resolvers: HashMap<String, Box<dyn ToolPolicyResolver>>,
 }
 
 impl ApprovalGate {
@@ -47,17 +55,53 @@ impl ApprovalGate {
         Self::with_global_resolvers(tool_policies, config, Vec::new())
     }
     pub fn with_global_resolvers(tool_policies: HashMap<String, ToolPolicy>, config: ApprovalConfig, global_resolvers: Vec<Box<dyn GlobalResolver>>) -> Self {
-        Self { tool_policies, config: Arc::new(parking_lot::RwLock::new(config)), global_resolvers }
+        Self { tool_policies, config: Arc::new(parking_lot::RwLock::new(config)), global_resolvers, dynamic_resolvers: HashMap::new() }
     }
     pub fn with_shared_config(tool_policies: HashMap<String, ToolPolicy>, config: Arc<parking_lot::RwLock<ApprovalConfig>>, global_resolvers: Vec<Box<dyn GlobalResolver>>) -> Self {
-        Self { tool_policies, config, global_resolvers }
+        Self { tool_policies, config, global_resolvers, dynamic_resolvers: HashMap::new() }
+    }
+    /// Construct a gate with both global resolvers and per-tool dynamic
+    /// resolvers. Used by `agent_runtime` to inject the
+    /// `ExecPolicyResolver` so structured exec with an allowed binary
+    /// runs without approval in `Manual` mode.
+    pub fn with_dynamic_resolvers(
+        tool_policies: HashMap<String, ToolPolicy>,
+        config: Arc<parking_lot::RwLock<ApprovalConfig>>,
+        global_resolvers: Vec<Box<dyn GlobalResolver>>,
+        dynamic_resolvers: HashMap<String, Box<dyn ToolPolicyResolver>>,
+    ) -> Self {
+        Self { tool_policies, config, global_resolvers, dynamic_resolvers }
     }
 
     pub fn evaluate(&self, call: &ToolCall<'_>) -> ApprovalDecision {
         let config = self.config.read();
+        // Phase 1: declared policy for the tool.
         let mut policy = self.tool_policies.get(call.tool).copied().unwrap_or(ToolPolicy::OnDemand);
+        // Phase 2: config-level tool overrides.
         if let Some(&override_p) = config.tool_overrides.get(call.tool) { policy = override_p; }
+        // Phase 2.5: per-tool dynamic resolver (e.g. ExecPolicyResolver).
+        // The resolver has per-call knowledge and replaces the base policy
+        // when it returns `Some(_)`. This lets ExecPolicyResolver relax a
+        // declared `OnDemand` policy to `Auto` for a specific allowed
+        // binary. The pipeline-wide blacklist (Phase 3) still max-merges
+        // on top, so it can always escalate back to `Always`.
+        //
+        // Invariant: `Always` is sticky. If the user explicitly demanded
+        // "always prompt for this tool" via a `tool_overrides` entry (or a
+        // Phase 1 declaration), the dynamic resolver must NOT relax it to
+        // `OnDemand`/`Auto` — that would silently bypass the user's intent.
+        if let Some(resolver) = self.dynamic_resolvers.get(call.tool) {
+            if let Some(p) = resolver.resolve(call.args) {
+                policy = if policy == ToolPolicy::Always {
+                    ToolPolicy::Always
+                } else {
+                    p
+                };
+            }
+        }
+        // Phase 3: pipeline-wide global resolvers (blacklist, audit, ...).
         for resolver in &self.global_resolvers { if let Some(p) = resolver.resolve(call) { policy = policy.max(p); } }
+        // Phase 4: mode × policy table.
         use {ApprovalMode::*, ToolPolicy::*};
         match (config.mode, policy) {
             (_, Auto) => ApprovalDecision::Allow,
@@ -167,6 +211,38 @@ mod tests {
         let args = json!({"mode": "shell", "command": "rm -rf /etc"});
         let rm_call = ToolCall { tool: "exec", binary: None, args: &args };
         assert!(matches!(g.evaluate(&rm_call), ApprovalDecision::RequireApproval { .. }));
+    }
+
+    // A user-set `Always` override must stay sticky across the dynamic
+    // resolver. The dynamic resolver is allowed to relax a declared
+    // `OnDemand` (e.g. ExecPolicyResolver returning `Auto` for an allowed
+    // binary) but must NOT relax an explicit `Always` — that would silently
+    // bypass the user's "always prompt" demand.
+    #[test]
+    fn always_override_sticks_across_dynamic_resolver() {
+        use super::super::resolver::ToolPolicyResolver;
+        let policies = default_tool_policy_map();
+        let mut overrides = HashMap::new();
+        overrides.insert("exec".to_string(), ToolPolicy::Always);
+        let config = Arc::new(parking_lot::RwLock::new(ApprovalConfig {
+            mode: AutoRun,
+            allow_list: vec![],
+            tool_overrides: overrides,
+        }));
+        // Always returns Auto — would relax an OnDemand, but not an Always.
+        struct AlwaysAuto;
+        impl ToolPolicyResolver for AlwaysAuto {
+            fn resolve(&self, _args: &serde_json::Value) -> Option<ToolPolicy> {
+                Some(ToolPolicy::Auto)
+            }
+        }
+        let mut dynamic = HashMap::new();
+        dynamic.insert("exec".to_string(), Box::new(AlwaysAuto) as Box<dyn ToolPolicyResolver>);
+        let g = ApprovalGate::with_dynamic_resolvers(policies, config, vec![], dynamic);
+        assert!(
+            matches!(g.evaluate(&call("exec", Some("curl"))), ApprovalDecision::RequireApproval { .. }),
+            "explicit Always must NOT be relaxed by the dynamic resolver"
+        );
     }
 
     #[test]
