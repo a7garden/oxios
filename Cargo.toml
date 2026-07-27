@@ -167,11 +167,11 @@ sqlite-memory = ["oxios-kernel/sqlite-memory"]
 embedding-gguf = ["oxios-kernel/embedding-gguf"]
 
 [dependencies]
-oxios-kernel = { version = "1.28.0", path = "crates/oxios-kernel", default-features = false }
+oxios-kernel = { version = "1.29.0", path = "crates/oxios-kernel", default-features = false }
 oxios-calendar = { version = "1.28.0", path = "crates/oxios-calendar" }
 oxios-markdown = { version = "1.28.0", path = "crates/oxios-markdown" }
 oxios-ouroboros = { version = "1.28.0", path = "crates/oxios-ouroboros" }
-oxios-gateway = { version = "1.28.0", path = "crates/oxios-gateway" }
+oxios-gateway = { version = "1.29.0", path = "crates/oxios-gateway" }
 oxi-sdk = { workspace = true }
 
 # RFC-026: optional deps gated by features (were separate crates)

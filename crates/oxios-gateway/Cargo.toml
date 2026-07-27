@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
 [dependencies]
-oxios-kernel = { version = "1.28.0", path = "../oxios-kernel", default-features = false, features = ["sqlite-memory"] }
+oxios-kernel = { version = "1.29.0", path = "../oxios-kernel", default-features = false, features = ["sqlite-memory"] }
 oxios-ouroboros = { version = "1.28.0", path = "../oxios-ouroboros" }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
