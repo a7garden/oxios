@@ -164,8 +164,16 @@ export const usePortalStore = create<PortalState>((set, get) => ({
   pushDocument: (path) => {
     const { stack } = get()
     const top = stack[stack.length - 1]
+    // Same doc on top → toggle off (peek).
     if (top?.type === 'document' && top.path === path) {
       set({ stack: stack.slice(0, -1) })
+      return
+    }
+    // Same doc deeper in the stack → re-surface it (truncate to that view)
+    // instead of pushing a duplicate. Matches toggleArtifact's dedup policy.
+    const existing = stack.findIndex((v) => v.type === 'document' && v.path === path)
+    if (existing >= 0) {
+      set({ stack: stack.slice(0, existing + 1) })
       return
     }
     set({

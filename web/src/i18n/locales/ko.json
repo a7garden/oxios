@@ -21,6 +21,13 @@
     "loading": "로드 중…",
     "filePreview": {
       "loading": "불러오는 중…"
+    },
+    "document": {
+      "edit": "지식 베이스에서 편집",
+      "editWarningTitle": "채팅 화면을 떠납니다",
+      "editWarningDesc": "이 문서를 편집하기 위해 채팅 화면을 떠나 지식 베이스로 이동합니다.",
+      "editConfirm": "이동",
+      "notFound": "문서를 찾을 수 없습니다. 삭제되었을 수 있습니다."
     }
   },
   "agentMonitor": {
@@ -454,7 +461,8 @@
       "newline": "줄바꿈",
       "mountBound": "이 세션에 연결됨"
     },
-    "emptyHint": "아래 최근 대화를 선택하거나, 새 대화를 입력해 시작하세요."
+    "emptyHint": "아래 최근 대화를 선택하거나, 새 대화를 입력해 시작하세요.",
+    "knowledgeOpen": "문서 보기"
   },
   "commandPalette": {
     "placeholder": "명령 검색 또는 메모 입력…",

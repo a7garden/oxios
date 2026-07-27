@@ -21,6 +21,13 @@
     "loading": "Loading…",
     "filePreview": {
       "loading": "Loading…"
+    },
+    "document": {
+      "edit": "Edit in Knowledge Base",
+      "editWarningTitle": "You’ll leave the chat",
+      "editWarningDesc": "Editing this document opens the Knowledge Base page and leaves the current chat screen.",
+      "editConfirm": "Go",
+      "notFound": "Document not found. It may have been deleted."
     }
   },
   "agentMonitor": {
@@ -454,7 +461,8 @@
       "removeAttachment": "Remove attachment",
       "newline": "new line",
       "mountBound": "Bound to this session"
-    }
+    },
+    "knowledgeOpen": "View document"
   },
   "commandPalette": {
     "placeholder": "Search commands or type a memo…",
@@ -1985,7 +1993,6 @@
     },
     "sectionAppearance": "Appearance",
     "appearanceDescription": "Theme mode and accent color customization",
-
     "systemAgents": {
       "system": "System Agents",
       "memory": "Memory Models",

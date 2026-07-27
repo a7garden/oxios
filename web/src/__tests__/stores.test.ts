@@ -14,6 +14,7 @@ import {
   useChatStore,
 } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'
+import { usePortalStore } from '@/stores/portal'
 import type { ChatMessage } from '@/types'
 
 describe('useAuthStore', () => {
@@ -1102,5 +1103,44 @@ describe('useChatStore reconnect (long-tail recovery)', () => {
     await vi.advanceTimersByTimeAsync(15_000)
     expect(useChatStore.getState().connected).toBe(true)
     expect(useChatStore.getState()._reconnectAttempts).toBe(0)
+  })
+})
+
+describe('usePortalStore pushDocument (saved-doc chip)', () => {
+  beforeEach(() => {
+    usePortalStore.setState({ stack: [] })
+  })
+
+  it('pushes a document view onto an empty stack', () => {
+    usePortalStore.getState().pushDocument('notes/foo.md')
+    const { stack } = usePortalStore.getState()
+    expect(stack).toHaveLength(1)
+    expect(stack[0]).toEqual({ type: 'document', path: 'notes/foo.md' })
+  })
+
+  it('toggles off when the same document is already on top (peek)', () => {
+    usePortalStore.getState().pushDocument('notes/foo.md')
+    usePortalStore.getState().pushDocument('notes/foo.md')
+    expect(usePortalStore.getState().stack).toHaveLength(0)
+  })
+
+  it('re-surfaces an existing deeper document instead of duplicating', () => {
+    // Stack: [docA, filePreview] — a non-document view is on top.
+    usePortalStore.getState().pushView({ type: 'document', path: 'a.md' })
+    usePortalStore.getState().pushView({ type: 'filePreview', path: 'other.txt', content: 'x' })
+    // The chip pushes docA again while the filePreview is on top.
+    usePortalStore.getState().pushDocument('a.md')
+    const { stack } = usePortalStore.getState()
+    // Truncated back to the original docA — no duplicate, filePreview popped.
+    expect(stack).toHaveLength(1)
+    expect(stack[0]).toEqual({ type: 'document', path: 'a.md' })
+  })
+
+  it('pushes a different document on top (stack navigation)', () => {
+    usePortalStore.getState().pushDocument('a.md')
+    usePortalStore.getState().pushDocument('b.md')
+    const { stack } = usePortalStore.getState()
+    expect(stack).toHaveLength(2)
+    expect(stack[1]).toEqual({ type: 'document', path: 'b.md' })
   })
 })

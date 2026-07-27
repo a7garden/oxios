@@ -11,13 +11,8 @@
 // content in via `updateFilePreviewContent`.
 
 import { useTranslation } from 'react-i18next'
-import ReactMarkdown from 'react-markdown'
-import rehypeHighlight from 'rehype-highlight'
-import rehypeRaw from 'rehype-raw'
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
-import remarkGfm from 'remark-gfm'
-import { cn } from '@/lib/utils'
 import type { PortalView } from '@/stores/portal'
+import { MarkdownPreview } from './markdown-preview'
 
 interface FilePreviewViewProps {
   view: Extract<PortalView, { type: 'filePreview' }>
@@ -69,25 +64,7 @@ export function FilePreviewView({ view }: FilePreviewViewProps) {
             <span className="ms-2">{t('portal.filePreview.loading')}</span>
           </div>
         ) : isMarkdown ? (
-          <div
-            className={cn(
-              'prose prose-sm dark:prose-invert max-w-none p-4',
-              // Keep markdown code blocks aligned with the surrounding monospace
-              // font so they blend with the code-mode preview used elsewhere.
-              '[&_code]:font-mono [&_code]:text-xs [&_pre]:bg-muted/40 [&_pre]:p-3',
-            )}
-          >
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[
-                [rehypeRaw, { allowDangerousHtml: true }],
-                [rehypeSanitize, defaultSchema],
-                rehypeHighlight,
-              ]}
-            >
-              {content ?? ''}
-            </ReactMarkdown>
-          </div>
+          <MarkdownPreview content={content ?? ''} className="p-4" />
         ) : (
           <pre className="h-full overflow-auto bg-muted/40 p-4 font-mono text-xs leading-relaxed">
             <code>{content ?? ''}</code>
