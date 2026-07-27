@@ -23,6 +23,7 @@ import { useMemorySemanticSearch } from '@/hooks/use-memory'
 import { useMounts } from '@/hooks/use-mounts'
 import { getInputHistory } from '@/lib/input-history-storage'
 import { cn } from '@/lib/utils'
+import { ApprovalModeSelector } from './approval-mode-selector'
 import { LiveActivityBar } from './live-activity-bar'
 import { ModelParamsPopover } from './model-params-popover'
 import { ModelPickerContainer } from './model-picker'
@@ -782,6 +783,7 @@ export function ChatInput({
               activeRole={activeRole}
               setActiveRole={setActiveRole}
             />
+            <ApprovalModeSelector />
             <input
               ref={fileInputRef}
               type="file"
