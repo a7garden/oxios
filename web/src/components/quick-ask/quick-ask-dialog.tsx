@@ -158,7 +158,7 @@ export function QuickAskDialog() {
               <ToolApprovalCard
                 toolName={activeToolApproval.toolName}
                 reason={activeToolApproval.reason}
-                onApprove={() => resolveToolApproval(activeToolApproval.id, true)}
+                onApprove={(remember) => resolveToolApproval(activeToolApproval.id, true, remember)}
                 onDeny={() => resolveToolApproval(activeToolApproval.id, false)}
               />
             )}

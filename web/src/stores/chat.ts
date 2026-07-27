@@ -156,7 +156,7 @@ interface ChatActions {
   /** Submit interview answers and send them as a message. */
   submitInterviewResponse: (answers: InterviewAnswer[]) => void
   /** Resolve a pending tool approval (RFC-017). */
-  resolveToolApproval: (id: string, approved: boolean) => Promise<void>
+  resolveToolApproval: (id: string, approved: boolean, remember?: boolean) => Promise<void>
   /** Handle an incoming WS chunk. */
   handleChunk: (chunk: StreamChunk) => void
 }
@@ -1493,7 +1493,7 @@ export const useChatStore = create<ChatStore>()(
         }))
       },
 
-      async resolveToolApproval(id: string, approved: boolean) {
+      async resolveToolApproval(id: string, approved: boolean, remember?: boolean) {
         const { activeToolApproval } = get()
         if (!activeToolApproval || activeToolApproval.id !== id) return
         // Record as resolved BEFORE the fetch so a concurrent WS replay of
@@ -1509,7 +1509,7 @@ export const useChatStore = create<ChatStore>()(
               'Content-Type': 'application/json',
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
-            body: JSON.stringify({ approved }),
+            body: JSON.stringify({ approved, ...(remember ? { remember: true } : {}) }),
           })
           if (!res.ok && res.status !== 404) {
             // 404 "not found or already resolved" is a benign idempotent

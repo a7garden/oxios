@@ -55,7 +55,7 @@ interface QuickAskState {
   send: (content: string) => void
   /** Cancel the in-flight stream and discard the queue. */
   cancel: () => void
-  resolveToolApproval: (id: string, approved: boolean) => Promise<void>
+  resolveToolApproval: (id: string, approved: boolean, remember?: boolean) => Promise<void>
   reset: () => void
   _drainPendingQueue: () => void
 }
@@ -242,7 +242,7 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
     set({ isStreaming: false, _ws: null, _pendingQueue: [] })
   },
 
-  resolveToolApproval: async (id, approved) => {
+  resolveToolApproval: async (id, approved, remember) => {
     // Record as resolved before the fetch so a WS replay cannot re-arm the
     // card with this id. 404 "already resolved" is benign (prior click,
     // replay re-arm, or the exec_tool 120 s timeout auto-denying it) — leave
@@ -255,7 +255,7 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
           'Content-Type': 'application/json',
           ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
         },
-        body: JSON.stringify({ approved }),
+        body: JSON.stringify({ approved, ...(remember ? { remember: true } : {}) }),
       })
       if (!res.ok && res.status !== 404) {
         console.warn('[quick-ask] tool approval respond failed:', res.status)

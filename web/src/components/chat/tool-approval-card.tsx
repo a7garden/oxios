@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { useApprovalConfig } from '@/hooks/use-approval-config'
 
 interface ToolApprovalCardProps {
   toolName: string
   reason: string
-  onApprove: () => void
+  onApprove: (remember: boolean) => void
   onDeny: () => void
   disabled?: boolean
 }
@@ -21,8 +24,13 @@ export function ToolApprovalCard({
   onDeny,
   disabled,
 }: ToolApprovalCardProps) {
-  const { t } = useTranslation()
-
+  const { t, i18n } = useTranslation()
+  const { data } = useApprovalConfig()
+  const { mode } = data ?? {}
+  const [remember, setRemember] = useState(false)
+  const rememberLabel = i18n.language?.startsWith('ko')
+    ? '이 도구는 다시 묻지 않기'
+    : 'Don\'t ask again for this tool'
   return (
     <div className="flex gap-3 my-1.5">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning text-warning-foreground">
@@ -43,18 +51,35 @@ export function ToolApprovalCard({
               {t('chat.toolApproval.description')}
             </p>
           </div>
-          <div className="flex justify-end gap-2 px-4 py-3 border-t">
-            <Button onClick={onDeny} variant="ghost" size="sm" disabled={disabled}>
-              {t('chat.toolApproval.deny')}
-            </Button>
-            <Button
-              onClick={onApprove}
-              size="sm"
-              disabled={disabled}
-              className="bg-success/90 hover:bg-success text-white"
-            >
-              {t('chat.toolApproval.approve')} ✅
-            </Button>
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+            {mode === 'allow-list' ? (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                <Checkbox
+                  checked={remember}
+                  onCheckedChange={(checked) => setRemember(checked === true)}
+                  disabled={disabled}
+                />
+                {rememberLabel}
+              </label>
+            ) : (
+              <span />
+            )}
+            <div className="flex justify-end gap-2">
+              <Button onClick={onDeny} variant="ghost" size="sm" disabled={disabled}>
+                {t('chat.toolApproval.deny')}
+              </Button>
+              <Button
+                onClick={() => {
+                  onApprove(mode === 'allow-list' && remember)
+                  setRemember(false)
+                }}
+                size="sm"
+                disabled={disabled}
+                className="bg-success/90 hover:bg-success text-white"
+              >
+                {t('chat.toolApproval.approve')} ✅
+              </Button>
+            </div>
           </div>
         </div>
       </div>
