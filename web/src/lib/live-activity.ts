@@ -1,4 +1,4 @@
-import type { ChatActivity, ToolCallContext } from '@/types'
+import type { ChatActivity, ChatBlock, ToolCallContext } from '@/types'
 
 /**
  * RFC-015 §4.3 — descriptor for the "current activity" header shown above the
@@ -62,6 +62,34 @@ export function deriveCurrentActivity(
       }
     }
     if (a.type === 'reasoning') {
+      return { kind: 'reasoning' }
+    }
+  }
+  return { kind: 'thinking' }
+}
+
+/**
+ * Block-stream variant of {@link deriveCurrentActivity}. Derives the live
+ * descriptor from a message's `blocks[]` (the single source of truth) by
+ * walking backwards for the most recent in-flight reasoning/tool block.
+ * Falls back to `thinking` when blocks are absent or all settled.
+ */
+export function deriveCurrentActivityFromBlocks(
+  blocks: readonly ChatBlock[] | undefined,
+): LiveActivityDescriptor {
+  if (!blocks || blocks.length === 0) return { kind: 'thinking' }
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const b = blocks[i]
+    if (!b) continue
+    if (b.type === 'tool' && b.status === 'loading') {
+      return {
+        kind: 'tool_running',
+        toolName: b.apiName,
+        progress: b.progress,
+        toolArgs: (b.arguments ?? {}) as Record<string, unknown>,
+      }
+    }
+    if (b.type === 'reasoning' && b.status === 'streaming') {
       return { kind: 'reasoning' }
     }
   }

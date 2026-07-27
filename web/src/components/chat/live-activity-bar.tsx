@@ -1,7 +1,7 @@
 import { Loader2, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { deriveCurrentActivity, describeLiveActivity } from '@/lib/live-activity'
+import { deriveCurrentActivity, deriveCurrentActivityFromBlocks, describeLiveActivity } from '@/lib/live-activity'
 import { useChatStore } from '@/stores/chat'
 
 const ELAPSED_THRESHOLD_MS = 2000
@@ -47,7 +47,9 @@ export function LiveActivityBar() {
 
   // Only the trailing assistant message carries this turn's activities/content.
   const lastAssistant = last?.role === 'assistant' ? last : undefined
-  const descriptor = deriveCurrentActivity(lastAssistant?.activities)
+  const descriptor = lastAssistant?.blocks?.length
+    ? deriveCurrentActivityFromBlocks(lastAssistant.blocks)
+    : deriveCurrentActivity(lastAssistant?.activities)
   const streamingText = !!(lastAssistant?.generating && (lastAssistant?.content ?? '').trim())
 
   let label: string

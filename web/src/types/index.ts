@@ -1,5 +1,6 @@
 // LobeHub-ported chat types (named versions; replace inline anonymous types below).
 import type {
+  ChatBlock,
   ChatError,
   ChatFileChunk,
   ChatFileItem,
@@ -10,6 +11,7 @@ import type {
 } from './chat'
 
 export type {
+  ChatBlock,
   ChatError,
   ChatErrorAttribution,
   ChatErrorSeverity,
@@ -25,6 +27,9 @@ export type {
   GroundingSearch,
   ImageCitationItem,
   ModelReasoning,
+  ReasoningBlock,
+  TextBlock,
+  ToolBlock,
   ToolRenderProps,
 } from './chat'
 
@@ -262,6 +267,11 @@ export interface ChatMessage {
   isToolCallGenerating?: boolean
   /** Whether this message is collapsed. */
   isCollapsed?: boolean
+  /** Block-stream transparency (2026-07-27): ordered reasoning/tool/text
+   *  blocks rendered as an interleaved timeline. Single source of truth;
+   *  legacy content/reasoning/toolCalls are derived from this during
+   *  transition. Absent on very-old messages (hydrated on load). */
+  blocks?: ChatBlock[]
 }
 
 // RFC-015: a single transparency activity entry shown in the chat timeline.

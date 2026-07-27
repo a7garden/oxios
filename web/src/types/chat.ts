@@ -108,6 +108,39 @@ export interface ChatToolPayload {
   tabId?: string
 }
 
+// ── Block-stream transparency (2026-07-27) ──────────────────────────────
+// A turn is an ordered array of blocks rendered as an interleaved timeline
+// (reason → tool → reason → tool → answer). Single source of truth; legacy
+// content/reasoning/toolCalls fields are derived from these during transition.
+
+/** A reasoning span, positioned at the point it occurred in the turn. */
+export interface ReasoningBlock {
+  type: 'reasoning'
+  /** Stable id: `r-${msgId}-${seq}` (seq = count of reasoning spans so far). */
+  id: string
+  text: string
+  status: 'streaming' | 'done'
+  /** 'compaction' for context-compaction summaries surfaced as reasoning. */
+  source?: 'thinking' | 'compaction'
+  startedAt: number
+  /** Consumed by the per-segment "· Xs" timer. */
+  durationMs?: number
+}
+
+/** A tool call positioned in the turn's execution order. Reuses ChatToolPayload. */
+export type ToolBlock = { type: 'tool' } & ChatToolPayload
+
+/** A text emission (preamble or terminal answer). */
+export interface TextBlock {
+  type: 'text'
+  /** Stable id: `t-${msgId}-${seq}`. */
+  id: string
+  text: string
+  streaming?: boolean
+}
+
+export type ChatBlock = ReasoningBlock | ToolBlock | TextBlock
+
 // ── Tool render types ──
 
 export interface ToolRenderProps {

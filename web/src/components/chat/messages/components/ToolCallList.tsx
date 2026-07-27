@@ -30,7 +30,7 @@ export function ToolCallList({ calls, defaultExpanded = false }: ToolCallListPro
   )
 }
 
-function ToolCallCard({
+export function ToolCallCard({
   call,
   defaultExpanded,
 }: {

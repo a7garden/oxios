@@ -19,8 +19,13 @@
 // See docs/designs/2026-07-21-lobehub-chat-port-design.md §6.2.
 
 import type { ChatMessage } from '@/types'
-import type { ChatError, ChatFileChunk, ChatToolPayload, ChatToolStatus } from '@/types/chat'
+import type { ChatBlock, ChatError, ChatFileChunk, ChatToolPayload, ChatToolStatus } from '@/types/chat'
 import type { ChatEvent, TokenUsage } from './ChatEvent'
+
+/** Total reasoning text budget per turn — bounds the persisted trace. On
+ *  overflow, further reasoning deltas are dropped (a marker is left on the
+ *  last reasoning block by the caller if desired). */
+const REASONING_BUDGET_BYTES = 16 * 1024
 
 export interface ProcessorResult {
   /** Partial ChatMessage patch to merge into the stored message. */
@@ -62,13 +67,25 @@ export class StreamProcessor {
   private lastUsage: TokenUsage | null = null
   private error: ChatError | null = null
   private stopped = false
+  // ── Block-stream transparency (single source of truth for the timeline) ──
+  private blocks: ChatBlock[] = []
+  private reasoningSeq = 0
+  private textSeq = 0
+  private reasoningBytes = 0
 
   constructor(messageId: string) {
     this.messageId = messageId
   }
 
-  /** Feed one ChatEvent. Returns incremental patch + lifecycle signals. */
+  /** Feed one ChatEvent. Returns incremental patch + lifecycle signals.
+   *  Always attaches the block-stream timeline (`blocks`) to the patch —
+   *  the single source of truth rendered by BlockStream. */
   handleEvent(ev: ChatEvent): ProcessorResult {
+    const result = this.handleEventInner(ev)
+    return { ...result, patch: { ...result.patch, blocks: [...this.blocks] } }
+  }
+
+  private handleEventInner(ev: ChatEvent): ProcessorResult {
     if (this.stopped && ev.kind !== 'stream.stop') {
       return { patch: {} }
     }
@@ -76,15 +93,17 @@ export class StreamProcessor {
     switch (ev.kind) {
       case 'text.delta':
         this.text += ev.text
+        this.appendText(ev.text)
         return { patch: { content: this.text, generating: true } }
 
       case 'reasoning.start':
-        this.beginReasoning()
+        this.openReasoning()
         return { patch: { isReasoning: true, generating: true } }
 
       case 'reasoning.delta': {
         if (!this.reasoningEverSeen) this.beginReasoning()
         this.reasoningText += ev.text
+        this.appendReasoning(ev.text)
         return {
           patch: {
             isReasoning: true,
@@ -100,6 +119,7 @@ export class StreamProcessor {
 
       case 'reasoning.end': {
         const duration = ev.durationMs ?? this.reasoningDuration()
+        this.closeReasoningBlock()
         return {
           patch: {
             isReasoning: false,
@@ -133,6 +153,8 @@ export class StreamProcessor {
             arguments: (typeof cur.arguments === 'string' ? cur.arguments : '') + ev.argsDelta,
           })
         }
+        this.closeReasoningBlock()
+        this.upsertToolBlock(this.tools.get(ev.toolCallId)!)
         return { patch: { toolCalls: this.toolsList(), ...this.closeReasoningIfOpen() } }
       }
 
@@ -147,6 +169,8 @@ export class StreamProcessor {
           ...(ev.tabId !== undefined ? { tabId: ev.tabId } : {}),
         }
         this.tools.set(ev.toolCallId, tool)
+        this.closeReasoningBlock()
+        this.upsertToolBlock(tool)
         return {
           patch: {
             toolCalls: this.toolsList(),
@@ -178,6 +202,7 @@ export class StreamProcessor {
           ...(ev.tabId !== undefined ? { tabId: ev.tabId } : {}),
         }
         this.tools.set(ev.toolCallId, next)
+        this.upsertToolBlock(next)
         return {
           patch: { toolCalls: this.toolsList() },
           activity: {
@@ -207,6 +232,7 @@ export class StreamProcessor {
           durationMs,
         }
         this.tools.set(ev.toolCallId, next)
+        this.upsertToolBlock(next)
         const allSettled = [...this.tools.values()].every(
           (t) => t.status === 'success' || t.status === 'error' || t.status === 'aborted',
         )
@@ -260,6 +286,7 @@ export class StreamProcessor {
       case 'stream.stop':
         this.stopped = true
         this.error = ev.error ?? null
+        this.closeAllBlocks()
         return {
           patch: {
             generating: false,
@@ -283,6 +310,7 @@ export class StreamProcessor {
     return {
       ...base,
       id: this.messageId,
+      blocks: [...this.blocks],
       content: this.text || base.content,
       reasoning:
         this.reasoningText || base.reasoning
@@ -340,6 +368,88 @@ export class StreamProcessor {
 
   private toolsList(): ChatToolPayload[] {
     return [...this.tools.values()]
+  }
+  // ── Block-stream helpers (2026-07-27) ───────────────────────────────
+  // Mutate `this.blocks` immutably (replace objects, never in-place) so the
+  // shallow clone `[...this.blocks]` returned in each patch yields new block
+  // refs and React detects per-block changes. Block ids are counter-assigned
+  // at open (stable across re-renders / rAF batches); tool blocks reuse
+  // tool_call_id.
+
+  private openReasoning(): void {
+    this.reasoningSeq++
+    this.blocks.push({
+      type: 'reasoning',
+      id: `r-${this.messageId}-${this.reasoningSeq}`,
+      text: '',
+      status: 'streaming',
+      startedAt: Date.now(),
+    })
+  }
+
+  private appendReasoning(text: string): void {
+    if (this.reasoningBytes >= REASONING_BUDGET_BYTES) return
+    const slice = text.slice(0, REASONING_BUDGET_BYTES - this.reasoningBytes)
+    if (!slice) return
+    this.reasoningBytes += slice.length
+    const i = this.blocks.length - 1
+    const last = this.blocks[i]
+    if (last && last.type === 'reasoning' && last.status === 'streaming') {
+      this.blocks[i] = { ...last, text: last.text + slice }
+    } else {
+      this.openReasoning()
+      const j = this.blocks.length - 1
+      const cur = this.blocks[j]
+      if (cur && cur.type === 'reasoning') this.blocks[j] = { ...cur, text: slice }
+    }
+  }
+
+  /** Close the trailing reasoning block if it is still streaming. */
+  private closeReasoningBlock(): void {
+    const i = this.blocks.length - 1
+    const last = this.blocks[i]
+    if (last && last.type === 'reasoning' && last.status === 'streaming') {
+      this.blocks[i] = { ...last, status: 'done', durationMs: Date.now() - last.startedAt }
+    }
+  }
+
+  /** Append text to the trailing text block, opening a new one (and closing
+   *  any open reasoning span) when the previous block isn't text. */
+  private appendText(text: string): void {
+    this.closeReasoningBlock()
+    const i = this.blocks.length - 1
+    const last = this.blocks[i]
+    if (last && last.type === 'text') {
+      this.blocks[i] = { ...last, text: last.text + text, streaming: true }
+    } else {
+      this.textSeq++
+      this.blocks.push({
+        type: 'text',
+        id: `t-${this.messageId}-${this.textSeq}`,
+        text,
+        streaming: true,
+      })
+    }
+  }
+
+  /** Insert or replace the tool block for `payload.id`, preserving stream position. */
+  private upsertToolBlock(payload: ChatToolPayload): void {
+    const i = this.blocks.findIndex((b) => b.type === 'tool' && b.id === payload.id)
+    const block: ChatBlock = { type: 'tool', ...payload }
+    if (i >= 0) this.blocks[i] = block
+    else this.blocks.push(block)
+  }
+
+  /** Mark every open block as done (called on stream.stop). */
+  private closeAllBlocks(): void {
+    for (let i = 0; i < this.blocks.length; i++) {
+      const b = this.blocks[i]!
+      if (b.type === 'text') {
+        this.blocks[i] = { ...b, streaming: false }
+      } else if (b.type === 'reasoning' && b.status === 'streaming') {
+        this.blocks[i] = { ...b, status: 'done', durationMs: Date.now() - b.startedAt }
+      }
+    }
   }
 }
 

@@ -34,6 +34,7 @@ import { useChatStore } from '@/stores/chat'
 import type { ChatMessage } from '@/types'
 import { ErrorCard } from './components/ErrorCard'
 import { MessageActionBar } from './components/MessageActionBar'
+import { BlockStream } from './components/BlockStream'
 import { ToolCallList } from './components/ToolCallList'
 import { useAssistantActions } from './useAssistantActions'
 
@@ -64,6 +65,7 @@ function AssistantMessageImpl({
   const hasContent = !!message.content
   const hasToolCalls = !!(message.toolCalls && message.toolCalls.length > 0)
   const hasChunks = !!(message.chunksList && message.chunksList.length > 0)
+  const hasBlocks = !!(message.blocks && message.blocks.length > 0)
   const isError = !!message.metadata?.isError
   const chatError = isError
     ? {
@@ -90,22 +92,28 @@ function AssistantMessageImpl({
       }
     >
       <div className="flex flex-col gap-2">
-        {hasReasoning && (
-          <Thinking
-            content={message.reasoning?.content ?? ''}
-            thinking={message.isReasoning ?? false}
-            duration={message.reasoning?.duration}
-          />
+        {hasBlocks ? (
+          <BlockStream blocks={message.blocks!} messageId={message.id} />
+        ) : (
+          <>
+            {hasReasoning && (
+              <Thinking
+                content={message.reasoning?.content ?? ''}
+                thinking={message.isReasoning ?? false}
+                duration={message.reasoning?.duration}
+              />
+            )}
+            {hasContent && !isError && (
+              <MarkdownMessage messageId={message.id} isStreaming={!!message.generating}>
+                {message.content}
+              </MarkdownMessage>
+            )}
+            {hasToolCalls && <ToolCallList calls={message.toolCalls!} />}
+          </>
         )}
         {hasSearch && message.search && <SearchGrounding search={message.search} />}
         {hasChunks && <FileChunksPlaceholder chunks={message.chunksList!} />}
-        {hasContent && !isError && (
-          <MarkdownMessage messageId={message.id} isStreaming={!!message.generating}>
-            {message.content}
-          </MarkdownMessage>
-        )}
         {isError && chatError && <ErrorCard error={chatError} onRetry={onRetry} />}
-        {hasToolCalls && <ToolCallList calls={message.toolCalls!} />}
         {hasContent && !isError && (
           <FollowUpChips
             content={message.content}

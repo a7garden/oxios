@@ -5,6 +5,7 @@ import type { ChatActivityEmission, ProcessorResult } from '@/lib/stream/StreamP
 import { StreamProcessor } from '@/lib/stream/StreamProcessor'
 import type {
   ChatActivity,
+  ChatBlock,
   ChatMessage,
   InterviewAnswer,
   InterviewQuestion,
@@ -518,6 +519,45 @@ function reasoningToActivity(
     content: record.content,
     reasoningSource: record.source,
   }
+}
+
+/**
+ * Hydrate the block-stream timeline for a message that lacks one (reopened
+ * history or pre-blocks persistence). Synthesizes an ordered block array from
+ * the legacy `activities[]` (tool_call + reasoning, already in arrival order)
+ * plus a trailing text block from `content`. Returns undefined when there is
+ * nothing to render so the caller can fall back. Pure.
+ */
+export function hydrateBlocks(msg: ChatMessage): ChatBlock[] | undefined {
+  if (msg.blocks && msg.blocks.length > 0) return msg.blocks
+  const blocks: ChatBlock[] = []
+  for (const a of msg.activities ?? []) {
+    if (a.type === 'tool_call') {
+      blocks.push({
+        type: 'tool',
+        id: a.toolCallId ?? a.id,
+        identifier: 'kernel',
+        apiName: a.toolName ?? 'unknown',
+        arguments: a.toolArgs ?? {},
+        status: a.isError ? 'error' : 'success',
+        ...(a.outputSummary != null ? { result: a.outputSummary } : {}),
+        ...(a.durationMs != null ? { durationMs: a.durationMs } : {}),
+      })
+    } else if (a.type === 'reasoning' && a.content) {
+      blocks.push({
+        type: 'reasoning',
+        id: a.id,
+        text: a.content,
+        status: 'done',
+        startedAt: Date.parse(a.timestamp) || Date.now(),
+        ...(a.reasoningSource ? { source: a.reasoningSource as 'thinking' | 'compaction' } : {}),
+      })
+    }
+  }
+  if (msg.content) {
+    blocks.push({ type: 'text', id: `${msg.id}-t1`, text: msg.content })
+  }
+  return blocks.length > 0 ? blocks : undefined
 }
 
 export function getToken(): string {
@@ -1274,6 +1314,7 @@ export const useChatStore = create<ChatStore>()(
             content: string
             source: string
             timestamp: string
+            segments?: Array<{ before_step: number; text: string }>
           }> = data.reasoning_records ?? []
 
           const maxLen = Math.max(userMsgs.length, agentMsgs.length)
@@ -1300,18 +1341,56 @@ export const useChatStore = create<ChatStore>()(
                   activitiesForThisTurn = trajectoryActivities
                 }
               }
-              // P4 (§7 persistence): restore reasoning record for this turn.
+              // P4 (§7 persistence) + block-stream P2: restore reasoning for
+              // this turn. When positioned segments exist, interleave them
+              // with the tool slice by `before_step` so a reopened session
+              // matches the live interleaved timeline; otherwise fall back to
+              // one consolidated reasoning activity.
               const reasoning = reasoningRecords[i]
-              if (reasoning?.content) {
-                const r = reasoningToActivity(reasoning, i)
-                activitiesForThisTurn = activitiesForThisTurn ? [...activitiesForThisTurn, r] : [r]
+              if (reasoning?.content || reasoning?.segments?.length) {
+                const tools = activitiesForThisTurn ?? []
+                const segs = reasoning?.segments
+                if (segs && segs.length > 0) {
+                  const byPos = new Map<number, string[]>()
+                  for (const s of segs) {
+                    const arr = byPos.get(s.before_step) ?? []
+                    arr.push(s.text)
+                    byPos.set(s.before_step, arr)
+                  }
+                  const ts = reasoning.timestamp
+                  const interleaved: ChatActivity[] = []
+                  for (let t = 0; t <= tools.length; t++) {
+                    const texts = byPos.get(t)
+                    if (texts) {
+                      for (const text of texts) {
+                        interleaved.push({
+                          id: `reason-${i}-${t}-${interleaved.length}`,
+                          type: 'reasoning',
+                          timestamp: ts,
+                          content: text,
+                          reasoningSource: reasoning.source || 'thinking',
+                        })
+                      }
+                    }
+                    if (t < tools.length) interleaved.push(tools[t]!)
+                  }
+                  activitiesForThisTurn = interleaved.length > 0 ? interleaved : undefined
+                } else if (reasoning?.content) {
+                  const r = reasoningToActivity(reasoning, i)
+                  activitiesForThisTurn = activitiesForThisTurn ? [...activitiesForThisTurn, r] : [r]
+                }
               }
-              messages.push({
+              const assistantMessage: ChatMessage = {
                 id: crypto.randomUUID(),
                 role: 'assistant',
                 content: agentMsg.content ?? '',
                 timestamp: agentMsg.timestamp ?? data.updated_at,
                 ...(activitiesForThisTurn ? { activities: activitiesForThisTurn } : null),
+              }
+              const hydratedBlocks = hydrateBlocks(assistantMessage)
+              messages.push({
+                ...assistantMessage,
+                ...(hydratedBlocks ? { blocks: hydratedBlocks } : null),
               })
             }
           }
