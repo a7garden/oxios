@@ -6,10 +6,10 @@
 
 mod commands;
 mod default_skills;
+mod embedded_web;
 mod kernel;
 mod surface;
 mod web_dist;
-mod embedded_web;
 
 // RFC-026: HTTP API server (merged from surface/oxios-web)
 #[cfg(feature = "web")]
