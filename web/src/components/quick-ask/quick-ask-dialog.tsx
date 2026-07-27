@@ -1,3 +1,4 @@
+import type { ChatBlock } from '@/types'
 import { useRouter } from '@tanstack/react-router'
 import { Check, Copy, MessageSquarePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -88,17 +89,23 @@ export function QuickAskDialog() {
       const res = await api.post<{ session_id: string }>('/api/chat/seed', {
         user_message: lastExchange.prompt,
         agent_response: lastExchange.reply,
-        trajectory_steps: lastExchange.activities
-          .filter((a) => a.type === 'tool_call')
-          .map((a) => ({
-            tool: a.toolName,
-            input: a.toolArgs,
-            output: a.outputSummary,
-            duration_ms: a.durationMs,
-          })),
-        reasoning_text: lastExchange.activities
-          .filter((a) => a.type === 'reasoning')
-          .map((a) => a.content)
+        trajectory_steps: lastExchange.blocks
+          .filter((b) => b.type === 'tool')
+          .map((b) => {
+            const tb = b as Extract<typeof b, { type: 'tool' }>
+            return {
+              tool: tb.apiName,
+              input: tb.arguments,
+              output: typeof tb.result === 'string' ? tb.result : undefined,
+              duration_ms: tb.durationMs,
+            }
+          }),
+        reasoning_text: lastExchange.blocks
+          .filter((b) => b.type === 'reasoning')
+          .map((b) => {
+            const rb = b as Extract<ChatBlock, { type: 'reasoning' }>
+            return rb.text
+          })
           .join('\n'),
         project_id: undefined,
       })

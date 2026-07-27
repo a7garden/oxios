@@ -5,9 +5,7 @@ import type {
   ChatFileChunk,
   ChatFileItem,
   ChatImageItem,
-  ChatToolPayload,
   GroundingSearch,
-
 } from './chat'
 
 export type {
@@ -236,8 +234,7 @@ export interface ChatMessage {
     /// Optional error category.
     errorKind?: 'quota_exceeded' | 'auth' | 'routing' | 'unknown'
   }
-  // RFC-015: real-time activity timeline.
-  activities?: ChatActivity[]
+
   totalInputTokens?: number
   totalOutputTokens?: number
   _interviewQuestions?: InterviewQuestion[]
@@ -253,9 +250,7 @@ export interface ChatMessage {
   imageList?: ChatImageItem[]
   /** Attached files. */
   fileList?: ChatFileItem[]
-  /** Structured tool calls (LobeHub-aligned, replaces toolName/toolArgs/toolResult).
-   *  Migration: legacy single-tool fields kept for one cycle; new code reads toolCalls[]. */
-  toolCalls?: ChatToolPayload[]
+
   /** Rich error with classification (LobeHub-ported). Renamed from chatError (which was unused). */
   error?: ChatError | null
   /** Whether this message is currently generating (streaming). */

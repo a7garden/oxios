@@ -58,6 +58,15 @@ export type ChatEvent =
   | { kind: 'grounding'; messageId: string; search: GroundingSearch }
   | { kind: 'file_chunks'; messageId: string; chunks: ChatFileChunk[] }
   | { kind: 'usage'; messageId: string; usage: TokenUsage }
+  | {
+      kind: 'memory'
+      messageId: string
+      action: 'recall' | 'store'
+      query?: string
+      count?: number
+      source?: string
+      timestamp: string
+    }
   | { kind: 'phase'; messageId?: string; phase: string; evaluationPassed?: boolean }
   | {
       kind: 'stream.stop'

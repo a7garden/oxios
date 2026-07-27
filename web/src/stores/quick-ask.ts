@@ -1,11 +1,9 @@
 import { create } from 'zustand'
-import type { ChatActivity, ChatMessage, StreamChunk } from '@/types'
+import type { ChatBlock, ChatMessage, StreamChunk } from '@/types'
 import {
-  appendActivityToMessages,
   applyContentChunk,
   applyTextFlush,
   buildWsUrl,
-  chunkToActivity,
   getToken,
   parseChunk,
   patchAssistantModel,
@@ -24,10 +22,11 @@ import {
 // Token batching uses the same RAF pattern as chat.ts so the UX is identical.
 // ---------------------------------------------------------------------------
 
+
 export interface CapturedExchange {
   prompt: string
   reply: string
-  activities: ChatActivity[]
+  blocks: ChatBlock[]
   model?: string
   sessionId?: string
 }
@@ -179,7 +178,7 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
       role: 'assistant',
       content: '',
       timestamp: now,
-      activities: [],
+
     }
     const baseMessages = [...messages, userMsg, assistantMsg]
     set({ messages: baseMessages, isStreaming: true, pendingModel: null })
@@ -362,24 +361,14 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
     case 'reasoning':
     case 'tool_start':
     case 'tool_progress':
-    case 'tool_end': {
+    case 'tool_end':
+    case 'memory':
+    case 'usage': {
       set((s) => ({
         messages: applyContentChunk(s.messages, chunk, {
           placeholderModel: s.pendingModel ?? s.quickAskModel ?? undefined,
         }).messages,
       }))
-      break
-    }
-    case 'memory':
-    case 'usage': {
-      const activity = chunkToActivity(chunk)
-      if (activity) {
-        set((s) => ({
-          messages: appendActivityToMessages(s.messages, activity, {
-            placeholderModel: s.pendingModel ?? s.quickAskModel ?? undefined,
-          }),
-        }))
-      }
       break
     }
     case 'tool_approval': {
@@ -421,12 +410,12 @@ function handleChunk(chunk: StreamChunk, set: SetFn, get: GetFn): void {
       if (assistant && user) {
         const prompt = user.content
         const reply = assistant.content
-        const activities = assistant.activities ?? []
+        const blocks = assistant.blocks ?? []
         set({
           lastExchange: {
             prompt,
             reply,
-            activities,
+            blocks,
             model: assistant.model ?? state.pendingModel ?? state.quickAskModel ?? undefined,
             sessionId: chunk.session_id,
           },

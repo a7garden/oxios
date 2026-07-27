@@ -13,23 +13,21 @@ interface ToolMessageProps {
 }
 
 function ToolMessageImpl({ message }: ToolMessageProps) {
-  // Prefer structured toolCalls; fall back to legacy single-tool fields.
-  const calls: ChatToolPayload[] =
-    message.toolCalls && message.toolCalls.length > 0
-      ? message.toolCalls
-      : message.toolName
-        ? [
-            {
-              id: message.id,
-              identifier: 'kernel',
-              apiName: message.toolName,
-              arguments: message.toolArgs,
-              result: message.toolResult,
-              status: 'success',
-              durationMs: message.toolDurationMs,
-            },
-          ]
-        : []
+  // role:'tool' messages carry the legacy single-tool fields; blocks are
+  // only built for assistant messages by the StreamProcessor.
+  const calls: ChatToolPayload[] = message.toolName
+    ? [
+        {
+          id: message.id,
+          identifier: 'kernel',
+          apiName: message.toolName,
+          arguments: message.toolArgs,
+          result: message.toolResult,
+          status: 'success',
+          durationMs: message.toolDurationMs,
+        },
+      ]
+    : []
 
   if (calls.length === 0) return null
   return (

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { adaptChunk } from '@/lib/stream/adapter'
-import type { ChatActivityEmission, ProcessorResult } from '@/lib/stream/StreamProcessor'
+import type { ProcessorResult } from '@/lib/stream/StreamProcessor'
 import { StreamProcessor } from '@/lib/stream/StreamProcessor'
 import type {
   ChatActivity,
@@ -12,7 +12,7 @@ import type {
   Project,
   StreamChunk,
   ToolCallContext,
-  ToolCallSummary,
+
 } from '@/types'
 import { useAuthStore } from './auth'
 
@@ -213,126 +213,7 @@ export function parseChunk(raw: unknown): StreamChunk {
   return { type: 'error', error: 'Malformed chunk' }
 }
 
-export function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
-  const ts = new Date().toISOString()
-  const baseId = (id?: string) => `${id ?? crypto.randomUUID()}`
-  switch (chunk.type) {
-    case 'tool_start':
-      return {
-        id: baseId(chunk.tool_call_id),
-        type: 'tool_call',
-        timestamp: ts,
-        toolName: chunk.tool_name,
-        toolCallId: chunk.tool_call_id,
-        toolArgs: chunk.tool_args,
-        isRunning: true,
-      }
-    case 'tool_progress':
-      return {
-        id: baseId(chunk.tool_call_id),
-        type: 'tool_call',
-        timestamp: ts,
-        toolName: chunk.tool_name,
-        toolCallId: chunk.tool_call_id,
-        progress: chunk.progress,
-        isRunning: true,
-        ...(chunk.tab_id ? { tabId: chunk.tab_id } : {}),
-        ...(chunk.context ? { context: chunk.context } : {}),
-      }
-    case 'tool_end':
-      return {
-        id: baseId(chunk.tool_call_id),
-        type: 'tool_call',
-        timestamp: ts,
-        toolName: chunk.tool_name,
-        toolCallId: chunk.tool_call_id,
-        outputSummary: chunk.output_summary,
-        durationMs: chunk.duration_ms,
-        isError: chunk.is_error,
-        isRunning: false,
-      }
-    case 'memory':
-      return {
-        id: baseId(`${chunk.action}-${chunk.query}`),
-        type: 'memory',
-        timestamp: ts,
-        memoryAction: chunk.action,
-        query: chunk.query,
-        count: chunk.count,
-        memorySource: chunk.source,
-      }
-    case 'reasoning':
-      return {
-        id: baseId(`reason-${chunk.content?.slice(0, 16)}`),
-        type: 'reasoning',
-        timestamp: ts,
-        content: chunk.content,
-        reasoningSource: chunk.source,
-      }
-    case 'usage':
-      return {
-        id: baseId(`usage-${Date.now()}`),
-        type: 'usage',
-        timestamp: ts,
-        inputTokens: chunk.input_tokens,
-        outputTokens: chunk.output_tokens,
-      }
-    default:
-      return null
-  }
-}
 
-/**
- * Merge `activity` into `existing` activities, returning a new array.
- *
- * Single source of truth for activity de-duplication/merging, shared by the
- * chat store and the one-shot QuickAsk store (quick-ask.ts) so the two
- * streaming paths cannot drift apart:
- *
- * - `tool_call` with a `toolCallId`: `tool_start`/`tool_progress`/`tool_end`
- *   all map to one `tool_call` activity per call — fold later fragments
- *   (progress/end) into the first by `toolCallId`.
- * - `reasoning` with a `reasoningSource`: reasoning streams as per-token
- *   deltas — concatenate onto the last activity when it shares the source,
- *   so one reasoning span renders as one "thinking" block (not one per token).
- * - otherwise: append a new activity.
- */
-export function mergeOrAppendActivity(
-  existing: ChatActivity[],
-  activity: ChatActivity,
-): ChatActivity[] {
-  if (activity.type === 'tool_call' && activity.toolCallId) {
-    const idx = existing.findIndex(
-      (a) => a.type === 'tool_call' && a.toolCallId === activity.toolCallId,
-    )
-    if (idx >= 0) {
-      const prior = existing[idx]!
-      const next = [...existing]
-      next[idx] = {
-        ...prior,
-        ...activity,
-        toolName: prior.toolName ?? activity.toolName,
-      }
-      return next
-    }
-  }
-  if (activity.type === 'reasoning') {
-    const lastAct = existing[existing.length - 1]
-    if (
-      lastAct &&
-      lastAct.type === 'reasoning' &&
-      lastAct.reasoningSource === activity.reasoningSource
-    ) {
-      const next = [...existing]
-      next[next.length - 1] = {
-        ...lastAct,
-        content: (lastAct.content ?? '') + (activity.content ?? ''),
-      }
-      return next
-    }
-  }
-  return [...existing, activity]
-}
 
 // ---------------------------------------------------------------------------
 // Shared message-transform primitives
@@ -398,24 +279,7 @@ export function appendTokenToMessages(
  * Append/merge an activity onto the last assistant message (creating a
  * placeholder if absent) and accumulate token counts. Pure. Delegates
  * dedup/merge to mergeOrAppendActivity. Used by both chat and quick-ask so the
- * activity timeline stays consistent across stores.
- */
-export function appendActivityToMessages(
-  messages: ChatMessage[],
-  activity: ChatActivity,
-  ctx: AssistantCtx,
-): ChatMessage[] {
-  const { messages: ensured, index } = ensureLastAssistant(messages, ctx)
-  const target = ensured[index]!
-  const next = ensured.slice()
-  next[index] = {
-    ...target,
-    activities: mergeOrAppendActivity(target.activities ?? [], activity),
-    totalInputTokens: (target.totalInputTokens ?? 0) + (activity.inputTokens ?? 0),
-    totalOutputTokens: (target.totalOutputTokens ?? 0) + (activity.outputTokens ?? 0),
-  }
-  return next
-}
+
 
 /**
  * Patch the model of the last assistant message; if no assistant message
@@ -454,11 +318,9 @@ export function finalizeStreamingMessage(messages: ChatMessage[]): ChatMessage[]
   const last = messages[messages.length - 1]
   if (last?.role !== 'assistant' || !last.generating) return messages
   // Blocks are the single source of truth; a turn with non-empty blocks is
-  // not empty even if `content`/legacy fields are blank.
+  // not empty even if `content` is blank.
   const isEmpty =
-    !(last.content ?? '').trim() &&
-    !(last.blocks && last.blocks.length > 0) &&
-    !(last.toolCalls && last.toolCalls.length > 0)
+    !(last.content ?? '').trim() && !(last.blocks && last.blocks.length > 0)
   if (isEmpty) return messages.slice(0, -1)
   return messages.map((m, i) =>
     i === messages.length - 1
@@ -495,65 +357,7 @@ function trajectoryToActivity(step: {
   }
 }
 
-function reasoningToActivity(
-  record: {
-    content: string
-    source: string
-    timestamp: string
-  },
-  turnIndex: number,
-): ChatActivity {
-  // P4 (§7 persistence): one reasoning record per turn, restored to the
-  // matching agent message's activities so the ThinkingPanel can render
-  // it above the answer. `id` derives from the turn index so the existing
-  // activity-card reasoning rendering paths work unchanged.
-  return {
-    id: `reasoning-restored-${turnIndex}`,
-    type: 'reasoning',
-    timestamp: record.timestamp,
-    content: record.content,
-    reasoningSource: record.source,
-  }
-}
 
-/**
- * Hydrate the block-stream timeline for a message that lacks one (reopened
- * history or pre-blocks persistence). Synthesizes an ordered block array from
- * the legacy `activities[]` (tool_call + reasoning, already in arrival order)
- * plus a trailing text block from `content`. Returns undefined when there is
- * nothing to render so the caller can fall back. Pure.
- */
-export function hydrateBlocks(msg: ChatMessage): ChatBlock[] | undefined {
-  if (msg.blocks && msg.blocks.length > 0) return msg.blocks
-  const blocks: ChatBlock[] = []
-  for (const a of msg.activities ?? []) {
-    if (a.type === 'tool_call') {
-      blocks.push({
-        type: 'tool',
-        id: a.toolCallId ?? a.id,
-        identifier: 'kernel',
-        apiName: a.toolName ?? 'unknown',
-        arguments: a.toolArgs ?? {},
-        status: a.isError ? 'error' : 'success',
-        ...(a.outputSummary != null ? { result: a.outputSummary } : {}),
-        ...(a.durationMs != null ? { durationMs: a.durationMs } : {}),
-      })
-    } else if (a.type === 'reasoning' && a.content) {
-      blocks.push({
-        type: 'reasoning',
-        id: a.id,
-        text: a.content,
-        status: 'done',
-        startedAt: Date.parse(a.timestamp) || Date.now(),
-        ...(a.reasoningSource ? { source: a.reasoningSource as 'thinking' | 'compaction' } : {}),
-      })
-    }
-  }
-  if (msg.content) {
-    blocks.push({ type: 'text', id: `${msg.id}-t1`, text: msg.content })
-  }
-  return blocks.length > 0 ? blocks : undefined
-}
 
 export function getToken(): string {
   return useAuthStore.getState().token || ''
@@ -866,31 +670,10 @@ function applyProcessorResult(
   if (result.patch && Object.keys(result.patch).length > 0) {
     next = next.map((m) => (m.id === msgId ? { ...m, ...result.patch } : m))
   }
-  // Apply activity emission (backward-compat with existing timeline rendering).
-  if (result.activity) {
-    const activity = emissionToActivity(msgId, result.activity)
-    if (activity) {
-      next = appendActivityToMessages(next, activity, ctx)
-    }
-  }
   return next
 }
 
-/** Convert a processor emission to a ChatActivity suitable for the timeline. */
-function emissionToActivity(msgId: string, em: ChatActivityEmission): ChatActivity | null {
-  return {
-    id:
-      em.type === 'tool_call' && em.toolCallId
-        ? `tool-${em.toolCallId}`
-        : `${em.type}-${msgId}-${Date.now()}`,
-    type: em.type,
-    timestamp: new Date().toISOString(),
-    // toolCallId must land on the activity itself so mergeOrAppendActivity
-    // can match by id (it reads activity.toolCallId, not em.toolCallId).
-    ...(em.toolCallId ? { toolCallId: em.toolCallId } : {}),
-    ...(em.patch as object),
-  } as ChatActivity
-}
+
 
 // ---------------------------------------------------------------------------
 // Pure content-chunk routing — shared with quick-ask.ts.
@@ -1326,66 +1109,79 @@ export const useChatStore = create<ChatStore>()(
             }
             if (agentMsg) {
               const range = agentMsg.trajectory_range
-              let activitiesForThisTurn: ChatActivity[] | undefined
-              if (range && trajectoryActivities.length > 0) {
-                activitiesForThisTurn = trajectoryActivities.slice(range.start, range.end)
-                if (activitiesForThisTurn.length === 0) activitiesForThisTurn = undefined
-              } else {
-                const isLast = i === maxLen - 1
-                if (isLast && trajectoryActivities.length > 0) {
-                  activitiesForThisTurn = trajectoryActivities
+              const blocks: ChatBlock[] = []
+              const toolSlice =
+                range && trajectoryActivities.length > 0
+                  ? trajectoryActivities.slice(range.start, range.end)
+                  : i === maxLen - 1 && trajectoryActivities.length > 0
+                    ? trajectoryActivities
+                    : []
+              // P4 (§7 persistence) + block-stream P2: restore the turn as
+              // an ordered ChatBlock[] directly from the trajectory slice
+              // and the reasoning segments (no ChatActivity intermediate).
+              const reasoning = reasoningRecords[i]
+              const segs = reasoning?.segments
+              const toolBlockCount = toolSlice.filter(
+                (a) => a.type === 'tool_call',
+              ).length
+              // Build a { before_step -> text[] } index of reasoning segments.
+              const byPos = new Map<number, string[]>()
+              if (segs && segs.length > 0) {
+                for (const s of segs) {
+                  const arr = byPos.get(s.before_step) ?? []
+                  arr.push(s.text)
+                  byPos.set(s.before_step, arr)
                 }
               }
-              // P4 (§7 persistence) + block-stream P2: restore reasoning for
-              // this turn. When positioned segments exist, interleave them
-              // with the tool slice by `before_step` so a reopened session
-              // matches the live interleaved timeline; otherwise fall back to
-              // one consolidated reasoning activity.
-              const reasoning = reasoningRecords[i]
-              if (reasoning?.content || reasoning?.segments?.length) {
-                const tools = activitiesForThisTurn ?? []
-                const segs = reasoning?.segments
-                if (segs && segs.length > 0) {
-                  const byPos = new Map<number, string[]>()
-                  for (const s of segs) {
-                    const arr = byPos.get(s.before_step) ?? []
-                    arr.push(s.text)
-                    byPos.set(s.before_step, arr)
+              let toolIdx = 0
+              for (let pos = 0; pos <= toolBlockCount; pos++) {
+                const texts = byPos.get(pos)
+                if (texts) {
+                  for (const text of texts) {
+                    blocks.push({
+                      type: 'reasoning',
+                      id: `reason-${i}-${pos}-${blocks.length}`,
+                      text,
+                      status: 'done',
+                      startedAt: Date.parse(reasoning!.timestamp) || Date.now(),
+                      ...(reasoning!.source
+                        ? { source: reasoning!.source as 'thinking' | 'compaction' }
+                        : {}),
+                    })
                   }
-                  const ts = reasoning.timestamp
-                  const interleaved: ChatActivity[] = []
-                  for (let t = 0; t <= tools.length; t++) {
-                    const texts = byPos.get(t)
-                    if (texts) {
-                      for (const text of texts) {
-                        interleaved.push({
-                          id: `reason-${i}-${t}-${interleaved.length}`,
-                          type: 'reasoning',
-                          timestamp: ts,
-                          content: text,
-                          reasoningSource: reasoning.source || 'thinking',
-                        })
-                      }
-                    }
-                    if (t < tools.length) interleaved.push(tools[t]!)
-                  }
-                  activitiesForThisTurn = interleaved.length > 0 ? interleaved : undefined
-                } else if (reasoning?.content) {
-                  const r = reasoningToActivity(reasoning, i)
-                  activitiesForThisTurn = activitiesForThisTurn ? [...activitiesForThisTurn, r] : [r]
                 }
+                while (toolIdx < toolSlice.length) {
+                  const a = toolSlice[toolIdx]!
+                  if (a.type !== 'tool_call') {
+                    toolIdx++
+                    continue
+                  }
+                  blocks.push({
+                    type: 'tool',
+                    id: a.toolCallId ?? a.id,
+                    identifier: 'kernel',
+                    apiName: a.toolName ?? 'unknown',
+                    arguments: a.toolArgs ?? {},
+                    status: a.isError ? 'error' : 'success',
+                    ...(a.outputSummary != null ? { result: a.outputSummary } : {}),
+                    ...(a.durationMs != null ? { durationMs: a.durationMs } : {}),
+                  })
+                  toolIdx++
+                  break
+                }
+              }
+              if (agentMsg.content) {
+                blocks.push({ type: 'text', id: `t-${i}-1`, text: agentMsg.content })
               }
               const assistantMessage: ChatMessage = {
                 id: crypto.randomUUID(),
                 role: 'assistant',
                 content: agentMsg.content ?? '',
                 timestamp: agentMsg.timestamp ?? data.updated_at,
-                ...(activitiesForThisTurn ? { activities: activitiesForThisTurn } : null),
               }
-              const hydratedBlocks = hydrateBlocks(assistantMessage)
               messages.push({
                 ...assistantMessage,
-                ...(hydratedBlocks ? { blocks: hydratedBlocks } : null),
+                ...(blocks.length > 0 ? { blocks } : null),
               })
             }
           }
@@ -1678,14 +1474,17 @@ export const useChatStore = create<ChatStore>()(
           }
 
           // ── RFC-015 chat transparency chunks ──
+          // ── RFC-015 chat transparency chunks (block-stream source of truth) ──
           case 'tool_start':
           case 'tool_progress':
           case 'tool_end':
           case 'tool_call_delta':
-          case 'reasoning': {
-            // Phase 1: route through StreamProcessor (toolCalls[], reasoning,
-            // generating state) for first-class fields; processor also emits
-            // backward-compat activity entries for the timeline.
+          case 'reasoning':
+          case 'memory':
+          case 'usage': {
+            // Route through StreamProcessor so the single source of truth
+            // (`blocks`) is built incrementally and the patch carries the
+            // latest `blocks` for the message.
             // Ensure an assistant message exists. A reasoning model streams
             // reasoning BEFORE the first token, so without this the opening
             // reasoning/tool deltas would be dropped (no message to attach
@@ -1712,18 +1511,6 @@ export const useChatStore = create<ChatStore>()(
               }))
               if (result.finished) streamProcessors.delete(msgId)
             }
-            break
-          }
-
-          case 'memory':
-          case 'usage': {
-            const activity = chunkToActivity(chunk)
-            if (!activity) break
-            set((s) => ({
-              messages: appendActivityToMessages(s.messages, activity, {
-                placeholderModel: s.pendingModel ?? s.activeModelId,
-              }),
-            }))
             break
           }
 
@@ -1827,35 +1614,6 @@ export const useChatStore = create<ChatStore>()(
             set((s) => {
               const updated = [...s.messages]
 
-              // Convert tool_calls from done chunk into ChatActivity entries
-              // (same shape as loadSession's trajectoryToActivity). These are
-              // used as a fallback when RFC-015 real-time events didn't arrive.
-              const doneActivities: ChatActivity[] = (
-                Array.isArray(toolCalls) ? toolCalls : []
-              ).map((tc: ToolCallSummary, i: number) => ({
-                id: `done-tc-${i}`,
-                type: 'tool_call' as const,
-                timestamp: new Date().toISOString(),
-                toolName: tc.tool_name ?? tc.tool,
-                toolCallId: `done-${i}`,
-                toolArgs:
-                  typeof tc.input === 'string'
-                    ? (() => {
-                        try {
-                          return JSON.parse(tc.input)
-                        } catch {
-                          return undefined
-                        }
-                      })()
-                    : undefined,
-                outputSummary:
-                  typeof tc.output === 'string'
-                    ? tc.output
-                    : JSON.stringify(tc.output ?? '', null, 2),
-                durationMs: tc.duration_ms,
-                isError: false,
-                isRunning: false,
-              }))
 
               // Find the last assistant message to attach metadata.
               // If none exists yet (e.g. a task that only ran tools with
@@ -1872,7 +1630,6 @@ export const useChatStore = create<ChatStore>()(
                   content: '',
                   timestamp: new Date().toISOString(),
                   model: get().pendingModel ?? get().activeModelId ?? undefined,
-                  activities: doneActivities.length > 0 ? doneActivities : undefined,
                   metadata: {
                     phase,
                     evaluation_passed: evaluationPassed,
@@ -1891,28 +1648,9 @@ export const useChatStore = create<ChatStore>()(
               const idx = updated.length - 1 - lastAssistantIdx
               const target = updated[idx]
               if (target) {
-                // Merge done activities into existing ones, skipping
-                // duplicates already added by RFC-015 real-time events.
-                // Done activities are a fallback — only keep them when
-                // no real-time activities with matching toolName exist.
-                const existingActivities = target.activities ?? []
-                const realTimeNames = new Set(
-                  existingActivities
-                    .filter(
-                      (a) =>
-                        a.type === 'tool_call' && a.toolCallId && !a.toolCallId.startsWith('done-'),
-                    )
-                    .map((a) => a.toolName),
-                )
-                const newActivities = doneActivities.filter((a) => !realTimeNames.has(a.toolName))
-
                 updated[idx] = {
                   ...target,
                   id: target.id ?? crypto.randomUUID(),
-                  activities:
-                    existingActivities.length > 0 || newActivities.length > 0
-                      ? [...existingActivities, ...newActivities]
-                      : undefined,
                   metadata: {
                     phase,
                     evaluation_passed: evaluationPassed,

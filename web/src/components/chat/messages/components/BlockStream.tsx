@@ -38,11 +38,31 @@ export const BlockStream = memo(function BlockStream({ blocks, messageId }: Bloc
           // ChatToolPayload prop (the discriminator is structurally compatible).
           return <ToolCallCard key={b.id} call={b} defaultExpanded={false} />
         }
-        return (
-          <MarkdownMessage key={b.id} messageId={messageId} isStreaming={!!b.streaming}>
-            {b.text}
-          </MarkdownMessage>
-        )
+        if (b.type === 'text') {
+          return (
+            <MarkdownMessage key={b.id} messageId={messageId} isStreaming={!!b.streaming}>
+              {b.text}
+            </MarkdownMessage>
+          )
+        }
+        if (b.type === 'memory') {
+          // Memory events are surfaced by the LiveActivityBar; the
+          // in-timeline card is intentionally minimal so it doesn't compete
+          // with the reasoning/tool call flow-of-thought.
+          return (
+            <div
+              key={b.id}
+              className="rounded-md border border-border/40 bg-muted/20 px-2.5 py-1.5 text-xs text-muted-foreground"
+              data-memory-action={b.action}
+            >
+              {b.action === 'store'
+                ? `Memory stored${b.count != null ? ` (${b.count})` : ''}`
+                : `Memory recall${b.query ? `: ${b.query}` : ''}${b.count != null ? ` (${b.count})` : ''}`}
+            </div>
+          )
+        }
+        // usage
+        return null
       })}
     </div>
   )

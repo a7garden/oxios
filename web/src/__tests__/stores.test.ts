@@ -4,12 +4,9 @@ import {
   __clearAuthCacheForTesting,
   __clearResolvedApprovalIdsForTesting,
   __clearStreamProcessorsForTesting,
-  appendActivityToMessages,
   appendTokenToMessages,
-  chunkToActivity,
   ensureLastAssistant,
   finalizeStreamingMessage,
-  mergeOrAppendActivity,
   patchAssistantModel,
   useChatStore,
 } from '@/stores/chat'
@@ -96,7 +93,7 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     })
   })
 
-  it('tool_start appends a tool_call activity', () => {
+  it('tool_start appends a tool block (P3 block-stream)', () => {
     useChatStore.getState().handleChunk({
       type: 'tool_start',
       tool_name: 'read_file',
@@ -104,15 +101,15 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       tool_args: { path: '/x' },
     })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.activities).toHaveLength(1)
-    expect(last.activities![0]).toMatchObject({
-      type: 'tool_call',
-      toolName: 'read_file',
-      toolCallId: 'c1',
+    expect(last.blocks?.filter((b) => b.type === 'tool')).toHaveLength(1)
+    expect(last.blocks?.find((b) => b.type === 'tool')).toMatchObject({
+      type: 'tool',
+      apiName: 'read_file',
+      id: 'c1',
     })
   })
 
-  it('tool_end attaches duration and output to the same tool_call', () => {
+  it('tool_end attaches duration and output to the same tool block', () => {
     useChatStore.getState().handleChunk({
       type: 'tool_start',
       tool_name: 'bash',
@@ -128,19 +125,19 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       output_summary: 'ok',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    // tool_end collapses into the same tool_call (no duplicate activity).
-    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
-    expect(toolActivities).toHaveLength(1)
-    expect(toolActivities[0]).toMatchObject({
-      type: 'tool_call',
-      toolName: 'bash',
-      toolCallId: 'c1',
+    // tool_end collapses into the same tool block (no duplicate).
+    const tools = last.blocks?.filter((b) => b.type === 'tool') ?? []
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({
+      type: 'tool',
+      id: 'c1',
+      apiName: 'bash',
       durationMs: 50,
-      outputSummary: 'ok',
+      result: 'ok',
     })
   })
 
-  it('tool_start marks the tool_call as running', () => {
+  it('tool_start marks the tool block as loading', () => {
     useChatStore.getState().handleChunk({
       type: 'tool_start',
       tool_name: 'browse',
@@ -148,16 +145,14 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       tool_args: {},
     })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.activities![0]).toMatchObject({
-      type: 'tool_call',
-      toolName: 'browse',
-      toolCallId: 'c1',
-      isRunning: true,
+    expect(last.blocks?.find((b) => b.type === 'tool')).toMatchObject({
+      type: 'tool',
+      id: 'c1',
+      status: 'loading',
     })
   })
 
-  it('tool_progress updates the existing tool_call in place (RFC-015 v0.12)', () => {
-    // Start a tool, then stream a progress update.
+  it('tool_progress updates the existing tool block in place (RFC-015 v0.12)', () => {
     useChatStore.getState().handleChunk({
       type: 'tool_start',
       tool_name: 'browse',
@@ -172,25 +167,22 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       tab_id: 'tab-abc-123',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    // Progress must merge into the existing tool_call (not append a new one).
-    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
-    expect(toolActivities).toHaveLength(1)
-    expect(toolActivities[0]).toMatchObject({
-      type: 'tool_call',
-      toolName: 'browse',
-      toolCallId: 'c1',
+    const tools = last.blocks?.filter((b) => b.type === 'tool') ?? []
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({
+      type: 'tool',
+      id: 'c1',
       progress: 'navigating to example.com',
-      isRunning: true,
       tabId: 'tab-abc-123',
     })
     // Original toolArgs from tool_start are preserved across the merge.
-    expect(toolActivities[0]!.toolArgs).toEqual({ url: 'https://example.com' })
+    expect((tools[0] as { arguments: unknown }).arguments).toEqual({ url: 'https://example.com' })
   })
 
-  it('tool_progress chunk without tab_id omits tabId on the activity', () => {
-    // Legacy oxi-agent versions don't emit tab_id; the resulting activity
+  it('tool_progress chunk without tab_id omits tabId on the tool block', () => {
+    // Legacy oxi-agent versions don't emit tab_id; the resulting tool block
     // must not have tabId at all (not tabId: undefined), so the frontend
-    // ActivityCard doesn't render a badge.
+    // doesn't render a badge.
     useChatStore.getState().handleChunk({
       type: 'tool_start',
       tool_name: 'browse',
@@ -204,11 +196,11 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       progress: 'step 1',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
-    expect(toolActivities).toHaveLength(1)
-    expect(toolActivities[0]!.tabId).toBeUndefined()
+    const tools = last.blocks?.filter((b) => b.type === 'tool') ?? []
+    expect(tools).toHaveLength(1)
+    expect((tools[0] as { tabId?: string }).tabId).toBeUndefined()
     // Defensive: the key should not even be present on the object literal.
-    expect('tabId' in toolActivities[0]!).toBe(false)
+    expect('tabId' in (tools[0] as object)).toBe(false)
   })
 
   it('tool_call_delta accumulates partial args before tool_start (oxi 0.58+)', () => {
@@ -225,15 +217,15 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       args_delta: 'p/foo"}',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    // A placeholder toolCall exists with accumulated raw-JSON args.
-    expect(last.toolCalls).toHaveLength(1)
-    expect(last.toolCalls![0]).toMatchObject({
+    // A placeholder tool block exists with accumulated raw-JSON args.
+    const tools = last.blocks?.filter((b) => b.type === 'tool') ?? []
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({
+      type: 'tool',
       id: 'c1',
       apiName: '(constructing…)',
     })
-    expect(last.toolCalls![0]!.arguments).toBe('{"path": "/tmp/foo"}')
-    // No activity yet — tool.start hasn't arrived.
-    expect(last.activities ?? []).toHaveLength(0)
+    expect((tools[0] as { arguments: unknown }).arguments).toBe('{"path": "/tmp/foo"}')
   })
 
   it('tool_call_delta placeholder is replaced by tool_start', () => {
@@ -249,19 +241,14 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       tool_args: { q: 'hi' },
     })
     const last = useChatStore.getState().messages.at(-1)!
-    // The placeholder is replaced by the real tool (parsed args + name).
-    expect(last.toolCalls).toHaveLength(1)
-    expect(last.toolCalls![0]).toMatchObject({
+    const tools = last.blocks?.filter((b) => b.type === 'tool') ?? []
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({
+      type: 'tool',
       id: 'c1',
       apiName: 'web_search',
     })
-    expect(last.toolCalls![0]!.arguments).toEqual({ q: 'hi' })
-    // tool.start creates the activity.
-    expect(last.activities).toHaveLength(1)
-    expect(last.activities![0]).toMatchObject({
-      type: 'tool_call',
-      toolName: 'web_search',
-    })
+    expect((tools[0] as { arguments: unknown }).arguments).toEqual({ q: 'hi' })
   })
 
   it('subsequent tool_progress replaces the prior progress text', () => {
@@ -284,12 +271,12 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       progress: 'step 2',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
-    expect(toolActivities).toHaveLength(1)
-    expect(toolActivities[0]!.progress).toBe('step 2')
+    const tools = last.blocks?.filter((b) => b.type === 'tool') ?? []
+    expect(tools).toHaveLength(1)
+    expect((tools[0] as { progress?: string }).progress).toBe('step 2')
   })
 
-  it('tool_end clears isRunning on the matching tool_call', () => {
+  it('tool_end marks the matching tool block success', () => {
     useChatStore.getState().handleChunk({
       type: 'tool_start',
       tool_name: 'browse',
@@ -305,16 +292,16 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       output_summary: 'done',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
-    expect(toolActivities).toHaveLength(1)
-    expect(toolActivities[0]).toMatchObject({
-      type: 'tool_call',
-      toolCallId: 'c1',
-      isRunning: false,
+    const tools = last.blocks?.filter((b) => b.type === 'tool') ?? []
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({
+      type: 'tool',
+      id: 'c1',
+      status: 'success',
     })
   })
 
-  it('memory recall appends a memory activity', () => {
+  it('memory recall appends a memory block', () => {
     useChatStore.getState().handleChunk({
       type: 'memory',
       action: 'recall',
@@ -323,16 +310,19 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       source: 'warm',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.activities![0]).toMatchObject({
+    expect(last.blocks?.find((b) => b.type === 'memory')).toMatchObject({
       type: 'memory',
-      memoryAction: 'recall',
+      action: 'recall',
       query: 'rust errors',
       count: 3,
-      memorySource: 'warm',
+      source: 'warm',
     })
   })
 
-  it('usage accumulates input/output tokens on the assistant message', () => {
+  it('usage accumulates input/output tokens via UsageBlocks', () => {
+    // Each `usage` chunk overwrites the last UsageBlock (provider sends
+    // cumulative totals). The chat store derives `totalInputTokens` /
+    // `totalOutputTokens` from the final UsageBlock.
     useChatStore.getState().handleChunk({
       type: 'usage',
       input_tokens: 100,
@@ -344,8 +334,8 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       output_tokens: 20,
     })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.totalInputTokens).toBe(150)
-    expect(last.totalOutputTokens).toBe(50)
+    expect(last.totalInputTokens).toBe(50)
+    expect(last.totalOutputTokens).toBe(20)
   })
 
   it('reasoning populates a positioned reasoning block (P2 block-stream)', () => {
@@ -409,7 +399,7 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       expect(reasoning.status).toBe('done')
       expect(reasoning.text).toBe('Let me try a search. Querying…')
     }
-    expect(last.toolCalls).toHaveLength(1)
+    expect(last.blocks?.filter((b) => b.type === 'tool')).toHaveLength(1)
   })
 
   it('token chunk does not add an activity', async () => {
@@ -418,7 +408,7 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     const last = useChatStore.getState().messages.at(-1)!
     expect(last.content).toBe('hello')
-    expect(last.activities ?? []).toEqual([])
+    expect(last.blocks?.filter((b) => b.type !== 'text') ?? []).toHaveLength(0)
   })
 
   it('mixed stream populates all first-class fields end-to-end (Phase 1+2 contract)', async () => {
@@ -459,8 +449,10 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     const reasoning = last.blocks?.find((b) => b.type === 'reasoning')
     if (reasoning?.type === 'reasoning') expect(reasoning.text).toBe('Thinking about it…')
     // Structured toolCalls[] with full lifecycle.
-    expect(last.toolCalls).toHaveLength(1)
-    expect(last.toolCalls![0]).toMatchObject({
+    const tools = last.blocks?.filter((b) => b.type === 'tool') ?? []
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({
+      type: 'tool',
       apiName: 'read_file',
       status: 'success',
       durationMs: 42,
@@ -489,7 +481,7 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     const state = useChatStore.getState()
     expect(state.isStreaming).toBe(false)
     const last = state.messages.at(-1)!
-    expect(last.activities).toHaveLength(1)
+    expect(last.blocks?.filter((b) => b.type === 'tool')).toHaveLength(1)
     expect(last.metadata?.phase).toBe('execute')
   })
 
@@ -562,88 +554,7 @@ describe('useChatStore handleChunk (RFC-015)', () => {
   })
 })
 
-// mergeOrAppendActivity is the single pure helper both the chat store and the
-// one-shot QuickAsk store route activity append/merge through. Testing it
-// directly guards the Cmd+J path (which has no store-level tests) and prevents
-// the two stores from drifting apart again.
-describe('mergeOrAppendActivity (shared by chat + quick-ask stores)', () => {
-  const act = (chunk: Parameters<typeof chunkToActivity>[0]) => chunkToActivity(chunk)!
 
-  it('folds tool_start/progress/end into one tool_call by toolCallId', () => {
-    const start = act({ type: 'tool_start', tool_name: 'bash', tool_call_id: 'c1', tool_args: {} })
-    const progress = act({
-      type: 'tool_progress',
-      tool_name: 'bash',
-      tool_call_id: 'c1',
-      progress: 'halfway',
-    })
-    const end = act({
-      type: 'tool_end',
-      tool_name: 'bash',
-      tool_call_id: 'c1',
-      output_summary: 'ok',
-      duration_ms: 9,
-      is_error: false,
-    })
-
-    let activities = mergeOrAppendActivity([], start)
-    activities = mergeOrAppendActivity(activities, progress)
-    activities = mergeOrAppendActivity(activities, end)
-
-    expect(activities.filter((a) => a.type === 'tool_call')).toHaveLength(1)
-    expect(activities[0]).toMatchObject({
-      type: 'tool_call',
-      toolCallId: 'c1',
-      progress: 'halfway',
-      outputSummary: 'ok',
-      durationMs: 9,
-      isRunning: false,
-    })
-  })
-
-  it('keeps distinct toolCallIds as separate activities', () => {
-    const a = act({ type: 'tool_start', tool_name: 'read', tool_call_id: 'c1', tool_args: {} })
-    const b = act({ type: 'tool_start', tool_name: 'write', tool_call_id: 'c2', tool_args: {} })
-    expect(mergeOrAppendActivity([a], b)).toHaveLength(2)
-  })
-
-  it('concatenates consecutive same-source reasoning deltas', () => {
-    const d1 = act({ type: 'reasoning', content: 'Thi', source: 'thinking' })
-    const d2 = act({ type: 'reasoning', content: 's is', source: 'thinking' })
-    const d3 = act({ type: 'reasoning', content: ' fine', source: 'thinking' })
-    const activities = mergeOrAppendActivity(mergeOrAppendActivity([d1], d2), d3)
-    expect(activities).toHaveLength(1)
-    expect(activities[0]).toMatchObject({
-      type: 'reasoning',
-      content: 'This is fine',
-      reasoningSource: 'thinking',
-    })
-  })
-
-  it('starts a new reasoning activity when the source changes', () => {
-    const a = act({ type: 'reasoning', content: 'thinking…', source: 'thinking' })
-    const b = act({ type: 'reasoning', content: 'compacting…', source: 'compaction' })
-    const activities = mergeOrAppendActivity([a], b)
-    expect(activities).toHaveLength(2)
-    expect(activities[1]).toMatchObject({ content: 'compacting…', reasoningSource: 'compaction' })
-  })
-
-  it('appends a tool_call after a reasoning span (no cross-type merge)', () => {
-    const r = act({ type: 'reasoning', content: 'hmm', source: 'thinking' })
-    const t = act({ type: 'tool_start', tool_name: 'bash', tool_call_id: 'c1', tool_args: {} })
-    expect(mergeOrAppendActivity([r], t)).toHaveLength(2)
-  })
-
-  it('does not mutate the input array', () => {
-    const a = act({ type: 'reasoning', content: 'x', source: 'thinking' })
-    const b = act({ type: 'reasoning', content: 'y', source: 'thinking' })
-    const input = [a]
-    const out = mergeOrAppendActivity(input, b)
-    expect(input).toHaveLength(1)
-    expect(input[0]).toBe(a)
-    expect(out).not.toBe(input)
-  })
-})
 
 // The message-transform primitives route every chunk through a single shared
 // path in chat.ts; both the chat store and the quick-ask store call them, so
@@ -689,29 +600,6 @@ describe('message-transform primitives (shared by chat + quick-ask stores)', () 
     expect(appendTokenToMessages(input, '', ctx)).toBe(input)
   })
 
-  it('appendActivityToMessages merges the activity and accumulates token counts', () => {
-    const usage = chunkToActivity({ type: 'usage', input_tokens: 10, output_tokens: 5 })!
-    const out = appendActivityToMessages([assistant({ content: 'x' })], usage, ctx)
-    expect(out[0]!.activities).toHaveLength(1)
-    expect(out[0]!.totalInputTokens).toBe(10)
-    expect(out[0]!.totalOutputTokens).toBe(5)
-  })
-
-  it('appendActivityToMessages creates a placeholder when no assistant exists', () => {
-    // Use tool_start — a chunk type that chunkToActivity actually maps to
-    // a ChatActivity. (Previously used `phase`, but that case was never
-    // wired up in chunkToActivity, so the conversion returned null and the
-    // non-null assertion (`!`) hid the bug.)
-    const toolStart = chunkToActivity({
-      type: 'tool_start',
-      tool_name: 'bash',
-      tool_call_id: 'call-1',
-      tool_args: { cmd: 'ls' },
-    })!
-    const out = appendActivityToMessages([userMsg()], toolStart, ctx)
-    expect(out).toHaveLength(2)
-    expect(out[1]!.activities).toHaveLength(1)
-  })
 
   it('patchAssistantModel patches the last assistant model', () => {
     const out = patchAssistantModel([assistant({ model: 'old' })], 'new')

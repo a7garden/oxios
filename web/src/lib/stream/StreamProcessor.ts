@@ -19,8 +19,8 @@
 // See docs/designs/2026-07-21-lobehub-chat-port-design.md §6.2.
 
 import type { ChatMessage } from '@/types'
-import type { ChatBlock, ChatError, ChatFileChunk, ChatToolPayload, ChatToolStatus } from '@/types/chat'
-import type { ChatEvent, TokenUsage } from './ChatEvent'
+import type { ChatBlock, ChatError, ChatToolPayload, ChatToolStatus, TextBlock } from '@/types/chat'
+import type { ChatEvent } from './ChatEvent'
 
 /** Total reasoning text budget per turn — bounds the persisted trace. On
  *  overflow, further reasoning deltas are dropped (a marker is left on the
@@ -32,19 +32,6 @@ export interface ProcessorResult {
   patch: Partial<ChatMessage>
   /** Set when the stream has terminated (stop event). Cleanup hint for store. */
   finished?: boolean
-  /** Side-effect activity emission — caller may push as ChatActivity for
-   *  backward-compat with existing timeline rendering (Phase 1 keeps activities
-   *  working alongside new toolCalls field). */
-  activity?: ChatActivityEmission
-}
-
-/** Activity side-channel emission (kept for Phase 1 backward compat). */
-export interface ChatActivityEmission {
-  type: 'tool_call' | 'usage'
-  toolCallId?: string
-  /** 'merge' = update existing activity by id; 'append' = push new activity. */
-  mode: 'merge' | 'append'
-  patch: Record<string, unknown>
 }
 
 /**
@@ -60,11 +47,11 @@ export class StreamProcessor {
   private text = ''
   private tools = new Map<string, ChatToolPayload>()
 
-  private search: ChatMessage['search'] = null
-  private chunks: ChatFileChunk[] = []
-  private lastUsage: TokenUsage | null = null
   private error: ChatError | null = null
   private stopped = false
+  private usageSeq = 0
+  private memorySeq = 0
+
   // ── Block-stream transparency (single source of truth for the timeline) ──
   private blocks: ChatBlock[] = []
   private reasoningSeq = 0
@@ -131,7 +118,7 @@ export class StreamProcessor {
         }
         this.closeReasoningBlock()
         this.upsertToolBlock(this.tools.get(ev.toolCallId)!)
-        return { patch: { toolCalls: this.toolsList() } }
+        return { patch: {} }
       }
 
       case 'tool.start': {
@@ -149,21 +136,8 @@ export class StreamProcessor {
         this.upsertToolBlock(tool)
         return {
           patch: {
-            toolCalls: this.toolsList(),
             isToolCallGenerating: true,
             generating: true,
-          },
-          activity: {
-            type: 'tool_call',
-            toolCallId: ev.toolCallId,
-            mode: 'append',
-            patch: {
-              toolName: ev.toolName,
-              toolCallId: ev.toolCallId,
-              toolArgs: ev.args,
-              isRunning: true,
-              ...(ev.tabId !== undefined ? { tabId: ev.tabId } : {}),
-            },
           },
         }
       }
@@ -178,18 +152,7 @@ export class StreamProcessor {
         }
         this.tools.set(ev.toolCallId, next)
         this.upsertToolBlock(next)
-        return {
-          patch: { toolCalls: this.toolsList() },
-          activity: {
-            type: 'tool_call',
-            toolCallId: ev.toolCallId,
-            mode: 'merge',
-            patch: {
-              progress: ev.progress,
-              ...(ev.tabId !== undefined ? { tabId: ev.tabId } : {}),
-            },
-          },
-        }
+        return { patch: {} }
       }
 
       case 'tool.end': {
@@ -213,49 +176,59 @@ export class StreamProcessor {
         )
         return {
           patch: {
-            toolCalls: this.toolsList(),
             isToolCallGenerating: !allSettled,
-          },
-          activity: {
-            type: 'tool_call',
-            toolCallId: ev.toolCallId,
-            mode: 'merge',
-            patch: {
-              isRunning: false,
-              isError: !!ev.error,
-              outputSummary: summariseResult(ev.result),
-              durationMs,
-            },
           },
         }
       }
 
-      case 'grounding':
-        this.search = ev.search
-        return { patch: { search: ev.search } }
-
-      case 'file_chunks':
-        this.chunks = ev.chunks
-        return { patch: { chunksList: ev.chunks } }
-
-      case 'usage':
-        this.lastUsage = ev.usage
+      case 'usage': {
+        // Append/replace a UsageBlock in the block stream. The cumulative
+        // token totals are also mirrored to the patch for legacy consumers.
+        const last = this.blocks[this.blocks.length - 1]
+        if (last && last.type === 'usage') {
+          this.blocks[this.blocks.length - 1] = {
+            ...last,
+            inputTokens: ev.usage.inputTokens,
+            outputTokens: ev.usage.outputTokens,
+          }
+        } else {
+          this.usageSeq++
+          this.blocks.push({
+            type: 'usage',
+            id: `u-${this.messageId}-${this.usageSeq}`,
+            inputTokens: ev.usage.inputTokens,
+            outputTokens: ev.usage.outputTokens,
+          })
+        }
         return {
           patch: {
             totalInputTokens: ev.usage.inputTokens,
             totalOutputTokens: ev.usage.outputTokens,
           },
-          activity: {
-            type: 'usage',
-            mode: 'append',
-            patch: {
-              inputTokens: ev.usage.inputTokens,
-              outputTokens: ev.usage.outputTokens,
-            },
-          },
         }
+      }
+
+      case 'memory': {
+        this.memorySeq++
+        this.blocks.push({
+          type: 'memory',
+          id: `m-${this.messageId}-${this.memorySeq}`,
+          action: ev.action,
+          ...(ev.query !== undefined ? { query: ev.query } : {}),
+          ...(ev.count !== undefined ? { count: ev.count } : {}),
+          ...(ev.source !== undefined ? { source: ev.source } : {}),
+          timestamp: ev.timestamp,
+        })
+        return { patch: {} }
+      }
+      case 'grounding':
+        return { patch: { search: ev.search } }
+
+      case 'file_chunks':
+        return { patch: { chunksList: ev.chunks } }
 
       case 'phase':
+
         return { patch: {} }
 
       case 'stream.stop':
@@ -281,16 +254,32 @@ export class StreamProcessor {
 
   /** Produce final ChatMessage (snapshot of accumulated state). */
   materialize(base: ChatMessage): ChatMessage {
+    // Derive legacy fields from the single source of truth (`blocks`) so
+    // downstream consumers (FollowUpChips, error card, etc.) keep working
+    // during the transition to a block-only model.
+    const text = this.blocks
+      .filter((b): b is TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+    // Sum all usage blocks (each one is a cumulative snapshot from the
+    // provider) so chat.ts/UI see the final total without re-aggregating.
+    let totalInputTokens = 0
+    let totalOutputTokens = 0
+    for (const b of this.blocks) {
+      if (b.type === 'usage') {
+        totalInputTokens = b.inputTokens
+        totalOutputTokens = b.outputTokens
+      }
+    }
+
     return {
       ...base,
       id: this.messageId,
       blocks: [...this.blocks],
-      content: this.text || base.content,
-      toolCalls: this.tools.size ? this.toolsList() : base.toolCalls,
-      search: this.search ?? base.search,
-      chunksList: this.chunks.length ? this.chunks : base.chunksList,
-      totalInputTokens: this.lastUsage?.inputTokens ?? base.totalInputTokens,
-      totalOutputTokens: this.lastUsage?.outputTokens ?? base.totalOutputTokens,
+      content: text || base.content,
+
+      totalInputTokens: totalInputTokens || base.totalInputTokens,
+      totalOutputTokens: totalOutputTokens || base.totalOutputTokens,
       error: this.error ?? base.error ?? null,
       generating: false,
       isToolCallGenerating: false,
@@ -299,9 +288,6 @@ export class StreamProcessor {
 
   // ── Internals ──
 
-  private toolsList(): ChatToolPayload[] {
-    return [...this.tools.values()]
-  }
   // ── Block-stream helpers (2026-07-27) ───────────────────────────────
   // Mutate `this.blocks` immutably (replace objects, never in-place) so the
   // shallow clone `[...this.blocks]` returned in each patch yields new block
@@ -386,17 +372,4 @@ export class StreamProcessor {
   }
 }
 
-/** Compress a tool result into a short human-readable summary for activity cards. */
-function summariseResult(result: unknown): string | undefined {
-  if (result == null) return undefined
-  if (typeof result === 'string') {
-    return result.length > 120 ? `${result.slice(0, 117)}...` : result
-  }
-  try {
-    const json = JSON.stringify(result)
-    if (!json) return undefined
-    return json.length > 120 ? `${json.slice(0, 117)}...` : json
-  } catch {
-    return undefined
-  }
-}
+

@@ -202,12 +202,29 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
       }
 
     case 'model':
-    case 'memory':
     case 'interview':
     case 'tool_approval':
     case 'path_access':
       return { events: [], passthrough: raw }
 
+    case 'memory': {
+      // Convert memory chunks into a `memory` ChatEvent so the block-stream
+      // timeline captures it as a MemoryBlock.
+      const action: 'recall' | 'store' = raw.action === 'store' ? 'store' : 'recall'
+      return {
+        events: [
+          {
+            kind: 'memory',
+            messageId: mid,
+            action,
+            query: raw.query,
+            count: raw.count,
+            source: raw.source,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      }
+    }
     default:
       return { events: [] }
   }

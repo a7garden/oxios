@@ -130,7 +130,26 @@ export interface TextBlock {
   streaming?: boolean
 }
 
-export type ChatBlock = ReasoningBlock | ToolBlock | TextBlock
+/** A memory recall/store event (RFC-015 transparency). */
+export interface MemoryBlock {
+  type: 'memory'
+  id: string
+  action: 'recall' | 'store'
+  query?: string
+  count?: number
+  source?: string
+  timestamp: string
+}
+
+/** Cumulative token usage for a turn (RFC-015 transparency). */
+export interface UsageBlock {
+  type: 'usage'
+  id: string
+  inputTokens: number
+  outputTokens: number
+}
+
+export type ChatBlock = ReasoningBlock | ToolBlock | TextBlock | MemoryBlock | UsageBlock
 
 // ── Tool render types ──
 
