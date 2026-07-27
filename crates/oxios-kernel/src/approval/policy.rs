@@ -82,11 +82,20 @@ mod tests {
 
     #[test]
     fn max_returns_stronger_policy() {
-        assert_eq!(ToolPolicy::Auto.max(ToolPolicy::OnDemand), ToolPolicy::OnDemand);
-        assert_eq!(ToolPolicy::OnDemand.max(ToolPolicy::Auto), ToolPolicy::OnDemand);
+        assert_eq!(
+            ToolPolicy::Auto.max(ToolPolicy::OnDemand),
+            ToolPolicy::OnDemand
+        );
+        assert_eq!(
+            ToolPolicy::OnDemand.max(ToolPolicy::Auto),
+            ToolPolicy::OnDemand
+        );
         assert_eq!(ToolPolicy::Auto.max(ToolPolicy::Always), ToolPolicy::Always);
         assert_eq!(ToolPolicy::Always.max(ToolPolicy::Auto), ToolPolicy::Always);
-        assert_eq!(ToolPolicy::OnDemand.max(ToolPolicy::Always), ToolPolicy::Always);
+        assert_eq!(
+            ToolPolicy::OnDemand.max(ToolPolicy::Always),
+            ToolPolicy::Always
+        );
         assert_eq!(ToolPolicy::Auto.max(ToolPolicy::Auto), ToolPolicy::Auto);
     }
 
@@ -94,7 +103,10 @@ mod tests {
     fn default_tool_policies_cover_core_tools() {
         let names: Vec<_> = DEFAULT_TOOL_POLICIES.iter().map(|(n, _)| *n).collect();
         for required in ["read", "write", "edit", "exec", "web_search", "grep", "ls"] {
-            assert!(names.contains(&required), "missing default policy for {required}");
+            assert!(
+                names.contains(&required),
+                "missing default policy for {required}"
+            );
         }
     }
 

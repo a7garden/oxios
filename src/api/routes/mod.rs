@@ -35,8 +35,8 @@ mod mount_routes;
 mod project_routes;
 mod resource_routes;
 mod secrets_routes;
-mod system;
 mod security_routes;
+mod system;
 mod task_routes;
 mod token_maxing_routes;
 mod tools;
@@ -140,6 +140,10 @@ pub(crate) use project_routes::{
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
 };
+pub(crate) use security_routes::{
+    handle_approval_config_get, handle_approval_config_patch, handle_approval_grant_add,
+    handle_approval_grant_remove,
+};
 pub(crate) use system::{
     handle_agent_get, handle_agent_kill, handle_agent_logs, handle_agent_stats, handle_agent_trace,
     handle_agents_list, handle_audit_verify_api, handle_backup, handle_config_get,
@@ -156,7 +160,6 @@ pub(crate) use token_maxing_routes::{
     handle_token_maxing_start, handle_token_maxing_status, handle_token_maxing_stop,
 };
 pub(crate) use tools::handle_tools_registry;
-pub(crate) use security_routes::{handle_approval_config_get, handle_approval_config_patch, handle_approval_grant_add, handle_approval_grant_remove};
 pub(crate) use workspace::{
     MemoryMapCache, handle_dream_reports, handle_dream_status, handle_memory_create,
     handle_memory_delete, handle_memory_get, handle_memory_list, handle_memory_map,
@@ -527,9 +530,18 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Approvals (HitL)
         .route("/api/approvals", get(handle_approvals_list))
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))
-        .route("/api/security/approval", get(handle_approval_config_get).patch(handle_approval_config_patch))
-        .route("/api/security/approval/allow-list", post(handle_approval_grant_add))
-        .route("/api/security/approval/allow-list/{key}", delete(handle_approval_grant_remove))
+        .route(
+            "/api/security/approval",
+            get(handle_approval_config_get).patch(handle_approval_config_patch),
+        )
+        .route(
+            "/api/security/approval/allow-list",
+            post(handle_approval_grant_add),
+        )
+        .route(
+            "/api/security/approval/allow-list/{key}",
+            delete(handle_approval_grant_remove),
+        )
         .route("/api/approvals/{id}/reject", post(handle_approval_reject))
         // Git
         .route("/api/git/log", get(handle_git_log))

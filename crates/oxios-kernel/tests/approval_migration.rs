@@ -18,8 +18,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use oxios_kernel::approval::{
-    default_blacklist_rules, default_tool_policy_map, ApprovalConfig, ApprovalDecision,
-    ApprovalGate, ApprovalMode, ExecPolicyResolver, SecurityBlacklist, ToolCall, ToolPolicyResolver,
+    ApprovalConfig, ApprovalDecision, ApprovalGate, ApprovalMode, ExecPolicyResolver,
+    SecurityBlacklist, ToolCall, ToolPolicyResolver, default_blacklist_rules,
+    default_tool_policy_map,
 };
 use parking_lot::RwLock;
 use serde_json::json;
@@ -49,12 +50,7 @@ fn gate_with_exec_resolver(mode: ApprovalMode, allowed: &[&str]) -> ApprovalGate
         Box::new(exec_resolver) as Box<dyn ToolPolicyResolver>,
     );
     let blacklist = SecurityBlacklist::new(default_blacklist_rules());
-    ApprovalGate::with_dynamic_resolvers(
-        policies,
-        config,
-        vec![Box::new(blacklist)],
-        dynamic,
-    )
+    ApprovalGate::with_dynamic_resolvers(policies, config, vec![Box::new(blacklist)], dynamic)
 }
 
 /// Structured exec with an allowed binary runs without approval in Manual.
@@ -64,7 +60,11 @@ fn gate_with_exec_resolver(mode: ApprovalMode, allowed: &[&str]) -> ApprovalGate
 fn structured_allowed_binary_runs_without_approval_in_manual() {
     let g = gate_with_exec_resolver(ApprovalMode::Manual, &["curl"]);
     let args = json!({"mode": "structured", "binary": "curl"});
-    let call = ToolCall { tool: "exec", binary: Some("curl"), args: &args };
+    let call = ToolCall {
+        tool: "exec",
+        binary: Some("curl"),
+        args: &args,
+    };
     assert!(
         matches!(g.evaluate(&call), ApprovalDecision::Allow),
         "structured exec with allowed binary must auto-run in Manual mode"
@@ -77,7 +77,11 @@ fn structured_allowed_binary_runs_without_approval_in_manual() {
 fn shell_mode_prompts_in_manual() {
     let g = gate_with_exec_resolver(ApprovalMode::Manual, &["curl"]);
     let args = json!({"mode": "shell", "command": "ls -la"});
-    let call = ToolCall { tool: "exec", binary: None, args: &args };
+    let call = ToolCall {
+        tool: "exec",
+        binary: None,
+        args: &args,
+    };
     assert!(
         matches!(g.evaluate(&call), ApprovalDecision::RequireApproval { .. }),
         "shell exec must prompt in Manual mode"
@@ -90,7 +94,11 @@ fn shell_mode_prompts_in_manual() {
 fn autorun_runs_shell_without_approval() {
     let g = gate_with_exec_resolver(ApprovalMode::AutoRun, &["curl"]);
     let args = json!({"mode": "shell", "command": "ls -la"});
-    let call = ToolCall { tool: "exec", binary: None, args: &args };
+    let call = ToolCall {
+        tool: "exec",
+        binary: None,
+        args: &args,
+    };
     assert!(
         matches!(g.evaluate(&call), ApprovalDecision::Allow),
         "AutoRun mode must allow shell exec without approval"
@@ -105,7 +113,11 @@ fn autorun_runs_shell_without_approval() {
 fn blacklist_rm_rf_prompts_even_in_autorun() {
     let g = gate_with_exec_resolver(ApprovalMode::AutoRun, &["curl"]);
     let args = json!({"mode": "shell", "command": "rm -rf /etc"});
-    let call = ToolCall { tool: "exec", binary: None, args: &args };
+    let call = ToolCall {
+        tool: "exec",
+        binary: None,
+        args: &args,
+    };
     assert!(
         matches!(g.evaluate(&call), ApprovalDecision::RequireApproval { .. }),
         "rm -rf must prompt even in AutoRun (blacklist escalation)"
@@ -137,6 +149,10 @@ fn allow_list_grant_key_matches_exec_binary() {
         "exec:shell",
         "shell exec grant_key must be 'exec:shell', not the command"
     );
-    let read = ToolCall { tool: "read", binary: None, args: &json!({}) };
+    let read = ToolCall {
+        tool: "read",
+        binary: None,
+        args: &json!({}),
+    };
     assert_eq!(read.grant_key(), "read");
 }

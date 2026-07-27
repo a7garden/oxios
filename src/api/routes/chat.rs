@@ -1822,8 +1822,16 @@ pub(crate) async fn handle_tool_approval_respond(
     let approval_id = uuid::Uuid::parse_str(&id)
         .map_err(|e| AppError::BadRequest(format!("invalid approval id: {e}")))?;
 
-    if body.remember && body.approved && state.kernel.infra.approval_config().mode == oxios_kernel::approval::ApprovalMode::AllowList {
-        let grant_key = state.kernel.infra.pending_tool_approvals().grant_key(approval_id);
+    if body.remember
+        && body.approved
+        && state.kernel.infra.approval_config().mode
+            == oxios_kernel::approval::ApprovalMode::AllowList
+    {
+        let grant_key = state
+            .kernel
+            .infra
+            .pending_tool_approvals()
+            .grant_key(approval_id);
         if let Some(key) = grant_key {
             crate::api::routes::security_routes::remember_grant(&state, key).await?;
         }

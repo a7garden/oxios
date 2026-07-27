@@ -1,4 +1,3 @@
-
 //! Security blacklist — always-enforced dangerous-command patterns.
 
 use glob::Pattern;
@@ -105,7 +104,11 @@ pub fn default_blacklist_rules() -> Vec<BlacklistRule> {
         }
     }
     vec![
-        rule("rm -rf system", "command", ArgMatcher::new_prefix("rm -rf /")),
+        rule(
+            "rm -rf system",
+            "command",
+            ArgMatcher::new_prefix("rm -rf /"),
+        ),
         rule("rm -rf home", "command", ArgMatcher::new_prefix("rm -rf ~")),
         rule(
             "sudo escalation",
@@ -117,7 +120,11 @@ pub fn default_blacklist_rules() -> Vec<BlacklistRule> {
             "command",
             ArgMatcher::new_prefix(":(){ :|:& };:"),
         ),
-        rule("disk format", "command", ArgMatcher::new_glob("mkfs*").unwrap()),
+        rule(
+            "disk format",
+            "command",
+            ArgMatcher::new_glob("mkfs*").unwrap(),
+        ),
         rule(
             "raw disk write",
             "command",
@@ -139,8 +146,8 @@ pub fn default_blacklist_rules() -> Vec<BlacklistRule> {
 #[cfg(test)]
 
 mod tests {
-    use super::*;
     use super::super::gate::ToolCall;
+    use super::*;
     use serde_json::json;
 
     #[test]
@@ -151,8 +158,16 @@ mod tests {
 
     #[test]
     fn glob_matcher_matches_wildcard() {
-        assert!(ArgMatcher::new_glob("sudo *").unwrap().matches("sudo apt install"));
-        assert!(!ArgMatcher::new_glob("sudo *").unwrap().matches("apt install"));
+        assert!(
+            ArgMatcher::new_glob("sudo *")
+                .unwrap()
+                .matches("sudo apt install")
+        );
+        assert!(
+            !ArgMatcher::new_glob("sudo *")
+                .unwrap()
+                .matches("apt install")
+        );
     }
 
     #[test]
@@ -177,15 +192,29 @@ mod tests {
     fn global_resolver_impl_returns_always_on_match() {
         let bl = SecurityBlacklist::new(default_blacklist_rules());
         let args = json!({"command": "rm -rf /etc"});
-        let call = ToolCall { tool: "exec", binary: None, args: &args };
-        assert_eq!(super::super::resolver::GlobalResolver::resolve(&bl, &call), Some(ToolPolicy::Always));
+        let call = ToolCall {
+            tool: "exec",
+            binary: None,
+            args: &args,
+        };
+        assert_eq!(
+            super::super::resolver::GlobalResolver::resolve(&bl, &call),
+            Some(ToolPolicy::Always)
+        );
     }
 
     #[test]
     fn global_resolver_impl_returns_none_on_safe_command() {
         let bl = SecurityBlacklist::new(default_blacklist_rules());
         let args = json!({"command": "curl https://example.com"});
-        let call = ToolCall { tool: "exec", binary: None, args: &args };
-        assert_eq!(super::super::resolver::GlobalResolver::resolve(&bl, &call), None);
+        let call = ToolCall {
+            tool: "exec",
+            binary: None,
+            args: &args,
+        };
+        assert_eq!(
+            super::super::resolver::GlobalResolver::resolve(&bl, &call),
+            None
+        );
     }
 }

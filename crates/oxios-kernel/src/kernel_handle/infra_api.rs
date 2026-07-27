@@ -62,21 +62,28 @@ impl InfraApi {
         &self.git_layer
     }
 
-    pub fn approval_config_handle(&self) -> Arc<parking_lot::RwLock<crate::approval::ApprovalConfig>> {
+    pub fn approval_config_handle(
+        &self,
+    ) -> Arc<parking_lot::RwLock<crate::approval::ApprovalConfig>> {
         Arc::clone(&self.approval_config)
     }
     pub fn approval_config(&self) -> crate::approval::ApprovalConfig {
         self.approval_config.read().clone()
     }
 
-    pub async fn set_approval_config(&self, config: crate::approval::ApprovalConfig) -> anyhow::Result<crate::approval::ApprovalConfig> {
+    pub async fn set_approval_config(
+        &self,
+        config: crate::approval::ApprovalConfig,
+    ) -> anyhow::Result<crate::approval::ApprovalConfig> {
         *self.approval_config.write() = config.clone();
         Ok(config)
     }
 
     pub async fn add_grant(&self, key: String) -> anyhow::Result<crate::approval::ApprovalConfig> {
         let mut config = self.approval_config();
-        if !config.allow_list.contains(&key) { config.allow_list.push(key); }
+        if !config.allow_list.contains(&key) {
+            config.allow_list.push(key);
+        }
         self.set_approval_config(config.clone()).await
     }
 

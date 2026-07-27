@@ -900,7 +900,9 @@ async fn run_agent(
     let approval_config = kernel_handle.infra.approval_config_handle();
     let exec_snapshot = kernel_handle.exec.config_snapshot();
     let exec_resolver = crate::approval::ExecPolicyResolver {
-        allowed_commands: Arc::new(parking_lot::RwLock::new(exec_snapshot.allowed_commands.clone())),
+        allowed_commands: Arc::new(parking_lot::RwLock::new(
+            exec_snapshot.allowed_commands.clone(),
+        )),
     };
     let mut dynamic_resolvers = std::collections::HashMap::new();
     dynamic_resolvers.insert(
@@ -916,8 +918,7 @@ async fn run_agent(
         dynamic_resolvers,
     ));
     let approval_event_bus = kernel_handle.infra.event_bus_clone();
-    let approval_pending =
-        kernel_handle.infra.pending_tool_approvals();
+    let approval_pending = kernel_handle.infra.pending_tool_approvals();
 
     register_tools_from_cspace_gated(
         &registry,

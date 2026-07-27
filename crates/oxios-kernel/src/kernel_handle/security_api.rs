@@ -49,7 +49,6 @@ impl SecurityApi {
         }
     }
 
-
     /// Generate a one-time WebSocket ticket.
     ///
     /// The ticket is valid for [`WS_TICKET_TTL_SECS`] seconds (single-use).

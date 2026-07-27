@@ -40,7 +40,11 @@ impl PendingToolApprovals {
 
     /// Register a new pending tool approval.
     /// Returns the approval ID and a receiver to await the user's decision.
-    pub fn register(&self, tool_name: String, grant_key: String) -> (Uuid, oneshot::Receiver<ToolApprovalResult>) {
+    pub fn register(
+        &self,
+        tool_name: String,
+        grant_key: String,
+    ) -> (Uuid, oneshot::Receiver<ToolApprovalResult>) {
         let id = Uuid::new_v4();
         let (tx, rx) = oneshot::channel();
         self.inner.lock().insert(
@@ -81,7 +85,10 @@ mod tests {
         let registry = PendingToolApprovals::new();
         let (id, rx) = registry.register("exec".to_string(), "exec:curl".to_string());
         assert_eq!(registry.grant_key(id), Some("exec:curl".to_string()));
-        assert_eq!(registry.resolve(id, ToolApprovalResult::Approved), Some("exec".to_string()));
+        assert_eq!(
+            registry.resolve(id, ToolApprovalResult::Approved),
+            Some("exec".to_string())
+        );
         let result = rx.blocking_recv().expect("oneshot did not deliver");
         assert_eq!(result, ToolApprovalResult::Approved);
     }

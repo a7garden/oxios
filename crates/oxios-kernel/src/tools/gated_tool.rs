@@ -251,7 +251,8 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                             .as_ref()
                             .expect("checked above")
                             .clone();
-                        let (approval_id, rx) = approvals.register(tool_name.to_string(), call.grant_key());
+                        let (approval_id, rx) =
+                            approvals.register(tool_name.to_string(), call.grant_key());
                         let action = format!("tool:{tool_name}");
                         // Resource shown on the approval card. Prefer the
                         // shell `command` (most informative), fall back to
@@ -285,10 +286,7 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                                 // fall through to Step 3
                             }
                             _ => {
-                                let _ = approvals.resolve(
-                                    approval_id,
-                                    ToolApprovalResult::Denied,
-                                );
+                                let _ = approvals.resolve(approval_id, ToolApprovalResult::Denied);
                                 return Ok(AgentToolResult::error(format!(
                                     "Tool execution was denied or timed out ({}s).",
                                     APPROVAL_TIMEOUT.as_secs()
@@ -304,7 +302,6 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
         self.inner.execute(tool_call_id, params, signal, ctx).await
     }
 }
-
 
 /// Wrap a tool with access control.
 ///
