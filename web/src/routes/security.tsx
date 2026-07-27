@@ -1,8 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { FileWarning, Filter, KeyRound, Search, Shield } from 'lucide-react'
+import {
+  FileWarning,
+  Filter,
+  Hand,
+  KeyRound,
+  ListChecks,
+  Loader2,
+  Search,
+  Shield,
+  Trash2,
+  Zap,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { ApprovalsQueue } from '@/components/dashboard/approvals-queue'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -11,14 +23,215 @@ import { PageHeader } from '@/components/shared/page-header'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  useApprovalConfig,
+  useRemoveGrant,
+  useSetApprovalMode,
+} from '@/hooks/use-approval-config'
 import { api } from '@/lib/api-client'
+import { cn } from '@/lib/utils'
+import type { ApprovalMode } from '@/types/approval'
 
 export const Route = createFileRoute('/security')({ component: SecurityPage })
 
+// Inline labels — same i18n-conflict-avoidance pattern as Tasks 11/12.
+// Do NOT touch i18n files; user has uncommitted i18n work.
+const MODE_LABELS: Record<ApprovalMode, { en: string; ko: string; icon: typeof Hand }> = {
+  manual: { en: 'Manual approval', ko: '수동 승인', icon: Hand },
+  'allow-list': { en: 'Allow list', ko: '허용 목록', icon: ListChecks },
+  'auto-run': { en: 'Auto-run', ko: '자동 실행', icon: Zap },
+}
+
+const MODE_ORDER: ApprovalMode[] = ['manual', 'allow-list', 'auto-run']
+
+/**
+ * ApprovalConfigPanel — power-user surface for the approval config.
+ *
+ * Sits below ApprovalsQueue on the security page. Lets the user:
+ *   - switch the approval mode (Manual / Allow list / Auto-run)
+ *   - view & remove entries from the allow_list
+ *
+ * Tool overrides are intentionally NOT exposed here — see the
+ * "Advanced" hint. Editing `config.toml` keeps that surface stable.
+ */
+function ApprovalConfigPanel({ isKo }: { isKo: boolean }) {
+  const { data, isLoading, isError, refetch } = useApprovalConfig()
+  const setMode = useSetApprovalMode()
+  const removeGrant = useRemoveGrant()
+
+  const mode: ApprovalMode = data?.mode ?? 'manual'
+  const allowList = Array.isArray(data?.allow_list) ? data.allow_list : []
+  const toolOverrides = data?.tool_overrides ?? {}
+  const isPending = setMode.isPending || removeGrant.isPending
+
+  const handleModeChange = (next: ApprovalMode) => {
+    if (next === mode) return
+    setMode.mutate(next, {
+      onSuccess: () => {
+        toast.success(isKo ? '승인 모드가 변경되었습니다' : 'Approval mode updated')
+      },
+      onError: (err) => {
+        toast.error(
+          isKo ? '승인 모드 변경 실패' : 'Failed to update approval mode',
+          { description: String(err instanceof Error ? err.message : err) },
+        )
+      },
+    })
+  }
+
+  const handleRemove = (key: string) => {
+    removeGrant.mutate(key, {
+      onSuccess: () => {
+        toast.success(
+          isKo ? '허용 목록에서 제거되었습니다' : 'Removed from allow list',
+        )
+      },
+      onError: (err) => {
+        toast.error(
+          isKo ? '제거 실패' : 'Failed to remove entry',
+          { description: String(err instanceof Error ? err.message : err) },
+        )
+      },
+    })
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-4 w-4" />
+          {isKo ? '승인 설정' : 'Approval settings'}
+        </CardTitle>
+        <CardDescription>
+          {isKo
+            ? '도구 승인 모드와 허용 목록을 관리합니다.'
+            : 'Manage tool approval mode and the allow list.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>{isKo ? '설정 불러오는 중…' : 'Loading settings…'}</span>
+          </div>
+        ) : isError ? (
+          <ErrorState onRetry={() => refetch()} />
+        ) : (
+          <>
+            {/* Mode selector */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">
+                  {isKo ? '승인 모드' : 'Approval mode'}
+                </p>
+                {isPending && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {MODE_ORDER.map((m) => {
+                  const entry = MODE_LABELS[m]
+                  const Icon = entry.icon
+                  const isCurrent = m === mode
+                  return (
+                    <Button
+                      key={m}
+                      type="button"
+                      variant={isCurrent ? 'default' : 'outline'}
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => handleModeChange(m)}
+                      aria-pressed={isCurrent}
+                      className={cn('gap-1.5', !isCurrent && 'text-muted-foreground')}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span>{isKo ? entry.ko : entry.en}</span>
+                    </Button>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {mode === 'manual'
+                  ? isKo
+                    ? '모든 도구 사용 전 사용자 승인이 필요합니다.'
+                    : 'Require approval before any tool runs.'
+                  : mode === 'allow-list'
+                    ? isKo
+                      ? '허용 목록에 있는 도구만 자동 실행됩니다.'
+                      : 'Auto-run only tools in the allow list.'
+                    : isKo
+                      ? '모든 도구를 자동으로 실행합니다. 주의해서 사용하세요.'
+                      : 'Auto-run every tool. Use with caution.'}
+              </p>
+            </div>
+
+            {/* Allow list */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">
+                  {isKo ? '허용 목록' : 'Allow list'}
+                </p>
+                <Badge variant="outline" className="text-2xs">
+                  {allowList.length}
+                </Badge>
+              </div>
+              {allowList.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {isKo
+                    ? '허용 목록이 비어 있습니다. 승인 카드에서 “다시 묻지 않기”를 눌러 도구를 추가하세요.'
+                    : "No tools in allow-list yet. Approve a tool with 'don't ask again' to add one."}
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {allowList.map((key) => (
+                    <li
+                      key={key}
+                      className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-1.5"
+                    >
+                      <span className="font-mono text-xs break-all">{key}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        disabled={isPending}
+                        onClick={() => handleRemove(key)}
+                        aria-label={
+                          isKo
+                            ? `${key} 제거`
+                            : `Remove ${key}`
+                        }
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Tool overrides — advanced, edit config.toml */}
+            <div className="space-y-1 border-t pt-4">
+              <p className="text-sm font-medium">
+                {isKo ? '도구 정책 재정의' : 'Tool overrides'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {isKo
+                  ? `고급 설정입니다. config.toml 에서 직접 편집하세요. (현재 ${Object.keys(toolOverrides).length}개)`
+                  : `Advanced — edit config.toml directly. (${Object.keys(toolOverrides).length} entries)`}
+              </p>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function SecurityPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const {
     data: audits,
     isLoading: auditLoading,
@@ -93,6 +306,7 @@ function SecurityPage() {
   const totalPages = Math.max(1, Math.ceil(entries.length / AUDIT_PAGE_SIZE))
   const safePage = Math.min(auditPage, totalPages)
   const pagedEntries = entries.slice((safePage - 1) * AUDIT_PAGE_SIZE, safePage * AUDIT_PAGE_SIZE)
+  const isKo = i18n.language?.startsWith('ko') ?? false
 
   return (
     <div className="space-y-6">
@@ -103,7 +317,10 @@ function SecurityPage() {
       />
       <ApprovalsQueue />
 
+      <ApprovalConfigPanel isKo={isKo} />
+
       {/* Permissions */}
+
       {permissionsError ? (
         <ErrorState onRetry={() => refetchPermissions()} />
       ) : permissions ? (
