@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 const GITHUB_REPO: &str = "a7garden/oxios";
 
@@ -140,10 +141,17 @@ async fn fetch_latest_release_tag() -> Result<String> {
 
 /// Extract a `web-dist.zip` byte slice into `dest` (created if missing).
 ///
-/// RFC-024 SP3: shared extraction used by both the startup download and the
-/// daily health check so both land in a staging dir before an atomic publish.
-/// Returns the number of files extracted. `dest` is cleared first if it
-/// already exists (e.g. an interrupted prior run).
+/// Atomic: extracts into a temp sibling first, then renames into `dest`, so
+/// a crash mid-extract never leaves a half-populated target. Returns the
+/// number of files extracted. `dest` is cleared first if it already exists.
+///
+/// Currently the building block for the RFC-042 Tauri seed installer (a
+/// future caller passes pre-seeded bytes through the unified web installer);
+/// the daemon's own download path uses [`download_and_extract_web_dist`]
+/// (same staging convention, with a progress bar). Kept `pub` so the seed
+/// path composes extraction + [`ActiveWebDist::persist_marker`] without
+/// re-implementing atomicity.
+#[allow(dead_code)]
 pub fn extract_zip_into(dest: &std::path::Path, bytes: &[u8]) -> Result<usize> {
     // Extract into a temp sibling first, then rename atomically into `dest`.
     // A crash mid-extract therefore never leaves a half-populated `dest`
@@ -210,11 +218,8 @@ pub fn staging_dir_for(version_tag: &str) -> Option<PathBuf> {
 /// publishes the staging dir atomically via the in-memory pointer + marker
 /// so concurrent requests never observe a half-extracted directory.
 async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
-    let web_root =
-        user_web_root().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
-    // Versioned dir so multiple generations can coexist during the swap.
-    let version_id = version_tag.trim_start_matches('v');
-    let dist_dir = web_root.join(format!("dist-{version_id}"));
+    let dist_dir = staging_dir_for(version_tag)
+        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
 
     let url =
         format!("https://github.com/{GITHUB_REPO}/releases/download/{version_tag}/web-dist.zip");
@@ -417,5 +422,241 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
     }
     WebDistResult::DownloadFailed {
         reason: last_reason,
+    }
+}
+
+// ── Web UI sync (latest / pinned) ────────────────────────────────────────
+//
+// `ensure_web_dist` only fetches a dist when nothing usable exists locally;
+// it never compares the installed version to GitHub's latest. The sync API
+// below closes that gap: compare → download → atomic publish. It is shared
+// by three callers:
+//   • the daily health check (kernel.rs) — periodic catch-up,
+//   • the eager startup check (kernel.rs) — so a frequently-restarted host
+//     still updates (the old code slept to 03:00 before its first check),
+//   • `oxios update --web-only` (commands/update.rs) — manual / pinned.
+
+/// Which release to sync the web UI to.
+#[derive(Debug, Clone)]
+pub enum SyncTarget {
+    /// GitHub `releases/latest`.
+    Latest,
+    /// A specific tag, e.g. `v1.28.0` or `1.28.0` (leading `v` optional).
+    Version(String),
+}
+
+/// Outcome of a [`sync`] / [`sync_to_disk`] attempt.
+#[derive(Debug, Clone)]
+pub enum SyncOutcome {
+    /// Active dist already reports `version.json` equal to the target.
+    UpToDate {
+        /// Version the active dist currently reports.
+        active: String,
+        /// Version the caller asked to sync to.
+        target: String,
+    },
+    /// Downloaded and published a new generation atomically.
+    Updated {
+        /// Tag (with leading `v`) that was published.
+        to: String,
+    },
+    /// Active dist is consistent but its `version.json` is blank/unstamped.
+    /// Left untouched to avoid a download storm when version stamping
+    /// regresses (mirrors the original daily-check guard).
+    Unstamped,
+    /// Check failed (network, API, extraction, inconsistent dist). The
+    /// daemon keeps serving whatever it had.
+    Failed {
+        reason: String,
+    },
+}
+
+/// Read the `version` field from `<dist>/version.json`, if present.
+fn read_version_json(dist: &Path) -> Option<String> {
+    std::fs::read(dist.join("version.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|v| v["version"].as_str().map(str::to_string))
+}
+
+/// Normalize a user-supplied version to a `v`-prefixed tag.
+fn normalize_tag(v: &str) -> String {
+    let v = v.trim();
+    let core = if let Some(rest) = v.strip_prefix('v').or_else(|| v.strip_prefix('V')) {
+        rest.trim()
+    } else {
+        v
+    };
+    format!("v{core}")
+}
+
+/// Resolve a [`SyncTarget`] to a concrete GitHub release tag. `Latest` does
+/// an API lookup; `Version` is normalized locally (a bad tag surfaces as a
+/// 404 at download time).
+async fn resolve_target_tag(target: &SyncTarget) -> Result<String> {
+    match target {
+        SyncTarget::Latest => fetch_latest_release_tag().await,
+        SyncTarget::Version(v) => Ok(normalize_tag(v)),
+    }
+}
+
+/// Resolve the currently-active dist path from the persisted marker + legacy
+/// fallback. Used by the CLI disk-only path, which has no in-memory pointer.
+fn current_active_path() -> Option<PathBuf> {
+    let marker = active_marker_path()?;
+    let legacy = user_web_dist_dir();
+    oxios_gateway::ActiveWebDist::resolve(&marker, legacy.as_deref())
+}
+
+/// Internal outcome of the compare+download stage, before the publish
+/// strategy (in-memory vs disk-only) is chosen.
+enum PrepareOutcome {
+    /// Active dist already matches the target.
+    UpToDate { active: String, target: String },
+    /// Active dist is consistent but unstamped.
+    Unstamped,
+    /// Downloaded + extracted + validated; ready to publish.
+    Ready { tag: String, staging: PathBuf },
+    /// Something went wrong.
+    Failed(String),
+}
+
+/// Shared core: resolve target, compare to the active dist, download into a
+/// fresh versioned staging dir, validate self-consistency. `active_path` is
+/// the dist currently being served (`None` when unknown). This does NOT
+/// publish — the caller decides how (in-memory pointer vs disk marker).
+async fn prepare_sync(target: &SyncTarget, active_path: Option<&Path>) -> PrepareOutcome {
+    let tag = match resolve_target_tag(target).await {
+        Ok(t) => t,
+        Err(e) => return PrepareOutcome::Failed(e.to_string()),
+    };
+    let target_version = tag.trim_start_matches('v').to_string();
+
+    let (consistent, current_version) = match active_path {
+        Some(p) => (
+            oxios_gateway::ActiveWebDist::dist_is_consistent(p),
+            read_version_json(p).unwrap_or_default(),
+        ),
+        None => (false, String::new()),
+    };
+
+    // Up-to-date: consistent, stamped, and equal to target.
+    if consistent && !current_version.is_empty() && current_version == target_version {
+        return PrepareOutcome::UpToDate {
+            active: current_version,
+            target: target_version,
+        };
+    }
+    // Consistent but unstamped → leave alone (avoids a re-download storm
+    // when version stamping regresses — see web/vite.config.ts).
+    if consistent && current_version.is_empty() {
+        return PrepareOutcome::Unstamped;
+    }
+    // Missing / inconsistent / different version → download into a fresh
+    // versioned staging dir. `download_and_extract_web_dist` clears any
+    // pre-existing staging dir for this exact version first.
+    let staging = match download_and_extract_web_dist(&tag).await {
+        Ok(p) => p,
+        Err(e) => return PrepareOutcome::Failed(e.to_string()),
+    };
+    // Validate the freshly-extracted dist before honoring it — a corrupt or
+    // partial extraction (entry chunk missing) must never become active.
+    if !oxios_gateway::ActiveWebDist::dist_is_consistent(&staging) {
+        return PrepareOutcome::Failed(format!(
+            "extracted dist for {tag} is not self-consistent \
+             (index.html references missing assets)"
+        ));
+    }
+    PrepareOutcome::Ready { tag, staging }
+}
+
+/// Daemon entry: sync the active web-dist to `target`, atomically publishing
+/// via the in-memory pointer + persisted marker. A running daemon swaps to
+/// the new generation without restart. Non-fatal on failure — the daemon
+/// keeps serving whatever it had.
+///
+/// Used by the daily health check and the eager startup check.
+pub async fn sync(
+    web_dist: &oxios_gateway::ActiveWebDist,
+    target: SyncTarget,
+) -> SyncOutcome {
+    let active = web_dist.path();
+    match prepare_sync(&target, active.as_deref()).await {
+        PrepareOutcome::UpToDate { active, target } => SyncOutcome::UpToDate { active, target },
+        PrepareOutcome::Unstamped => SyncOutcome::Unstamped,
+        PrepareOutcome::Failed(reason) => SyncOutcome::Failed { reason },
+        PrepareOutcome::Ready { tag, staging } => {
+            let Some(marker) = active_marker_path() else {
+                return SyncOutcome::Failed {
+                    reason: "cannot determine home directory".into(),
+                };
+            };
+            web_dist.publish(staging, &marker);
+            SyncOutcome::Updated { to: tag }
+        }
+    }
+}
+
+/// CLI / disk-only entry: sync to `target` by downloading into a versioned
+/// staging dir and persisting the marker — WITHOUT touching an in-memory
+/// pointer (the CLI runs in its own process; the running daemon picks the
+/// new generation up on restart via `resolve`).
+///
+/// Used by `oxios update --web-only`.
+pub async fn sync_to_disk(target: SyncTarget) -> SyncOutcome {
+    let active = current_active_path();
+    match prepare_sync(&target, active.as_deref()).await {
+        PrepareOutcome::UpToDate { active, target } => SyncOutcome::UpToDate { active, target },
+        PrepareOutcome::Unstamped => SyncOutcome::Unstamped,
+        PrepareOutcome::Failed(reason) => SyncOutcome::Failed { reason },
+        PrepareOutcome::Ready { tag, staging } => {
+            let Some(marker) = active_marker_path() else {
+                return SyncOutcome::Failed {
+                    reason: "cannot determine home directory".into(),
+                };
+            };
+            oxios_gateway::ActiveWebDist::persist_marker(&marker, &staging);
+            SyncOutcome::Updated { to: tag }
+        }
+    }
+}
+
+// ── Eager-startup throttle ───────────────────────────────────────────────
+//
+// The eager startup check runs `sync(Latest)` once on daemon boot so a host
+// that never survives until 03:00 still gets web UI updates. To keep a crash
+// loop from hammering GitHub (unauth limit 60/hr), it is throttled to once
+// per hour via the mtime of `~/.oxios/web/.last-check`.
+
+/// Minimum spacing between eager startup checks (crash-loop protection).
+const EAGER_THROTTLE: Duration = Duration::from_secs(3600);
+
+/// Path to the throttle sentinel (`~/.oxios/web/.last-check`).
+fn last_check_path() -> Option<PathBuf> {
+    user_web_root().map(|r| r.join(".last-check"))
+}
+
+/// True when no eager check has run in the last hour (or none ever ran).
+pub(crate) fn eager_check_allowed() -> bool {
+    let Some(p) = last_check_path() else {
+        return true;
+    };
+    let Ok(meta) = std::fs::metadata(&p) else {
+        return true;
+    };
+    match meta.modified() {
+        Ok(t) => SystemTime::now()
+            .duration_since(t)
+            .map(|elapsed| elapsed >= EAGER_THROTTLE)
+            .unwrap_or(true),
+        Err(_) => true,
+    }
+}
+
+/// Record that an eager check just ran (updates the sentinel's mtime).
+pub(crate) fn touch_last_check() {
+    if let Some(p) = last_check_path() {
+        // `write` creates the file if absent and bumps mtime either way.
+        let _ = std::fs::write(&p, b"");
     }
 }

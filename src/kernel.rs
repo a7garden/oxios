@@ -674,15 +674,31 @@ impl Kernel {
 
     /// Start the daily health check loop.
     ///
-    /// Runs at 03:00 AM every day (user's local time) via cron expression.
-    /// First tick is calculated to land on the next 3 AM, then every 24h after.
-    /// Returns the `JoinHandle` so callers can track it for clean shutdown
-    /// (audit F-14).
+    /// **Eager startup check** (RFC-024 follow-up): runs `sync(Latest)` once
+    /// immediately so a frequently-restarted host still gets web UI updates —
+    /// the previous code slept to 03:00 before its first check, so a machine
+    /// that never survived until 03:00 never updated. Throttled to once/hour
+    /// via `~/.oxios/web/.last-check` so a crash loop can't hammer GitHub.
+    ///
+    /// **Recurring**: aligns to 03:00 local, then every 24h. Returns the
+    /// `JoinHandle` so callers can track it for clean shutdown (audit F-14).
     fn start_daily_health_check(
         &self,
         web_dist: oxios_gateway::ActiveWebDist,
     ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
+            // Eager startup check: catch up to the latest release immediately so
+            // a host that never survives until 03:00 still gets web UI updates.
+            // Throttled to once/hour via `~/.oxios/web/.last-check` so a crash
+            // loop can't exhaust GitHub's unauth rate limit (60/hr). The
+            // recurring 03:00 + 24h cadence below runs regardless of the throttle.
+            if crate::web_dist::eager_check_allowed() {
+                crate::web_dist::touch_last_check();
+                if let Err(e) = daily_health_check(web_dist.clone()).await {
+                    tracing::warn!(error = %e, "Startup web UI check failed");
+                }
+            }
+
             let now = chrono::Local::now();
             let mut next = now
                 .date_naive()
@@ -772,102 +788,35 @@ fn now_secs_epoch() -> u64 {
         .unwrap_or(0)
 }
 
-/// Daily health check logic (RFC-024 SP3: atomic publish).
+/// Daily health check: sync the web UI to the latest GitHub release.
 ///
-/// Downloads the new dist into a **fresh versioned staging directory** and
-/// publishes it atomically via the in-memory pointer + persisted marker.
-/// The previously-active directory is removed after a grace period by a
-/// background task. No request ever observes a half-extracted directory.
+/// Delegates to [`crate::web_dist::sync`], which compares the active
+/// dist's `version.json` against `releases/latest` and atomically
+/// publishes a new generation when they differ (RFC-024 SP3). The
+/// compare/download/publish logic lives in `web_dist.rs` and is shared
+/// with the eager startup check and `oxios update --web-only`.
 async fn daily_health_check(web_dist: oxios_gateway::ActiveWebDist) -> anyhow::Result<()> {
-    // Fetch latest release tag from GitHub
-    let client = reqwest::Client::builder()
-        .user_agent("oxios-health")
-        .timeout(std::time::Duration::from_secs(30))
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .build()?;
-
-    let resp: serde_json::Value = client
-        .get("https://api.github.com/repos/a7garden/oxios/releases/latest")
-        .send()
-        .await?
-        .json()
-        .await?;
-
-    let latest_tag = resp["tag_name"]
-        .as_str()
-        .ok_or_else(|| anyhow::anyhow!("no tag_name in response"))?;
-
-    // Current active directory + its version. The version lives inside the
-    // dist itself (written by the Vite build as `dist/version.json`).
-    // GitHub tags carry a leading `v`; the version file does not, so
-    // normalize before comparing.
-    let active_path = web_dist.path();
-    // A dir is "usable" only when internally self-consistent; a partial or
-    // raced extraction missing referenced assets must be replaced.
-    let consistent = active_path
-        .as_ref()
-        .map(|p| oxios_gateway::ActiveWebDist::dist_is_consistent(p))
-        .unwrap_or(false);
-    let current_version = active_path
-        .as_ref()
-        .and_then(|p| std::fs::read(p.join("version.json")).ok())
-        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
-        .and_then(|v| v["version"].as_str().map(str::to_string))
-        .unwrap_or_default();
-
-    let latest_version = latest_tag.trim_start_matches('v');
-    // Only (re)download when the dist is missing/inconsistent, OR reports a
-    // KNOWN version that differs from latest. A blank version on a
-    // CONSISTENT dir (e.g. an unstamped "0.0.0" build — see
-    // web/vite.config.ts) does NOT trigger a download: this is what stops a
-    // perpetually re-downloading storm when version stamping regresses,
-    // while still recovering a genuinely broken or missing dist.
-    let needs_download =
-        !consistent || (!current_version.is_empty() && current_version != latest_version);
-
-    if !needs_download {
-        tracing::debug!(
-            current = %current_version,
-            latest = %latest_tag,
-            consistent,
-            "Daily health check: web UI up to date; skipping download"
-        );
-        return Ok(());
+    use crate::web_dist::{SyncOutcome, SyncTarget};
+    match crate::web_dist::sync(&web_dist, SyncTarget::Latest).await {
+        SyncOutcome::UpToDate { active, target } => {
+            tracing::debug!(
+                current = %active,
+                latest = %target,
+                "Daily health check: web UI up to date"
+            );
+        }
+        SyncOutcome::Updated { to } => {
+            tracing::info!(version = %to, "Daily health check: web UI updated");
+        }
+        SyncOutcome::Unstamped => {
+            tracing::debug!(
+                "Daily health check: active dist is unstamped, skipping download"
+            );
+        }
+        SyncOutcome::Failed { reason } => {
+            anyhow::bail!(reason);
+        }
     }
-
-    tracing::info!(
-        current = %current_version,
-        latest = %latest_tag,
-        "Updating web UI..."
-    );
-
-    // Download web-dist.zip
-    let url =
-        format!("https://github.com/a7garden/oxios/releases/download/{latest_tag}/web-dist.zip");
-    let bytes = client.get(&url).send().await?.bytes().await?;
-
-    // Extract into a fresh versioned staging dir (never the active dir).
-    let staging = crate::web_dist::staging_dir_for(latest_tag)
-        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
-    crate::web_dist::extract_zip_into(&staging, &bytes)?;
-
-    // Validate before publishing — a corrupt or partial extraction must not
-    // become active. Self-consistency (not just index.html presence) catches
-    // a dist that mixes two builds, so a broken page is never published.
-    if !oxios_gateway::ActiveWebDist::dist_is_consistent(&staging) {
-        anyhow::bail!(
-            "extracted dist is not self-consistent (index.html references missing assets)"
-        );
-    }
-
-    // Atomic publish: swap the pointer + persist marker. The previous
-    // generation is cleaned up after a grace period so in-flight requests
-    // reading from the old inode complete successfully.
-    let marker = crate::web_dist::active_marker_path()
-        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
-    web_dist.publish(staging, &marker);
-
-    tracing::info!(version = %latest_tag, "Daily health check: web UI updated");
     Ok(())
 }
 

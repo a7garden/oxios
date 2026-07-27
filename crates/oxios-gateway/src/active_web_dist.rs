@@ -105,6 +105,18 @@ impl ActiveWebDist {
         // swap_and_clean_previous schedules removal of the *previous* dir.
         // The new dir is never moved or deleted after this.
         self.swap_and_clean_previous(new_dir.clone(), std::time::Duration::from_secs(300));
+        // Persist the marker so the next process start resolves this dir
+        // (the in-memory pointer does not survive restart).
+        Self::persist_marker(marker, &new_dir);
+    }
+
+    /// Atomically persist `dir` as the active-dist path in `marker`.
+    ///
+    /// Used by [`publish`](Self::publish) (daemon path) and by the CLI
+    /// disk-only sync (`oxios update --web-only`, which runs in its own
+    /// process and has no in-memory pointer to swap). Written via tmp+rename
+    /// so a crash mid-write can't leave a truncated marker (F26).
+    pub fn persist_marker(marker: &std::path::Path, dir: &std::path::Path) {
         if let Some(parent) = marker.parent()
             && let Err(e) = std::fs::create_dir_all(parent)
         {
@@ -118,7 +130,7 @@ impl ActiveWebDist {
         }
         // F26: atomic marker write via tmp+rename.
         let tmp = marker.with_extension("marker.tmp");
-        if let Err(e) = std::fs::write(&tmp, new_dir.to_string_lossy().as_bytes())
+        if let Err(e) = std::fs::write(&tmp, dir.to_string_lossy().as_bytes())
             .and_then(|()| std::fs::rename(&tmp, marker))
         {
             tracing::error!(

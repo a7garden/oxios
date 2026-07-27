@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Web UI no longer drifts from the binary across restarts** — the daemon
+  only re-synced the web UI at 03:00 daily, so a frequently-restarted host
+  never caught up (each restart re-scheduled the next 03:00), and
+  `oxios update --web-only` extracted into the legacy `~/.oxios/web/dist/`
+  while the active marker still pointed at the old versioned dir — so the
+  update was silently shadowed and never served. Web-dist sync is now owned
+  by a single `web_dist::sync` core (compare `version.json` to the target →
+  download to a versioned staging dir → atomic publish): the daily check and
+  a new eager startup check both call it, and `--web-only` publishes through
+  it so the marker always matches what's served. The eager startup run is
+  throttled to once/hour via `~/.oxios/web/.last-check` so a crash loop can't
+  exhaust GitHub's unauth rate limit.
+
 ## [1.28.0] - 2026-07-27
 
 ### Added
