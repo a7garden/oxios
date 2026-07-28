@@ -17,7 +17,7 @@
 // See docs/designs/2026-07-21-lobehub-chat-port-design.md §5.1.
 
 import type { StreamChunk } from '@/types'
-import type { ChatError } from '@/types/chat'
+import type { ChatError, ReasoningBlock } from '@/types/chat'
 import type { ChatEvent, TokenUsage } from './ChatEvent'
 
 export interface AdaptedChunk {
@@ -49,22 +49,25 @@ export function adaptChunk(raw: StreamChunk, ctx: { msgId: string }): AdaptedChu
       if (raw.subtype === 'end') {
         return { events: [{ kind: 'reasoning.end', messageId: mid }] }
       }
-      // Regular reasoning delta (accumulated text).
+      // Regular reasoning delta (accumulated text). Narrow the opaque
+      // `source` payload to the closed `ReasoningBlock['source']` union; any
+      // other value is dropped so `reasoning.delta.source` stays compatible
+      // with the block model.
       const text = raw.content ?? ''
-      return text ? { events: [{ kind: 'reasoning.delta', messageId: mid, text }] } : { events: [] }
+      if (!text) return { events: [] }
+      const source: ReasoningBlock['source'] | undefined =
+        raw.source === 'thinking' || raw.source === 'compaction' ? raw.source : undefined
+      return {
+        events: [
+          {
+            kind: 'reasoning.delta',
+            messageId: mid,
+            text,
+            ...(source ? { source } : {}),
+          },
+        ],
+      }
     }
-    case 'grounding':
-      return raw.citations && raw.citations.length > 0
-        ? {
-            events: [
-              {
-                kind: 'grounding',
-                messageId: mid,
-                search: { citations: raw.citations },
-              },
-            ],
-          }
-        : { events: [] }
 
     case 'tool_call_delta':
       return {

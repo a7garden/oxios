@@ -19,7 +19,14 @@
 // See docs/designs/2026-07-21-lobehub-chat-port-design.md §6.2.
 
 import type { ChatMessage } from '@/types'
-import type { ChatBlock, ChatError, ChatToolPayload, ChatToolStatus, TextBlock } from '@/types/chat'
+import type {
+  ChatBlock,
+  ChatError,
+  ChatToolPayload,
+  ChatToolStatus,
+  ReasoningBlock,
+  TextBlock,
+} from '@/types/chat'
 import type { ChatEvent } from './ChatEvent'
 
 /** Total reasoning text budget per turn — bounds the persisted trace. On
@@ -86,7 +93,7 @@ export class StreamProcessor {
         return { patch: { generating: true } }
 
       case 'reasoning.delta': {
-        this.appendReasoning(ev.text)
+        this.appendReasoning(ev.text, ev.source)
         return { patch: { generating: true } }
       }
 
@@ -295,7 +302,7 @@ export class StreamProcessor {
   // at open (stable across re-renders / rAF batches); tool blocks reuse
   // tool_call_id.
 
-  private openReasoning(): void {
+  private openReasoning(source?: ReasoningBlock['source']): void {
     this.reasoningSeq++
     this.blocks.push({
       type: 'reasoning',
@@ -303,10 +310,11 @@ export class StreamProcessor {
       text: '',
       status: 'streaming',
       startedAt: Date.now(),
+      ...(source ? { source } : {}),
     })
   }
 
-  private appendReasoning(text: string): void {
+  private appendReasoning(text: string, source?: ReasoningBlock['source']): void {
     if (this.reasoningBytes >= REASONING_BUDGET_BYTES) return
     const slice = text.slice(0, REASONING_BUDGET_BYTES - this.reasoningBytes)
     if (!slice) return
@@ -314,9 +322,16 @@ export class StreamProcessor {
     const i = this.blocks.length - 1
     const last = this.blocks[i]
     if (last && last.type === 'reasoning' && last.status === 'streaming') {
-      this.blocks[i] = { ...last, text: last.text + slice }
+      // Preserve the block's existing source; a subsequent delta from a
+      // different provider doesn't relabel the reasoning span.
+      const nextSource = last.source ?? source
+      this.blocks[i] = {
+        ...last,
+        text: last.text + slice,
+        ...(nextSource ? { source: nextSource } : {}),
+      }
     } else {
-      this.openReasoning()
+      this.openReasoning(source)
       const j = this.blocks.length - 1
       const cur = this.blocks[j]
       if (cur && cur.type === 'reasoning') this.blocks[j] = { ...cur, text: slice }

@@ -9,6 +9,7 @@
 // docs/designs/2026-07-21-lobehub-chat-port-design.md §5.1, §6.2.
 
 import type { ChatError, ChatFileChunk, GroundingSearch } from '@/types/chat'
+import type { ReasoningBlock } from '@/types/chat'
 
 /** Token usage for a single assistant message. */
 export interface TokenUsage {
@@ -24,7 +25,7 @@ export interface TokenUsage {
 export type ChatEvent =
   | { kind: 'text.delta'; messageId: string; text: string }
   | { kind: 'reasoning.start'; messageId: string }
-  | { kind: 'reasoning.delta'; messageId: string; text: string }
+  | { kind: 'reasoning.delta'; messageId: string; text: string; source?: ReasoningBlock['source'] }
   | { kind: 'reasoning.end'; messageId: string; durationMs?: number }
   | {
       kind: 'tool.args_delta'

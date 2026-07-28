@@ -84,4 +84,55 @@ describe('StreamProcessor — block-stream timeline', () => {
     expect(openReasoning).toHaveLength(0)
     expect(openText).toHaveLength(0)
   })
+
+  it('opens a reasoning block with source on the first delta and preserves it on append', () => {
+    // A no-subtype reasoning delta carrying `source: 'compaction'` opens the
+    // reasoning block with that label, and subsequent deltas (even without a
+    // matching source on the event) keep the block's source stable.
+    const p = new StreamProcessor('m1')
+    p.handleEvent({
+      kind: 'reasoning.delta',
+      messageId: 'm1',
+      text: 'compaction complete',
+      source: 'compaction',
+    })
+    p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: ' (kept)' })
+    p.handleEvent({
+      kind: 'reasoning.delta',
+      messageId: 'm1',
+      text: ' more',
+      source: 'thinking',
+    })
+
+    const reasoning = blocksOf(p).filter((b): b is ReasoningBlock => b.type === 'reasoning')
+    expect(reasoning).toHaveLength(1)
+    expect(reasoning[0]).toMatchObject({ source: 'compaction', text: 'compaction complete (kept) more' })
+  })
+
+  it('applies source when the first reasoning delta opens its own block', () => {
+    // appendReasoning must accept `source` and stamp it on the freshly opened
+    // block when no prior reasoning span is open — this is the path that the
+    // adapter takes for a no-subtype compaction chunk.
+    const p = new StreamProcessor('m1')
+    p.handleEvent({
+      kind: 'reasoning.delta',
+      messageId: 'm1',
+      text: 'first',
+      source: 'thinking',
+    })
+
+    const reasoning = blocksOf(p).filter((b): b is ReasoningBlock => b.type === 'reasoning')
+    expect(reasoning[0]).toMatchObject({ source: 'thinking', text: 'first' })
+  })
+
+  it('leaves source absent when neither the first delta nor its successors carry one', () => {
+    // No-subtype reasoning deltas without `source` should still flow through;
+    // the block must simply omit the optional field.
+    const p = new StreamProcessor('m1')
+    p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'plain' })
+
+    const reasoning = blocksOf(p).filter((b): b is ReasoningBlock => b.type === 'reasoning')
+    expect(reasoning[0]).toMatchObject({ text: 'plain' })
+    expect((reasoning[0] as ReasoningBlock).source).toBeUndefined()
+  })
 })

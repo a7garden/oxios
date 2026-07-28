@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   deriveCurrentActivity,
+  deriveCurrentActivityFromBlocks,
   describeLiveActivity,
   type LiveActivityDescriptor,
   type Translator,
 } from '@/lib/live-activity'
 import type { ChatActivity } from '@/types'
+import type { ChatBlock, ReasoningBlock, ToolBlock } from '@/types/chat'
+
 
 const NOW = new Date().toISOString()
 
@@ -279,5 +282,165 @@ describe('describeLiveActivity', () => {
   it('uses toolDefault when toolName is absent', () => {
     const { label } = describeLiveActivity({ kind: 'tool_running', toolName: undefined }, mockT)
     expect(label).toBe('chat.liveActivity.toolDefault')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Block-stream variant — direct coverage for the selector that
+// LiveActivityBar actually uses. deriveCurrentActivity() walks the legacy
+// `activities` field; deriveCurrentActivityFromBlocks() walks the newer
+// `blocks[]` single-source-of-truth field. They share priority semantics
+// (running tool → streaming reasoning → thinking) but differ in shape.
+// ---------------------------------------------------------------------------
+
+/** Build a minimal tool block — the live variant the selector cares about. */
+function loadingTool(overrides: Partial<ToolBlock> & { apiName?: string }): ToolBlock {
+  return {
+    type: 'tool',
+    id: `tool-${Math.random().toString(36).slice(2)}`,
+    identifier: 'kernel',
+    apiName: 'read',
+    arguments: { path: 'src/main.ts' },
+    status: 'loading',
+    ...overrides,
+  } as ToolBlock
+}
+
+function doneTool(overrides: Partial<ToolBlock> & { apiName?: string }): ToolBlock {
+  return {
+    type: 'tool',
+    id: `tool-${Math.random().toString(36).slice(2)}`,
+    identifier: 'kernel',
+    apiName: 'read',
+    arguments: { path: 'src/main.ts' },
+    status: 'success',
+    ...overrides,
+  } as ToolBlock
+}
+
+function streamingReasoning(): ReasoningBlock {
+  return {
+    type: 'reasoning',
+    id: `reason-${Math.random().toString(36).slice(2)}`,
+    text: 'thinking…',
+    status: 'streaming',
+    source: 'thinking',
+    startedAt: 0,
+  }
+}
+
+function doneReasoning(): ReasoningBlock {
+  return {
+    type: 'reasoning',
+    id: `reason-${Math.random().toString(36).slice(2)}`,
+    text: 'concluded',
+    status: 'done',
+    source: 'thinking',
+    startedAt: 0,
+    durationMs: 250,
+  }
+}
+
+describe('deriveCurrentActivityFromBlocks (block-stream selector)', () => {
+  it('falls back to thinking when blocks is undefined', () => {
+    expect(deriveCurrentActivityFromBlocks(undefined)).toEqual<LiveActivityDescriptor>({
+      kind: 'thinking',
+    })
+  })
+
+  it('falls back to thinking when blocks is empty', () => {
+    expect(deriveCurrentActivityFromBlocks([])).toEqual<LiveActivityDescriptor>({
+      kind: 'thinking',
+    })
+  })
+
+  it('reports a loading tool block as tool_running with the apiName', () => {
+    const blocks: ChatBlock[] = [loadingTool({ apiName: 'browser' })]
+    expect(deriveCurrentActivityFromBlocks(blocks)).toEqual<LiveActivityDescriptor>({
+      kind: 'tool_running',
+      toolName: 'browser',
+      toolArgs: { path: 'src/main.ts' },
+    })
+  })
+
+  it('ignores tool blocks that are not loading', () => {
+    // Settled tool blocks must NOT keep the bar pinned to the tool label —
+    // success/error/aborted all count as "done".
+    const blocks: ChatBlock[] = [doneTool({ apiName: 'browser', status: 'success' })]
+    expect(deriveCurrentActivityFromBlocks(blocks)).toEqual<LiveActivityDescriptor>({
+      kind: 'thinking',
+    })
+  })
+
+  it('reports a streaming reasoning block as in-progress reasoning', () => {
+    const blocks: ChatBlock[] = [streamingReasoning()]
+    expect(deriveCurrentActivityFromBlocks(blocks)).toEqual<LiveActivityDescriptor>({
+      kind: 'reasoning',
+    })
+  })
+
+  it('ignores reasoning blocks that have already settled', () => {
+    // A "done" reasoning block is not live — the selector must keep walking.
+    const blocks: ChatBlock[] = [doneReasoning()]
+    expect(deriveCurrentActivityFromBlocks(blocks)).toEqual<LiveActivityDescriptor>({
+      kind: 'thinking',
+    })
+  })
+
+  it('prefers a loading tool over an older streaming reasoning block', () => {
+    const blocks: ChatBlock[] = [streamingReasoning(), loadingTool({ apiName: 'bash' })]
+    expect(deriveCurrentActivityFromBlocks(blocks)).toEqual<LiveActivityDescriptor>({
+      kind: 'tool_running',
+      toolName: 'bash',
+      toolArgs: { path: 'src/main.ts' },
+    })
+  })
+
+  it('returns reasoning when the most recent live block is streaming reasoning', () => {
+    // [done tool, loading tool, streaming reasoning] — reasoning is the most
+    // recent fire-and-forget fragment.
+    const blocks: ChatBlock[] = [
+      doneTool({ apiName: 'read', status: 'success' }),
+      loadingTool({ apiName: 'browser' }),
+      streamingReasoning(),
+    ]
+    expect(deriveCurrentActivityFromBlocks(blocks)).toEqual<LiveActivityDescriptor>({
+      kind: 'reasoning',
+    })
+  })
+  it('skips trailing settled blocks (e.g. text + usage) and falls back to thinking', () => {
+    // No loading tool, no streaming reasoning — just done text + usage.
+    // The selector must keep walking past them and land on thinking.
+    const blocks: ChatBlock[] = [
+      doneTool({ apiName: 'read', status: 'success' }),
+      { type: 'text', id: 't1', text: 'hello', streaming: false },
+      { type: 'usage', id: 'u1', inputTokens: 5, outputTokens: 3 },
+    ]
+    expect(deriveCurrentActivityFromBlocks(blocks)).toEqual<LiveActivityDescriptor>({
+      kind: 'thinking',
+    })
+  })
+
+  it('carries progress text from a loading tool block', () => {
+    const blocks: ChatBlock[] = [
+      loadingTool({ apiName: 'browser', progress: 'Navigating to example.com' }),
+    ]
+    const d = deriveCurrentActivityFromBlocks(blocks)
+    expect(d.kind).toBe('tool_running')
+    expect(d.progress).toBe('Navigating to example.com')
+  })
+
+  it('carries arguments from a loading tool block as toolArgs', () => {
+    const blocks: ChatBlock[] = [
+      loadingTool({ apiName: 'exec', arguments: { command: 'cargo test' } }),
+    ]
+    const d = deriveCurrentActivityFromBlocks(blocks)
+    expect(d.toolArgs).toEqual({ command: 'cargo test' })
+  })
+
+  it('defaults toolArgs to {} when a loading tool has no arguments', () => {
+    const blocks: ChatBlock[] = [loadingTool({ apiName: 'noop', arguments: undefined })]
+    const d = deriveCurrentActivityFromBlocks(blocks)
+    expect(d.toolArgs).toEqual({})
   })
 })
