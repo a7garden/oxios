@@ -93,9 +93,12 @@ pub struct Gateway {
 
     /// Persona API for persona switching (action-based routing).
     persona_api: Option<Arc<oxios_kernel::PersonaApi>>,
-
     /// Gateway-wide shutdown signal.
     shutdown: watch::Sender<bool>,
+    /// Sender-side mirror of the shutdown flag so `is_shutdown()` can read
+    /// it without a receiver. Sender-only `watch::Sender::borrow` is stale;
+    /// mirroring keeps the producer-side check truthful for diagnostics.
+    shutdown_flag: Arc<std::sync::atomic::AtomicBool>,
 
     /// Concurrency limiter for route tasks. A permit is acquired in `run()`
     /// *before* spawning each dispatch task (F19), bounding in-flight tasks
@@ -174,13 +177,14 @@ impl Gateway {
             rx: Mutex::new(rx),
             tx,
             orchestrator,
-            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
-            streaming_sinks: Arc::new(oxios_kernel::streaming_sink::StreamingSinkRegistry::new()),
             engine_api: None,
             persona_api: None,
             shutdown,
+            shutdown_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
             in_flight: Arc::new(Mutex::new(Vec::new())),
+            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
+            streaming_sinks: Arc::new(oxios_kernel::streaming_sink::StreamingSinkRegistry::new()),
         }
     }
 
@@ -197,20 +201,19 @@ impl Gateway {
             rx: Mutex::new(rx),
             tx,
             orchestrator,
-            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
-            streaming_sinks: Arc::new(oxios_kernel::streaming_sink::StreamingSinkRegistry::new()),
             engine_api: Some(engine_api),
             persona_api: Some(persona_api),
             shutdown,
+            shutdown_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
             in_flight: Arc::new(Mutex::new(Vec::new())),
+            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
+            streaming_sinks: Arc::new(oxios_kernel::streaming_sink::StreamingSinkRegistry::new()),
         }
     }
 
-    /// Attach the streaming-sink registry shared with `KernelHandle` so the
-    /// runtime callback's `TextChunk` lookup finds the gateway's collector
-    /// sender for the active session. Called by the kernel assembler after
-    /// both sides are constructed; both sides must point at the SAME `Arc`.
+    /// Attaches a streaming sink registry for message-level streaming.
+    /// Both sides must point at the same `Arc`.
     pub fn with_streaming_sinks(
         mut self,
         registry: Arc<oxios_kernel::streaming_sink::StreamingSinkRegistry>,
@@ -221,15 +224,16 @@ impl Gateway {
 
     /// Signal the gateway to stop its event loop.
     pub fn signal_shutdown(&self) {
+        self.shutdown_flag
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         let _ = self.shutdown.send(true);
         tracing::info!("Gateway shutdown signal sent");
     }
-
     /// Check if shutdown has been signalled.
     pub fn is_shutdown(&self) -> bool {
-        *self.shutdown.borrow()
+        self.shutdown_flag
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
-
     // ── Channel management ──────────────────────────────────
 
     /// Registers a channel with the gateway and starts its background receive task.
