@@ -7,7 +7,7 @@
 
 ## Overview
 
-Integrate the Search & Browse Panel (PortalPanel) with the Knowledge Base (Knowledge UI at `/knowledge`). Three integration points:
+Integrate the Search & Browse Panel (PortalPanel) with the Knowledge Base (Knowledge UI at `/knowledge`). Four integration points:
 
 1. **Search Panel Knowledge tab** — Search/browse knowledge notes from the chat sidebar
 2. **Save to Knowledge** — Save web search results and page content as knowledge notes
@@ -99,8 +99,8 @@ copilot.tsx (수정)
 const [activeTab, setActiveTab] = useState<'web' | 'knowledge'>('web')
 
 // 탭 바 렌더링 (기존 검색 입력 아래)
-// 조건: agent-driven 결과가 있을 때는 Web 탭 자동 선택
-//        Knowledge 탭 선택 시 SearchPanel store에서 knowledgeResults 읽음
+// - agent-driven 결과 수신 시 → Web 탭 자동 선택
+// - 사용자가 Knowledge 탭 수동 선택 시 유지
 ```
 
 ### 파일: `web/src/components/portal/views/knowledge-browser.tsx` (신규)
@@ -116,7 +116,19 @@ const [activeTab, setActiveTab] = useState<'web' | 'knowledge'>('web')
 | **Error** | 에러 메시지 + Retry 버튼 |
 | **Empty results** | "No notes matching '{query}'" |
 
-**데이터 흐름:**
+### Props
+
+```typescript
+interface KnowledgeBrowserProps {
+  /** 초기에 로드할 파일 경로 (선택). 설정 시 자동으로 해당 파일 로드 + 미리보기 표시. */
+  initialPath?: string
+}
+```
+
+**initialPath 동작:**
+- `initialPath`가 설정되면 → 해당 파일을 자동으로 읽어서 미리보기 표시
+- `initialPath`가 없으면 → 빈 상태에서 검색 대기
+- KnowledgeView (PortalPanel)에서 사용 시: `path`를 `initialPath`로 전달
 
 ```
 검색 입력 (debounce 300ms)
@@ -176,10 +188,11 @@ Web tab 결과 카드 또는 Browse 확장 카드
     ├─ Title: 검색 결과 title (편집 가능)
     ├─ Path: web-clippings/{domain}/{date}-{slug}.md (편집 가능)
     ├─ Content 미리보기 (읽기 전용)
-    └─ [Save] 버튼
-        → PUT /api/knowledge/file/{path} (with frontmatter)
-        → Toast "Saved to Knowledge"
-        → [View in Knowledge] 버튼 (Toast action)
+→ [Save] 버튼
+    → PUT /api/knowledge/file/{path} (with frontmatter)
+    → 모달 auto-close
+    → Toast "Saved to Knowledge"
+    → Toast action: [View in Knowledge] 버튼 (/knowledge/file/$path로 이동)
 ```
 
 ### 저장 포맷
@@ -372,7 +385,7 @@ case 'knowledge': {
 | 7 | PortalPanel KnowledgeView 등록 | 1 |
 | 8 | 전체 검증 (tsc + test) | 1-7 |
 
-Tasks 1-4, 5, 6, 7 are **independent** (can be parallelized).
+Tasks 1, 5, 6, 7 are independent (parallelizable).
 
 ## 9. Open Questions / Edge Cases
 
