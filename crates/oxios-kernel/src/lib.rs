@@ -84,6 +84,7 @@ pub mod mount;
 pub mod project;
 pub mod resource_monitor;
 pub mod session_context;
+pub mod compression;
 pub mod state_store;
 pub mod task;
 
