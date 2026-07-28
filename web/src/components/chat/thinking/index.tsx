@@ -1,11 +1,12 @@
 // Thinking block — collapsible reasoning display (ported from LobeHub).
 //
-// Visual tier (2026-07-28 redesign): reasoning is a RECESSED aside, not a peer
-// of the answer. The in-bubble hierarchy is answer (plain text) > tool card
-// (muted, bordered) > reasoning (left-rail accent, no full border, muted bg).
-// This keeps the agent's flow-of-thought readable without competing with the
-// conclusion. The body renders as markdown — the Phase 3 upgrade of the
-// original monospace <pre> (lists/code/emphasis now render, not raw glyphs).
+// Visual tier: reasoning lies FLAT — no fill, no border, no rail. It is the
+// agent's internal monologue (marginalia), not a container like a tool card.
+// Hierarchy reads: answer (foreground) > tool card (bordered container) >
+// reasoning (flat muted text). The title row is the only anchor; the body
+// drops below it indented, in small muted type. Streaming: full muted weight
+// + shiny sweep + spinner. Settled: recedes to 60% so completed thoughts fade
+// into the rhythm between tool cards.
 
 import { Brain, Loader2 } from 'lucide-react'
 import { memo, useEffect, useState } from 'react'
@@ -17,7 +18,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
 // ── Props ──
@@ -62,19 +62,14 @@ export const Thinking = memo(function Thinking({
       onValueChange={(v) => setOpen(v === 'thinking')}
       className={cn('border-0', className)}
     >
-      <AccordionItem
-        value="thinking"
-        className="rounded-md border-0 border-l-2 border-l-muted-foreground/20 bg-muted/25"
-      >
-        <AccordionTrigger className="py-1.5 px-2.5 hover:no-underline">
+      <AccordionItem value="thinking" className="border-0 bg-transparent">
+        <AccordionTrigger className="py-1 px-1 -mx-1 rounded-sm hover:no-underline hover:bg-muted/30 transition-colors">
           <ThinkingTitle thinking={thinking} duration={duration} />
         </AccordionTrigger>
-        <AccordionContent className="px-2.5 pb-2.5">
-          <ScrollArea className="max-h-[min(40vh,320px)]">
-            <MarkdownMessage messageId={messageId} isStreaming={thinking} className="text-xs">
-              {content ?? ''}
-            </MarkdownMessage>
-          </ScrollArea>
+        <AccordionContent className="pb-2 pl-3">
+          <MarkdownMessage messageId={messageId} isStreaming={thinking} className="text-xs">
+            {content ?? ''}
+          </MarkdownMessage>
         </AccordionContent>
       </AccordionItem>
     </Accordion>
@@ -86,7 +81,12 @@ export const Thinking = memo(function Thinking({
 function ThinkingTitle({ thinking, duration }: { thinking: boolean; duration?: number }) {
   const { t } = useTranslation()
   return (
-    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <div
+      className={cn(
+        'flex items-center gap-1.5 text-xs',
+        thinking ? 'text-muted-foreground' : 'text-muted-foreground/60',
+      )}
+    >
       {thinking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
       <span className={cn('font-medium', thinking && 'thinking-shiny')}>
         {thinking ? t('chat.thinking') : t('chat.thought')}
