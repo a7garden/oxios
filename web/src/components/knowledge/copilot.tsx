@@ -1,4 +1,4 @@
-import { Bot, ExternalLink, Send } from 'lucide-react'
+import { Bot, ExternalLink, Globe, Loader2, Send } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,11 @@ export function Copilot() {
   const [response, setResponse] = useState<{ content: string; referenced_notes: string[] } | null>(
     null,
   )
+  const [includeWeb, setIncludeWeb] = useState(false)
+  const [webResults, setWebResults] = useState<{ title: string; url: string; snippet: string }[]>(
+    [],
+  )
+  const [webLoading, setWebLoading] = useState(false)
 
   const handleAsk = useCallback(async () => {
     if (!question.trim()) return
@@ -27,7 +32,27 @@ export function Copilot() {
     } catch {
       setResponse(null)
     }
-  }, [question, currentFilePath, copilot])
+
+    // Parallel web search
+    if (includeWeb) {
+      setWebLoading(true)
+      try {
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: question.trim(), engines: 'ddg,wiki', limit: 5 }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setWebResults(data.results)
+        }
+      } catch {
+        /* web results optional */
+      } finally {
+        setWebLoading(false)
+      }
+    }
+  }, [question, currentFilePath, copilot, includeWeb])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -43,6 +68,16 @@ export function Copilot() {
         <div className="flex items-center gap-2">
           <Bot className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium">{t('knowledge.copilot')}</span>
+          <label className="ml-auto flex items-center gap-1 text-xs text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={includeWeb}
+              onChange={(e) => setIncludeWeb(e.target.checked)}
+              className="rounded border-muted-foreground/30"
+            />
+            <Globe className="w-3 h-3" />
+            Web
+          </label>
         </div>
         <div className="flex gap-2">
           <Textarea
@@ -87,6 +122,33 @@ export function Copilot() {
                     <ExternalLink className="h-3 w-3" />
                     {note.replace(/\.md$/, '')}
                   </button>
+                ))}
+              </div>
+            )}
+
+            {/* Web results section */}
+            {includeWeb && (webResults.length > 0 || webLoading) && (
+              <div className="space-y-1.5 border-t pt-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <Globe className="w-3 h-3" />
+                  Web Results
+                </p>
+                {webLoading && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Searching web…
+                  </div>
+                )}
+                {webResults.map((r, i) => (
+                  <a
+                    key={i}
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-xs text-primary hover:underline truncate"
+                  >
+                    {r.title || r.url}
+                  </a>
                 ))}
               </div>
             )}
