@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.1] - 2026-07-28
+
+### Changed
+- **Thinking block visual tier (web)** — reasoning now renders flat as muted
+  marginalia (no fill, border, or left-rail) instead of a recessed aside, so
+  the flow-of-thought reads as the agent's internal monologue rather than a
+  container like a tool card. Settled thoughts recede to 60% opacity to fade
+  into the rhythm between tool cards. Drops the now-unused `ScrollArea` import.
+
+### Fixed
+- **Duplicate i18n key (web)** — removed the duplicate `sectionNotifications`
+  entry in the Korean locale (`ko.json`) flagged by biome; both occurrences
+  held the identical value, so no behavior change.
+
 ## [1.31.0] - 2026-07-28
 
 ### Added
