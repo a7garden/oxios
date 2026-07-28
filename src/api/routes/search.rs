@@ -51,6 +51,7 @@ pub struct SearchResultItem {
 pub struct BrowseRequest {
     pub url: String,
     #[serde(default = "default_format")]
+    #[expect(dead_code)]
     pub format: String,
 }
 
@@ -74,7 +75,7 @@ pub struct BrowseResponse {
 /// Calls `oxibrowser::search::dispatch()` — the same function the agent's
 /// `web_search` tool uses. No agent loop involved.
 pub(crate) async fn handle_search(
-    state: State<Arc<AppState>>,
+    _state: State<Arc<AppState>>,
     Json(body): Json<SearchRequest>,
 ) -> Result<Json<SearchResponse>, AppError> {
     let start = std::time::Instant::now();

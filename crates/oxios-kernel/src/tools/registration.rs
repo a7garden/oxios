@@ -64,13 +64,13 @@ pub fn register_always_on(registry: &ToolRegistry, search_cache: Arc<SearchCache
 /// without it this is a no-op stub so the file compiles unchanged.
 #[cfg(feature = "native-browser")]
 fn register_browser_tools(kernel: &KernelHandle, registry: &ToolRegistry) {
-    if let Some(browser) = &kernel.browser {
-        if let Some(engine) = browser.try_engine() {
-            registry.register(oxi_sdk::BrowseTool::new(engine.clone()));
-            registry.register(oxi_sdk::BrowseExtractTool::new(engine.clone()));
-            registry.register(oxi_sdk::BrowseSessionTool::new(engine.clone()));
-            registry.register(oxi_sdk::BrowseScriptTool::new(engine));
-        }
+    if let Some(browser) = &kernel.browser
+        && let Some(engine) = browser.try_engine()
+    {
+        registry.register(oxi_sdk::BrowseTool::new(engine.clone()));
+        registry.register(oxi_sdk::BrowseExtractTool::new(engine.clone()));
+        registry.register(oxi_sdk::BrowseSessionTool::new(engine.clone()));
+        registry.register(oxi_sdk::BrowseScriptTool::new(engine));
     }
 }
 

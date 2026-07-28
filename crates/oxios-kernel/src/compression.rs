@@ -284,13 +284,13 @@ pub fn session_needs_compression(session: &Session) -> bool {
     if let Some(comp) = session.metadata.get("compression")
         && comp.get("status").and_then(|s| s.as_str()) == Some("done")
     {
-            let covered = comp
-                .get("compressed_before_index")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as usize;
-            if covered >= range_end {
-                return false;
-            }
+        let covered = comp
+            .get("compressed_before_index")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
+        if covered >= range_end {
+            return false;
+        }
     }
     true
 }

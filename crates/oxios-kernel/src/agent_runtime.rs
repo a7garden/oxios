@@ -933,10 +933,10 @@ async fn run_agent(
     // KernelHandle, so this is a one-time cost; agents without a Browser
     // capability still skip tool registration. No-op without `native-browser`.
     #[cfg(feature = "native-browser")]
-    if let Some(browser) = &kernel_handle.browser {
-        if let Err(e) = browser.engine().await {
-            tracing::warn!("browser engine unavailable, browse tools disabled: {e:#}");
-        }
+    if let Some(browser) = &kernel_handle.browser
+        && let Err(e) = browser.engine().await
+    {
+        tracing::warn!("browser engine unavailable, browse tools disabled: {e:#}");
     }
 
     register_tools_from_cspace_gated(

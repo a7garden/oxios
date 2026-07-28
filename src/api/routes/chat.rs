@@ -959,16 +959,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             }
 
                             // Auto-trigger compression for long sessions.
-                            if let Some(sid) = &active_session_id {
-                                if let Some(ref compression) = state.kernel.compression {
-                                    if let Ok(Some(session)) = state.kernel.state.load_session(
-                                        &oxios_kernel::state_store::SessionId(sid.clone()),
-                                    ).await {
-                                        if compression.should_compress(&session) {
-                                            compression.spawn_compress(sid.clone());
-                                        }
-                                    }
-                                }
+                            if let Some(sid) = &active_session_id
+                                && let Some(ref compression) = state.kernel.compression
+                                && let Ok(Some(session)) = state.kernel.state.load_session(
+                                    &oxios_kernel::state_store::SessionId(sid.clone()),
+                                ).await
+                                && compression.should_compress(&session)
+                            {
+                                compression.spawn_compress(sid.clone());
                             }
                         }
                     }
