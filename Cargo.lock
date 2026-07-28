@@ -5510,6 +5510,7 @@ dependencies = [
  "libc",
  "mime_guess",
  "oxi-sdk",
+ "oxibrowser",
  "oxios-calendar",
  "oxios-gateway",
  "oxios-kernel",
