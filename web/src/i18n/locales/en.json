@@ -2278,7 +2278,16 @@
       "placeholder": "Search the web…",
       "agentResults": "Agent search results",
       "empty": "Search the web or wait for agent results",
-      "results": "results"
+      "results": "results",
+      "saveToKnowledge": "Save to Knowledge",
+      "savedToKnowledge": "Saved to Knowledge",
+      "viewInKnowledge": "View in Knowledge",
+      "knowledgeTab": "Knowledge",
+      "webTab": "Web",
+      "knowledgePlaceholder": "Search your knowledge base…",
+      "knowledgeEmpty": "Search your knowledge base",
+      "knowledgeNoResults": "No notes matching '{{query}}'",
+      "openInKnowledge": "Open in Knowledge"
     }
   }
 }

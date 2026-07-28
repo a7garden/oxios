@@ -2274,7 +2274,16 @@
       "placeholder": "웹 검색…",
       "agentResults": "에이전트 검색 결과",
       "empty": "웹을 검색하거나 에이전트 결과를 기다리세요",
-      "results": "개 결과"
+      "results": "개 결과",
+      "saveToKnowledge": "Knowledge에 저장",
+      "savedToKnowledge": "Knowledge에 저장됨",
+      "viewInKnowledge": "Knowledge에서 보기",
+      "knowledgeTab": "Knowledge",
+      "webTab": "Web",
+      "knowledgePlaceholder": "Knowledge 베이스 검색…",
+      "knowledgeEmpty": "Knowledge 베이스를 검색하세요",
+      "knowledgeNoResults": "'{{query}}'와 일치하는 노트가 없습니다",
+      "openInKnowledge": "Knowledge에서 열기"
     }
   }
 }
