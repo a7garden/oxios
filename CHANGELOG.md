@@ -7,19 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-07-28
+
+### Added
+- **Block-stream timeline (web)** — assistant turns now render as
+  interleaved block-stream timelines: reasoning segments, tool calls,
+  and text are each displayed in their full original order instead of
+  being concatenated into a single blob (P3a; see
+  `docs/designs/2026-07-27-block-stream-chat-design.md`).
+- **Persisted reasoning (kernel)** — positioned reasoning segments are
+  stored per-message so the web UI can faithfully reconstruct the
+  interleaved timeline on reopen (P3b).
+- **YAML frontmatter rendering (web)** — knowledge note frontmatter now
+  renders as Obsidian-style property cards instead of enlarged body text.
+  Editing the note's H1 title inline renames the knowledge entry via the
+  frontmatter-aware title API.
+- **HTML knowledge support** — `.html` files are treated as read-only
+  knowledge entries.
+
 ### Fixed
-- **Web UI no longer drifts from the binary across restarts** — the daemon
-  only re-synced the web UI at 03:00 daily, so a frequently-restarted host
-  never caught up (each restart re-scheduled the next 03:00), and
-  `oxios update --web-only` extracted into the legacy `~/.oxios/web/dist/`
-  while the active marker still pointed at the old versioned dir — so the
-  update was silently shadowed and never served. Web-dist sync is now owned
-  by a single `web_dist::sync` core (compare `version.json` to the target →
-  download to a versioned staging dir → atomic publish): the daily check and
-  a new eager startup check both call it, and `--web-only` publishes through
-  it so the marker always matches what's served. The eager startup run is
-  throttled to once/hour via `~/.oxios/web/.last-check` so a crash loop can't
-  exhaust GitHub's unauth rate limit.
+- **Web UI sync drift** — the daemon only re-synced web UI at 03:00 daily,
+  so a frequently-restarted host never caught up. Web-dist sync is now
+  owned by a single `web_dist::sync` core (compare `version.json` →
+  download to staging dir → atomic publish), run both on startup (throttled
+  to once/hour) and on the existing daily schedule.
+- **Rust lint**: trailing blank line in `cron.rs`, empty line after `#[cfg(test)]`
+  attribute in `blacklist.rs`.
+- **Web lint**: import ordering and bracket-to-dot notation fixes across
+  6 test files.
+
+### Changed
+- **StreamProcessor** reworked for block-stream chat model
+- **Gateway**: `active_web_dist.rs`, `gateway.rs`, `gateway_behavior` test
+- **Kernel**: cron scheduler, Cargo.toml updates
+- **API**: bridge and plugin modules updated
+- **CI**: workflow updates
+- **Refactor(web)**: removed legacy ActivityTimeline, activity/toolCalls,
+  and reasoning fields (P3b cleanup)
 
 ## [1.28.0] - 2026-07-27
 
