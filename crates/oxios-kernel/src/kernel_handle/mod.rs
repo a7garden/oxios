@@ -2,6 +2,7 @@
 
 pub mod a2a_api;
 pub mod agent_api;
+pub mod browser_api;
 pub mod calendar_api;
 pub mod email_api;
 pub mod engine_api;
@@ -23,6 +24,7 @@ pub use crate::host_tools::HostToolsApi;
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
 pub use calendar_api::CalendarApi;
+pub use browser_api::BrowserApi;
 pub use email_api::EmailApi;
 pub use engine_api::{
     EngineApi, EngineConfigResponse, FallbackEvent, InputModality, ModelInfo, ProviderCategory,
@@ -89,6 +91,8 @@ pub struct KernelHandle {
     pub mounts: Option<MountApi>,
     /// Execution: config + access management.
     pub exec: ExecApi,
+    /// Headless browser (RFC: browser-migration). `None` unless `[browser].enabled`.
+    pub browser: Option<BrowserApi>,
     /// Agent-to-agent communication.
     pub a2a: A2aApi,
     /// Engine: LLM providers, models, config.
@@ -155,6 +159,7 @@ impl KernelHandle {
             projects,
             mounts: None,
             exec,
+            browser: None,
             a2a,
             engine,
             knowledge,
@@ -197,6 +202,16 @@ impl KernelHandle {
     /// Set the TokenMaxing facade in place (post-construction wiring).
     pub fn set_token_maxing(&mut self, api: TokenMaxingApi) {
         self.token_maxing = Some(api);
+    }
+
+    /// Attach the browser facade (RFC: browser-migration).
+    ///
+    /// Called by the kernel assembler when `[browser].enabled` is set.
+    /// Without the `native-browser` feature the facade exists but never
+    /// produces an engine, so browse tools are not registered.
+    pub fn with_browser(mut self, api: Option<BrowserApi>) -> Self {
+        self.browser = api;
+        self
     }
 
     /// Attach the shared streaming-sink registry. Called by the kernel

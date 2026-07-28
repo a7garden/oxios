@@ -289,6 +289,7 @@ impl Kernel {
                     self.quota_tracker.clone(),
                     self.token_maxer.clone(),
                 ));
+                let kh = kh.with_browser(oxios_kernel::BrowserApi::from_config(&self.config));
                 Arc::new(kh)
             })
             .clone()
@@ -1479,6 +1480,7 @@ impl KernelBuilder {
             } else {
                 kh
             };
+            let kh = kh.with_browser(oxios_kernel::BrowserApi::from_config(&config));
             Arc::new(kh)
         };
 
@@ -1916,9 +1918,9 @@ async fn build_tool_retriever(sm: &SkillManager) -> oxios_kernel::tools::retriev
             "Personal markdown vault — save, read, search documents and notes",
         ),
         (
-            "browser",
+            "browse",
             "os-tool",
-            "Headless browser for web automation and scraping",
+            "Render web pages and read content (markdown/html) — use after web_search for page bodies",
         ),
     ];
 

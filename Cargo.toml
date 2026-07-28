@@ -162,7 +162,7 @@ web = ["dep:axum", "dep:tower", "dep:tower-http",
 cli = ["dep:reedline"]
 # telegram: Telegram bot channel. Source: src/channels/telegram/ (merged from channels/oxios-telegram per RFC-026)
 telegram = []
-browser = []
+browser = ["oxios-kernel/native-browser"]
 sqlite-memory = ["oxios-kernel/sqlite-memory"]
 embedding-gguf = ["oxios-kernel/embedding-gguf"]
 

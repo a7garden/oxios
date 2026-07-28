@@ -58,6 +58,26 @@ pub fn register_always_on(registry: &ToolRegistry, search_cache: Arc<SearchCache
     registry.register(GetSearchResultsTool::new(search_cache));
 }
 
+/// Register the headless-browser browse tools when the engine is available.
+///
+/// The concrete registration runs only with the `native-browser` feature;
+/// without it this is a no-op stub so the file compiles unchanged.
+#[cfg(feature = "native-browser")]
+fn register_browser_tools(kernel: &KernelHandle, registry: &ToolRegistry) {
+    if let Some(browser) = &kernel.browser {
+        if let Some(engine) = browser.try_engine() {
+            registry.register(oxi_sdk::BrowseTool::new(engine.clone()));
+            registry.register(oxi_sdk::BrowseExtractTool::new(engine.clone()));
+            registry.register(oxi_sdk::BrowseSessionTool::new(engine.clone()));
+            registry.register(oxi_sdk::BrowseScriptTool::new(engine));
+        }
+    }
+}
+
+/// No-op stub when the `native-browser` feature is disabled.
+#[cfg(not(feature = "native-browser"))]
+fn register_browser_tools(_kernel: &KernelHandle, _registry: &ToolRegistry) {}
+
 /// Register always-on tools with access gate and (RFC-035) approval wrapping.
 ///
 /// Same as [`register_always_on`] but wraps each tool in [`GatedTool`] so that
@@ -200,8 +220,10 @@ pub fn register_tools_from_cspace(
                 registry.register(ExecTool::from_kernel(kernel));
             }
 
-            // Headless browser
-            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {}
+            // Headless browser — SDK browse tools (pure-Rust oxibrowser-core).
+            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
+                register_browser_tools(kernel, registry);
+            }
 
             // Kernel domain tools
             ResourceRef::KernelDomain { domain } => match domain.as_str() {
@@ -306,8 +328,10 @@ pub fn register_tools_from_cspace_gated(
                 ));
             }
 
-            // Headless browser
-            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {}
+            // Headless browser — SDK browse tools.
+            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
+                register_browser_tools(kernel, registry);
+            }
 
             // Kernel domain tools (same as ungated — these already use KernelHandle internally)
             ResourceRef::KernelDomain { domain } => match domain.as_str() {

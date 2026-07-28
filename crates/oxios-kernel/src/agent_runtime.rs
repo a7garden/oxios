@@ -928,6 +928,17 @@ async fn run_agent(
     let approval_pending = kernel_handle.infra.pending_tool_approvals();
     let path_access_pending = kernel_handle.infra.pending_path_access();
 
+    // Pre-initialize the browser engine so the synchronous registration path
+    // can attach browse tools. The engine is a shared `OnceCell` on the
+    // KernelHandle, so this is a one-time cost; agents without a Browser
+    // capability still skip tool registration. No-op without `native-browser`.
+    #[cfg(feature = "native-browser")]
+    if let Some(browser) = &kernel_handle.browser {
+        if let Err(e) = browser.engine().await {
+            tracing::warn!("browser engine unavailable, browse tools disabled: {e:#}");
+        }
+    }
+
     register_tools_from_cspace_gated(
         &registry,
         &kernel_handle,

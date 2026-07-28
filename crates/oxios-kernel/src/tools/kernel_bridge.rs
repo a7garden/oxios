@@ -40,7 +40,7 @@ impl OxiosKernelBridge {
 
 impl SdkKernelToolProvider for OxiosKernelBridge {
     fn tool_names(&self) -> Vec<&str> {
-        vec![
+        let mut names = vec![
             // Always-on file + web-search tools (registration::register_always_on)
             "read",
             "write",
@@ -75,7 +75,13 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
             "send_email",
             // NOTE: MCP tools use a dynamic `full_name` and are enumerated
             // per-server at registration time, so they are not listed here.
-        ]
+        ];
+
+        // Headless browser — pure-Rust oxibrowser-core browse suite.
+        #[cfg(feature = "native-browser")]
+        names.extend(["browse", "browse_extract", "browse_session", "browse_script"]);
+
+        names
     }
 
     fn register_tools(&self, registry: &ToolRegistry, context: &SdkKernelToolContext) {
@@ -201,7 +207,14 @@ mod tests {
         // + 22 kernel domain (exec, memory×3, subagent, project, mount,
         //   kernel_agent, persona, cron, security, budget, resource, a2a×3,
         //   knowledge, ask_user, marketplace, skill_forge, calendar, send_email)
-        // = 30. MCP tools are dynamic (per-server) and excluded from the list.
-        assert_eq!(names.len(), 30, "expected 30 tools, got {:?}", names);
+        // = 30. MCP tools are dynamic (per-server) and excluded.
+        // +4 browse tools when native-browser feature is enabled.
+        #[allow(unused_mut)]
+        let mut expected = 30_usize;
+        #[cfg(feature = "native-browser")]
+        {
+            expected += 4; // browse, browse_extract, browse_session, browse_script
+        }
+        assert_eq!(names.len(), expected, "expected {expected} tools, got {:?}", names);
     }
 }

@@ -279,7 +279,7 @@ pub use host_tools::{CredentialStatus, DetectedTool, ToolSource};
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
-    A2aApi, AgentApi, CalendarApi, CopilotResponse, EmailApi, EngineApi, EngineConfigResponse,
+    A2aApi, AgentApi, BrowserApi, CalendarApi, CopilotResponse, EmailApi, EngineApi, EngineConfigResponse,
     ExecApi, ExtensionApi, FallbackEvent, HostToolsApi, InfraApi,
     InputModality as EngineInputModality, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi,
     MemoryNote, ModelInfo, MountApi, MountInfo, PersonaApi, ProjectApi, ProjectInfo,

@@ -1,7 +1,6 @@
 # RFC: Browser Migration — oxios → oxi-sdk
 
-> **Status**: In Progress (awaiting SDK publish)
-> **Depends on**: `oxi-sdk` `native-browser` feature + `BrowseSessionTool` (RFC pending in oxi)
+> **Status**: Done (implemented 2026-07-28)
 
 ## Summary
 

@@ -2032,9 +2032,9 @@ pub struct BrowserConfig {
     #[serde(default = "default_browser_enabled")]
     pub enabled: bool,
 
-    /// Engine configuration — passed to oxi-sdk's `native_browser_tools_with_config()`.
-    ///
-    /// All fields have sensible defaults; override only what you need:
+    /// Engine configuration — deserialized directly into the SDK's
+    /// [`BrowseConfig`] and propagated to the pure-Rust `oxibrowser-core`
+    /// backend on first use. All fields have sensible defaults.
     ///
     /// ```toml
     /// [browser.engine]
@@ -2042,8 +2042,10 @@ pub struct BrowserConfig {
     /// obey_robots = false
     /// js_timeout_ms = 10000
     /// ```
+    ///
+    /// [`BrowseConfig`]: oxi_sdk::BrowseConfig
     #[serde(default)]
-    pub engine: serde_json::Value,
+    pub engine: oxi_sdk::BrowseConfig,
 }
 
 fn default_browser_enabled() -> bool {
@@ -2054,7 +2056,7 @@ impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            engine: serde_json::json!({}),
+            engine: oxi_sdk::BrowseConfig::default(),
         }
     }
 }
