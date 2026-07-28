@@ -25,7 +25,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - uses: oven-sh/setup-bun@v2
+      - name: Use system bun
+        run: which bun && bun --version
       - name: Build web assets
         working-directory: web
         run: bun install --frozen-lockfile && bun run build

@@ -58,9 +58,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.14"
+      - name: Use system bun
+        run: which bun && bun --version
 
       - name: Install deps
         working-directory: web
@@ -112,9 +111,8 @@ jobs:
 
       # Build web assets before Rust compilation: build.rs emits the
       # `web_embedded` cfg when web/dist exists, baking the UI into the binary.
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.14"
+      - name: Use system bun
+        run: which bun && bun --version
 
       - name: Build web assets
         working-directory: web
