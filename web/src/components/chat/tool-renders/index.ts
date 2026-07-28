@@ -18,6 +18,7 @@ import { registerToolRender } from './registry'
 import { SendEmailRender } from './SendEmail'
 import { WebFetchRender } from './WebFetch'
 import { WebSearchRender } from './WebSearch'
+import { BrowseRender } from './Browse'
 
 // ── File operations ──
 registerToolRender('read_file', FileReadRender)
@@ -54,6 +55,12 @@ registerToolRender('get_search_results', WebSearchRender)
 registerToolRender('web_fetch', WebFetchRender)
 registerToolRender('webFetch', WebFetchRender)
 registerToolRender('fetch', WebFetchRender)
+
+// Browse (headless browser page reading)
+registerToolRender('browse', BrowseRender)
+registerToolRender('browse_extract', BrowseRender)
+registerToolRender('browse_session', BrowseRender)
+registerToolRender('browse_script', BrowseRender)
 
 // ── Communication ──
 registerToolRender('send_email', SendEmailRender)
