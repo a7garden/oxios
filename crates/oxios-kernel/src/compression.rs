@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use serde_json::json;
 
 use crate::config::OxiosConfig;
@@ -192,7 +192,9 @@ impl CompressionService {
         // Build context and stream.
         let mut ctx = oxi_sdk::Context::new();
         ctx.set_system_prompt(COMPRESSION_SYSTEM_PROMPT);
-        ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(user_prompt)));
+        ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(
+            user_prompt,
+        )));
 
         let stream = resolved
             .provider
@@ -279,8 +281,9 @@ pub fn session_needs_compression(session: &Session) -> bool {
         return false;
     }
     let range_end = count.saturating_sub(VISIBLE_TAIL);
-    if let Some(comp) = session.metadata.get("compression") {
-        if comp.get("status").and_then(|s| s.as_str()) == Some("done") {
+    if let Some(comp) = session.metadata.get("compression")
+        && comp.get("status").and_then(|s| s.as_str()) == Some("done")
+    {
             let covered = comp
                 .get("compressed_before_index")
                 .and_then(|v| v.as_u64())
@@ -288,7 +291,6 @@ pub fn session_needs_compression(session: &Session) -> bool {
             if covered >= range_end {
                 return false;
             }
-        }
     }
     true
 }

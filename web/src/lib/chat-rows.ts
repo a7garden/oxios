@@ -11,7 +11,12 @@ import type { ChatMessage, CompressionInfo } from '@/types'
 /** One renderable row in the virtualized chat list. */
 export type ChatRow =
   | { kind: 'empty' }
-  | { kind: 'collapse-bar'; count: number; foldedMessages: ChatMessage[]; compression: CompressionInfo | null }
+  | {
+      kind: 'collapse-bar'
+      count: number
+      foldedMessages: ChatMessage[]
+      compression: CompressionInfo | null
+    }
   | { kind: 'message'; message: ChatMessage; index: number }
   | { kind: 'interview' }
   | { kind: 'tool-approval' }

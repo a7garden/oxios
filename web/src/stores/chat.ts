@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { adaptChunk } from '@/lib/stream/adapter'
 import type { ProcessorResult } from '@/lib/stream/StreamProcessor'
 import { StreamProcessor } from '@/lib/stream/StreamProcessor'
+import { usePortalStore } from '@/stores/portal'
 import type {
   ChatActivity,
   ChatBlock,
@@ -15,7 +16,6 @@ import type {
   ToolCallContext,
 } from '@/types'
 import { useAuthStore } from './auth'
-import { usePortalStore } from '@/stores/portal'
 
 // ---------------------------------------------------------------------------
 // Persisted state (survives tab switches)
@@ -1785,9 +1785,7 @@ export const useChatStore = create<ChatStore>()(
           }
           case 'compression_done': {
             set((s) => ({
-              compression: s.compression
-                ? { ...s.compression, status: 'done' as const }
-                : null,
+              compression: s.compression ? { ...s.compression, status: 'done' as const } : null,
             }))
             break
           }
