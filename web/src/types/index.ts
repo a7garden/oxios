@@ -25,7 +25,6 @@ export type {
   GroundingSearch,
   ImageCitationItem,
   ReasoningBlock,
-
   TextBlock,
   ToolBlock,
   ToolRenderProps,

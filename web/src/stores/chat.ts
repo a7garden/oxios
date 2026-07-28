@@ -12,7 +12,6 @@ import type {
   Project,
   StreamChunk,
   ToolCallContext,
-
 } from '@/types'
 import { useAuthStore } from './auth'
 
@@ -213,8 +212,6 @@ export function parseChunk(raw: unknown): StreamChunk {
   return { type: 'error', error: 'Malformed chunk' }
 }
 
-
-
 // ---------------------------------------------------------------------------
 // Shared message-transform primitives
 // ---------------------------------------------------------------------------
@@ -319,8 +316,7 @@ export function finalizeStreamingMessage(messages: ChatMessage[]): ChatMessage[]
   if (last?.role !== 'assistant' || !last.generating) return messages
   // Blocks are the single source of truth; a turn with non-empty blocks is
   // not empty even if `content` is blank.
-  const isEmpty =
-    !(last.content ?? '').trim() && !(last.blocks && last.blocks.length > 0)
+  const isEmpty = !(last.content ?? '').trim() && !(last.blocks && last.blocks.length > 0)
   if (isEmpty) return messages.slice(0, -1)
   return messages.map((m, i) =>
     i === messages.length - 1
@@ -356,8 +352,6 @@ function trajectoryToActivity(step: {
     ...(step.context ? { context: step.context } : {}),
   }
 }
-
-
 
 export function getToken(): string {
   return useAuthStore.getState().token || ''
@@ -672,8 +666,6 @@ function applyProcessorResult(
   }
   return next
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Pure content-chunk routing — shared with quick-ask.ts.
@@ -1121,9 +1113,7 @@ export const useChatStore = create<ChatStore>()(
               // and the reasoning segments (no ChatActivity intermediate).
               const reasoning = reasoningRecords[i]
               const segs = reasoning?.segments
-              const toolBlockCount = toolSlice.filter(
-                (a) => a.type === 'tool_call',
-              ).length
+              const toolBlockCount = toolSlice.filter((a) => a.type === 'tool_call').length
               // Build a { before_step -> text[] } index of reasoning segments.
               const byPos = new Map<number, string[]>()
               if (segs && segs.length > 0) {
@@ -1613,7 +1603,6 @@ export const useChatStore = create<ChatStore>()(
 
             set((s) => {
               const updated = [...s.messages]
-
 
               // Find the last assistant message to attach metadata.
               // If none exists yet (e.g. a task that only ran tools with

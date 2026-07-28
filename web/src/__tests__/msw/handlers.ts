@@ -42,9 +42,7 @@ export const handlers = [
   // Stub it so any code path that auto-requests a dev token (e.g. on
   // session restore) does not blow up the `onUnhandledRequest: 'error'`
   // policy.
-  http.post('/api/auth/token', () =>
-    HttpResponse.json({ token: 'dev-token', expiresIn: 3600 }),
-  ),
+  http.post('/api/auth/token', () => HttpResponse.json({ token: 'dev-token', expiresIn: 3600 })),
 
   // ── Health / version ────────────────────────────────────────────────────
   http.get('/api/health', () => HttpResponse.json({ status: 'ok' })),
@@ -69,9 +67,7 @@ export const handlers = [
   http.get('/api/mounts', () => HttpResponse.json({ mounts: [] })),
 
   // ── Models ──────────────────────────────────────────────────────────────
-  http.get('/api/models', () =>
-    HttpResponse.json({ providers: [], models: [], default: null }),
-  ),
+  http.get('/api/models', () => HttpResponse.json({ providers: [], models: [], default: null })),
 
   // ── Cost / token usage ──────────────────────────────────────────────────
   http.get('/api/cost', () =>
@@ -81,9 +77,7 @@ export const handlers = [
       byModel: [],
     }),
   ),
-  http.get('/api/token-usage', () =>
-    HttpResponse.json({ total: 0, sessions: [] }),
-  ),
+  http.get('/api/token-usage', () => HttpResponse.json({ total: 0, sessions: [] })),
 
   // ── Notifications ───────────────────────────────────────────────────────
   http.get('/api/notifications', () => HttpResponse.json({ items: [] })),

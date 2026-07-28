@@ -1,4 +1,3 @@
-import type { ChatBlock } from '@/types'
 import { useRouter } from '@tanstack/react-router'
 import { Check, Copy, MessageSquarePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -20,6 +19,7 @@ import { useEngineConfig } from '@/hooks/use-engine'
 import { api } from '@/lib/api-client'
 import { useChatStore } from '@/stores/chat'
 import { useQuickAskStore } from '@/stores/quick-ask'
+import type { ChatBlock } from '@/types'
 
 /**
  * QuickAskDialog — global one-shot question overlay.

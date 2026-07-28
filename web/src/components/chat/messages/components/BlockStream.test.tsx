@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import type { ChatBlock } from '@/types'
 import { BlockStream } from './BlockStream'
 

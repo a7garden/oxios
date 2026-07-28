@@ -95,9 +95,7 @@ describe('SseClient data parsing', () => {
   })
 
   it('emits parsed event + JSON data on default "message" events', async () => {
-    const fetchMock = vi.fn(async () =>
-      sseResponse(new ScriptedBody('data: {"foo":"bar"}\n\n')),
-    )
+    const fetchMock = vi.fn(async () => sseResponse(new ScriptedBody('data: {"foo":"bar"}\n\n')))
     vi.stubGlobal('fetch', fetchMock)
 
     const events: Array<{ name: string; data: unknown }> = []
@@ -187,8 +185,8 @@ describe('SseClient data parsing', () => {
     const client = new SseClient()
     await client.connect('/api/events', vi.fn(), vi.fn(), () => {})
 
-    expect(headers['Authorization']).toBe('Bearer test-token')
-    expect(headers['Accept']).toBe('text/event-stream')
+    expect(headers.Authorization).toBe('Bearer test-token')
+    expect(headers.Accept).toBe('text/event-stream')
     expect(headers['Cache-Control']).toBe('no-cache')
     client.disconnect()
   })

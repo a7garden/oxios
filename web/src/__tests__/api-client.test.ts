@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
 import { HttpResponse, http } from 'msw'
+import { afterEach, describe, expect, it } from 'vitest'
 import { ApiError, api, apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/stores/auth'
 import { server } from './msw/server'
@@ -93,10 +93,12 @@ describe('apiClient', () => {
 
   it('parses text/* responses as raw text', async () => {
     server.use(
-      http.get('/api/raw', () =>
-        new HttpResponse('# Markdown', {
-          headers: { 'content-type': 'text/markdown; charset=utf-8' },
-        }),
+      http.get(
+        '/api/raw',
+        () =>
+          new HttpResponse('# Markdown', {
+            headers: { 'content-type': 'text/markdown; charset=utf-8' },
+          }),
       ),
     )
     const out = await apiClient<string>('/api/raw')
@@ -105,8 +107,9 @@ describe('apiClient', () => {
 
   it('parses application/toml responses as text', async () => {
     server.use(
-      http.get('/api/config', () =>
-        new HttpResponse('title = "hi"', { headers: { 'content-type': 'application/toml' } }),
+      http.get(
+        '/api/config',
+        () => new HttpResponse('title = "hi"', { headers: { 'content-type': 'application/toml' } }),
       ),
     )
     const out = await apiClient<string>('/api/config')
@@ -185,12 +188,14 @@ describe('apiClient', () => {
 
   it('throws ApiError carrying status, statusText, and body for non-2xx', async () => {
     server.use(
-      http.get('/api/boom', () =>
-        new HttpResponse('{"error":"nope"}', {
-          status: 404,
-          statusText: 'Not Found',
-          headers: { 'content-type': 'application/json' },
-        }),
+      http.get(
+        '/api/boom',
+        () =>
+          new HttpResponse('{"error":"nope"}', {
+            status: 404,
+            statusText: 'Not Found',
+            headers: { 'content-type': 'application/json' },
+          }),
       ),
     )
     await expect(apiClient('/api/boom')).rejects.toMatchObject({
@@ -204,8 +209,9 @@ describe('apiClient', () => {
   it('calls useAuthStore.logout() on 401 responses', async () => {
     useAuthStore.getState().setToken('will-be-revoked')
     server.use(
-      http.get('/api/expired', () =>
-        new HttpResponse(null, { status: 401, statusText: 'Unauthorized' }),
+      http.get(
+        '/api/expired',
+        () => new HttpResponse(null, { status: 401, statusText: 'Unauthorized' }),
       ),
     )
     await expect(apiClient('/api/expired')).rejects.toBeInstanceOf(ApiError)

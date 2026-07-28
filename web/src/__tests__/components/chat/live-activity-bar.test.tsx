@@ -6,14 +6,14 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LiveActivityBar } from '@/components/chat/live-activity-bar'
+import { useChatStore } from '@/stores/chat'
 import type { ChatMessage } from '@/types'
 import type { ChatBlock, ReasoningBlock, ToolBlock } from '@/types/chat'
-import { useChatStore } from '@/stores/chat'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
-      if (opts && 'name' in opts) return `${key}:${String(opts['name'])}`
+      if (opts && 'name' in opts) return `${key}:${String(opts.name)}`
       return key
     },
     i18n: { language: 'en' },
@@ -177,9 +177,7 @@ describe('LiveActivityBar', () => {
     useChatStore.setState({
       isStreaming: true,
       streamStartedAt: NOW,
-      messages: [
-        assistantWithBlocks([streamingReasoning(), loadingTool({ apiName: 'exec' })]),
-      ],
+      messages: [assistantWithBlocks([streamingReasoning(), loadingTool({ apiName: 'exec' })])],
     })
     render(<LiveActivityBar />)
     // toolVerb maps exec → chat.liveActivity.exec

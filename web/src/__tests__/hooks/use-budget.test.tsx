@@ -240,9 +240,7 @@ describe('useBudgetReset', () => {
       }),
     )
     server.use(
-      http.post('/api/budget/:agentId/reset', () =>
-        new HttpResponse('boom', { status: 500 }),
-      ),
+      http.post('/api/budget/:agentId/reset', () => new HttpResponse('boom', { status: 500 })),
     )
 
     const wrapper = createWrapper()

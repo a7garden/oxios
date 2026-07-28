@@ -235,7 +235,6 @@ export class StreamProcessor {
         return { patch: { chunksList: ev.chunks } }
 
       case 'phase':
-
         return { patch: {} }
 
       case 'stream.stop':
@@ -386,5 +385,3 @@ export class StreamProcessor {
     }
   }
 }
-
-

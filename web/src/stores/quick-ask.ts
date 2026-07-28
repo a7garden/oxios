@@ -22,7 +22,6 @@ import {
 // Token batching uses the same RAF pattern as chat.ts so the UX is identical.
 // ---------------------------------------------------------------------------
 
-
 export interface CapturedExchange {
   prompt: string
   reply: string
@@ -178,7 +177,6 @@ export const useQuickAskStore = create<QuickAskState>((set, get) => ({
       role: 'assistant',
       content: '',
       timestamp: now,
-
     }
     const baseMessages = [...messages, userMsg, assistantMsg]
     set({ messages: baseMessages, isStreaming: true, pendingModel: null })

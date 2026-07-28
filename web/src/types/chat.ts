@@ -17,8 +17,6 @@ export interface ChatError {
   type: string // ErrorType from model-runtime
 }
 
-
-
 export interface CitationItem {
   favicon?: string
   id?: string

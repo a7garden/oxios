@@ -13,9 +13,9 @@ import { flattenTree } from '@/lib/tree-utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { type EditorStats, EditorStatusBar } from './editor-status-bar'
 import { EditorToolbar } from './editor-toolbar'
+import { HtmlRenderer } from './html-renderer'
 import { MarkdownEditor } from './markdown-editor'
 import { SplitEditor } from './split-editor'
-import { HtmlRenderer } from './html-renderer'
 
 export function EditorPanel() {
   const { t } = useTranslation()

@@ -348,7 +348,9 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       source: 'compaction',
     })
     const last = useChatStore.getState().messages.at(-1)!
-    expect(last.blocks?.some((b) => b.type === 'reasoning' && b.text === 'compaction complete')).toBe(true)
+    expect(
+      last.blocks?.some((b) => b.type === 'reasoning' && b.text === 'compaction complete'),
+    ).toBe(true)
     expect(last.blocks?.find((b) => b.type === 'reasoning')?.source).toBe('compaction')
   })
 
@@ -554,8 +556,6 @@ describe('useChatStore handleChunk (RFC-015)', () => {
   })
 })
 
-
-
 // The message-transform primitives route every chunk through a single shared
 // path in chat.ts; both the chat store and the quick-ask store call them, so
 // these tests guard the Cmd+J (one-shot) path too (which has no store tests).
@@ -599,7 +599,6 @@ describe('message-transform primitives (shared by chat + quick-ask stores)', () 
     const input = [assistant({ content: 'foo' })]
     expect(appendTokenToMessages(input, '', ctx)).toBe(input)
   })
-
 
   it('patchAssistantModel patches the last assistant model', () => {
     const out = patchAssistantModel([assistant({ model: 'old' })], 'new')

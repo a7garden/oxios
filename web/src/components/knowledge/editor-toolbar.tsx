@@ -38,7 +38,11 @@ export function EditorToolbar() {
 
   const canGoBack = historyIndex > 0
   const canGoForward = historyIndex < history.length - 1
-  const fileName = currentFilePath?.split('/').pop()?.replace(/\.(md|html)$/, '') ?? ''
+  const fileName =
+    currentFilePath
+      ?.split('/')
+      .pop()
+      ?.replace(/\.(md|html)$/, '') ?? ''
 
   const handleSave = () => {
     document.dispatchEvent(new CustomEvent('knowledge:save'))

@@ -9,7 +9,6 @@ import {
 import type { ChatActivity } from '@/types'
 import type { ChatBlock, ReasoningBlock, ToolBlock } from '@/types/chat'
 
-
 const NOW = new Date().toISOString()
 
 /** Convenience: build a minimal tool_call activity with the running flag. */

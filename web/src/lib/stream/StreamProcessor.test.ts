@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ReasoningBlock } from '@/types'
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, ReasoningBlock } from '@/types'
 import { StreamProcessor } from './StreamProcessor'
 
 const base = { id: 'm1', role: 'assistant', content: '' } as ChatMessage
@@ -14,8 +13,20 @@ describe('StreamProcessor — block-stream timeline', () => {
     const p = new StreamProcessor('m1')
     p.handleEvent({ kind: 'reasoning.start', messageId: 'm1' })
     p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'need to grep' })
-    p.handleEvent({ kind: 'tool.start', messageId: 'm1', toolCallId: 't1', toolName: 'grep', args: { q: 'foo' } })
-    p.handleEvent({ kind: 'tool.end', messageId: 'm1', toolCallId: 't1', result: 'match', durationMs: 10 })
+    p.handleEvent({
+      kind: 'tool.start',
+      messageId: 'm1',
+      toolCallId: 't1',
+      toolName: 'grep',
+      args: { q: 'foo' },
+    })
+    p.handleEvent({
+      kind: 'tool.end',
+      messageId: 'm1',
+      toolCallId: 't1',
+      result: 'match',
+      durationMs: 10,
+    })
     p.handleEvent({ kind: 'reasoning.start', messageId: 'm1' })
     p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'now read' })
     p.handleEvent({ kind: 'text.delta', messageId: 'm1', text: 'Answer' })
@@ -30,9 +41,21 @@ describe('StreamProcessor — block-stream timeline', () => {
 
   it('merges tool progress/end into the same tool block by id', () => {
     const p = new StreamProcessor('m1')
-    p.handleEvent({ kind: 'tool.start', messageId: 'm1', toolCallId: 't1', toolName: 'bash', args: {} })
+    p.handleEvent({
+      kind: 'tool.start',
+      messageId: 'm1',
+      toolCallId: 't1',
+      toolName: 'bash',
+      args: {},
+    })
     p.handleEvent({ kind: 'tool.progress', messageId: 'm1', toolCallId: 't1', progress: 'step 1' })
-    p.handleEvent({ kind: 'tool.end', messageId: 'm1', toolCallId: 't1', result: 'ok', durationMs: 5 })
+    p.handleEvent({
+      kind: 'tool.end',
+      messageId: 'm1',
+      toolCallId: 't1',
+      result: 'ok',
+      durationMs: 5,
+    })
 
     const tools = blocksOf(p).filter((b) => b.type === 'tool')
     expect(tools).toHaveLength(1)
@@ -43,8 +66,20 @@ describe('StreamProcessor — block-stream timeline', () => {
     const p = new StreamProcessor('m1')
     p.handleEvent({ kind: 'text.delta', messageId: 'm1', text: 'Hello' })
     p.handleEvent({ kind: 'text.delta', messageId: 'm1', text: ' world' })
-    p.handleEvent({ kind: 'tool.start', messageId: 'm1', toolCallId: 't1', toolName: 'ls', args: {} })
-    p.handleEvent({ kind: 'tool.end', messageId: 'm1', toolCallId: 't1', result: 'x', durationMs: 1 })
+    p.handleEvent({
+      kind: 'tool.start',
+      messageId: 'm1',
+      toolCallId: 't1',
+      toolName: 'ls',
+      args: {},
+    })
+    p.handleEvent({
+      kind: 'tool.end',
+      messageId: 'm1',
+      toolCallId: 't1',
+      result: 'x',
+      durationMs: 1,
+    })
     p.handleEvent({ kind: 'text.delta', messageId: 'm1', text: 'After' })
 
     const texts = blocksOf(p).filter((b) => b.type === 'text')
@@ -57,7 +92,13 @@ describe('StreamProcessor — block-stream timeline', () => {
     const p = new StreamProcessor('m1')
     p.handleEvent({ kind: 'reasoning.start', messageId: 'm1' })
     p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'thinking…' })
-    p.handleEvent({ kind: 'tool.start', messageId: 'm1', toolCallId: 't1', toolName: 'ls', args: {} })
+    p.handleEvent({
+      kind: 'tool.start',
+      messageId: 'm1',
+      toolCallId: 't1',
+      toolName: 'ls',
+      args: {},
+    })
 
     expect(blocksOf(p)[0]).toMatchObject({ type: 'reasoning', status: 'done' })
   })
@@ -106,7 +147,10 @@ describe('StreamProcessor — block-stream timeline', () => {
 
     const reasoning = blocksOf(p).filter((b): b is ReasoningBlock => b.type === 'reasoning')
     expect(reasoning).toHaveLength(1)
-    expect(reasoning[0]).toMatchObject({ source: 'compaction', text: 'compaction complete (kept) more' })
+    expect(reasoning[0]).toMatchObject({
+      source: 'compaction',
+      text: 'compaction complete (kept) more',
+    })
   })
 
   it('applies source when the first reasoning delta opens its own block', () => {

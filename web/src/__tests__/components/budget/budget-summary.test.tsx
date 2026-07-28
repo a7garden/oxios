@@ -115,9 +115,11 @@ describe('BudgetSummaryCard', () => {
     // count text node (`0` for `total_agents`) so we pin the consumer-
     // visible value without relying on `getByText`, which would be
     // ambiguous against the other zero-value fields.
-    const totalAgents = screen.getByText('budget.totalAgents').nextElementSibling as HTMLElement | null
+    const totalAgents = screen.getByText('budget.totalAgents')
+      .nextElementSibling as HTMLElement | null
     expect(totalAgents?.textContent).toBe('0')
-    const exhausted = screen.getByText('budget.exhaustedCount').nextElementSibling as HTMLElement | null
+    const exhausted = screen.getByText('budget.exhaustedCount')
+      .nextElementSibling as HTMLElement | null
     expect(exhausted?.textContent).toBe('0')
     const bar = container.querySelector('div[style*="width"]') as HTMLElement | null
     expect(bar).not.toBeNull()
