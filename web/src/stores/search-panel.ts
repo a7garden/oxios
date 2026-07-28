@@ -6,6 +6,7 @@
 // and per-card expand state.
 
 import { create } from 'zustand'
+import type { KnowledgeSearchHit } from '@/types/knowledge'
 
 // ── Types ──
 
@@ -54,11 +55,35 @@ export interface SearchPanelState {
   // UI state
   expandedUrls: Set<string>
 
+  // Knowledge tab state
+  activeTab: 'web' | 'knowledge'
+  knowledgeResults: KnowledgeSearchHit[]
+  knowledgeLoading: boolean
+  knowledgeError: string | null
+  selectedKnowledgePath: string | null
+  selectedKnowledgeContent: string | null
+  selectedKnowledgeLoading: boolean
+
+  // Save to Knowledge modal
+  saveModalOpen: boolean
+  saveUrl: string
+  saveTitle: string
+  saveContent: string
+  savePath: string
+  saveLoading: boolean
+  saveError: string | null
+
   // Actions
   search: (query: string) => Promise<void>
   browse: (url: string) => Promise<void>
   toggleExpand: (url: string) => void
   saveToKnowledge: (url: string, title: string, content: string) => Promise<void>
+  setActiveTab: (tab: 'web' | 'knowledge') => void
+  searchKnowledge: (query: string) => Promise<void>
+  selectKnowledge: (path: string) => Promise<void>
+  openSaveModal: (url: string, title: string, content: string) => void
+  closeSaveModal: () => void
+  saveModalSave: () => Promise<void>
   reset: () => void
 }
 
@@ -73,6 +98,22 @@ export const useSearchPanelStore = create<SearchPanelState>((set, get) => ({
   browseError: {},
 
   expandedUrls: new Set<string>(),
+
+  activeTab: 'web',
+  knowledgeResults: [],
+  knowledgeLoading: false,
+  knowledgeError: null,
+  selectedKnowledgePath: null,
+  selectedKnowledgeContent: null,
+  selectedKnowledgeLoading: false,
+
+  saveModalOpen: false,
+  saveUrl: '',
+  saveTitle: '',
+  saveContent: '',
+  savePath: '',
+  saveLoading: false,
+  saveError: null,
 
   search: async (query: string) => {
     if (!query.trim()) return
@@ -143,6 +184,95 @@ export const useSearchPanelStore = create<SearchPanelState>((set, get) => ({
     }
   },
 
+  setActiveTab: (tab) => {
+    set({ activeTab: tab })
+  },
+
+  searchKnowledge: async (query) => {
+    if (!query.trim()) {
+      set({ knowledgeResults: [], knowledgeError: null })
+      return
+    }
+    set({ knowledgeLoading: true, knowledgeError: null })
+    try {
+      const res = await fetch('/api/knowledge/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, limit: 50 }),
+      })
+      if (!res.ok) throw new Error(`Knowledge search failed: ${res.status}`)
+      const data = await res.json()
+      set({ knowledgeResults: data.results as KnowledgeSearchHit[], knowledgeLoading: false })
+    } catch (e) {
+      set({ knowledgeError: (e as Error).message, knowledgeLoading: false })
+    }
+  },
+
+  selectKnowledge: async (path) => {
+    set({
+      selectedKnowledgePath: path,
+      selectedKnowledgeLoading: true,
+      selectedKnowledgeContent: null,
+    })
+    try {
+      const encoded = path
+        .split('/')
+        .map((seg) => encodeURIComponent(seg))
+        .join('/')
+      const res = await fetch(`/api/knowledge/file/${encoded}`)
+      if (!res.ok) throw new Error(`Read failed: ${res.status}`)
+      const data = await res.json()
+      set({ selectedKnowledgeContent: data.content, selectedKnowledgeLoading: false })
+    } catch (e) {
+      set({ selectedKnowledgeLoading: false })
+    }
+  },
+
+  openSaveModal: (url, title, content) => {
+    let domain = 'web'
+    try {
+      domain = new URL(url).hostname
+    } catch {
+      /* keep default */
+    }
+    const date = new Date().toISOString().slice(0, 10)
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 40) || 'page'
+    set({
+      saveModalOpen: true,
+      saveUrl: url,
+      saveTitle: title,
+      saveContent: content,
+      savePath: `web-clippings/${domain}/${date}-${slug}.md`,
+      saveError: null,
+    })
+  },
+
+  closeSaveModal: () => {
+    set({ saveModalOpen: false })
+  },
+
+  saveModalSave: async () => {
+    const state = get()
+    if (!state.saveTitle.trim() || !state.savePath.trim()) return
+    set({ saveLoading: true, saveError: null })
+    try {
+      const body = `# ${state.saveTitle}\n> **Source:** [${state.saveUrl}](${state.saveUrl})\n> **Saved:** ${new Date().toISOString().slice(0, 10)}\n\n${state.saveContent}`
+      const res = await fetch('/api/knowledge/file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: state.savePath, content: body }),
+      })
+      if (!res.ok) throw new Error(`Save failed: ${res.status}`)
+      set({ saveLoading: false, saveModalOpen: false })
+    } catch (e) {
+      set({ saveError: (e as Error).message, saveLoading: false })
+    }
+  },
+
   reset: () => {
     set({
       manualQuery: '',
@@ -150,6 +280,14 @@ export const useSearchPanelStore = create<SearchPanelState>((set, get) => ({
       manualLoading: false,
       manualError: null,
       expandedUrls: new Set<string>(),
+      activeTab: 'web',
+      knowledgeResults: [],
+      knowledgeLoading: false,
+      knowledgeError: null,
+      selectedKnowledgePath: null,
+      selectedKnowledgeContent: null,
+      selectedKnowledgeLoading: false,
+      saveModalOpen: false,
     })
   },
 }))
