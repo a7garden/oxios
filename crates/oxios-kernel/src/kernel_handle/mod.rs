@@ -4,6 +4,7 @@ pub mod a2a_api;
 pub mod agent_api;
 pub mod browser_api;
 pub mod calendar_api;
+pub mod compression_api;
 pub mod email_api;
 pub mod engine_api;
 pub mod exec_api;
@@ -24,6 +25,7 @@ pub use crate::host_tools::HostToolsApi;
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
 pub use calendar_api::CalendarApi;
+pub use compression_api::CompressionApi;
 pub use browser_api::BrowserApi;
 pub use email_api::EmailApi;
 pub use engine_api::{
@@ -110,6 +112,8 @@ pub struct KernelHandle {
     /// Token-maxing (RFC-031): the shared QuotaTracker facade. `None` only on
     /// the incomplete preliminary handle; the cached handle attaches it.
     pub token_maxing: Option<TokenMaxingApi>,
+    /// Context compression: LLM session summaries (optional).
+    pub compression: Option<CompressionApi>,
     /// Host Integrations (RFC-041): host-CLI discovery, OAuth, provisioning.
     pub host_tools: HostToolsApi,
     /// RFC-024 SP4: subsystem readiness gate.
@@ -168,6 +172,7 @@ impl KernelHandle {
             calendar,
             email,
             token_maxing: None,
+            compression: None,
             host_tools: HostToolsApi::new(),
             // RFC-024 SP4: default Warming/no-deadline. The Kernel
             // (src/kernel.rs) sets the actual state and deadline during
@@ -202,6 +207,12 @@ impl KernelHandle {
     /// Set the TokenMaxing facade in place (post-construction wiring).
     pub fn set_token_maxing(&mut self, api: TokenMaxingApi) {
         self.token_maxing = Some(api);
+    }
+
+    /// Attach the CompressionApi facade. Called by the kernel assembler.
+    pub fn with_compression(mut self, api: CompressionApi) -> Self {
+        self.compression = Some(api);
+        self
     }
 
     /// Attach the browser facade (RFC: browser-migration).

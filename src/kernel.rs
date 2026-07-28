@@ -290,6 +290,13 @@ impl Kernel {
                     self.token_maxer.clone(),
                 ));
                 let kh = kh.with_browser(oxios_kernel::BrowserApi::from_config(&self.config));
+                let compression_service = Arc::new(oxios_kernel::CompressionService::new(
+                    self.state_store.clone(),
+                    self.engine_handle.clone(),
+                    self.config.clone(),
+                    self.event_bus.clone(),
+                ));
+                let kh = kh.with_compression(oxios_kernel::CompressionApi::new(compression_service));
                 Arc::new(kh)
             })
             .clone()
@@ -1481,6 +1488,13 @@ impl KernelBuilder {
                 kh
             };
             let kh = kh.with_browser(oxios_kernel::BrowserApi::from_config(&config));
+            let compression_svc = Arc::new(oxios_kernel::CompressionService::new(
+                state_store.clone(),
+                engine_handle.clone(),
+                config.clone(),
+                event_bus.clone(),
+            ));
+            let kh = kh.with_compression(oxios_kernel::CompressionApi::new(compression_svc));
             Arc::new(kh)
         };
 

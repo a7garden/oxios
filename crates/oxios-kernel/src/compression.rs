@@ -80,8 +80,8 @@ Preserve essential code snippets, commands, or technical syntax
 /// LLM-generated session summary service.
 pub struct CompressionService {
     state_store: Arc<StateStore>,
-    engine_handle: EngineHandle,
-    config: Arc<RwLock<OxiosConfig>>,
+    engine_handle: Arc<EngineHandle>,
+    config: OxiosConfig,
     event_bus: EventBus,
     /// Sessions currently being compressed (prevents concurrent runs).
     active: Mutex<HashSet<String>>,
@@ -91,8 +91,8 @@ impl CompressionService {
     /// Create a new CompressionService.
     pub fn new(
         state_store: Arc<StateStore>,
-        engine_handle: EngineHandle,
-        config: Arc<RwLock<OxiosConfig>>,
+        engine_handle: Arc<EngineHandle>,
+        config: OxiosConfig,
         event_bus: EventBus,
     ) -> Self {
         Self {
@@ -181,8 +181,8 @@ impl CompressionService {
 
         // Resolve model.
         let resolved = {
-            let cfg = self.config.read();
-            match cfg.system_agents.model_for_task("history_compress") {
+            let model_id = self.config.system_agents.model_for_task("history_compress");
+            match model_id {
                 Some(id) => self.engine_handle.resolve(&id),
                 None => self.engine_handle.resolve_default(),
             }

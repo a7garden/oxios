@@ -227,6 +227,9 @@ pub use tools::{ExecTool, KnowledgeTool};
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 // Token-maxing (RFC-031): self-tracker + QuotaTracker + maxer/planner/session.
 pub use kernel_handle::TokenMaxingApi;
+// Compression — LLM session summaries (LobeHub port).
+pub use compression::CompressionService;
+pub use kernel_handle::CompressionApi;
 pub use token_maxing::{
     Availability, CooldownRecord, ProviderBudget, ProviderSnapshot, ProviderState, QuotaTracker,
     QuotaTrackerSnapshot, RecalibrationOutcome, RecalibrationRecord, ReserveError,
