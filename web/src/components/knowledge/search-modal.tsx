@@ -1,10 +1,11 @@
 import { useRouterState } from '@tanstack/react-router'
-import { FileText, Folder, Search } from 'lucide-react'
+import { ExternalLink, FileText, Folder, Globe, Loader2, Search } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useKnowledgeSearch, useKnowledgeTree } from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { usePortalStore } from '@/stores/portal'
 import type { KnowledgeSearchHit, KnowledgeTreeEntry } from '@/types/knowledge'
 
 interface SearchModalProps {
@@ -49,6 +50,12 @@ export function SearchModal({
 
   const isMoveMode = selectedMessageText != null
   const [searchResults, setSearchResults] = useState<KnowledgeSearchHit[]>([])
+
+  // ── Web tab state ────────────────────────────────────────────
+  const [searchTab, setSearchTab] = useState<'files' | 'web'>('files')
+  const [webQuery, setWebQuery] = useState('')
+  const [webResults, setWebResults] = useState<{ title: string; url: string; snippet: string }[]>([])
+  const [webLoading, setWebLoading] = useState(false)
 
   // ── Build the display list ──────────────────────────────────
   const recentFiles: ResultItem[] = (treeEntries ?? [])
@@ -142,6 +149,34 @@ export function SearchModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, open, searchMutation.mutate])
 
+  // ── Web search on web query change (debounced) ──────────────
+  useEffect(() => {
+    if (!open || searchTab !== 'web') return
+    if (!webQuery.trim()) {
+      setWebResults([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      setWebLoading(true)
+      try {
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: webQuery, engines: 'ddg,wiki', limit: 10 }),
+        })
+        if (!res.ok) throw new Error(`Search failed: ${res.status}`)
+        const data = await res.json()
+        setWebResults(data.results)
+      } catch {
+        setWebResults([])
+      } finally {
+        setWebLoading(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webQuery, open, searchTab])
+
   // ── Close handler ───────────────────────────────────────────
   const close = useCallback(() => {
     setOpen(false)
@@ -222,24 +257,70 @@ export function SearchModal({
       <div className="relative w-full max-w-lg bg-background border rounded-lg shadow-lg overflow-hidden">
         {/* Search input row */}
         <div className="flex items-center gap-2 px-3 py-2.5 border-b">
-          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          {searchTab === 'web' ? (
+            <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+          ) : (
+            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          )}
           <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
+            ref={searchTab === 'files' ? inputRef : undefined}
+            value={searchTab === 'web' ? webQuery : query}
+            onChange={(e) =>
+              searchTab === 'web' ? setWebQuery(e.target.value) : setQuery(e.target.value)
+            }
+            onKeyDown={searchTab === 'files' ? handleKeyDown : undefined}
             placeholder={
-              isMoveMode ? t('knowledge.searchOrSelectDestination') : t('knowledge.searchFiles')
+              searchTab === 'web'
+                ? 'Search the web…'
+                : isMoveMode
+                  ? t('knowledge.searchOrSelectDestination')
+                  : t('knowledge.searchFiles')
             }
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
+          {webLoading && searchTab === 'web' && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+          )}
           <kbd className="text-2xs text-muted-foreground border rounded px-1.5 py-0.5 font-mono">
             ESC
           </kbd>
         </div>
 
-        {/* Results list */}
-        <ul ref={listRef} className="max-h-80 overflow-y-auto p-1">
+        {/* Tab bar */}
+        {!isMoveMode && (
+          <div className="flex border-b">
+            <button
+              type="button"
+              className={cn(
+                'flex-1 text-xs font-medium py-1.5 text-center transition-colors',
+                searchTab === 'files'
+                  ? 'text-foreground border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setSearchTab('files')}
+            >
+              <FileText className="w-3 h-3 inline mr-1" />
+              Files
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'flex-1 text-xs font-medium py-1.5 text-center transition-colors',
+                searchTab === 'web'
+                  ? 'text-foreground border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setSearchTab('web')}
+            >
+              <Globe className="w-3 h-3 inline mr-1" />
+              Web
+            </button>
+          </div>
+        )}
+
+        {/* Results */}
+        {searchTab === 'files' ? (
+          <ul ref={listRef} className="max-h-80 overflow-y-auto p-1">
           {displayItems.length > 0 ? (
             displayItems.map((item, i) => (
               <li
@@ -277,6 +358,51 @@ export function SearchModal({
             </li>
           )}
         </ul>
+        ) : (
+          <div className="max-h-80 overflow-y-auto p-1">
+            {webLoading && webQuery.trim() && (
+              <div className="space-y-2 p-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="animate-pulse h-12 bg-muted/30 rounded" />
+                ))}
+              </div>
+            )}
+            {!webLoading && webResults.length === 0 && webQuery.trim() && (
+              <p className="px-4 py-6 text-sm text-muted-foreground text-center">
+                No web results found
+              </p>
+            )}
+            {!webLoading && !webQuery.trim() && (
+              <p className="px-4 py-6 text-sm text-muted-foreground text-center">
+                Search the web…
+              </p>
+            )}
+            {webResults.map((r, i) => (
+              <div
+                key={`${r.url}-${i}`}
+                className="flex items-start gap-2.5 px-3 py-2 text-sm cursor-pointer select-none rounded-md transition-colors hover:bg-accent/50"
+              >
+                <Globe className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{r.title || r.url}</p>
+                  <p className="text-xs text-muted-foreground/70 line-clamp-1">{r.snippet}</p>
+                  <p className="text-[10px] text-muted-foreground/50 truncate mt-0.5">{r.url}</p>
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 text-xs text-primary hover:underline"
+                  onClick={() => {
+                    usePortalStore.getState().pushView({ type: 'search', query: r.title || r.url })
+                    close()
+                  }}
+                >
+                  <ExternalLink className="w-3 h-3 inline mr-0.5" />
+                  Panel
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Footer hint */}
         <div className="flex items-center justify-between border-t px-3 py-1.5 text-2xs text-muted-foreground">
