@@ -215,6 +215,8 @@ webbrowser = "1.0"
  toml_edit = "0.22"
 include_dir = "0.7"
 
+oxibrowser = "0.16"
+
 [dev-dependencies]
 oxios-ouroboros = { version = "1.30.0", path = "crates/oxios-ouroboros" }
 chrono = { workspace = true }

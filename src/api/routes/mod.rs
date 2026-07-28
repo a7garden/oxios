@@ -31,6 +31,8 @@ pub(crate) use integrations_routes::{
 };
 mod knowledge_routes;
 mod marketplace;
+mod search;
+use search::{handle_browse, handle_search};
 mod mount_routes;
 mod project_routes;
 mod resource_routes;
@@ -762,6 +764,9 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/integrations/{id}/oauth/poll",
             get(handle_integration_oauth_poll),
         )
+        // Search & Browse (Search Panel)
+        .route("/api/search", post(handle_search))
+        .route("/api/browse", post(handle_browse))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,
