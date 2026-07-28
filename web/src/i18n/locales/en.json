@@ -2272,5 +2272,13 @@
     "complete": "Complete",
     "runs": "{{count}} runs",
     "every": "every {{secs}}s"
+  },
+  "search": {
+    "panel": {
+      "placeholder": "Search the web…",
+      "agentResults": "Agent search results",
+      "empty": "Search the web or wait for agent results",
+      "results": "results"
+    }
   }
 }

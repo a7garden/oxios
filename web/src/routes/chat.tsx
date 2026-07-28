@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowDown, RefreshCw } from 'lucide-react'
+import { ArrowDown, RefreshCw, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { VList, type VListHandle } from 'virtua'
@@ -110,14 +110,29 @@ function ChatPage() {
     [messages, expanded, activeInterview, activeToolApproval, activePathAccess],
   )
 
+  // Signature of the trailing message: content length + block count + streaming
+  // flag. Any of these changing means the last row grew (text, a tool/reasoning
+  // block, or a state flip) and the view must re-anchor to the bottom.
+  const lastMsg = messages.at(-1)
+  const lastSig = `${lastMsg?.content?.length ?? 0}:${lastMsg?.blocks?.length ?? 0}:${
+    lastMsg?.generating ? 1 : 0
+  }`
+
   // Auto-scroll to the last row while the user is at (or near) the bottom.
-  // Re-anchors as the streaming message grows (dep on trailing content length).
-  const lastContentLen = messages.at(-1)?.content?.length ?? 0
+  // Re-anchors as the streaming message grows.
   useEffect(() => {
     if (atBottomRef.current) {
       vListRef.current?.scrollToIndex(rows.length - 1, { align: 'end' })
     }
-  }, [rows.length, isStreaming, lastContentLen])
+  }, [rows.length, lastSig])
+
+  // Session switch: always jump to the bottom of the freshly loaded session
+  // (the original behavior scrolled on every messages change; keep that for
+  // loadSession, independent of the current at-bottom state).
+  useEffect(() => {
+    vListRef.current?.scrollToIndex(rows.length - 1, { align: 'end' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId])
 
   // Auto-connect WebSocket on mount
   useEffect(() => {
@@ -252,11 +267,22 @@ function ChatPage() {
         {/* RFC-025: Mount Detection Badge */}
         <MountDetectionBadge />
 
+        {/* Search Panel toggle */}
+        <button
+          type="button"
+          className="fixed top-4 right-4 z-50 flex items-center gap-1 rounded-lg border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors shadow-sm"
+          onClick={() => usePortalStore.getState().pushView({ type: 'search' })}
+        >
+          <Search className="w-3.5 h-3.5" />
+          Search
+        </button>
+
         {/* ── Messages area ── */}
         <div ref={messagesContainerRef} className="relative flex-1 min-h-0">
           <VList
             ref={vListRef}
             onScroll={handleVListScroll}
+            keepMounted={rows.length > 0 ? [rows.length - 1] : []}
             className="h-full"
             role="log"
             aria-label={t('common.chatMessages')}

@@ -2268,5 +2268,13 @@
     "complete": "완료",
     "runs": "{{count}}회 실행",
     "every": "{{secs}}초마다"
+  },
+  "search": {
+    "panel": {
+      "placeholder": "웹 검색…",
+      "agentResults": "에이전트 검색 결과",
+      "empty": "웹을 검색하거나 에이전트 결과를 기다리세요",
+      "results": "개 결과"
+    }
   }
 }
