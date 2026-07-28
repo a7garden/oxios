@@ -83,13 +83,10 @@ impl Supervisor for FailingUntilOverrideSupervisor {
                 output: "recovered via fallback".into(),
                 steps_completed: 1,
                 success: true,
-                tool_calls: vec![],
                 tokens_input: 10,
                 tokens_output: 5,
                 model_id: env.model_override.clone().unwrap_or_default(),
-                failure_class: None,
-                restore_state: None,
-                reasoning_text: String::new(),
+                ..Default::default()
             });
         }
 
@@ -98,13 +95,9 @@ impl Supervisor for FailingUntilOverrideSupervisor {
             output: "HTTP error 429: rate limited".into(),
             steps_completed: 0,
             success: false,
-            tool_calls: vec![],
-            tokens_input: 0,
-            tokens_output: 0,
             model_id: "anthropic/claude-sonnet-4".into(),
             failure_class: Some(self.fail_class),
-            restore_state: None,
-            reasoning_text: String::new(),
+            ..Default::default()
         })
     }
 

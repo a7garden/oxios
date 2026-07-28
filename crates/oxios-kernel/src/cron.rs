@@ -442,13 +442,16 @@ impl CronScheduler {
 
         loop {
             tokio::select! {
-                _ = interval.tick() => {
-                    if self.cancel.load(Ordering::Relaxed) {
-                        tracing::info!("Cron scheduler stopped");
-                        return;
-                    }
-                    self.tick_inner(&executor).await;
-                }
+               _ = interval.tick() => {
+                   if self.cancel.load(Ordering::Relaxed) {
+                       tracing::info!("Cron scheduler stopped");
+                       return;
+                   }
+                   // `start` runs as `self: Arc<Self>`. Arc implements
+                   // Deref<Target = Self>, so this resolves to the
+                   // `&self` method without an explicit deref.
+                   self.tick_once(&executor).await;
+               }
             }
         }
     }
@@ -456,7 +459,10 @@ impl CronScheduler {
     /// Single tick: find due jobs and spawn execution.
     ///
     /// Enforces `max_concurrent_jobs` limit and `job_timeout_secs` per job.
-    async fn tick_inner<F, Fut>(&self, executor: &Arc<F>)
+    ///
+    /// Public seam: callers (admin tooling, tests) can drive a single
+    /// deterministic tick without the wall-clock-driven `start` loop.
+    pub async fn tick_once<F, Fut>(&self, executor: &Arc<F>)
     where
         F: Fn(Uuid, String) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = (bool, String)> + Send + 'static,
@@ -523,8 +529,9 @@ impl CronScheduler {
         }
     }
 
-    /// Persist all jobs to disk.
-    async fn persist_jobs(&self) {
+    /// Persist all jobs to disk. Public seam for tests and the kernel handle
+    /// to call directly (e.g. after a config import).
+    pub(crate) async fn persist_jobs(&self) {
         let job_list: Vec<CronJob> = {
             let jobs = self.jobs.read();
             jobs.values().cloned().collect()
@@ -850,4 +857,155 @@ mod tests {
         scheduler.set_job_timeout_secs(300);
         assert_eq!(scheduler.job_timeout_secs, 300);
     }
+
+    // ── start-loop execution (tick_once public seam) ──────────────
+
+    /// Build a job whose `next_run` is in the past so the next tick fires.
+    async fn add_due_job(cs: &CronScheduler, name: &str, goal: &str) -> Uuid {
+        let id = cs
+            .add_job(CronJob::new(name.into(), "*/5 * * * *".into(), goal.into()))
+            .await
+            .unwrap();
+        // Force next_run into the past so the next tick picks it up
+        // immediately regardless of when add_job ran.
+        {
+            let mut jobs = cs.jobs.write();
+            if let Some(j) = jobs.get_mut(&id) {
+                j.next_run = Some(Utc::now() - chrono::Duration::seconds(60));
+            }
+        }
+        id
+    }
+
+    #[tokio::test]
+    async fn tick_once_runs_due_jobs_and_marks_completion() {
+        let cs = Arc::new(CronScheduler::new(test_store(), 60));
+        let id = add_due_job(&cs, "due", "do the thing").await;
+
+        let called = Arc::new(Mutex::new(Vec::<(Uuid, String)>::new()));
+        let called_for_tick = called.clone();
+        let exec = Arc::new(move |jid: Uuid, goal: String| {
+            let called = called_for_tick.clone();
+            async move {
+                called.lock().push((jid, goal));
+                (true, "ok".into())
+            }
+        });
+
+        cs.tick_once(&exec).await;
+
+        // Allow the spawned completion task to run.
+        for _ in 0..50 {
+            if cs.get_job(id).unwrap().run_count >= 1 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+
+        let log = called.lock().clone();
+        assert_eq!(log, vec![(id, "do the thing".into())]);
+        let job = cs.get_job(id).unwrap();
+        assert_eq!(job.run_count, 1, "completion must increment run_count");
+        assert_eq!(job.last_success, Some(true));
+        assert_eq!(job.last_result.as_deref(), Some("ok"));
+        assert!(job.last_run.is_some(), "completion must set last_run");
+        // next_run must be advanced to a future time.
+        assert!(job.next_run.unwrap() > Utc::now() - chrono::Duration::seconds(1));
+        assert!(!cs.is_running(id), "completion must clear running flag");
+    }
+
+    #[tokio::test]
+    async fn tick_once_skips_disabled_jobs() {
+        let cs = Arc::new(CronScheduler::new(test_store(), 60));
+        let id = add_due_job(&cs, "off", "ignored").await;
+        cs.toggle_job(id, false).await.unwrap();
+
+        let called = Arc::new(Mutex::new(0u32));
+        let called_for_tick = called.clone();
+        let exec = Arc::new(move |_jid: Uuid, _goal: String| {
+            let called = called_for_tick.clone();
+            async move {
+                *called.lock() += 1;
+                (true, String::new())
+            }
+        });
+
+        cs.tick_once(&exec).await;
+        tokio::task::yield_now().await;
+
+        assert_eq!(*called.lock(), 0);
+        assert_eq!(cs.get_job(id).unwrap().run_count, 0);
+    }
+
+    #[tokio::test]
+    async fn tick_once_prevents_overlap_with_already_running_job() {
+        // If a previous tick spawned a job whose spawned task is still
+        // in flight (still in `running_jobs`), the next tick must NOT
+        // re-trigger it — otherwise a slow agent would run multiple
+        // copies of the same job.
+        let cs = Arc::new(CronScheduler::new(test_store(), 60));
+        let id = add_due_job(&cs, "long", "slow").await;
+        // Manually mark the job as running, simulating an in-flight tick
+        // whose spawn has not yet finished.
+        cs.running_jobs.lock().insert(id);
+
+        let called = Arc::new(Mutex::new(0u32));
+        let called_for_tick = called.clone();
+        let exec = Arc::new(move |_jid: Uuid, _goal: String| {
+            let called = called_for_tick.clone();
+            async move {
+                *called.lock() += 1;
+                (true, String::new())
+            }
+        });
+
+        cs.tick_once(&exec).await;
+        tokio::task::yield_now().await;
+
+        assert_eq!(
+            *called.lock(),
+            0,
+            "overlap-prevention must skip a job already in running_jobs"
+        );
+        // Clean up so the scheduler's Drop doesn't observe a stale entry.
+        cs.running_jobs.lock().remove(&id);
+    }
+
+    #[tokio::test]
+    async fn tick_once_respects_max_concurrent_jobs() {
+        let mut cs = CronScheduler::new(test_store(), 60);
+        cs.set_max_concurrent_jobs(2);
+        let cs = Arc::new(cs);
+
+        // Three due jobs, capacity=2 → one is deferred on this tick.
+        add_due_job(&cs, "a", "a").await;
+        add_due_job(&cs, "b", "b").await;
+        add_due_job(&cs, "c", "c").await;
+
+        let called = Arc::new(Mutex::new(0u32));
+        let called_for_tick = called.clone();
+        let exec = Arc::new(move |_jid: Uuid, _goal: String| {
+            let called = called_for_tick.clone();
+            async move {
+                *called.lock() += 1;
+                (true, String::new())
+            }
+        });
+
+        cs.tick_once(&exec).await;
+        // Wait for all spawned ticks to finish. Each increments `called`
+        // synchronously before the executor returns, so this is bounded.
+        for _ in 0..200 {
+            if *called.lock() >= 2 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(
+            *called.lock(),
+            2,
+            "tick_once must enforce max_concurrent_jobs"
+        );
+    }
+
 }

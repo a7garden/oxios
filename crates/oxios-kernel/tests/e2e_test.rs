@@ -1,8 +1,12 @@
-//! End-to-end smoke test for the Oxios pipeline.
+//! Orchestrator integration tests for the Oxios pipeline.
 //!
-//! Tests the full Ouroboros lifecycle with fully-mocked protocol and supervisor.
-//! Uses `Orchestrator::with_config` to control evolution iterations explicitly,
-//! so each test verifies a specific pipeline path.
+//! Tests the full Ouroboros lifecycle against a fully-mocked protocol and
+//! supervisor (no real LLM, no real agent execution). Despite the file
+//! name, these are NOT end-to-end tests in the production-traffic sense
+//! — they verify the in-process pipeline's orchestration paths via
+//! `MockSupervisor` and `MockIntentEngine`. Uses `Orchestrator::with_config`
+//! to control evolution iterations explicitly, so each test verifies a
+//! specific pipeline path.
 
 #[path = "common/mod.rs"]
 mod common;
@@ -108,13 +112,7 @@ impl Supervisor for MockSupervisor {
             output: "Mock agent completed successfully".into(),
             steps_completed: 5,
             success: true,
-            tool_calls: vec![],
-            tokens_input: 0,
-            tokens_output: 0,
-            model_id: String::new(),
-            failure_class: None,
-            restore_state: None,
-            reasoning_text: String::new(),
+            ..Default::default()
         })
     }
 

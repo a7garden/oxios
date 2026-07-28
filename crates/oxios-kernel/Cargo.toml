@@ -88,4 +88,6 @@ hf-hub = { version = "0.4", optional = true }
 tempfile = { workspace = true }
 lettre = { workspace = true }
 async-trait = { workspace = true }
-criterion = { version = "0.5", features = ["async"] }
+tokio = { workspace = true, features = ["test-util"] }
+
+ criterion = { version = "0.5", features = ["async"] }

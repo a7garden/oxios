@@ -114,13 +114,7 @@ impl Supervisor for MockSupervisor {
             output: "Mock agent completed".into(),
             steps_completed: 3,
             success: true,
-            tool_calls: vec![],
-            tokens_input: 0,
-            tokens_output: 0,
-            model_id: String::new(),
-            failure_class: None,
-            restore_state: None,
-            reasoning_text: String::new(),
+            ..Default::default()
         })
     }
 
@@ -483,13 +477,7 @@ impl Supervisor for TrackingSupervisor {
             output: "Task completed".into(),
             steps_completed: 1,
             success: true,
-            tool_calls: vec![],
-            tokens_input: 0,
-            tokens_output: 0,
-            model_id: String::new(),
-            failure_class: None,
-            restore_state: None,
-            reasoning_text: String::new(),
+            ..Default::default()
         })
     }
 
