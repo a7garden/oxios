@@ -18,7 +18,7 @@ jobs:
   # is the sole artifact for this release.
   binary:
     name: Build macOS arm64 binary
-    runs-on: macos-14
+    runs-on: [self-hosted, macOS, ARM64]
     permissions:
       contents: write
     steps:
@@ -57,7 +57,7 @@ jobs:
   trigger-publish:
     name: Trigger crates.io publish
     needs: binary
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v5
       - name: Dispatch publish workflow

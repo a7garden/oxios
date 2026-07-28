@@ -37,7 +37,7 @@ jobs:
   # ── Pre-flight: ensure release.yml succeeded for this tag ──────
   pre-flight:
     name: Verify release artifacts exist
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v5
       - name: Check that the release workflow ran for this tag

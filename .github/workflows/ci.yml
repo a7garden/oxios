@@ -11,17 +11,12 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # sccache: caches compiled crate artifacts. The 4-way test partition
-  # each compiles the full dependency tree (~1700 crates) independently —
-  # sccache lets them share compiled artifacts via a shared cache key.
-  RUSTC_WRAPPER: sccache
-  SCCACHE_DIR: ${{ github.workspace }}/.sccache
 
 jobs:
   # ─── Formatting & Linting ────────────────────────────────────────
   fmt:
     name: fmt
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v5
 
@@ -57,10 +52,9 @@ jobs:
 
   # ─── Frontend ─────────────────────────────────────────────────────
   # Verifies web app: install deps, typecheck, run unit tests, build.
-  # E2E (Playwright) is intentionally not run in CI — slow and flaky in container.
   frontend:
     name: frontend
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v5
 
@@ -85,19 +79,12 @@ jobs:
       - name: Build
         working-directory: web
         run: bun run build
+
   # ─── Test Suite ────────────────────────────────────────────────────
   test:
     name: test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     needs: [fmt, frontend]
-    strategy:
-      fail-fast: false
-      matrix:
-        partition:
-          - [1, 4]
-          - [2, 4]
-          - [3, 4]
-          - [4, 4]
     steps:
       - uses: actions/checkout@v5
 
@@ -120,159 +107,6 @@ jobs:
 
       - name: Install sccache
         uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Cache sccache
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-sccache-
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache target directory
-        uses: actions/cache@v4
-        with:
-          # Include github.sha so identical Cargo.lock state across commits
-          # still produces a primary hit; restore-keys fall back to shared state.
-          path: target
-          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}-
-
-      # Build web assets before Rust compilation: build.rs emits the
-      # `web_embedded` cfg when web/dist exists, baking the UI into the binary.
-      - uses: oven-sh/setup-bun@v2
-
-      - name: Build web assets
-        working-directory: web
-        run: bun install --frozen-lockfile && bun run build
-
-      - name: Run unit tests (partitioned)
-        run: |
-          cargo nextest run --workspace \
-            --partition count:${{ matrix.partition[0] }}/${{ matrix.partition[1] }} \
-            --profile ci \
-            --no-fail-fast
-
-      - name: Run doc tests
-        run: cargo test --workspace --doc
-
-  # ─── Feature Tests ────────────────────────────────────────────────
-  # Executes (not just compiles) oxios-kernel tests with every feature
-  # enabled so feature-gated suites — notably `wasm-sandbox` — actually run
-  # in CI. Without this job the `wasm-sandbox` tests only show up as
-  # "skipped" in the regular `--workspace` matrix and never execute.
-  test-features:
-    name: kernel + bridge feature tests
-    runs-on: ubuntu-latest
-    needs: [fmt]
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Read rust-toolchain channel
-        id: rust-channel
-        run: |
-          if grep -q 'channel = "' rust-toolchain.toml 2>/dev/null; then
-            CHANNEL=$(grep 'channel = "' rust-toolchain.toml | sed 's/.*= "\([^"]*\)".*/\1/')
-            echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
-          else
-            echo "channel=stable" >> $GITHUB_OUTPUT
-          fi
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ steps.rust-channel.outputs.channel }}
-
-      - name: Install nextest
-        uses: taiki-e/install-action@nextest
-
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Cache sccache
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.sccache
-          key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-sccache-
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Run feature-gated tests
-        # Kernel tests: `--all-features` enables every kernel feature
-        # (including `wasm-sandbox` gating) so those suites actually run.
-        # Root crate bridge tests: `--features web` explicitly enables the
-        # `web` feature so `#[cfg(feature = "web")]`-gated inline tests in
-        # `src/api/bridge.rs` (request/response correlation, timeout,
-        # replay_after) are compiled and executed alongside the kernel.
-        # `web` is a default feature in the root crate, but we gate it
-        # explicitly here so the bridge tests survive a hypothetical
-        # removal of `web` from `default`.
-        # No web asset build: the kernel crate does not depend on the root
-        # `oxios` binary, and the root crate's build.rs gracefully degrades
-        # when `web/dist/` is absent.
-        run: |
-          cargo nextest run \
-            -p oxios-kernel \
-            --all-features \
-            --profile ci \
-            --no-fail-fast
-          cargo nextest run \
-            -p oxios \
-            --features web \
-            --profile ci \
-            --no-fail-fast
-  test-macos:
-    name: test (macOS)
-    runs-on: macos-latest
-    needs: [fmt]
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Read rust-toolchain channel
-        id: rust-channel
-        run: |
-          if grep -q 'channel = "' rust-toolchain.toml 2>/dev/null; then
-            CHANNEL=$(grep 'channel = "' rust-toolchain.toml | sed 's/.*= "\([^"]*\)".*/\1/')
-            echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
-          else
-            echo "channel=stable" >> $GITHUB_OUTPUT
-          fi
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ steps.rust-channel.outputs.channel }}
-
-      - name: Install nextest
-        uses: taiki-e/install-action@nextest
-
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - uses: Swatinem/rust-cache@v2
 
       # Build web assets before Rust compilation: build.rs emits the
       # `web_embedded` cfg when web/dist exists, baking the UI into the binary.
@@ -288,10 +122,53 @@ jobs:
       - name: Run doc tests
         run: cargo test --workspace --doc
 
+  # ─── Feature Tests ────────────────────────────────────────────────
+  # Executes (not just compiles) oxios-kernel tests with every feature
+  # enabled so feature-gated suites — notably `wasm-sandbox` — actually run.
+  test-features:
+    name: kernel + bridge feature tests
+    runs-on: [self-hosted, macOS, ARM64]
+    needs: [fmt]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read rust-toolchain channel
+        id: rust-channel
+        run: |
+          if grep -q 'channel = "' rust-toolchain.toml 2>/dev/null; then
+            CHANNEL=$(grep 'channel = "' rust-toolchain.toml | sed 's/.*= "\([^"]*\)".*/\1/')
+            echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          else
+            echo "channel=stable" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-channel.outputs.channel }}
+
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Run feature-gated tests
+        run: |
+          cargo nextest run \
+            -p oxios-kernel \
+            --all-features \
+            --profile ci \
+            --no-fail-fast
+          cargo nextest run \
+            -p oxios \
+            --features web \
+            --profile ci \
+            --no-fail-fast
+
   # ─── Security Audit ────────────────────────────────────────────────
   audit:
     name: audit
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       - uses: actions/checkout@v5
 
@@ -321,25 +198,16 @@ jobs:
   # ─── Summary ───────────────────────────────────────────────────────
   summary:
     name: summary
-    needs: [fmt, frontend, test, test-features, test-macos, audit]
-    runs-on: ubuntu-latest
+    needs: [fmt, frontend, test, test-features, audit]
+    runs-on: [self-hosted, macOS, ARM64]
     if: always()
     steps:
       - name: Check required upstream jobs
-        # Truthfully propagate failures: GitHub's `needs:` already blocks
-        # `summary` when a required job fails, so simply reaching this
-        # step means every required upstream succeeded. We re-assert the
-        # invariants explicitly so a future change that adds a non-required
-        # or `continue-on-error` job to `needs` cannot silently flip the
-        # overall status to green. Required jobs are those without
-        # `continue-on-error`; `audit` is intentionally excluded because
-        # RUSTSEC advisories are non-blocking by policy (see audit job).
         env:
           FMT_RESULT: ${{ needs.fmt.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           TEST_RESULT: ${{ needs.test.result }}
           TEST_FEATURES_RESULT: ${{ needs.test-features.result }}
-          TEST_MACOS_RESULT: ${{ needs.test-macos.result }}
           AUDIT_RESULT: ${{ needs.audit.result }}
         run: |
           echo "Upstream job results:"
@@ -347,10 +215,9 @@ jobs:
           echo "  frontend=$FRONTEND_RESULT"
           echo "  test=$TEST_RESULT"
           echo "  test-features=$TEST_FEATURES_RESULT"
-          echo "  test-macos=$TEST_MACOS_RESULT"
           echo "  audit=$AUDIT_RESULT (non-blocking)"
           FAILED=0
-          for r in "$FMT_RESULT" "$FRONTEND_RESULT" "$TEST_RESULT" "$TEST_FEATURES_RESULT" "$TEST_MACOS_RESULT"; do
+          for r in "$FMT_RESULT" "$FRONTEND_RESULT" "$TEST_RESULT" "$TEST_FEATURES_RESULT"; do
             if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
               echo "::error::Required upstream job failed (result=$r)"
               FAILED=1
