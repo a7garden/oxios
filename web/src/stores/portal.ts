@@ -52,6 +52,13 @@ export type PortalView =
       /** Chat message ID that triggered this view (agent-driven only). */
       messageId?: string
     }
+  | {
+      type: 'knowledge'
+      /** Knowledge base file path (relative to knowledge root). */
+      path: string
+      /** Optional display title. */
+      title?: string
+    }
 export interface PortalState {
   /** Navigation stack; top (last) element is the visible view. */
   stack: PortalView[]

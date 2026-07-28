@@ -17,6 +17,7 @@ import { ArtifactView } from './views/artifact-view'
 import { DocumentView } from './views/document-view'
 import { ThreadView } from './views/thread-view'
 import { SearchView } from './views/search-view'
+import { KnowledgeBrowser } from './views/knowledge-browser'
 
 /** Resolve a human title for a view (shown in the shared header). */
 function viewTitle(view: PortalView): string {
@@ -31,6 +32,8 @@ function viewTitle(view: PortalView): string {
       return `Thread from ${view.parentId.slice(0, 8)}`
     case 'search':
       return view.query ?? 'Search'
+    case 'knowledge':
+      return view.title ?? basename(view.path)
   }
 }
 
@@ -79,6 +82,8 @@ function ViewBody() {
       return <ThreadView view={top} />
     case 'search':
       return <SearchView query={top.query} messageId={top.messageId} />
+    case 'knowledge':
+      return <KnowledgeBrowser initialPath={top.path} />
   }
 }
 
