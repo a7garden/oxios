@@ -1,6 +1,7 @@
 // WebSearch render — search results with favicons
-import { Globe } from 'lucide-react'
+import { Globe, Search } from 'lucide-react'
 import type { ToolRenderComponent } from './registry'
+import { usePortalStore } from '@/stores/portal'
 
 export const WebSearchRender: ToolRenderComponent = ({ args, result, isRunning }) => {
   const query = (args?.query ?? args?.search_query ?? '') as string
@@ -63,6 +64,16 @@ export const WebSearchRender: ToolRenderComponent = ({ args, result, isRunning }
               </div>
             </a>
           ))}
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+              onClick={() => usePortalStore.getState().pushView({ type: 'search' })}
+            >
+              <Search className="w-3 h-3" />
+              Open in Panel
+            </button>
+          </div>
         </div>
       ) : result != null ? (
         <pre className="p-2 rounded bg-muted text-xs overflow-x-auto max-h-48 whitespace-pre-wrap">

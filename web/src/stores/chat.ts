@@ -14,6 +14,7 @@ import type {
   ToolCallContext,
 } from '@/types'
 import { useAuthStore } from './auth'
+import { usePortalStore } from '@/stores/portal'
 
 // ---------------------------------------------------------------------------
 // Persisted state (survives tab switches)
@@ -1518,6 +1519,17 @@ export const useChatStore = create<ChatStore>()(
                 }),
               }))
               if (result.finished) streamProcessors.delete(msgId)
+            }
+            // Auto-open search panel on web_search/browse tool calls
+            if (
+              (chunk.type === 'tool_start' || chunk.type === 'tool_end') &&
+              (chunk.tool_name === 'web_search' || chunk.tool_name === 'browse')
+            ) {
+              const portalState = usePortalStore.getState()
+              const top = portalState.stack[portalState.stack.length - 1]
+              if (!top || top.type !== 'search') {
+                portalState.pushView({ type: 'search', messageId: msgId })
+              }
             }
             break
           }
