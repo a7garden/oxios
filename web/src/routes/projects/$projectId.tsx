@@ -63,7 +63,7 @@ function ProjectDetailsCard({ project }: { project: Project }) {
     { label: t('projects.source'), value: project.source ?? 'manual' },
     {
       label: t('projects.memoryVisible'),
-      value: project.memory_visible ? 'Yes' : 'No',
+      value: project.memory_visible ? t('common.yes') : t('common.no'),
     },
     { label: t('projects.createdAt'), value: formatDate(project.created_at) },
     {

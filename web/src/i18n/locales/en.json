@@ -683,7 +683,10 @@
     "spend": "Spend",
     "noData": "No spend data yet",
     "period": {
-      "month": "30 Days"
+      "today": "Today",
+      "week": "7 Days",
+      "month": "30 Days",
+      "all": "All Time"
     },
     "providerQuota": "Provider Quota",
     "noProviderQuotaDesc": "This provider does not expose quota data or no requests have been made yet.",
@@ -1335,6 +1338,7 @@
     "importance": "Importance",
     "protection": "Protection",
     "appearances": "Appearances",
+    "categories": "Categories",
     "source": "Source",
     "content": "Content",
     "tags": "Tags",
@@ -1593,6 +1597,7 @@
     "noMessages": "No messages in this session",
     "registered": "{{count}} session(s)",
     "id": "ID",
+    "userId": "User ID",
     "noSessionsDescription": "Sessions will appear here after agent interactions.",
     "updatedAt": "Updated",
     "noProject": "— No project",
@@ -1890,6 +1895,12 @@
     "browserEnabledDesc": "Enable browser tools for web automation",
     "browserEngine": "Engine Config (JSON)",
     "browserEngineDesc": "Browser engine overrides as JSON",
+    "sectionSystemAgents": "System Agents",
+    "sectionImage": "Image Generation",
+    "sectionStats": "Stats",
+    "systemAgentsDescription": "AI provider and model routing for built-in system agents",
+    "imageDescription": "AI image generation provider configuration",
+    "statsDescription": "Usage statistics and performance metrics",
     "sectionBudget": "Budget",
     "budgetDescription": "Token and call budget enforcement",
     "budgetEnabled": "Enable Budget",
@@ -2223,9 +2234,14 @@
       "endedAt": "Ended",
       "window": "Window",
       "stopReason": "Stop reason",
+      "tokens": "Tokens",
       "tokensFmt": "{{tokens}} tokens",
       "duration": "{{seconds}}s",
-      "source": {}
+      "source": {
+        "skill": "Skill",
+        "project": "Project",
+        "recurring": "Recurring"
+      }
     }
   },
   "ui": {},
@@ -2299,5 +2315,20 @@
       "knowledgeNoResults": "No notes matching '{{query}}'",
       "openInKnowledge": "Open in Knowledge"
     }
+  },
+  "auth": {
+    "title": "Sign in to Oxios",
+    "description": "Enter your API token to connect to the Oxios server",
+    "autoIssueCta": "Auto-connect from browser",
+    "autoIssueDenied": "Auto-connect denied. Paste your token below.",
+    "autoIssueUnavailable": "Auto-connect unavailable. Paste your token below.",
+    "connecting": "Connecting…",
+    "submit": "Connect",
+    "tokenLabel": "API Token",
+    "tokenPlaceholder": "Paste your token here…",
+    "tokenHint": "Find your token in ~/.oxi/auth.json on the server machine.",
+    "invalidToken": "Token rejected by server. Check and try again.",
+    "networkError": "Could not reach the server. Check your connection.",
+    "serverError": "Server error ({{status}}). Try again later."
   }
 }

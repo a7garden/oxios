@@ -36,7 +36,7 @@ function MemoryPage() {
             {t('memory.map')}
           </TabsTrigger>
           <TabsTrigger value="dream">{t('memory.dream')}</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="categories">{t('memory.categories')}</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <MemoryOverview />

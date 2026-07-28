@@ -104,7 +104,7 @@ export function MessageContextMenu({ message, onRetry, children }: MessageContex
           />
           <ContextItem
             icon={GitBranch}
-            label={t('chat.createThread')}
+            label={t('portal.createThread')}
             onClick={() => {
               usePortalStore
                 .getState()

@@ -7,6 +7,7 @@
  */
 
 import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Handle, Position } from 'reactflow'
 import { statusBorder, statusDot } from '@/components/shared/status-palette'
 import { cn } from '@/lib/utils'
@@ -43,6 +44,7 @@ function formatTokens(n: number): string {
 }
 
 function MonitorNodeInner({ data }: { data: MonitorNodeData }) {
+  const { t } = useTranslation()
   const { name, displayStatus, lifecycle, a2a, selected, onSelect, agentId } = data
   const isRunning = displayStatus === 'running'
 
@@ -88,7 +90,7 @@ function MonitorNodeInner({ data }: { data: MonitorNodeData }) {
         <span aria-hidden="true">·</span>
         <span className="font-mono">
           {isRunning && lifecycle.duration_secs == null ? (
-            <span className="text-success">running…</span>
+            <span className="text-success">{t('agents.running')}</span>
           ) : (
             formatDuration(lifecycle.duration_secs)
           )}
@@ -101,16 +103,16 @@ function MonitorNodeInner({ data }: { data: MonitorNodeData }) {
           <div className="mt-2 space-y-1.5 border-t pt-2">
             {/* Cost + tokens */}
             <div className="flex items-center justify-between text-2xs">
-              <span className="text-muted-foreground">Cost</span>
+              <span className="text-muted-foreground">{t('agents.cost')}</span>
               <span className="font-mono">{formatCost(lifecycle.cost_usd)}</span>
             </div>
             <div className="flex items-center justify-between text-2xs">
-              <span className="text-muted-foreground">Tokens</span>
+              <span className="text-muted-foreground">{t('agents.tokens')}</span>
               <span className="font-mono">{formatTokens(lifecycle.tokens_used)}</span>
             </div>
             {lifecycle.model_id && (
               <div className="flex items-center justify-between text-2xs">
-                <span className="text-muted-foreground">Model</span>
+                <span className="text-muted-foreground">{t('agents.model')}</span>
                 <span
                   className="truncate font-mono text-muted-foreground"
                   title={lifecycle.model_id}

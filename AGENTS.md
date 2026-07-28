@@ -39,7 +39,8 @@ oxios/
 |------|-------|
 | **Language** | Rust 2021 + TypeScript 5 (frontend) |
 | **License** | MIT |
-| **CI** | `cargo fmt && clippy -D warnings && cargo test --workspace` |
+| **Target** | `aarch64-apple-darwin` (macOS ARM64 — single target) |
+| **CI** | `cargo fmt && clippy -D warnings && cargo test --workspace` (self-hosted macOS runner) |
 | **Build** | `cargo build && cd web && bun run build` |
 | **Test** | `cargo test --workspace` |
 
@@ -124,12 +125,14 @@ See `docs/ARCHITECTURE.md` for the full reference (subsystems, data flow, depend
 
 Two separate pipelines, two different triggers.
 
-### Web UI — GitHub Actions (automatic)
+### Native binary — self-hosted macOS ARM64 runner
 
-Tag push (`v*`) triggers `.github/workflows/release.yml`. Builds `web/` with Bun, zips `dist/`, uploads as GitHub Release asset. No local action needed.
+Tag push (`v*`) triggers `.github/workflows/release.yml`. Builds native
+`aarch64-apple-darwin` binary (embeds the SPA via `include_dir!`), packages as
+tarball + SHA256, creates GitHub Release.
 
 ```bash
-git tag v1.2.0 && git push --tags   # → CI builds & publishes web-dist.zip
+git tag v1.2.0 && git push --tags   # → CI builds native binary
 ```
 
 ### crates.io — CI (automatic)
