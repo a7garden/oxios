@@ -626,6 +626,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     let mut set: tokio::task::JoinSet<()> = tokio::task::JoinSet::new();
     set.spawn({
         let ws_tx = ws_tx.clone();
+        let state = state.clone();
         async move {
             // Track the active session so we only forward events tagged with it.
             // Multi-turn conversations keep the same session_id across messages.
@@ -955,6 +956,19 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             };
                             if ws_tx.lock().await.send(Message::Text(done_json.into())).await.is_err() {
                                 break; // WS closed — session was already persisted above
+                            }
+
+                            // Auto-trigger compression for long sessions.
+                            if let Some(sid) = &active_session_id {
+                                if let Some(ref compression) = state.kernel.compression {
+                                    if let Ok(Some(session)) = state.kernel.state.load_session(
+                                        &oxios_kernel::state_store::SessionId(sid.clone()),
+                                    ).await {
+                                        if compression.should_compress(&session) {
+                                            compression.spawn_compress(sid.clone());
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

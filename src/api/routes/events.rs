@@ -92,6 +92,8 @@ pub(crate) async fn handle_session_get(
            "trajectory_steps": session.trajectory_steps,
            // P4 (§7 persistence): reasoning text for the ThinkingPanel.
            "reasoning_records": session.reasoning_records,
+           // Context compression: LLM-generated summary of older messages.
+           "compression": session.metadata.get("compression"),
         }))),
         Ok(None) => Err(StatusCode::NOT_FOUND),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -186,6 +188,37 @@ pub(crate) async fn handle_session_move(
         Ok(false) => Err(AppError::NotFound("Session not found".into())),
         Err(e) => Err(AppError::Internal(format!("Failed to move session: {e}"))),
     }
+}
+
+/// POST /api/sessions/:id/compress — Trigger LLM compression for a session.
+pub(crate) async fn handle_session_compress(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let compression = state
+        .kernel
+        .compression
+        .as_ref()
+        .ok_or_else(|| AppError::Internal("compression not available".into()))?;
+
+    let sid = oxios_kernel::state_store::SessionId(id.clone());
+    let session = state
+        .kernel
+        .state
+        .load_session(&sid)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound("session not found".into()))?;
+
+    if !compression.should_compress(&session) {
+        return Ok(Json(serde_json::json!({
+            "status": "skipped",
+            "reason": "session does not meet compression threshold or is already compressed"
+        })));
+    }
+
+    compression.spawn_compress(id);
+    Ok(Json(serde_json::json!({"status": "started"})))
 }
 
 /// POST /api/sessions/prune — Prune sessions based on config.

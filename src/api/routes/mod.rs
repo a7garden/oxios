@@ -101,7 +101,7 @@ pub(crate) use engine_routes::{
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
-    handle_session_create_thread, handle_session_delete, handle_session_get, handle_session_move,
+    handle_session_create_thread, handle_session_compress, handle_session_delete, handle_session_get, handle_session_move,
     handle_session_threads, handle_sessions_list, handle_sessions_prune,
 };
 pub(crate) use git_routes::{
@@ -487,6 +487,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
         .route("/api/sessions/{id}/project", patch(handle_session_move))
+        .route("/api/sessions/{id}/compress", post(handle_session_compress))
         // RFC-035: Threads (sub-sessions)
         .route("/api/sessions/{id}/threads", get(handle_session_threads))
         .route(
