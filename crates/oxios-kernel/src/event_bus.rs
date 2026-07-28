@@ -403,6 +403,25 @@ pub enum KernelEvent {
         integration_id: String,
         error: String,
     },
+    /// A chunk of the compression summary being streamed.
+    CompressionDelta {
+        /// The session being compressed.
+        session_id: String,
+        /// Incremental summary text.
+        delta: String,
+    },
+    /// Compression completed successfully.
+    CompressionDone {
+        /// The session that was compressed.
+        session_id: String,
+    },
+    /// Compression failed.
+    CompressionFailed {
+        /// The session that failed compression.
+        session_id: String,
+        /// Error description.
+        error: String,
+    },
 }
 
 /// Convert a KernelEvent to an AuditAction for the audit trail.
@@ -611,6 +630,11 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
             ..
         } => AuditAction::Other {
             detail: format!("install:failed:{integration_id}:{job_id}"),
+        },
+        KernelEvent::CompressionDelta { .. }
+        | KernelEvent::CompressionDone { .. }
+        | KernelEvent::CompressionFailed { .. } => AuditAction::Other {
+            detail: "compression".to_string(),
         },
     }
 }

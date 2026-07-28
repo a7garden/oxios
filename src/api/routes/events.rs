@@ -630,6 +630,12 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "integration_id": integration_id,
             "error": error,
         }),
+        // Compression events are delivered via WS, not SSE.
+        KernelEvent::CompressionDelta { .. }
+        | KernelEvent::CompressionDone { .. }
+        | KernelEvent::CompressionFailed { .. } => serde_json::json!({
+            "type": "compression",
+        }),
     };
     // Merge payload into base
     if let serde_json::Value::Object(mut map) = base {

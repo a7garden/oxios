@@ -1583,6 +1583,9 @@ fn kernel_event_to_ws_chunk(
         KernelEvent::TokenUsageUpdate { session_id, .. } => Some(session_id),
         KernelEvent::ReasoningFragment { session_id, .. } => Some(session_id),
         KernelEvent::ToolArgsDelta { session_id, .. } => Some(session_id),
+        KernelEvent::CompressionDelta { session_id, .. } => Some(session_id),
+        KernelEvent::CompressionDone { session_id } => Some(session_id),
+        KernelEvent::CompressionFailed { session_id, .. } => Some(session_id),
         _ => None,
     };
     if let (Some(eid), Some(active)) = (event_session_id, active_session_id.as_ref())
@@ -1720,6 +1723,26 @@ fn kernel_event_to_ws_chunk(
                 "path": path,
                 "mode": mode,
                 "reason": reason,
+            }))
+        }
+        KernelEvent::CompressionDelta { session_id, delta } => {
+            Some(serde_json::json!({
+                "type": "compression_delta",
+                "content": delta,
+                "session_id": session_id,
+            }))
+        }
+        KernelEvent::CompressionDone { session_id } => {
+            Some(serde_json::json!({
+                "type": "compression_done",
+                "session_id": session_id,
+            }))
+        }
+        KernelEvent::CompressionFailed { session_id, error } => {
+            Some(serde_json::json!({
+                "type": "compression_failed",
+                "error": error,
+                "session_id": session_id,
             }))
         }
         _ => None,
