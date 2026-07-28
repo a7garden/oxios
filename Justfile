@@ -33,7 +33,7 @@ test-doc:
 
 # Run Clippy with warnings
 lint:
-    cargo clippy -p oxios -p oxios-kernel -p oxios-ouroboros -p oxios-gateway -p oxios-web -- -D warnings
+    cargo clippy --workspace -- -D warnings
 
 # Format code
 fmt:
@@ -49,7 +49,7 @@ ci: fmt-check lint test
 # Full CI pipeline (like GitHub Actions)
 ci-full:
     cargo fmt --all -- --check
-    cargo clippy -p oxios -p oxios-kernel -p oxios-ouroboros -p oxios-gateway -p oxios-markdown -p oxios-mcp -- -D warnings
+    cargo clippy --workspace -- -D warnings
     cargo nextest run --workspace --profile ci
     cargo test --workspace --doc
 
@@ -70,9 +70,10 @@ sccache-zero:
 run:
     cargo run
 
-# Build the Dioxus WASM frontend
+# Build the Bun/Vite web frontend
 frontend:
-    cd channels/oxios-web/frontend && dx build --release
+    bun --cwd web install --frozen-lockfile
+    bun --cwd web run build
 
 # Clean build artifacts
 clean:
