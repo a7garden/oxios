@@ -101,8 +101,9 @@ pub(crate) use engine_routes::{
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
-    handle_session_create_thread, handle_session_compress, handle_session_delete, handle_session_get, handle_session_move,
-    handle_session_threads, handle_sessions_list, handle_sessions_prune,
+    handle_session_compress, handle_session_create_thread, handle_session_delete,
+    handle_session_get, handle_session_move, handle_session_threads, handle_sessions_list,
+    handle_sessions_prune,
 };
 pub(crate) use git_routes::{
     handle_git_log, handle_git_restore, handle_git_tag_delete, handle_git_tags, handle_git_verify,

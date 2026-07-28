@@ -296,7 +296,8 @@ impl Kernel {
                     self.config.clone(),
                     self.event_bus.clone(),
                 ));
-                let kh = kh.with_compression(oxios_kernel::CompressionApi::new(compression_service));
+                let kh =
+                    kh.with_compression(oxios_kernel::CompressionApi::new(compression_service));
                 Arc::new(kh)
             })
             .clone()

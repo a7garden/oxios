@@ -1739,26 +1739,20 @@ fn kernel_event_to_ws_chunk(
                 "reason": reason,
             }))
         }
-        KernelEvent::CompressionDelta { session_id, delta } => {
-            Some(serde_json::json!({
-                "type": "compression_delta",
-                "content": delta,
-                "session_id": session_id,
-            }))
-        }
-        KernelEvent::CompressionDone { session_id } => {
-            Some(serde_json::json!({
-                "type": "compression_done",
-                "session_id": session_id,
-            }))
-        }
-        KernelEvent::CompressionFailed { session_id, error } => {
-            Some(serde_json::json!({
-                "type": "compression_failed",
-                "error": error,
-                "session_id": session_id,
-            }))
-        }
+        KernelEvent::CompressionDelta { session_id, delta } => Some(serde_json::json!({
+            "type": "compression_delta",
+            "content": delta,
+            "session_id": session_id,
+        })),
+        KernelEvent::CompressionDone { session_id } => Some(serde_json::json!({
+            "type": "compression_done",
+            "session_id": session_id,
+        })),
+        KernelEvent::CompressionFailed { session_id, error } => Some(serde_json::json!({
+            "type": "compression_failed",
+            "error": error,
+            "session_id": session_id,
+        })),
         _ => None,
     };
     // Phase A: stamp active stream's message_id on every chunk so frontend

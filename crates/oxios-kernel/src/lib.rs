@@ -78,13 +78,13 @@ pub mod workers;
 // ─── State & Config ─────────────────────────────────────────────────
 // 영속 상태, 설정, 백업, 리소스 모니터링.
 pub mod backup;
+pub mod compression;
 pub mod config;
 pub mod git_layer;
 pub mod mount;
 pub mod project;
 pub mod resource_monitor;
 pub mod session_context;
-pub mod compression;
 pub mod state_store;
 pub mod task;
 
@@ -283,8 +283,8 @@ pub use host_tools::{CredentialStatus, DetectedTool, ToolSource};
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
-    A2aApi, AgentApi, BrowserApi, CalendarApi, CopilotResponse, EmailApi, EngineApi, EngineConfigResponse,
-    ExecApi, ExtensionApi, FallbackEvent, HostToolsApi, InfraApi,
+    A2aApi, AgentApi, BrowserApi, CalendarApi, CopilotResponse, EmailApi, EngineApi,
+    EngineConfigResponse, ExecApi, ExtensionApi, FallbackEvent, HostToolsApi, InfraApi,
     InputModality as EngineInputModality, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi,
     MemoryNote, ModelInfo, MountApi, MountInfo, PersonaApi, ProjectApi, ProjectInfo,
     ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot,

@@ -79,7 +79,12 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
 
         // Headless browser — pure-Rust oxibrowser-core browse suite.
         #[cfg(feature = "native-browser")]
-        names.extend(["browse", "browse_extract", "browse_session", "browse_script"]);
+        names.extend([
+            "browse",
+            "browse_extract",
+            "browse_session",
+            "browse_script",
+        ]);
 
         names
     }
@@ -215,6 +220,11 @@ mod tests {
         {
             expected += 4; // browse, browse_extract, browse_session, browse_script
         }
-        assert_eq!(names.len(), expected, "expected {expected} tools, got {:?}", names);
+        assert_eq!(
+            names.len(),
+            expected,
+            "expected {expected} tools, got {:?}",
+            names
+        );
     }
 }

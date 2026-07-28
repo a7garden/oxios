@@ -83,10 +83,10 @@ pub(crate) async fn handle_search(
         &body.query,
         "web",
         &body.engines,
-        None,  // repo
-        None,  // token
+        None, // repo
+        None, // token
         body.limit,
-        10,    // timeout_secs
+        10, // timeout_secs
     )
     .await
     .map_err(|e| AppError::Internal(format!("search failed: {e}")))?;

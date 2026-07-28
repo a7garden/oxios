@@ -24,9 +24,9 @@ pub mod token_maxing_api;
 pub use crate::host_tools::HostToolsApi;
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
+pub use browser_api::BrowserApi;
 pub use calendar_api::CalendarApi;
 pub use compression_api::CompressionApi;
-pub use browser_api::BrowserApi;
 pub use email_api::EmailApi;
 pub use engine_api::{
     EngineApi, EngineConfigResponse, FallbackEvent, InputModality, ModelInfo, ProviderCategory,
