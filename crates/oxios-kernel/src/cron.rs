@@ -1007,5 +1007,4 @@ mod tests {
             "tick_once must enforce max_concurrent_jobs"
         );
     }
-
 }

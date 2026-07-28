@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { HttpResponse, http } from 'msw'
 import { ApiError, api, apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/stores/auth'
-import { HttpResponse, http } from 'msw'
 import { server } from './msw/server'
 
 // ---------------------------------------------------------------------------

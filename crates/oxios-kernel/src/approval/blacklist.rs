@@ -144,7 +144,6 @@ pub fn default_blacklist_rules() -> Vec<BlacklistRule> {
 }
 
 #[cfg(test)]
-
 mod tests {
     use super::super::gate::ToolCall;
     use super::*;
