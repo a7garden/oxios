@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { ArrowDown, RefreshCw } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { VList, type VListHandle } from 'virtua'
 import type { AttachedFile, ContextAttachment } from '@/components/chat/chat-input'
 import { ChatInput } from '@/components/chat/chat-input'
 import { ChatMiniMap } from '@/components/chat/chat-minimap'
@@ -16,10 +17,10 @@ import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { PortalPanel } from '@/components/portal/portal-panel'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { useDraftPersistence } from '@/hooks/use-draft-persistence'
 import { useRoles } from '@/hooks/use-engine'
 import { useMounts } from '@/hooks/use-mounts'
+import { buildChatRows } from '@/lib/chat-rows'
 import { addInputHistory } from '@/lib/input-history-storage'
 import { useChatStore } from '@/stores/chat'
 import { usePortalStore } from '@/stores/portal'
@@ -85,18 +86,38 @@ function ChatPage() {
   const [input, setInput] = useState('')
   useDraftPersistence(activeSessionId, input, setInput)
   const [userScrolledUp, setUserScrolledUp] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const vListRef = useRef<VListHandle>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const atBottomRef = useRef(true)
+  const [expanded, setExpanded] = useState(false)
 
   // Compressed groups: collapse older messages when a conversation is long.
   const COLLAPSE_THRESHOLD = 40
   const VISIBLE_TAIL = 20
-  const collapseCount = messages.length > COLLAPSE_THRESHOLD ? messages.length - VISIBLE_TAIL : 0
 
-  // Auto-scroll to bottom on new messages, but only if user hasn't scrolled up
+  // Virtualized row model (LobeHub borrow): the VList renders this flat array.
+  const rows = useMemo(
+    () =>
+      buildChatRows({
+        messages,
+        expanded,
+        collapseThreshold: COLLAPSE_THRESHOLD,
+        visibleTail: VISIBLE_TAIL,
+        hasInterview: !!activeInterview && activeInterview.length > 0,
+        hasToolApproval: !!activeToolApproval,
+        hasPathAccess: !!activePathAccess,
+      }),
+    [messages, expanded, activeInterview, activeToolApproval, activePathAccess],
+  )
+
+  // Auto-scroll to the last row while the user is at (or near) the bottom.
+  // Re-anchors as the streaming message grows (dep on trailing content length).
+  const lastContentLen = messages.at(-1)?.content?.length ?? 0
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isStreaming, userScrolledUp])
+    if (atBottomRef.current) {
+      vListRef.current?.scrollToIndex(rows.length - 1, { align: 'end' })
+    }
+  }, [rows.length, isStreaming, lastContentLen])
 
   // Auto-connect WebSocket on mount
   useEffect(() => {
@@ -116,16 +137,19 @@ function ChatPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [newSession])
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  const handleVListScroll = (offset: number) => {
+    const vl = vListRef.current
+    if (!vl) return
+    const atBottom = vl.scrollSize - offset - vl.viewportSize < 80
+    atBottomRef.current = atBottom
     setUserScrolledUp(!atBottom)
   }
 
   const handleMiniMapJump = (index: number) => {
-    scrollAreaRef.current
-      ?.querySelector(`[data-msg-index="${index}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const rowIndex = rows.findIndex((r) => r.kind === 'message' && r.index === index)
+    if (rowIndex >= 0) {
+      vListRef.current?.scrollToIndex(rowIndex, { align: 'center', smooth: true })
+    }
   }
 
   const handleSend = (
@@ -229,103 +253,104 @@ function ChatPage() {
         <MountDetectionBadge />
 
         {/* ── Messages area ── */}
-        <div className="relative flex-1 min-h-0">
-          <ScrollArea
-            ref={scrollAreaRef as any}
+        <div ref={messagesContainerRef} className="relative flex-1 min-h-0">
+          <VList
+            ref={vListRef}
+            onScroll={handleVListScroll}
             className="h-full"
-            onScroll={handleScroll}
             role="log"
             aria-label={t('common.chatMessages')}
           >
-            <div className="max-w-3xl mx-auto px-4 py-6">
-              {messages.length === 0 && <EmptyChatState />}
-              <div className="space-y-1">
-                {/* Collapsed older messages */}
-                {collapseCount > 0 && (
-                  <CompressedGroup count={collapseCount}>
-                    {messages.slice(0, collapseCount).map((msg, _idx) => {
-                      const assistantIndex =
-                        msg.role === 'assistant'
-                          ? messages.slice(0, _idx).filter((m) => m.role === 'assistant').length
-                          : undefined
-                      return (
-                        <div key={msg.id} data-msg-index={_idx}>
-                          <MessageBubble
-                            message={msg}
-                            sessionId={activeSessionId ?? undefined}
-                            assistantIndex={assistantIndex}
-                            onRetry={msg.metadata?.isError ? () => handleRetry(msg.id) : undefined}
-                          />
-                        </div>
-                      )
-                    })}
-                  </CompressedGroup>
-                )}
-                {/* Visible recent messages */}
-                {messages.slice(collapseCount).map((msg, i) => {
-                  const _idx = collapseCount + i
-                  const assistantIndex =
-                    msg.role === 'assistant'
-                      ? messages.slice(0, _idx).filter((m) => m.role === 'assistant').length
-                      : undefined
-                  return (
-                    <div key={msg.id} data-msg-index={_idx}>
-                      <MessageBubble
-                        message={msg}
-                        sessionId={activeSessionId ?? undefined}
-                        assistantIndex={assistantIndex}
-                        onRetry={msg.metadata?.isError ? () => handleRetry(msg.id) : undefined}
-                      />
-                    </div>
-                  )
-                })}
-
-                {/* Interview wizard */}
-                {activeInterview && activeInterview.length > 0 && (
-                  <InterviewWizard
-                    questions={activeInterview}
-                    round={interviewRound}
-                    ambiguity={interviewAmbiguity}
-                    onSubmit={submitInterviewResponse}
-                    disabled={isStreaming}
-                  />
-                )}
-
-                {/* Tool approval */}
-                {activeToolApproval && (
-                  <ToolApprovalCard
-                    toolName={activeToolApproval.toolName}
-                    reason={activeToolApproval.reason}
-                    onApprove={(remember) =>
-                      resolveToolApproval(activeToolApproval.id, true, remember)
-                    }
-                    onDeny={() => resolveToolApproval(activeToolApproval.id, false)}
-                    disabled={isStreaming}
-                  />
-                )}
-                {/* Path access request */}
-                {activePathAccess && (
+            {rows.map((row) => {
+              if (row.kind === 'empty') {
+                return (
+                  <div key="empty" className="mx-auto max-w-3xl px-4 py-6">
+                    <EmptyChatState />
+                  </div>
+                )
+              }
+              if (row.kind === 'collapse-bar') {
+                return (
+                  <div key="collapse-bar" className="mx-auto max-w-3xl px-4 pt-6">
+                    <CompressedGroup
+                      count={row.count}
+                      expanded={expanded}
+                      onToggle={() => setExpanded((v) => !v)}
+                    />
+                  </div>
+                )
+              }
+              if (row.kind === 'message') {
+                const m = row.message
+                const assistantIndex =
+                  m.role === 'assistant'
+                    ? messages.slice(0, row.index).filter((x) => x.role === 'assistant').length
+                    : undefined
+                return (
+                  <div
+                    key={m.id}
+                    data-msg-index={row.index}
+                    className="mx-auto max-w-3xl px-4 py-0.5"
+                  >
+                    <MessageBubble
+                      message={m}
+                      sessionId={activeSessionId ?? undefined}
+                      assistantIndex={assistantIndex}
+                      onRetry={m.metadata?.isError ? () => handleRetry(m.id) : undefined}
+                    />
+                  </div>
+                )
+              }
+              if (row.kind === 'interview') {
+                return (
+                  <div key="interview" className="mx-auto max-w-3xl px-4 py-2">
+                    <InterviewWizard
+                      questions={activeInterview!}
+                      round={interviewRound}
+                      ambiguity={interviewAmbiguity}
+                      onSubmit={submitInterviewResponse}
+                      disabled={isStreaming}
+                    />
+                  </div>
+                )
+              }
+              if (row.kind === 'tool-approval') {
+                return (
+                  <div key="tool-approval" className="mx-auto max-w-3xl px-4 py-2">
+                    <ToolApprovalCard
+                      toolName={activeToolApproval!.toolName}
+                      reason={activeToolApproval!.reason}
+                      onApprove={(remember) =>
+                        resolveToolApproval(activeToolApproval!.id, true, remember)
+                      }
+                      onDeny={() => resolveToolApproval(activeToolApproval!.id, false)}
+                      disabled={isStreaming}
+                    />
+                  </div>
+                )
+              }
+              // path-access
+              return (
+                <div key="path-access" className="mx-auto max-w-3xl px-4 py-2">
                   <PathAccessCard
-                    path={activePathAccess.path}
-                    mode={activePathAccess.mode}
-                    toolName={activePathAccess.toolName}
-                    reason={activePathAccess.reason}
-                    onMount={() => resolvePathAccess(activePathAccess.id, 'mount')}
-                    onTempAllow={() => resolvePathAccess(activePathAccess.id, 'temp')}
-                    onDeny={() => resolvePathAccess(activePathAccess.id, 'deny')}
+                    path={activePathAccess!.path}
+                    mode={activePathAccess!.mode}
+                    toolName={activePathAccess!.toolName}
+                    reason={activePathAccess!.reason}
+                    onMount={() => resolvePathAccess(activePathAccess!.id, 'mount')}
+                    onTempAllow={() => resolvePathAccess(activePathAccess!.id, 'temp')}
+                    onDeny={() => resolvePathAccess(activePathAccess!.id, 'deny')}
                     disabled={isStreaming}
                   />
-                )}
-
-                <div ref={bottomRef} />
-              </div>
-            </div>
-          </ScrollArea>
+                </div>
+              )
+            })}
+          </VList>
           {userScrolledUp && (
             <button
               type="button"
               onClick={() => {
-                bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+                vListRef.current?.scrollToIndex(rows.length - 1, { align: 'end', smooth: true })
                 setUserScrolledUp(false)
               }}
               className="absolute bottom-4 left-1/2 z-10 flex h-9 w-9 -translate-x-1/2 items-center justify-center rounded-full border bg-background shadow-lg transition-all hover:bg-accent"
@@ -335,7 +360,7 @@ function ChatPage() {
             </button>
           )}
           <ChatMiniMap messages={messages} onJump={handleMiniMapJump} />
-          <TextSelectionBar containerRef={scrollAreaRef} />
+          <TextSelectionBar containerRef={messagesContainerRef} />
         </div>
         {!activeInterview && (
           <div className="bg-background/95 backdrop-blur-sm shrink-0">
