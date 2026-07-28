@@ -6,12 +6,12 @@
 // approval / path access). `index` on a message row is its position in the
 // FULL messages array — used to derive assistantIndex and minimap jumps.
 
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, CompressionInfo } from '@/types'
 
 /** One renderable row in the virtualized chat list. */
 export type ChatRow =
   | { kind: 'empty' }
-  | { kind: 'collapse-bar'; count: number }
+  | { kind: 'collapse-bar'; count: number; foldedMessages: ChatMessage[]; compression: CompressionInfo | null }
   | { kind: 'message'; message: ChatMessage; index: number }
   | { kind: 'interview' }
   | { kind: 'tool-approval' }
@@ -28,10 +28,12 @@ export interface BuildChatRowsOptions {
   hasInterview: boolean
   hasToolApproval: boolean
   hasPathAccess: boolean
+  /** LLM compression summary for the session (null = not generated yet). */
+  compression: CompressionInfo | null
 }
 
 export function buildChatRows(opts: BuildChatRowsOptions): ChatRow[] {
-  const { messages, expanded, collapseThreshold, visibleTail } = opts
+  const { messages, expanded, collapseThreshold, visibleTail, compression } = opts
   const hasCard = opts.hasInterview || opts.hasToolApproval || opts.hasPathAccess
 
   if (messages.length === 0 && !hasCard) return [{ kind: 'empty' }]
@@ -40,7 +42,12 @@ export function buildChatRows(opts: BuildChatRowsOptions): ChatRow[] {
   const collapseCount = messages.length > collapseThreshold ? messages.length - visibleTail : 0
 
   if (collapseCount > 0) {
-    rows.push({ kind: 'collapse-bar', count: collapseCount })
+    rows.push({
+      kind: 'collapse-bar',
+      count: collapseCount,
+      foldedMessages: messages.slice(0, collapseCount),
+      compression,
+    })
     const start = expanded ? 0 : collapseCount
     for (let i = start; i < messages.length; i++) {
       rows.push({ kind: 'message', message: messages[i]!, index: i })

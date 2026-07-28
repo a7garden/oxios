@@ -22,7 +22,7 @@ import { useRoles } from '@/hooks/use-engine'
 import { useMounts } from '@/hooks/use-mounts'
 import { buildChatRows } from '@/lib/chat-rows'
 import { addInputHistory } from '@/lib/input-history-storage'
-import { useChatStore } from '@/stores/chat'
+import { useChatStore, getToken } from '@/stores/chat'
 import { usePortalStore } from '@/stores/portal'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
@@ -56,6 +56,7 @@ function ChatPage() {
     resolveToolApproval,
     activePathAccess,
     resolvePathAccess,
+    compression,
     disconnect,
     connect,
     newSession,
@@ -106,8 +107,9 @@ function ChatPage() {
         hasInterview: !!activeInterview && activeInterview.length > 0,
         hasToolApproval: !!activeToolApproval,
         hasPathAccess: !!activePathAccess,
+        compression,
       }),
-    [messages, expanded, activeInterview, activeToolApproval, activePathAccess],
+    [messages, expanded, activeInterview, activeToolApproval, activePathAccess, compression],
   )
 
   // Signature of the trailing message: content length + block count + streaming
@@ -151,6 +153,34 @@ function ChatPage() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [newSession])
+
+  // Auto-trigger LLM compression for long sessions.
+  const compressTriggered = useRef(false)
+  useEffect(() => {
+    if (
+      activeSessionId &&
+      messages.length >= COLLAPSE_THRESHOLD &&
+      compression === null &&
+      !compressTriggered.current
+    ) {
+      compressTriggered.current = true
+      const sid = activeSessionId
+      const token = getToken()
+      fetch(`/api/sessions/${encodeURIComponent(sid)}/compress`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(() => {
+        compressTriggered.current = false
+      })
+    }
+    // Reset the guard when the session changes.
+    return () => {
+      compressTriggered.current = false
+    }
+  }, [activeSessionId, messages.length, compression])
 
   const handleVListScroll = (offset: number) => {
     const vl = vListRef.current
@@ -302,6 +332,8 @@ function ChatPage() {
                       count={row.count}
                       expanded={expanded}
                       onToggle={() => setExpanded((v) => !v)}
+                      foldedMessages={row.foldedMessages}
+                      compression={row.compression}
                     />
                   </div>
                 )

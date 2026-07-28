@@ -16,6 +16,7 @@ const base = {
   hasInterview: false,
   hasToolApproval: false,
   hasPathAccess: false,
+  compression: null,
 }
 
 describe('buildChatRows', () => {
@@ -35,7 +36,7 @@ describe('buildChatRows', () => {
     const messages = Array.from({ length: 45 }, (_, i) => msg(`m${i}`))
     const rows = buildChatRows({ ...base, messages })
     // collapseCount = 45 - 20 = 25 → bar + last 20 messages.
-    expect(rows[0]).toEqual({ kind: 'collapse-bar', count: 25 })
+    expect(rows[0]).toMatchObject({ kind: 'collapse-bar', count: 25 })
     expect(rows).toHaveLength(21)
     expect(rows[1]).toMatchObject({ kind: 'message', index: 25 })
     expect(rows[20]).toMatchObject({ kind: 'message', index: 44 })
@@ -44,7 +45,7 @@ describe('buildChatRows', () => {
   it('expands to all messages (bar stays, full list follows) when expanded', () => {
     const messages = Array.from({ length: 45 }, (_, i) => msg(`m${i}`))
     const rows = buildChatRows({ ...base, messages, expanded: true })
-    expect(rows[0]).toEqual({ kind: 'collapse-bar', count: 25 })
+    expect(rows[0]).toMatchObject({ kind: 'collapse-bar', count: 25 })
     expect(rows).toHaveLength(46) // bar + 45 messages
     expect(rows[1]).toMatchObject({ kind: 'message', index: 0 })
   })
