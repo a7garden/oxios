@@ -88,9 +88,21 @@ export class StreamProcessor {
         this.appendText(ev.text)
         return { patch: { content: this.text, generating: true } }
 
-      case 'reasoning.start':
-        this.openReasoning()
+      case 'reasoning.start': {
+        const i = this.blocks.length - 1
+        const last = this.blocks[i]
+        if (last && last.type === 'reasoning') {
+          // Reopen the existing span: the runtime emitted another start
+          // marker for the same uninterrupted thinking run (no tool/text
+          // arrived between — those close + displace it, see
+          // closeReasoningBlock / upsertToolBlock / appendText). Spawning a
+          // sibling here is what produced adjacent duplicate "Thought" cards.
+          this.blocks[i] = { ...last, status: 'streaming' }
+        } else {
+          this.openReasoning()
+        }
         return { patch: { generating: true } }
+      }
 
       case 'reasoning.delta': {
         this.appendReasoning(ev.text, ev.source)
@@ -320,12 +332,16 @@ export class StreamProcessor {
     this.reasoningBytes += slice.length
     const i = this.blocks.length - 1
     const last = this.blocks[i]
-    if (last && last.type === 'reasoning' && last.status === 'streaming') {
-      // Preserve the block's existing source; a subsequent delta from a
-      // different provider doesn't relabel the reasoning span.
+    if (last && last.type === 'reasoning') {
+      // Append to the trailing reasoning span, REOPENING it if a prior
+      // reasoning.end closed it. A tool/text block would have displaced it
+      // (so `last` wouldn't be reasoning), which means we only ever merge a
+      // single uninterrupted thinking run — never across a tool. Mirrors the
+      // backend's per-position segment coalescing (agent_runtime.rs).
       const nextSource = last.source ?? source
       this.blocks[i] = {
         ...last,
+        status: 'streaming',
         text: last.text + slice,
         ...(nextSource ? { source: nextSource } : {}),
       }

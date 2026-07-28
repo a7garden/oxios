@@ -230,6 +230,28 @@ export interface AssistantCtx {
   placeholderModel?: string | null
 }
 
+// ---------------------------------------------------------------------------
+// Turn-boundary invariant — single source of truth
+// ---------------------------------------------------------------------------
+// The store streams one assistant message per turn, and that message is always
+// the TRAILING entry in `messages`: `sendMessage` appends only the user
+// message, and the assistant placeholder is created lazily on the first
+// content chunk (never optimistically on send — the LiveActivityBar owns the
+// pre-chunk "thinking" affordance, so an empty bubble would only duplicate it).
+//
+// Corollary: an assistant from a PRIOR turn is never the streaming target.
+// Once a new user message is appended it is the trailing message until a fresh
+// placeholder is created. EVERY site that routes a chunk to "the assistant"
+// must go through `currentAssistant` — searching backward for the last
+// assistant anywhere in the list silently targets the previous turn's response
+// and overwrites it (the multi-turn disappearance/ordering bug).
+
+/** The current turn's assistant placeholder, or undefined when a user message
+ *  is still waiting for its first content chunk. Pure. */
+function currentAssistant(messages: ChatMessage[]): ChatMessage | undefined {
+  const last = messages[messages.length - 1]
+  return last?.role === 'assistant' ? last : undefined
+}
 /**
  * Ensure the last message is an assistant message, appending an empty
  * placeholder if not. Returns the (possibly unchanged) list and the index of
@@ -239,8 +261,7 @@ export function ensureLastAssistant(
   messages: ChatMessage[],
   ctx: AssistantCtx,
 ): { messages: ChatMessage[]; index: number } {
-  const last = messages[messages.length - 1]
-  if (last?.role === 'assistant') {
+  if (currentAssistant(messages)) {
     return { messages, index: messages.length - 1 }
   }
   const placeholder: ChatMessage = {
@@ -288,16 +309,15 @@ export function patchAssistantModel(
   messages: ChatMessage[],
   modelId: string,
 ): { messages: ChatMessage[]; pendingModel?: string } {
-  let idx = -1
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i]?.role === 'assistant') {
-      idx = i
-      break
-    }
-  }
-  if (idx >= 0) {
+  // Turn-aware (see lastAssistantMessageId): patch only the current turn's
+  // placeholder — the trailing message. When the trailing message is a user
+  // message (new turn, no assistant created yet), stash as pendingModel so
+  // the next placeholder picks it up; otherwise we'd overwrite the PREVIOUS
+  // turn's assistant `model` field instead of routing to the new turn.
+  const cur = currentAssistant(messages)
+  if (cur) {
     const next = messages.slice()
-    next[idx] = { ...next[idx]!, model: modelId }
+    next[next.length - 1] = { ...cur, model: modelId }
     return { messages: next }
   }
   return { messages, pendingModel: modelId }
@@ -312,8 +332,8 @@ export function patchAssistantModel(
  * empty "Thinking…" bubble stuck on screen.
  */
 export function finalizeStreamingMessage(messages: ChatMessage[]): ChatMessage[] {
-  const last = messages[messages.length - 1]
-  if (last?.role !== 'assistant' || !last.generating) return messages
+  const last = currentAssistant(messages)
+  if (!last?.generating) return messages
   // Blocks are the single source of truth; a turn with non-empty blocks is
   // not empty even if `content` is blank.
   const isEmpty = !(last.content ?? '').trim() && !(last.blocks && last.blocks.length > 0)
@@ -631,12 +651,10 @@ function getOrCreateProcessor(messageId: string): StreamProcessor {
   return p
 }
 
-/** Find the last assistant message id in the list, or null. */
+/** Id of the current turn's assistant placeholder, or null. See
+ *  `currentAssistant` for the turn-boundary invariant. */
 function lastAssistantMessageId(messages: ChatMessage[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i]!.role === 'assistant') return messages[i]!.id
-  }
-  return null
+  return currentAssistant(messages)?.id ?? null
 }
 
 /** Apply a StreamProcessor result to a specific message by id, creating an
@@ -1604,15 +1622,12 @@ export const useChatStore = create<ChatStore>()(
             set((s) => {
               const updated = [...s.messages]
 
-              // Find the last assistant message to attach metadata.
-              // If none exists yet (e.g. a task that only ran tools with
-              // no token stream), create one so the
-              // completion metadata has a home.
-              const lastAssistantIdx = [...updated]
-                .reverse()
-                .findIndex((m) => m.role === 'assistant')
-              if (lastAssistantIdx < 0) {
-                // No assistant message yet — create one.
+              // currentAssistant invariant (see helper): completion metadata
+              // belongs to THIS turn's trailing assistant. If nothing streamed
+              // (model+done only), create a fresh placeholder rather than
+              // reusing a prior turn's response.
+              const target = currentAssistant(updated)
+              if (!target) {
                 const placeholder: ChatMessage = {
                   id: crypto.randomUUID(),
                   role: 'assistant',
@@ -1629,29 +1644,30 @@ export const useChatStore = create<ChatStore>()(
                 return {
                   messages: [...updated, placeholder],
                   isStreaming: false,
+                  pendingModel: null,
                   activeToolApproval: null,
                   activePathAccess: null,
                 }
               }
 
-              const idx = updated.length - 1 - lastAssistantIdx
-              const target = updated[idx]
-              if (target) {
-                updated[idx] = {
-                  ...target,
-                  id: target.id ?? crypto.randomUUID(),
-                  metadata: {
-                    phase,
-                    evaluation_passed: evaluationPassed,
-                    duration_ms: durationMs,
-                    tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
-                  },
-                }
+              updated[updated.length - 1] = {
+                ...target,
+                id: target.id ?? crypto.randomUUID(),
+                metadata: {
+                  phase,
+                  evaluation_passed: evaluationPassed,
+                  duration_ms: durationMs,
+                  tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
+                },
               }
 
               return {
                 messages: updated,
                 isStreaming: false,
+                // Clear the per-turn model stash so a later turn without a
+                // model chunk does not stamp the prior turn's model onto its
+                // placeholder.
+                pendingModel: null,
                 activeToolApproval: null,
                 activePathAccess: null,
               }
@@ -1723,6 +1739,7 @@ export const useChatStore = create<ChatStore>()(
               return {
                 messages: [...updated, errorMsg],
                 isStreaming: false,
+                pendingModel: null,
                 activeToolApproval: null,
                 activePathAccess: null,
               }

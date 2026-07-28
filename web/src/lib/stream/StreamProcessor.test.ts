@@ -179,4 +179,66 @@ describe('StreamProcessor — block-stream timeline', () => {
     expect(reasoning[0]).toMatchObject({ text: 'plain' })
     expect((reasoning[0] as ReasoningBlock).source).toBeUndefined()
   })
+  // ── Reasoning coalescing (turn-boundary invariant) ──
+  // A single uninterrupted thinking run must stay ONE block even when the
+  // runtime emits multiple start/end marker pairs (or a delta after an end).
+  // Only a tool/text block may split it. Mirrors the backend's per-position
+  // segment coalescing (agent_runtime.rs).
+  it('merges adjacent reasoning spans with no tool between into one block', () => {
+    const p = new StreamProcessor('m1')
+    p.handleEvent({ kind: 'reasoning.start', messageId: 'm1' })
+    p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'Thinking ' })
+    p.handleEvent({ kind: 'reasoning.end', messageId: 'm1' })
+    // Second span, NO tool between — before the fix this spawned a sibling
+    // "Thought" card. It must reopen and append to the same block.
+    p.handleEvent({ kind: 'reasoning.start', messageId: 'm1' })
+    p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'more' })
+    p.handleEvent({ kind: 'reasoning.end', messageId: 'm1' })
+
+    const reasoning = blocksOf(p).filter((b) => b.type === 'reasoning')
+    expect(reasoning).toHaveLength(1)
+    expect(reasoning[0]).toMatchObject({ type: 'reasoning', text: 'Thinking more', status: 'done' })
+  })
+
+  it('reopens a closed reasoning span when a delta arrives with no fresh start', () => {
+    const p = new StreamProcessor('m1')
+    p.handleEvent({ kind: 'reasoning.start', messageId: 'm1' })
+    p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'part1 ' })
+    p.handleEvent({ kind: 'reasoning.end', messageId: 'm1' })
+    // Delta after end, no new start — must reopen, not spawn a sibling.
+    p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'part2' })
+
+    const reasoning = blocksOf(p).filter((b) => b.type === 'reasoning')
+    expect(reasoning).toHaveLength(1)
+    expect(reasoning[0]).toMatchObject({ text: 'part1 part2' })
+  })
+
+  it('does not merge reasoning across a tool (flow order preserved)', () => {
+    const p = new StreamProcessor('m1')
+    p.handleEvent({ kind: 'reasoning.start', messageId: 'm1' })
+    p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'before' })
+    p.handleEvent({ kind: 'reasoning.end', messageId: 'm1' })
+    p.handleEvent({
+      kind: 'tool.start',
+      messageId: 'm1',
+      toolCallId: 't1',
+      toolName: 'ls',
+      args: {},
+    })
+    p.handleEvent({
+      kind: 'tool.end',
+      messageId: 'm1',
+      toolCallId: 't1',
+      result: 'ok',
+      durationMs: 1,
+    })
+    p.handleEvent({ kind: 'reasoning.start', messageId: 'm1' })
+    p.handleEvent({ kind: 'reasoning.delta', messageId: 'm1', text: 'after' })
+    p.handleEvent({ kind: 'reasoning.end', messageId: 'm1' })
+
+    const blocks = blocksOf(p)
+    expect(blocks.map((b) => b.type)).toEqual(['reasoning', 'tool', 'reasoning'])
+    expect(blocks[0]).toMatchObject({ text: 'before' })
+    expect(blocks[2]).toMatchObject({ text: 'after' })
+  })
 })

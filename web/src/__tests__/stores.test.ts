@@ -556,6 +556,120 @@ describe('useChatStore handleChunk (RFC-015)', () => {
   })
 })
 
+// Regression: multi-turn accumulation. Before the turn-aware fix, every
+// streaming chunk was routed to "the last assistant message anywhere in the
+// list" — which, once a new user message is appended, is the PREVIOUS turn's
+// response. Turn 2's stream then overwrote turn 1's bubble and left the new
+// user message with no answer beneath it (ordering scrambled, prior response
+// gone). These guard the turn-boundary targeting fix.
+describe('multi-turn accumulation (turn-boundary targeting)', () => {
+  beforeEach(() => {
+    __clearStreamProcessorsForTesting()
+    localStorage.clear()
+    sessionStorage.clear()
+  })
+
+  it('a second turn streams into a NEW assistant message, leaving the prior turn intact', async () => {
+    // Turn 1 already completed.
+    useChatStore.setState({
+      messages: [
+        { id: 'u1', role: 'user' as const, content: 'q1', timestamp: new Date().toISOString() },
+        {
+          id: 'a1',
+          role: 'assistant' as const,
+          content: 'response1',
+          timestamp: new Date().toISOString(),
+        },
+      ],
+      isStreaming: false,
+      pendingModel: null,
+    })
+    // User sends turn 2 (mirrors sendMessage's optimistic append — no WS here).
+    useChatStore.setState((s) => ({
+      messages: [
+        ...s.messages,
+        { id: 'u2', role: 'user' as const, content: 'q2', timestamp: new Date().toISOString() },
+      ],
+      isStreaming: true,
+    }))
+    // Turn 2 streams a token.
+    useChatStore.getState().handleChunk({ type: 'token', content: 'response2' })
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+
+    const msgs = useChatStore.getState().messages
+    expect(msgs).toHaveLength(4)
+    expect(msgs[2]!.role).toBe('user')
+    expect(msgs[3]!.role).toBe('assistant')
+    expect(msgs[3]!.content).toBe('response2')
+    // Prior turn's response is untouched (the pre-fix bug overwrote this).
+    expect(msgs[1]!.role).toBe('assistant')
+    expect(msgs[1]!.content).toBe('response1')
+  })
+
+  it('a model chunk before the first token stashes pendingModel instead of overwriting the prior turn', () => {
+    useChatStore.setState({
+      messages: [
+        { id: 'u1', role: 'user' as const, content: 'q1', timestamp: '' },
+        { id: 'a1', role: 'assistant' as const, content: 'r1', model: 'old-model', timestamp: '' },
+        { id: 'u2', role: 'user' as const, content: 'q2', timestamp: '' },
+      ],
+      isStreaming: true,
+      pendingModel: null,
+    })
+    useChatStore.getState().handleChunk({ type: 'model', model: 'new-model' })
+    const s = useChatStore.getState()
+    expect(s.pendingModel).toBe('new-model')
+    expect(s.messages[1]!.model).toBe('old-model')
+  })
+
+  it('a done-only second turn creates a fresh assistant instead of reusing the prior turn', () => {
+    useChatStore.setState({
+      messages: [
+        { id: 'u1', role: 'user' as const, content: 'q1', timestamp: '' },
+        {
+          id: 'a1',
+          role: 'assistant' as const,
+          content: 'response1',
+          timestamp: '',
+          metadata: { phase: 'execute', tool_calls: [] },
+        },
+        { id: 'u2', role: 'user' as const, content: 'q2', timestamp: '' },
+      ],
+      isStreaming: true,
+      pendingModel: null,
+    })
+    useChatStore.getState().handleChunk({ type: 'done', phase: 'execute' })
+    const msgs = useChatStore.getState().messages
+    expect(msgs).toHaveLength(4)
+    expect(msgs[3]!.role).toBe('assistant')
+    expect(msgs[1]!.content).toBe('response1')
+  })
+
+  it('patchAssistantModel patches only the trailing assistant of the current turn', () => {
+    const messages: ChatMessage[] = [
+      { id: 'u1', role: 'user', content: 'q1', timestamp: '' },
+      { id: 'a1', role: 'assistant', content: 'r1', model: 'old', timestamp: '' },
+      { id: 'u2', role: 'user', content: 'q2', timestamp: '' },
+      { id: 'a2', role: 'assistant', content: '', timestamp: '' },
+    ]
+    const r = patchAssistantModel(messages, 'new')
+    expect(r.pendingModel).toBeUndefined()
+    expect(r.messages[3]!.model).toBe('new')
+    expect(r.messages[1]!.model).toBe('old')
+  })
+
+  it('patchAssistantModel returns pendingModel when the trailing message is a user message', () => {
+    const messages: ChatMessage[] = [
+      { id: 'u1', role: 'user', content: 'q1', timestamp: '' },
+      { id: 'a1', role: 'assistant', content: 'r1', model: 'old', timestamp: '' },
+      { id: 'u2', role: 'user', content: 'q2', timestamp: '' },
+    ]
+    const r = patchAssistantModel(messages, 'new')
+    expect(r.pendingModel).toBe('new')
+    expect(r.messages[1]!.model).toBe('old')
+  })
+})
+
 // The message-transform primitives route every chunk through a single shared
 // path in chat.ts; both the chat store and the quick-ask store call them, so
 // these tests guard the Cmd+J (one-shot) path too (which has no store tests).

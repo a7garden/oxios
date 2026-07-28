@@ -358,7 +358,15 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
     let legacy = user_web_dist_dir();
 
     // 1. Marker (RFC-024): generation the previous process was serving.
-    if let Some(m) = marker.as_ref()
+    //    Skipped when the binary has embedded assets — a stale download
+    //    from a previous version must not shadow the authoritative
+    //    embedded UI (every pre-1.29.0 → post-embedding upgrader hits
+    //    this: they installed an old version that auto-downloaded web UI
+    //    into `~/.oxios/web/dist-*/`, which the marker keeps pointing at
+    //    forever). The legacy/user-override dist (step 2) is still honored
+    //    — that requires an explicit `~/oxios/web/dist/` placement.
+    if !crate::embedded_web::is_embedded()
+        && let Some(m) = marker.as_ref()
         && let Some(p) = oxios_gateway::ActiveWebDist::resolve(m, legacy.as_deref())
     {
         tracing::info!(path = ?p, "Serving web UI from active marker");

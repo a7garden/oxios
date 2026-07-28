@@ -30,4 +30,25 @@ describe('BlockStream', () => {
     const { container } = render(<BlockStream blocks={blocks} messageId="m1" />)
     expect(container.textContent).toContain('Just an answer')
   })
+
+  it('renders a reasoning block through the Thinking + markdown body', () => {
+    // Exercises the reasoning → Thinking → MarkdownMessage path (the body was
+    // monospace <pre> before the hierarchy redesign). A streaming span is
+    // auto-expanded so its content is in the DOM.
+    const blocks: ChatBlock[] = [
+      {
+        type: 'reasoning',
+        id: 'r1',
+        text: 'Considering the options first',
+        status: 'streaming',
+        startedAt: Date.now(),
+      },
+      { type: 'text', id: 'x1', text: 'Answer' },
+    ]
+    const { container } = render(<BlockStream blocks={blocks} messageId="m1" />)
+    const text = container.textContent ?? ''
+    expect(text).toContain('Considering the options first')
+    // Answer still renders after the reasoning span (flow order).
+    expect(text.indexOf('Considering')).toBeLessThan(text.indexOf('Answer'))
+  })
 })

@@ -250,6 +250,7 @@
     "connectingToServer": "Connecting to server...",
     "startConversationHint": "Send a message to start a conversation.",
     "thinking": "Thinking...",
+    "thought": "Thought",
     "inputPlaceholder": "Type a message...",
     "mentionHint": "Search knowledge, memory, mounts with @ — type to filter",
     "noMentionResults": "No matching items",
