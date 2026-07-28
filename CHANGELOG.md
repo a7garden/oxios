@@ -45,6 +45,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Refactor(web)**: removed legacy ActivityTimeline, activity/toolCalls,
   and reasoning fields (P3b cleanup)
 
+## [1.29.0] - 2026-07-27
+
+### Added
+- **Embedded web UI (oxios)** — the SPA is now baked into the binary via
+  `include_dir!` at build time, eliminating the first-run download and the
+  separate `web-dist.zip` release asset for the binary-only distribution.
+- **Interactive path-access cards (kernel)** — Mount / temp-allow / deny
+  cards for interactive file-system access decisions.
+
+### Fixed
+- **Approval state sharing (kernel)** — `approval_config` Arc is now shared
+  across both `KernelHandle` instances, preventing stale approval state.
+- **Approval re-evaluation (kernel)** — manual-mode approval grants are
+  honored and re-evaluated on policy change.
+- **Web-dist sync (gateway)** — unified sync with eager startup check so
+  the daemon always serves the correct version.
+- **Frontend lint**: biome unsafe optional chain fix.
+- **Module declaration order**: fmt fix.
+
+### Changed
+- **Version bumps**: oxios-kernel and oxios-gateway to 1.29.0.
+- **Dep version specs**: updated for gateway and binary.
+
 ## [1.28.0] - 2026-07-27
 
 ### Added
