@@ -16,6 +16,7 @@ import { type PortalView, usePortalStore } from '@/stores/portal'
 import { ArtifactView } from './views/artifact-view'
 import { DocumentView } from './views/document-view'
 import { ThreadView } from './views/thread-view'
+import { SearchView } from './views/search-view'
 
 /** Resolve a human title for a view (shown in the shared header). */
 function viewTitle(view: PortalView): string {
@@ -28,6 +29,8 @@ function viewTitle(view: PortalView): string {
       return basename(view.path)
     case 'thread':
       return `Thread from ${view.parentId.slice(0, 8)}`
+    case 'search':
+      return view.query ?? 'Search'
   }
 }
 
@@ -74,6 +77,8 @@ function ViewBody() {
       return <DocumentView view={top} />
     case 'thread':
       return <ThreadView view={top} />
+    case 'search':
+      return <SearchView query={top.query} messageId={top.messageId} />
   }
 }
 

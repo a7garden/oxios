@@ -45,6 +45,13 @@ export type PortalView =
       /** Parent session ID this thread was spawned from. */
       parentId: string
     }
+  | {
+      type: 'search'
+      /** Search query (auto-set on agent-driven, entered in panel on manual). */
+      query?: string
+      /** Chat message ID that triggered this view (agent-driven only). */
+      messageId?: string
+    }
 export interface PortalState {
   /** Navigation stack; top (last) element is the visible view. */
   stack: PortalView[]
