@@ -1,0 +1,502 @@
+# Remote Access Architecture — Design
+
+> **Status:** Design (not yet implemented)
+> **Date:** 2026-07-29
+> **Scope:** How external devices reach the Oxios dashboard, and what to strengthen.
+
+---
+
+## TL;DR
+
+**Oxios should NOT become a cloud-hosted SaaS.** It is a local-first Agent OS — its value proposition is direct host execution, filesystem-only state, and zero-dependency operation. Pivoting to cloud hosting would require a database backend, multi-user tenancy, and a container runtime, fundamentally changing the product.
+
+Instead, **strengthen the remote-access layer** so the local instance is securely reachable from other devices. The recommended architecture:
+
+```
+Tier 0  Local          http://127.0.0.1:4200          (current default, zero config)
+Tier 1  Private mesh   https://<host>.<tailnet>.ts.net (Tailscale Serve — RECOMMENDED)
+Tier 2  Public share   https://<host>.<tailnet>.ts.net (Tailscale Funnel — opt-in)
+Tier 3  Custom domain  https://oxios.example.com        (Caddy reverse proxy)
+```
+
+The daemon **always binds to loopback**. External access is provided by a TLS-terminating proxy in front (Tailscale Serve/Funnel or Caddy), never by widening the bind address. This preserves the existing loopback-only security model while adding a clean access layer.
+
+Five improvements are proposed (§5). The headline change is **Tailscale identity-header trust** — an auth-proxy mode that auto-authenticates requests from `tailscale serve`, eliminating token friction for tailnet users.
+
+---
+
+## 1. Question: Do We Need Self-Hosting?
+
+**No.** Here is the reasoning:
+
+### What "self-hosting" would mean for Oxios
+
+| Requirement | Current (local) | Cloud-hosted |
+|---|---|---|
+| State backend | Filesystem (`~/.oxios/`) | PostgreSQL + S3 (like LobeHub's 9-container stack) |
+| Multi-user | Single user | Workspaces, RBAC, SSO |
+| Agent execution | Direct host (fork/exec/wait/kill) | Sandboxed containers or VMs |
+| Deployment | `cargo install oxios` | Docker Compose / Kubernetes |
+| Ops overhead | Zero | Database migrations, cert renewal, backups, monitoring |
+
+Oxios's entire architecture — `AccessManager` with host-level path sandboxing, `Supervisor` with real process management, the `DaemonManager` with launchd/systemd integration — is built around **running on the user's machine**. Moving it to the cloud would require reimplementing the execution model, which is the product.
+
+### What users actually need
+
+Users don't need "Oxios in the cloud." They need: **"I left my Mac running at home, and I want to check on my agents from my phone / laptop / another location."** That is a remote-access problem, not a hosting problem.
+
+### Verdict
+
+Keep the daemon local. Invest in making remote access **secure, frictionless, and well-documented**. This is what the rest of this document designs.
+
+---
+
+## 2. Current State
+
+### 2.1 Daemon binding
+
+```toml
+[gateway]
+host = "127.0.0.1"   # loopback only — the daemon never listens on external interfaces
+port = 4200
+```
+
+The bind is loopback by default. A non-loopback bind triggers a security warning (`plugin.rs:is_loopback_host` → stderr + log). This is correct and should stay.
+
+### 2.2 Authentication
+
+| Layer | Mechanism | Loopback-only? |
+|---|---|---|
+| API (REST) | `Authorization: Bearer <token>` middleware | No — any origin with a valid token |
+| Token issuance | `POST /api/auth/issue` | **Yes** — 403 from non-loopback peers |
+| WebSocket | `?ticket=<short-lived>` or `?token=<bearer>` query param | No |
+| SSE events | `fetch`-based stream with `Authorization: Bearer` header | No |
+
+Tokens are SHA-256 hashed, stored in `~/.oxios/api-keys.json`. The first-boot auto-issue creates a `default` key and prints it in the terminal banner.
+
+The **loopback-only token issuance** (`auth_routes.rs:handle_auth_issue`) is the key friction point: a browser on the same machine gets a token zero-click; a remote browser gets 403 and must fall back to manual paste.
+
+### 2.3 TLS
+
+**None.** The daemon serves plain HTTP. Bearer tokens transit in cleartext. This is acceptable for loopback (traffic never leaves the kernel) but **unsafe for any remote access path** — even Tailscale's WireGuard encryption is transport-level, not application-level, and browsers warn on HTTP.
+
+### 2.4 CORS
+
+```toml
+cors_origins = ["http://localhost:4200", "http://127.0.0.1:4200", "http://localhost:5173", "http://127.0.0.1:5173"]
+```
+
+Not a practical blocker: the SPA uses relative URLs (`API_BASE = ''`), so all `/api/*` calls are same-origin. CORS only matters for third-party API clients or cross-origin SPA hosting.
+
+### 2.5 Daemon lifecycle
+
+- `oxios start` (alias `serve`): launches daemon (background by default, `--foreground` for attached).
+- `oxios daemon install`: installs as launchd (macOS) or systemd (Linux) service — survives reboots.
+- Single-instance guard via `flock` on `~/.oxios/oxios.lock`.
+
+### 2.6 Tailscale integration
+
+**None in code.** Tailscale is configured at the OS level (the user has a tailnet set up). The codebase has zero Tailscale references. The user's current setup ("지역 VPN 방식") most likely means:
+
+1. Devices joined to a tailnet.
+2. The daemon either bound to `0.0.0.0` (exposing it on the Tailscale interface) or proxied via `tailscale serve`.
+
+If they bound to `0.0.0.0`:
+- `/api/auth/issue` returns 403 (non-loopback peer) → manual token paste required.
+- No TLS → Bearer token in cleartext.
+- The non-loopback warning fires on every boot.
+
+If they used `tailscale serve`:
+- The daemon stays on loopback → token issuance works (Serve proxies from `127.0.0.1`).
+- TLS is handled by Tailscale → HTTPS.
+- But no identity integration → still need a Bearer token (manual or auto-issued).
+
+---
+
+## 3. Gap Analysis
+
+| Gap | Impact | Severity |
+|---|---|---|
+| **No TLS** | Bearer tokens in cleartext; browser warnings on remote access | High |
+| **Auth issuance is loopback-only** | Remote users must manually paste tokens (poor UX) | Medium |
+| **No identity integration** | Cannot auto-trust known tailnet users; every remote session needs a token | Medium |
+| **No `tailscale serve` CLI integration** | Users must manually configure Tailscale; no guided setup | Low |
+| **No remote-access documentation** | Users don't know the correct way to expose Oxios remotely | Medium |
+| **CORS is localhost-only** | Cross-origin API access (third-party tools) blocked from tailnet domains | Low |
+
+---
+
+## 4. Architecture: Tiered Access Model
+
+```mermaid
+graph TD
+    subgraph "Tier 0 — Local (default)"
+        A1[Browser on same machine] -->|http://127.0.0.1:4200| D1[Oxios Daemon<br/>loopback bind]
+    end
+
+    subgraph "Tier 1 — Private Mesh (RECOMMENDED)"
+        B1[Phone / Laptop<br/>on tailnet] -->|HTTPS| TS1[Tailscale Serve<br/>:443 on tailnet iface]
+        TS1 -->|proxy http://127.0.0.1:4200<br/>+ identity headers| D2[Oxios Daemon<br/>loopback bind]
+    end
+
+    subgraph "Tier 2 — Public Share (opt-in)"
+        C1[Anyone on internet] -->|HTTPS| TS2[Tailscale Funnel<br/>public URL]
+        TS2 -->|proxy http://127.0.0.1:4200<br/>NO identity headers| D3[Oxios Daemon<br/>loopback bind]
+    end
+
+    subgraph "Tier 3 — Custom Domain (advanced)"
+        E1[Browser] -->|HTTPS| CD[Caddy / nginx<br/>Let's Encrypt TLS]
+        CD -->|proxy http://127.0.0.1:4200| D4[Oxios Daemon<br/>loopback bind]
+    end
+```
+
+### Tier 0 — Local (current, zero changes)
+
+- Daemon binds `127.0.0.1:4200`.
+- Browser on the same machine accesses `http://127.0.0.1:4200`.
+- Auto-token issuance works (loopback peer).
+- **This is the default and should never change.**
+
+### Tier 1 — Private Mesh via Tailscale Serve (RECOMMENDED)
+
+**Concept:** `tailscale serve 4200` exposes the loopback daemon to the tailnet over HTTPS.
+
+```bash
+# One-time setup (persists across reboots):
+tailscale serve --bg --https=443 http://127.0.0.1:4200
+```
+
+**Why this is the right default for remote access:**
+
+1. **Daemon stays on loopback** — `gateway.host` never changes. The existing security model (loopback-only auth issuance, non-loopback warning) is preserved.
+2. **HTTPS is automatic** — Tailscale provisions and renews TLS certificates for `<machine>.<tailnet>.ts.net`. No certbot, no manual cert management.
+3. **Tailnet-only access** — only authenticated tailnet members can reach it. No public exposure.
+4. **Identity headers** — Serve injects `Tailscale-User-Login`, `Tailscale-User-Name`, `Tailscale-User-Profile-Pic` into proxied requests. The daemon can use these for **zero-friction auth** (see §5.1).
+5. **Serve proxies from localhost** — the daemon sees the proxied request as coming from `127.0.0.1`. The existing loopback-only token issuance (`/api/auth/issue`) works unchanged — a remote browser gets a token zero-click through the Serve proxy.
+6. **MagicDNS** — access via human-readable hostname (`https://my-mac.tailnet-name.ts.net`), not raw IPs.
+
+**What works today without code changes:**
+- HTTPS (via Tailscale).
+- Token issuance (loopback peer from Serve proxy).
+- SPA + all API calls (same-origin, relative URLs).
+- WebSocket (`?ticket=` auth works through the proxy).
+- SSE (fetch-based, Bearer header works through the proxy).
+
+**What doesn't work today:**
+- Zero-friction auth (remote users still need a token, even though they're authenticated tailnet members).
+- No guided setup (users must discover `tailscale serve` on their own).
+
+### Tier 2 — Public Share via Tailscale Funnel (opt-in)
+
+**Concept:** `tailscale funnel 4200` exposes the daemon to the public internet over HTTPS.
+
+```bash
+tailscale funnel --bg 4200
+```
+
+**Trade-offs:**
+- **Pro:** Shareable URL; no tailnet membership required.
+- **Con:** No identity headers (Funnel strips them — public traffic has no authenticated user).
+- **Con:** Public exposure — must rely on Bearer auth + rate limiting.
+- **Mitigation:** `auth_enabled = true` is mandatory. Consider adding IP-based rate limiting.
+
+**Use case:** Temporarily sharing a dashboard with someone who isn't on your tailnet (e.g., a colleague reviewing agent output).
+
+### Tier 3 — Custom Domain via Reverse Proxy (advanced)
+
+**Concept:** Caddy (or nginx) in front of the daemon, with a custom domain and automatic Let's Encrypt TLS.
+
+```caddyfile
+oxios.example.com {
+    reverse_proxy 127.0.0.1:4200
+    # Caddy handles TLS automatically (Let's Encrypt)
+}
+```
+
+Or with Tailscale certs (no public domain needed):
+```caddyfile
+my-mac.tailnet-name.ts.net {
+    reverse_proxy 127.0.0.1:4200
+    # Caddy uses Tailscale's local cert daemon — *.ts.net TLS
+}
+```
+
+**Trade-offs:**
+- **Pro:** Full control; works with any domain; can add rate limiting, WAF, etc.
+- **Con:** More moving parts; requires domain + DNS or Tailscale cert setup.
+- **Use case:** Power users who want their own infrastructure; or non-Tailscale setups.
+
+---
+
+## 5. Proposed Improvements
+
+Listed by priority. Items 1–3 are the core changes; 4–5 are polish.
+
+### 5.1 Tailscale Identity-Header Trust (auth-proxy mode) — HIGH PRIORITY
+
+**Problem:** Even with Tailscale Serve, remote users must paste a Bearer token. They're already authenticated tailnet members — the friction is unnecessary.
+
+**Solution:** Add a new auth mode that trusts Tailscale identity headers.
+
+```toml
+[security]
+auth_enabled = true  # existing
+# NEW:
+tailscale_auth = false  # opt-in. When true, requests from loopback with a
+                        # valid Tailscale-User-Login header are auto-authenticated.
+```
+
+**How it works:**
+
+1. Tailscale Serve proxies a request from a tailnet member.
+2. Serve adds `Tailscale-User-Login: alice@example.com` (and strips any client-sent spoof).
+3. The proxy connects to the daemon from `127.0.0.1` (loopback).
+4. The auth middleware checks: **is the peer loopback?** → **yes** → **is `Tailscale-User-Login` present?** → **yes** → **auto-authenticate as that user** (skip Bearer check).
+
+**Security model:**
+
+| Threat | Mitigation |
+|---|---|
+| Remote attacker spoofs identity header | Tailscale Serve **strips** client-sent identity headers before injecting its own. A remote request cannot carry a spoofed header through Serve. |
+| Local attacker spoofs identity header | If an attacker can send HTTP to `127.0.0.1:4200`, they are already on the machine — they can read `~/.oxios/api-keys.json` directly. Loopback trust is not an additional exposure. |
+| Unauthorized tailnet user accesses | Tailscale ACLs (tailnet policy) control who can reach the Serve endpoint. Only explicitly allowed users/devices can connect. |
+
+**Implementation surface:**
+
+- `middleware.rs::require_auth` — add a branch: if `security.tailscale_auth && is_loopback_peer && headers.contains("Tailscale-User-Login")` → pass through (authenticated as the tailnet user).
+- `auth_routes.rs::handle_auth_issue` — when `tailscale_auth` is on, return a session token for the tailnet user (so the browser gets a Bearer token for WS/SSE, which can't use identity headers).
+- New config field: `[security].tailscale_auth: bool` (default `false`).
+- Audit log entry on every identity-header-authenticated request (first per session, not per request, to avoid log spam).
+
+**Note on WebSocket/SSE:** These connections go through the Serve proxy too. The WS handler authenticates via `?ticket=` (obtained from an already-authenticated REST call) and SSE via Bearer header. As long as the initial `/api/auth/issue` (or `/api/status` with identity trust) succeeds, the browser obtains a token/ticket for streaming. Identity headers are not needed on every request — just the initial auth bootstrap.
+
+### 5.2 TLS Awareness — MEDIUM PRIORITY
+
+**Problem:** The daemon has no concept of HTTPS. When behind a TLS-terminating proxy, it should:
+- Detect HTTPS (via `X-Forwarded-Proto: https`).
+- Emit `Strict-Transport-Security` (HSTS) header.
+- Set `Secure` flag on any cookies (currently none, but future-proofing).
+- Refuse to serve auth tokens over plain HTTP to non-loopback peers.
+
+**Solution:**
+
+1. Add a `gateway.trusted_proxies` config (list of CIDRs, default `["127.0.0.1/32", "::1/128"]`). Only trust `X-Forwarded-*` headers from these addresses.
+2. When `X-Forwarded-Proto: https` is present from a trusted proxy, mark the request as secure.
+3. On secure requests, emit HSTS.
+4. The `/api/auth/issue` endpoint already restricts to loopback — when behind a trusted proxy with HTTPS, consider allowing it from the proxy's forwarded identity (but this is subsumed by §5.1).
+
+**Why not terminate TLS in Oxios itself?** Adding a TLS server (rustls/axum-server) would mean cert management — provisioning, renewal, storage. Tailscale Serve and Caddy already handle this better. Oxios should remain a plain HTTP server behind a proxy. This is the Unix way: one tool, one job.
+
+### 5.3 `oxios serve --tailscale` CLI Integration — MEDIUM PRIORITY
+
+**Problem:** Users must discover and manually configure `tailscale serve`.
+
+**Solution:** Add a CLI flag that wraps Tailscale Serve setup:
+
+```bash
+oxios serve --tailscale          # start daemon + configure tailscale serve
+oxios serve --tailscale --funnel # start daemon + configure tailscale funnel (public)
+```
+
+**Behavior:**
+1. Start the daemon on loopback (as today).
+2. Check if `tailscale` CLI is available.
+3. Run `tailscale serve --bg --https=443 http://127.0.0.1:4200`.
+4. Print the tailnet URL: `https://<hostname>.<tailnet>.ts.net`.
+5. Optionally enable `tailscale_auth` in config (prompt the user).
+
+This is a convenience wrapper — it shells out to the `tailscale` CLI. No Tailscale API integration or dependency.
+
+### 5.4 CORS Tailnet Auto-Include — LOW PRIORITY
+
+**Problem:** If a user hosts the SPA separately (or a third-party tool calls the API), the localhost-only CORS blocks tailnet origins.
+
+**Solution:** When `tailscale_auth` is enabled, automatically add `https://*.ts.net` to the CORS allowlist. Or add a config field:
+
+```toml
+[security]
+cors_origins = ["http://localhost:4200", "https://*.ts.net"]  # wildcard for tailnet
+```
+
+Low priority because the normal SPA access is same-origin (no CORS needed).
+
+### 5.5 Remote Access Documentation — MEDIUM PRIORITY
+
+**Problem:** No guide exists for setting up remote access.
+
+**Solution:** Add `docs/remote-access-guide.md` covering:
+- Tier 0: Local (default).
+- Tier 1: Tailscale Serve (step-by-step).
+- Tier 2: Tailscale Funnel (step-by-step, with security warnings).
+- Tier 3: Caddy reverse proxy (example config).
+- Security checklist (auth enabled, ACLs, tailscale_auth).
+- Troubleshooting (common proxy/WebSocket/SSE issues).
+
+Also update `docs/security.md` §7 (Authentication) with the tailscale_auth mode.
+
+---
+
+## 6. Security Model Summary
+
+### Trust boundaries
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Internet (untrusted)                                   │
+│    │                                                    │
+│    ▼                                                    │
+│  [Tailscale Funnel — Tier 2]  ← public, no identity     │
+│    │ OR                                                 │
+│  [Tailscale tailnet — Tier 1] ← authenticated mesh       │
+│    │                                                    │
+│    ▼  HTTPS (TLS terminated here)                       │
+│  Tailscale Serve proxy (on the host)                     │
+│    │  + identity headers (Tier 1 only)                  │
+│    │  + connects from 127.0.0.1                         │
+│    ▼                                                    │
+│  Oxios daemon (127.0.0.1:4200)                          │
+│    │  Bearer auth OR tailscale_auth identity trust      │
+│    ▼                                                    │
+│  Kernel (AccessManager, RBAC, audit trail)              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Security checklist for remote deployment
+
+| Item | Required | How |
+|---|---|---|
+| Auth enabled | **Yes** | `[security].auth_enabled = true` (default) |
+| TLS | **Yes** | Tailscale Serve/Funnel or Caddy (never plain HTTP remote) |
+| Tailnet ACLs | Recommended | Restrict who can reach the Serve endpoint |
+| `tailscale_auth` | Optional | Eliminates token friction for tailnet users |
+| Loopback bind | **Yes** | `gateway.host = "127.0.0.1"` (never `0.0.0.0`) |
+| Firewall | Recommended | Block port 4200 from LAN/WAN; only loopback + Tailscale |
+| Audit trail | **Yes** | Already on by default; verify with `oxios audit` |
+
+### What NOT to do
+
+1. **Never bind to `0.0.0.0`** — even with auth, it exposes the daemon to the LAN. Use a proxy.
+2. **Never disable auth for remote access** — the non-loopback + auth-disabled warning exists for a reason.
+3. **Never expose without TLS** — Bearer tokens must not transit in cleartext.
+4. **Don't add a TLS server to Oxios** — cert management is a separate concern; use a dedicated proxy.
+
+---
+
+## 7. Decision Matrix
+
+| Scenario | Recommended tier | Why |
+|---|---|---|
+| Solo dev, same machine | Tier 0 (Local) | Zero config, fastest |
+| Access from phone/laptop on the go | Tier 1 (Tailscale Serve) | HTTPS, tailnet-only, zero-friction with tailscale_auth |
+| Share dashboard with a non-tailnet colleague | Tier 2 (Tailscale Funnel) | Temporary public URL; revoke when done |
+| Self-host on a home server with custom domain | Tier 3 (Caddy) | Full control, own domain |
+| Team of users sharing one Oxios instance | **Not supported** | Oxios is single-user. Multi-user requires a fundamentally different architecture (DB, SSO, workspaces). |
+
+---
+
+## 8. Implementation Phases (for when we build this)
+
+### Phase 1: Identity trust + docs (highest ROI)
+
+- `[security].tailscale_auth` config field + middleware branch.
+- `/api/auth/issue` returns a session token for tailnet-identified requests.
+- `docs/remote-access-guide.md`.
+- Update `docs/security.md`.
+
+### Phase 2: CLI integration
+
+- `oxios serve --tailscale` / `--funnel` flags.
+- Auto-detect `tailscale` CLI; print tailnet URL.
+
+### Phase 3: TLS awareness
+
+- `gateway.trusted_proxies` config.
+- `X-Forwarded-Proto` detection → HSTS.
+- Secure-context enforcement.
+
+### Phase 4: CORS polish
+
+- Tailnet wildcard CORS when `tailscale_auth` is on.
+
+---
+
+## 9. Alternatives Considered
+
+### Cloud-hosted Oxios (rejected)
+
+Would require: PostgreSQL backend, S3 storage, multi-user auth (SSO/OIDC), containerized agent execution, Docker deployment. This is a different product. Oxios's principles (Unix philosophy, no containers, direct host execution) are incompatible with cloud hosting.
+
+### Built-in TLS via rustls (rejected)
+
+Would add cert management (ACME/Let's Encrypt or self-signed) to Oxios. This is a separate concern better handled by a dedicated proxy (Tailscale Serve, Caddy). Oxios should remain a plain HTTP server.
+
+### SSH tunnel (rejected)
+
+`ssh -L 4200:127.0.0.1:4200 user@host` works but requires:
+- An SSH server on the host.
+- Key management.
+- Manual tunnel setup per session.
+- No HTTPS (browser warnings).
+
+Tailscale Serve provides the same loopback-proxy benefit with automatic TLS, DNS, and identity. SSH tunnels are a fallback for users without Tailscale.
+
+### Cloudflare Tunnel (viable alternative)
+
+`cloudflared tunnel` exposes the daemon via Cloudflare's network. Pros: no tailnet needed, free, automatic TLS. Cons: traffic transits Cloudflare (privacy concern for an Agent OS with sensitive data), no identity headers, requires a Cloudflare account. Viable for users who prefer Cloudflare over Tailscale, but not the default recommendation.
+
+---
+
+## 10. Open Questions
+
+1. **Should `tailscale_auth` restrict which tailnet users are allowed?** (e.g., an allowlist of email addresses). Or trust all tailnet members (relies on Tailscale ACLs)?
+   - **Recommendation:** Start with "trust all tailnet members" (simplest; ACLs are the right control plane). Add an allowlist later if needed.
+
+2. **Should the WS ticket endpoint also accept identity headers?** Currently `POST /api/chat/ticket` requires a Bearer token. If `tailscale_auth` is on, should it accept identity-header auth too?
+   - **Recommendation:** Yes — the ticket endpoint should follow the same auth rules as the rest of the API. Since `require_auth` middleware handles it centrally, this should work automatically.
+
+3. **Rate limiting for Funnel (public) access?** Public exposure without rate limiting is a DoS vector.
+   - **Recommendation:** Add a simple IP-based rate limiter (tower middleware) when the request is not from loopback and not tailnet-authenticated. Defer to Phase 2+.
+
+---
+
+## Appendix A: Current Auth Flow (reference)
+
+```
+Browser → http://127.0.0.1:4200 (loads SPA)
+  ↓
+SPA mount → POST /api/auth/issue
+  ↓
+Daemon: is_loopback_ip(peer)? → YES → generate session token → 200 {token}
+  ↓
+SPA stores token in sessionStorage
+  ↓
+All subsequent requests: Authorization: Bearer <token>
+  WS: POST /api/chat/ticket → {ticket} → ws://...?ticket=<ticket>
+  SSE: fetch('/api/events', {headers: {Authorization: Bearer <token>}})
+```
+
+With Tailscale Serve (no code changes needed for basic operation):
+
+```
+Phone → https://my-mac.tailnet.ts.net (HTTPS, TLS by Tailscale)
+  ↓
+Tailscale Serve proxy → http://127.0.0.1:4200 (from localhost)
+  ↓
+Daemon: is_loopback_ip(peer)? → YES (Serve connects from 127.0.0.1)
+  ↓
+Same flow as local — token issuance works, WS/SSE work
+```
+
+With `tailscale_auth` enabled (proposed):
+
+```
+Phone → https://my-mac.tailnet.ts.net
+  ↓
+Tailscale Serve proxy → http://127.0.0.1:4200
+  + Tailscale-User-Login: alice@example.com
+  ↓
+Daemon: is_loopback_ip(peer)? → YES
+  + has Tailscale-User-Login? → YES
+  → auto-authenticated (no token needed for REST)
+  → /api/auth/issue still returns a session token (for WS/SSE Bearer auth)
+```
