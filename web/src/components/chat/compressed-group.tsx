@@ -4,8 +4,8 @@
 import { ChevronDown, ChevronRight, FileText, History, MessagesSquare } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
 import { buildCompressedDigest } from '@/lib/compressed-summary'
+import { cn } from '@/lib/utils'
 import type { ChatMessage, CompressionInfo } from '@/types'
 
 interface CompressedGroupProps {

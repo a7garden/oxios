@@ -22,7 +22,7 @@ import { useRoles } from '@/hooks/use-engine'
 import { useMounts } from '@/hooks/use-mounts'
 import { buildChatRows } from '@/lib/chat-rows'
 import { addInputHistory } from '@/lib/input-history-storage'
-import { useChatStore, getToken } from '@/stores/chat'
+import { getToken, useChatStore } from '@/stores/chat'
 import { usePortalStore } from '@/stores/portal'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })

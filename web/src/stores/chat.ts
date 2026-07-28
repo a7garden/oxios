@@ -1536,7 +1536,7 @@ export const useChatStore = create<ChatStore>()(
             ) {
               const portalState = usePortalStore.getState()
               const top = portalState.stack[portalState.stack.length - 1]
-              if (!top || top.type !== 'search') {
+              if (top?.type !== 'search') {
                 portalState.pushView({ type: 'search', messageId: msgId })
               }
             }

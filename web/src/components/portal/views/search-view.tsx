@@ -8,14 +8,14 @@
 // Each result card is expandable — click "Read page" → POST /api/browse
 // → markdown content via MarkdownMessage.
 
-import { Globe, Search, Loader2, ChevronRight, ExternalLink, BookmarkPlus } from 'lucide-react'
+import { BookmarkPlus, ChevronRight, ExternalLink, Globe, Loader2, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MarkdownMessage } from '@/components/chat/markdown-message'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useChatStore } from '@/stores/chat'
-import { useSearchPanelStore, type SearchResultItem } from '@/stores/search-panel'
 import { cn } from '@/lib/utils'
+import { useChatStore } from '@/stores/chat'
+import { type SearchResultItem, useSearchPanelStore } from '@/stores/search-panel'
 import { KnowledgeBrowser } from './knowledge-browser'
 
 interface SearchViewProps {
@@ -66,7 +66,7 @@ export function SearchView({ query: propQuery, messageId }: SearchViewProps) {
   const agentResults = useMemo<SearchResultItem[]>(() => {
     if (!messageId) return []
     const msg = messages.find((m) => m.id === messageId)
-    if (!msg || !msg.metadata?.tool_calls?.length) return []
+    if (!msg?.metadata?.tool_calls?.length) return []
 
     // Only extract from web_search results
     const searchCall = msg.metadata.tool_calls.find(
@@ -99,12 +99,14 @@ export function SearchView({ query: propQuery, messageId }: SearchViewProps) {
     // JSON.parse failed or raw is a string — try GroundingSearch citations
     const search = msg.search
     if (search?.citations?.length) {
-      return search.citations.map((c): SearchResultItem => ({
-        title: c.title ?? '',
-        url: c.url,
-        snippet: '',
-        engine: '',
-      }))
+      return search.citations.map(
+        (c): SearchResultItem => ({
+          title: c.title ?? '',
+          url: c.url,
+          snippet: '',
+          engine: '',
+        }),
+      )
     }
 
     return []
@@ -205,7 +207,10 @@ export function SearchView({ query: propQuery, messageId }: SearchViewProps) {
               {/* Loading skeleton */}
               {loading &&
                 Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="animate-pulse rounded-lg border bg-muted/30 p-3 space-y-2">
+                  <div
+                    key={i}
+                    className="animate-pulse rounded-lg border bg-muted/30 p-3 space-y-2"
+                  >
                     <div className="h-4 bg-muted-foreground/20 rounded w-3/4" />
                     <div className="h-3 bg-muted-foreground/10 rounded w-1/2" />
                     <div className="h-3 bg-muted-foreground/10 rounded w-full" />
@@ -216,14 +221,20 @@ export function SearchView({ query: propQuery, messageId }: SearchViewProps) {
               {error && (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                   {error}
-                  <button type="button" className="ml-2 text-xs underline hover:no-underline" onClick={() => doSearch(input)}>
+                  <button
+                    type="button"
+                    className="ml-2 text-xs underline hover:no-underline"
+                    onClick={() => doSearch(input)}
+                  >
                     Retry
                   </button>
                 </div>
               )}
 
               {/* Result cards */}
-              {!loading && !error && results.length > 0 &&
+              {!loading &&
+                !error &&
+                results.length > 0 &&
                 results.map((item, idx) => {
                   const expanded = expandedUrls.has(item.url)
                   const cached = browseCache[item.url]
@@ -231,18 +242,49 @@ export function SearchView({ query: propQuery, messageId }: SearchViewProps) {
                   const browseErr = browseError[item.url]
 
                   return (
-                    <div key={`${item.url}-${idx}`} className={cn('rounded-lg border transition-colors', expanded ? 'border-border' : 'border-border/60 hover:border-border')}>
+                    <div
+                      key={`${item.url}-${idx}`}
+                      className={cn(
+                        'rounded-lg border transition-colors',
+                        expanded ? 'border-border' : 'border-border/60 hover:border-border',
+                      )}
+                    >
                       {/* Card header */}
-                      <button type="button" onClick={() => toggleExpand(item.url)} className="flex w-full items-start gap-2.5 p-3 text-left hover:bg-muted/30 transition-colors rounded-lg">
-                        <ChevronRight className={cn('w-3.5 h-3.5 mt-1 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
-                        {faviconUrl(item.url) && <img src={faviconUrl(item.url)} alt="" className="w-4 h-4 mt-0.5 shrink-0 rounded" />}
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(item.url)}
+                        className="flex w-full items-start gap-2.5 p-3 text-left hover:bg-muted/30 transition-colors rounded-lg"
+                      >
+                        <ChevronRight
+                          className={cn(
+                            'w-3.5 h-3.5 mt-1 shrink-0 text-muted-foreground transition-transform',
+                            expanded && 'rotate-90',
+                          )}
+                        />
+                        {faviconUrl(item.url) && (
+                          <img
+                            src={faviconUrl(item.url)}
+                            alt=""
+                            className="w-4 h-4 mt-0.5 shrink-0 rounded"
+                          />
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{item.title || item.url}</p>
-                          <p className="text-xs text-muted-foreground truncate">{domain(item.url)}</p>
-                          {item.snippet && <p className="text-xs text-muted-foreground/70 mt-1 line-clamp-2">{item.snippet}</p>}
+                          <p className="text-xs text-muted-foreground truncate">
+                            {domain(item.url)}
+                          </p>
+                          {item.snippet && (
+                            <p className="text-xs text-muted-foreground/70 mt-1 line-clamp-2">
+                              {item.snippet}
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-1 shrink-0 mt-0.5">
-                          {cached && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Browsed</span>}
+                          {cached && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                              Browsed
+                            </span>
+                          )}
                         </div>
                       </button>
 
@@ -250,7 +292,11 @@ export function SearchView({ query: propQuery, messageId }: SearchViewProps) {
                       {expanded && (
                         <div className="border-t border-border/60 px-3 pb-3 pt-2 space-y-2">
                           {!cached && !browsing && !browseErr && (
-                            <button type="button" className="w-full rounded border border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors" onClick={() => doBrowse(item.url)}>
+                            <button
+                              type="button"
+                              className="w-full rounded border border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+                              onClick={() => doBrowse(item.url)}
+                            >
                               Read page
                             </button>
                           )}
@@ -264,20 +310,38 @@ export function SearchView({ query: propQuery, messageId }: SearchViewProps) {
                           {browseErr && (
                             <div className="text-xs text-destructive">
                               {browseErr}
-                              <button type="button" className="ml-2 underline hover:no-underline" onClick={() => doBrowse(item.url)}>Retry</button>
+                              <button
+                                type="button"
+                                className="ml-2 underline hover:no-underline"
+                                onClick={() => doBrowse(item.url)}
+                              >
+                                Retry
+                              </button>
                             </div>
                           )}
                           {cached && (
                             <>
                               <div className="max-h-80 overflow-y-auto rounded bg-muted/40 p-2">
-                                <MarkdownMessage messageId="" isStreaming={false}>{cached.markdown}</MarkdownMessage>
+                                <MarkdownMessage messageId="" isStreaming={false}>
+                                  {cached.markdown}
+                                </MarkdownMessage>
                               </div>
                               <div className="flex justify-end gap-1">
-                                <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1" onClick={() => window.open(item.url, '_blank')}>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1"
+                                  onClick={() => window.open(item.url, '_blank')}
+                                >
                                   <ExternalLink className="w-3 h-3" />
                                   Open
                                 </button>
-                                <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1" onClick={() => saveToKnowledge(item.url, cached.title, cached.markdown)}>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1"
+                                  onClick={() =>
+                                    saveToKnowledge(item.url, cached.title, cached.markdown)
+                                  }
+                                >
                                   <BookmarkPlus className="w-3 h-3" />
                                   Save
                                 </button>

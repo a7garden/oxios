@@ -7,6 +7,7 @@
 import { A2aDelegateRender, A2aQueryRender, A2aSendRender } from './A2a'
 import { ActionToolRender } from './ActionTool'
 import { BashRender } from './Bash'
+import { BrowseRender } from './Browse'
 import { CalendarRender } from './Calendar'
 import { FileEditRender } from './FileEdit'
 import { FileReadRender } from './FileRead'
@@ -18,7 +19,6 @@ import { registerToolRender } from './registry'
 import { SendEmailRender } from './SendEmail'
 import { WebFetchRender } from './WebFetch'
 import { WebSearchRender } from './WebSearch'
-import { BrowseRender } from './Browse'
 
 // ── File operations ──
 registerToolRender('read_file', FileReadRender)

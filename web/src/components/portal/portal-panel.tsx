@@ -15,9 +15,9 @@ import { cn } from '@/lib/utils'
 import { type PortalView, usePortalStore } from '@/stores/portal'
 import { ArtifactView } from './views/artifact-view'
 import { DocumentView } from './views/document-view'
-import { ThreadView } from './views/thread-view'
-import { SearchView } from './views/search-view'
 import { KnowledgeBrowser } from './views/knowledge-browser'
+import { SearchView } from './views/search-view'
+import { ThreadView } from './views/thread-view'
 
 /** Resolve a human title for a view (shown in the shared header). */
 function viewTitle(view: PortalView): string {

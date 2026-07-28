@@ -54,7 +54,9 @@ export function SearchModal({
   // ── Web tab state ────────────────────────────────────────────
   const [searchTab, setSearchTab] = useState<'files' | 'web'>('files')
   const [webQuery, setWebQuery] = useState('')
-  const [webResults, setWebResults] = useState<{ title: string; url: string; snippet: string }[]>([])
+  const [webResults, setWebResults] = useState<{ title: string; url: string; snippet: string }[]>(
+    [],
+  )
   const [webLoading, setWebLoading] = useState(false)
 
   // ── Build the display list ──────────────────────────────────
@@ -321,43 +323,43 @@ export function SearchModal({
         {/* Results */}
         {searchTab === 'files' ? (
           <ul ref={listRef} className="max-h-80 overflow-y-auto p-1">
-          {displayItems.length > 0 ? (
-            displayItems.map((item, i) => (
-              <li
-                key={item.path + (item.isDir ? '-dir' : '-file')}
-                className={cn(
-                  'flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer select-none rounded-md transition-colors',
-                  i === focusedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
-                )}
-                onClick={() => handleSelect(item)}
-                onMouseEnter={() => setFocusedIndex(i)}
-              >
-                {item.isDir ? (
-                  <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-                ) : (
-                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                )}
-                <span className="font-medium truncate">{item.name.replace(/\.md$/, '')}</span>
-                {item.path.includes('/') && (
-                  <span className="ml-auto text-xs text-muted-foreground shrink-0">
-                    {item.path.replace(/\/[^/]+$/, '')}
-                  </span>
-                )}
-                {item.isDir && (
-                  <span className="ml-auto text-xs text-muted-foreground shrink-0">dir</span>
-                )}
+            {displayItems.length > 0 ? (
+              displayItems.map((item, i) => (
+                <li
+                  key={item.path + (item.isDir ? '-dir' : '-file')}
+                  className={cn(
+                    'flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer select-none rounded-md transition-colors',
+                    i === focusedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
+                  )}
+                  onClick={() => handleSelect(item)}
+                  onMouseEnter={() => setFocusedIndex(i)}
+                >
+                  {item.isDir ? (
+                    <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="font-medium truncate">{item.name.replace(/\.md$/, '')}</span>
+                  {item.path.includes('/') && (
+                    <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                      {item.path.replace(/\/[^/]+$/, '')}
+                    </span>
+                  )}
+                  {item.isDir && (
+                    <span className="ml-auto text-xs text-muted-foreground shrink-0">dir</span>
+                  )}
+                </li>
+              ))
+            ) : hasQuery ? (
+              <li className="px-4 py-6 text-sm text-muted-foreground text-center">
+                {isSearching ? t('knowledge.searching') : t('knowledge.noSearchResults')}
               </li>
-            ))
-          ) : hasQuery ? (
-            <li className="px-4 py-6 text-sm text-muted-foreground text-center">
-              {isSearching ? t('knowledge.searching') : t('knowledge.noSearchResults')}
-            </li>
-          ) : (
-            <li className="px-4 py-6 text-sm text-muted-foreground text-center">
-              {isMoveMode ? 'Select a file or directory' : 'Type to search files'}
-            </li>
-          )}
-        </ul>
+            ) : (
+              <li className="px-4 py-6 text-sm text-muted-foreground text-center">
+                {isMoveMode ? 'Select a file or directory' : 'Type to search files'}
+              </li>
+            )}
+          </ul>
         ) : (
           <div className="max-h-80 overflow-y-auto p-1">
             {webLoading && webQuery.trim() && (
@@ -373,9 +375,7 @@ export function SearchModal({
               </p>
             )}
             {!webLoading && !webQuery.trim() && (
-              <p className="px-4 py-6 text-sm text-muted-foreground text-center">
-                Search the web…
-              </p>
+              <p className="px-4 py-6 text-sm text-muted-foreground text-center">Search the web…</p>
             )}
             {webResults.map((r, i) => (
               <div

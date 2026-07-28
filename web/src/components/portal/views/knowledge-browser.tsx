@@ -6,10 +6,10 @@
 //
 // Stateful: manages its own search + file loading. No dep on SearchPanel store.
 
-import { Book, ExternalLink, FileText, Loader2, ArrowLeft } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
+import { ArrowLeft, Book, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from '@tanstack/react-router'
 import { MarkdownMessage } from '@/components/chat/markdown-message'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { api } from '@/lib/api-client'
@@ -145,7 +145,6 @@ export function KnowledgeBrowser({ initialPath }: KnowledgeBrowserProps) {
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('search.panel.knowledgePlaceholder', 'Search your knowledge base…')}
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
-              autoFocus
             />
             {loading && (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />
@@ -183,10 +182,7 @@ export function KnowledgeBrowser({ initialPath }: KnowledgeBrowserProps) {
           {!selectedPath &&
             loading &&
             Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="animate-pulse rounded-lg border bg-muted/30 p-3 space-y-2"
-              >
+              <div key={i} className="animate-pulse rounded-lg border bg-muted/30 p-3 space-y-2">
                 <div className="h-4 bg-muted-foreground/20 rounded w-3/4" />
                 <div className="h-3 bg-muted-foreground/10 rounded w-1/2" />
               </div>

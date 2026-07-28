@@ -223,7 +223,7 @@ export const useSearchPanelStore = create<SearchPanelState>((set, get) => ({
       if (!res.ok) throw new Error(`Read failed: ${res.status}`)
       const data = await res.json()
       set({ selectedKnowledgeContent: data.content, selectedKnowledgeLoading: false })
-    } catch (e) {
+    } catch (_e) {
       set({ selectedKnowledgeLoading: false })
     }
   },
@@ -236,11 +236,12 @@ export const useSearchPanelStore = create<SearchPanelState>((set, get) => ({
       /* keep default */
     }
     const date = new Date().toISOString().slice(0, 10)
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '')
-      .slice(0, 40) || 'page'
+    const slug =
+      title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .slice(0, 40) || 'page'
     set({
       saveModalOpen: true,
       saveUrl: url,

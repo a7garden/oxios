@@ -1,7 +1,7 @@
 // WebSearch render — search results with favicons
 import { Globe, Search } from 'lucide-react'
-import type { ToolRenderComponent } from './registry'
 import { usePortalStore } from '@/stores/portal'
+import type { ToolRenderComponent } from './registry'
 
 export const WebSearchRender: ToolRenderComponent = ({ args, result, isRunning }) => {
   const query = (args?.query ?? args?.search_query ?? '') as string
