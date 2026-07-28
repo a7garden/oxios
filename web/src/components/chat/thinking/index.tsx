@@ -88,7 +88,9 @@ function ThinkingTitle({ thinking, duration }: { thinking: boolean; duration?: n
   return (
     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
       {thinking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
-      <span className="font-medium">{thinking ? t('chat.thinking') : t('chat.thought')}</span>
+      <span className={cn('font-medium', thinking && 'thinking-shiny')}>
+        {thinking ? t('chat.thinking') : t('chat.thought')}
+      </span>
       {duration != null && (
         <span className="ml-auto tabular-nums text-muted-foreground/60">
           {formatDuration(duration)}

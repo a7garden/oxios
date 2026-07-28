@@ -430,3 +430,23 @@
 /* ReactFlow Controls touch target */
 .react-flow__controls-button { height: 36px; width: 36px; }
 @media (pointer: coarse) { .react-flow__controls-button { height: 44px; width: 44px; } }
+
+/* Shiny sweep for the active "Thinking…" reasoning title (LobeHub borrow). */
+@keyframes thinking-shine {
+  to {
+    background-position: 200% center;
+  }
+}
+.thinking-shiny {
+  background: linear-gradient(90deg, currentColor 40%, var(--foreground) 50%, currentColor 60%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thinking-shine 2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-shiny {
+    animation: none;
+  }
+}
