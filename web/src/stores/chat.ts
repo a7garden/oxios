@@ -7,6 +7,7 @@ import type {
   ChatActivity,
   ChatBlock,
   ChatMessage,
+  CompressionInfo,
   InterviewAnswer,
   InterviewQuestion,
   Project,
@@ -98,6 +99,8 @@ interface ChatRuntimeState {
   interviewRound: number
   /** Interview ambiguity score. */
   interviewAmbiguity: number
+  /** LLM compression summary for the active session. */
+  compression: CompressionInfo | null
 
   // ── WebSocket lifecycle (encapsulated, not persisted) ──
   /** WebSocket instance managed by the store. */
@@ -200,6 +203,9 @@ const KNOWN_CHUNK_TYPES = new Set<StreamChunk['type']>([
   'tool_approval',
   'path_access',
   'model',
+  'compression_delta',
+  'compression_done',
+  'compression_failed',
 ])
 
 export function parseChunk(raw: unknown): StreamChunk {
@@ -762,6 +768,7 @@ export const useChatStore = create<ChatStore>()(
       activeInterview: null,
       interviewRound: 0,
       interviewAmbiguity: 0,
+      compression: null,
       activeToolApproval: null,
       activePathAccess: null,
       // WebSocket lifecycle
@@ -1204,6 +1211,7 @@ export const useChatStore = create<ChatStore>()(
             activeProjectId: projectId,
             isStreaming: false,
             _pendingQueue: [],
+            compression: (data.compression ?? null) as CompressionInfo | null,
           })
         } catch {
           // Silently fail — network issues shouldn't break the UI
@@ -1224,6 +1232,7 @@ export const useChatStore = create<ChatStore>()(
           activeInterview: null,
           interviewRound: 0,
           interviewAmbiguity: 0,
+          compression: null,
         }))
       },
 
@@ -1758,6 +1767,36 @@ export const useChatStore = create<ChatStore>()(
             })
             // Turn ended — advance the queue (same as done).
             get()._drainPendingQueue()
+            break
+          }
+          case 'compression_delta': {
+            if (!chunk.content) break
+            set((s) => {
+              const prev = s.compression
+              return {
+                compression: {
+                  summary: (prev?.summary ?? '') + chunk.content!,
+                  status: 'generating' as const,
+                  compressed_before_index: prev?.compressed_before_index,
+                },
+              }
+            })
+            break
+          }
+          case 'compression_done': {
+            set((s) => ({
+              compression: s.compression
+                ? { ...s.compression, status: 'done' as const }
+                : null,
+            }))
+            break
+          }
+          case 'compression_failed': {
+            set((s) => ({
+              compression: s.compression
+                ? { ...s.compression, status: 'failed' as const, error: chunk.error }
+                : { summary: '', status: 'failed' as const, error: chunk.error },
+            }))
             break
           }
         }

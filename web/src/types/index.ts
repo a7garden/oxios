@@ -357,6 +357,17 @@ export interface InterviewAnswer {
   value: string
 }
 
+/** LLM-generated session compression summary (LobeHub port). */
+export interface CompressionInfo {
+  summary: string
+  status: 'done' | 'generating' | 'failed'
+  error?: string
+  compressed_at?: string
+  original_count?: number
+  compressed_before_index?: number
+  model?: string
+}
+
 export interface StreamChunk {
   type:
     | 'token'
@@ -382,6 +393,10 @@ export interface StreamChunk {
     | 'path_access'
     // RFC-015 model mark — one-shot announcement of the responding model.
     | 'model'
+    // Context compression: LLM session summary streaming.
+    | 'compression_delta'
+    | 'compression_done'
+    | 'compression_failed'
   content?: string
   model?: string
   tool_name?: string
