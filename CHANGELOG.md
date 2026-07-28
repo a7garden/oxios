@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-07-28
+
+### Added
+- **Context compression (kernel)** — `CompressionService` with LLM streaming
+  summary for compressing conversation history; `CompressionApi` facade on
+  `KernelHandle` with compression endpoint `POST /api/sessions/:id/compress`
+  and auto-trigger on context threshold (P3a).
+- **Knowledge in search (web)** — `KnowledgeBrowser` component for viewing
+  read-only knowledge notes; `SearchView` with tab bar (Web/Knowledge tabs);
+  `KnowledgeView` portal panel type; Web results toggle in Knowledge Copilot;
+  Web tab in ⌘K SearchModal.
+- **Search & Browse panel (web)** — `POST /api/search` and `POST /api/browse`
+  endpoints; `SearchPanel` store with manual search and browse cache;
+  `BrowseRender` component for markdown rendering; auto-open panel on
+  `web_search`/`browse` tool calls; i18n keys.
+- **BrowseTool (kernel)** — wired oxi-sdk `BrowseTool` for headless page
+  content reading.
+- **Virtualized chat list (web)** — migrated chat message list to `virtua`
+  for smooth rendering of large histories.
+- **Animated Thinking title (web)** — shiny animated title while reasoning
+  streams.
+
+### Fixed
+- **Multi-turn streaming boundary (web)** — fixed turn-boundary targeting and
+  duplicate reasoning card rendering in streaming responses.
+- **clippy & biome fixups** — resolved warnings across kernel and web.
+
+### Changed
+- **CompressedGroup (web)** — refactored as controlled collapse toggle.
+- **Chat row model (web)** — pure chat row model for virtualized list.
+- **CI** — migrated all runners to self-hosted macOS ARM64; pinned
+  `bun-version` 1.3.14.
+- **Deps** — updated `Cargo.lock` for `oxibrowser` dependency.
+
 ## [1.30.0] - 2026-07-28
 
 ### Added
