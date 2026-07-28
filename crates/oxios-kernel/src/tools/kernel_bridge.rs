@@ -40,53 +40,55 @@ impl OxiosKernelBridge {
 
 impl SdkKernelToolProvider for OxiosKernelBridge {
     fn tool_names(&self) -> Vec<&str> {
-        let mut names = vec![
-            // Always-on file + web-search tools (registration::register_always_on)
-            "read",
-            "write",
-            "edit",
-            "grep",
-            "find",
-            "ls",
-            "web_search",
-            "get_search_results",
-            // Kernel domain tools (builtin::register_all_kernel_tools)
-            "exec",
-            "memory_read",
-            "memory_write",
-            "memory_search",
-            "subagent",
-            "project",
-            "mount",
-            "kernel_agent",
-            "persona",
-            "cron",
-            "security",
-            "budget",
-            "resource",
-            "a2a_delegate",
-            "a2a_send",
-            "a2a_query",
-            "knowledge",
-            "ask_user",
-            "marketplace",
-            "skill_forge",
-            "calendar", // conditional on [calendar] config
-            "send_email",
-            // NOTE: MCP tools use a dynamic `full_name` and are enumerated
-            // per-server at registration time, so they are not listed here.
-        ];
+        let names = {
+            let mut v = vec![
+                // Always-on file + web-search tools (registration::register_always_on)
+                "read",
+                "write",
+                "edit",
+                "grep",
+                "find",
+                "ls",
+                "web_search",
+                "get_search_results",
+                // Kernel domain tools (builtin::register_all_kernel_tools)
+                "exec",
+                "memory_read",
+                "memory_write",
+                "memory_search",
+                "subagent",
+                "project",
+                "mount",
+                "kernel_agent",
+                "persona",
+                "cron",
+                "security",
+                "budget",
+                "resource",
+                "a2a_delegate",
+                "a2a_send",
+                "a2a_query",
+                "knowledge",
+                "ask_user",
+                "marketplace",
+                "skill_forge",
+                "calendar", // conditional on [calendar] config
+                "send_email",
+                // NOTE: MCP tools use a dynamic `full_name` and are enumerated
+                // per-server at registration time, so they are not listed here.
+            ];
 
-        // Headless browser — pure-Rust oxibrowser-core browse suite.
-        #[cfg(feature = "native-browser")]
-        names.extend([
-            "browse",
-            "browse_extract",
-            "browse_session",
-            "browse_script",
-        ]);
+            // Headless browser — pure-Rust oxibrowser-core browse suite.
+            #[cfg(feature = "native-browser")]
+            v.extend([
+                "browse",
+                "browse_extract",
+                "browse_session",
+                "browse_script",
+            ]);
 
-        names
+            v
+        }
     }
 
     fn register_tools(&self, registry: &ToolRegistry, context: &SdkKernelToolContext) {
