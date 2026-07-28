@@ -284,7 +284,7 @@ async fn spa_handler(
     // No active dist → embedded assets (authoritative when compiled in).
     if let Some(data) = crate::embedded_web::get("index.html") {
         let version = crate::embedded_web::version();
-        let etag = compute_etag(&data);
+        let etag = compute_etag(data);
         if let Some(client_etag) = headers
             .get(axum::http::header::IF_NONE_MATCH)
             .and_then(|v| v.to_str().ok())

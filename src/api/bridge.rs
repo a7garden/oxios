@@ -334,3 +334,219 @@ impl WebBridgeHandle {
         outcome
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Boundary tests for the HTTP↔Gateway bridge.
+    //!
+    //! Exercises `WebBridge` / `WebBridgeHandle` methods that the HTTP
+    //! layer relies on: `send_and_wait` request/response correlation via
+    //! the oneshot map, `BridgeSendError::Timeout` typed variant, and
+    //! `replay_after` delivery (gapless replay) plus resync marker when
+    //! the cursor is older than the buffer's oldest surviving message.
+    //!
+    //! No network or HTTP server involved — the bridge is tested as the
+    //! adapter it is, with `Channel::send` / `deliver_response` driven
+    //! directly.
+
+    use super::*;
+    use oxios_gateway::ReplayConfig;
+    use std::time::Duration;
+    use tokio::sync::broadcast::error::TryRecvError;
+    use uuid::Uuid;
+
+    fn fresh_bridge(buffer: usize) -> WebBridge {
+        let reliability = Arc::new(ReliabilityLayer::new(Default::default()));
+        WebBridge::new(buffer, reliability)
+    }
+
+    fn push_seq(reliability: &ReliabilityLayer, content: &str) -> OutgoingMessage {
+        let m = OutgoingMessage::with_id(Uuid::new_v4(), "web", "user", content);
+        reliability.assign_seq(m)
+    }
+
+    // ── Request/response correlation ────────────────────────────────
+
+    #[tokio::test]
+    async fn send_and_wait_correlates_response_by_id() {
+        // The bridge must route a `Channel::send` whose OutgoingMessage.id
+        // matches the registered oneshot back to the awaiting caller, AND
+        // broadcast it on outgoing_tx for WS/SSE subscribers.
+        let bridge = fresh_bridge(8);
+        let handle =
+            WebBridgeHandle::from_bridge(&bridge).with_response_timeout(Duration::from_secs(2));
+
+        let mut sub = handle.subscribe();
+
+        let msg_id = Uuid::new_v4();
+        let mut incoming = IncomingMessage::new("web", "user", "ping");
+        incoming.id = msg_id;
+        let wait = tokio::spawn({
+            let handle = handle.clone();
+            async move { handle.send_and_wait(incoming).await }
+        });
+
+        // Wait until the spawned task has registered its oneshot under
+        // msg_id, otherwise our reply would miss the correlation map.
+        for _ in 0..200 {
+            if handle.responses.read().await.contains_key(&msg_id) {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        assert!(
+            handle.responses.read().await.contains_key(&msg_id),
+            "send_and_wait did not register its oneshot in time"
+        );
+
+        let reply = OutgoingMessage::with_id(msg_id, "web", "user", "pong");
+        bridge.deliver_response(reply).await.unwrap();
+
+        let result = wait
+            .await
+            .unwrap()
+            .expect("correlated response should arrive");
+        assert_eq!(result.id, msg_id);
+        assert_eq!(result.content, "pong");
+
+        // The same message also reaches subscribers via the broadcast channel.
+        let broadcast = sub.recv().await.unwrap();
+        assert_eq!(broadcast.content, "pong");
+    }
+
+    #[tokio::test]
+    async fn send_and_wait_timeout_returns_typed_variant() {
+        // RFC-024 SP1: the deadline must produce a typed `Timeout`
+        // (not a generic error) so the HTTP layer can map to 504.
+        let bridge = fresh_bridge(8);
+        let handle =
+            WebBridgeHandle::from_bridge(&bridge).with_response_timeout(Duration::from_millis(50));
+
+        let incoming = IncomingMessage::new("web", "user", "hello");
+        let msg_id = incoming.id;
+        let err = handle.send_and_wait(incoming).await.unwrap_err();
+        assert!(
+            matches!(err, BridgeSendError::Timeout),
+            "expected Timeout variant, got {err:?}"
+        );
+
+        // Timeout must remove the correlation entry so the map doesn't
+        // leak oneshots across requests.
+        assert!(
+            !handle.responses.read().await.contains_key(&msg_id),
+            "timeout must remove the correlation entry"
+        );
+    }
+
+    // ── replay_after delivery ───────────────────────────────────────
+
+    #[tokio::test]
+    async fn replay_after_broadcasts_messages_with_higher_seq() {
+        // RFC-024 §C2: a WS reconnecting with last_seq=k must receive the
+        // gapless slice of messages strictly greater than k, in seq order.
+        let bridge = fresh_bridge(16);
+        let handle = WebBridgeHandle::from_bridge(&bridge);
+
+        let m1 = push_seq(&handle.reliability, "first");
+        let m2 = push_seq(&handle.reliability, "second");
+        let m3 = push_seq(&handle.reliability, "third");
+        let cursor = m1.seq.unwrap();
+        assert_eq!(m2.seq.unwrap(), cursor + 1);
+        assert_eq!(m3.seq.unwrap(), cursor + 2);
+
+        let mut sub = handle.subscribe();
+        handle.replay_after(cursor);
+
+        let seen1 = sub.recv().await.unwrap();
+        let seen2 = sub.recv().await.unwrap();
+        assert_eq!(seen1.content, "second");
+        assert_eq!(seen2.content, "third");
+        assert_ne!(
+            seen1.metadata.get("type").map(String::as_str),
+            Some("resync")
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_after_at_latest_seq_emits_no_messages() {
+        // Cursor == latest seq → empty gapless slice, NOT Resync. The WS
+        // client is caught up; we must not falsely demand it pull state.
+        let bridge = fresh_bridge(16);
+        let handle = WebBridgeHandle::from_bridge(&bridge);
+
+        push_seq(&handle.reliability, "a");
+        let m2 = push_seq(&handle.reliability, "b");
+        let latest = m2.seq.unwrap();
+        let mut sub = handle.subscribe();
+        handle.replay_after(latest);
+
+        match sub.try_recv() {
+            Err(TryRecvError::Empty) => {}
+            other => panic!("expected Empty, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn replay_after_when_cursor_older_than_buffer_emits_resync_marker() {
+        // RFC-024 §2: cursor older than the buffer's oldest surviving
+        // message → Resync. The bridge must broadcast a `type: "resync"`
+        // marker so the client knows to pull state via the regular API.
+        let reliability = Arc::new(ReliabilityLayer::new(ReplayConfig {
+            buffer_size: 2,
+            ttl: Duration::from_secs(60),
+        }));
+        let bridge = WebBridge::new(16, reliability.clone());
+        let handle = WebBridgeHandle::from_bridge(&bridge);
+
+        push_seq(&reliability, "evicted-1");
+        push_seq(&reliability, "evicted-2");
+        push_seq(&reliability, "evicted-3"); // evicts evicted-1
+
+        let mut sub = handle.subscribe();
+        handle.replay_after(0);
+
+        let marker = sub.recv().await.unwrap();
+        assert_eq!(
+            marker.metadata.get("type").map(String::as_str),
+            Some("resync"),
+            "resync marker must carry the documented metadata"
+        );
+        assert_eq!(marker.content, "", "resync marker must have empty content");
+    }
+
+    #[tokio::test]
+    async fn replay_after_uses_per_bridge_reliability_layer() {
+        // Two distinct WebBridges must have independent replay buffers —
+        // a message pushed through bridge A must not surface on bridge B.
+        let reliability_a = Arc::new(ReliabilityLayer::new(Default::default()));
+        let reliability_b = Arc::new(ReliabilityLayer::new(Default::default()));
+        let bridge_a = WebBridge::new(8, reliability_a.clone());
+        let bridge_b = WebBridge::new(8, reliability_b.clone());
+        let handle_a = WebBridgeHandle::from_bridge(&bridge_a);
+        let handle_b = WebBridgeHandle::from_bridge(&bridge_b);
+
+        push_seq(&reliability_a, "only-on-a");
+        push_seq(&reliability_b, "only-on-b");
+
+        let mut sub_a = handle_a.subscribe();
+        let mut sub_b = handle_b.subscribe();
+        handle_a.replay_after(0);
+
+        // A replays its own message to its own subscribers.
+        let replayed = sub_a.recv().await.unwrap();
+        assert_eq!(replayed.content, "only-on-a");
+
+        // B's broadcast channel must NOT have received A's replay —
+        // per-bridge isolation across both the reliability layer AND
+        // the outgoing broadcast sender.
+        match sub_b.try_recv() {
+            Err(TryRecvError::Empty) => {}
+            other => panic!("bridge B must not receive bridge A's replay; got {other:?}"),
+        }
+
+        // B's replay on its own layer still surfaces its own message.
+        handle_b.replay_after(0);
+        let replayed_b = sub_b.recv().await.unwrap();
+        assert_eq!(replayed_b.content, "only-on-b");
+    }
+}
