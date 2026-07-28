@@ -57,7 +57,12 @@ describe('buildChatRows', () => {
       hasToolApproval: true,
       hasPathAccess: true,
     })
-    expect(rows.map((r) => r.kind)).toEqual(['message', 'interview', 'tool-approval', 'path-access'])
+    expect(rows.map((r) => r.kind)).toEqual([
+      'message',
+      'interview',
+      'tool-approval',
+      'path-access',
+    ])
   })
 
   it('shows cards even with no messages (no empty row)', () => {
