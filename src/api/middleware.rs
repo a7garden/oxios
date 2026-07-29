@@ -6,8 +6,6 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::Instant;
 
-#[cfg(test)]
-use axum::extract::ConnectInfo;
 use axum::{
     extract::{Request, State},
     http::StatusCode,
@@ -99,60 +97,10 @@ pub async fn rate_limit_layer(
     }
 }
 
-/// Tailscale identity headers used for auth-proxy mode. Documented at
-/// <https://tailscale.com/docs/features/tailscale-serve#identity-headers>.
-/// `tailscale serve` injects these from the local Tailscale daemon after
-/// stripping any client-supplied copies, so they are trustworthy when
-/// the request arrives from a loopback peer.
-pub const TAILSCALE_USER_LOGIN: &str = "tailscale-user-login";
-/// Tries the Tailscale identity-header trust path. Returns `Some(user_login)`
-/// when the request qualifies: Tailscale auth is enabled, the peer is
-/// loopback (the local Tailscale daemon proxy), the identity header is
-/// present, and the user is in the optional allowlist.
-fn tailscale_identity_trust<B>(
-    request: &Request<B>,
-    tailscale_auth_enabled: bool,
-    allow_users: &[String],
-) -> Option<String> {
-    if !tailscale_auth_enabled {
-        return None;
-    }
-    let peer = request
-        .extensions()
-        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-        .map(|ci| ci.0)?;
-    if !peer.ip().is_loopback() {
-        // Tailscale Serve connects from 127.0.0.1, so a non-loopback
-        // peer carrying these headers is a local-process spoof attempt —
-        // we already trust loopback, so reject.
-        return None;
-    }
-    let user = request
-        .headers()
-        .get(TAILSCALE_USER_LOGIN)
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())?;
-    if !allow_users.is_empty() && !allow_users.iter().any(|u| u == &user) {
-        tracing::warn!(user = %user, "Rejected Tailscale user not in allowlist");
-        return None;
-    }
-    Some(user)
-}
-
 /// Bearer token authentication middleware.
 ///
 /// Applied via `from_fn_with_state`. Skips auth when `auth_enabled` is false.
 /// `/health` and static assets are always accessible without auth.
-///
-/// Two valid credential paths:
-/// 1. **`Authorization: Bearer <token>`** — the standard path, validated
-///    against the kernel's auth manager, `[engine].api_key`, or the
-///    `OXIOS_API_KEY` env var.
-/// 2. **Tailscale identity headers** — when `tailscale_auth = true` AND
-///    the peer is loopback AND `Tailscale-User-Login` is present AND
-///    the user is in `tailscale_allow_users` (or the list is empty).
-///    This is the `tailscale serve` auth-proxy model.
 pub async fn require_auth(
     State(state): State<Arc<AppState>>,
     request: Request,
@@ -160,36 +108,6 @@ pub async fn require_auth(
 ) -> Result<Response, StatusCode> {
     // Skip auth if disabled
     if !state.config.read().security.auth_enabled {
-        return Ok(next.run(request).await);
-    }
-    // Tailscale identity-header trust. This runs BEFORE the static-asset
-    // short-circuit so that identity-header-authenticated remote clients
-    // can hit any endpoint, not just API ones. Static assets don't need
-    // auth at all (they're served by the SPA fallback), but routing them
-    // through identity trust is harmless and keeps the contract uniform.
-    let (tailscale_auth_enabled, tailscale_allow_users) = {
-        let cfg = state.config.read();
-        (cfg.security.tailscale_auth, cfg.security.tailscale_allow_users.clone())
-    };
-    if let Some(user) = tailscale_identity_trust(
-        &request,
-        tailscale_auth_enabled,
-        &tailscale_allow_users,
-    ) {
-        // Audit the first identity-trusted request per user. Per-request
-        // logging would drown the trail in repeats; one row per user is
-        // the right signal-to-noise ratio. The session-id dimension was
-        // dropped: there is no reliable browser session id that every
-        // request carries, and per-user is sufficient for forensics.
-        let audit_key = format!("tailscale-session:{user}");
-        if !state.identity_trust_audit.lock().contains(&audit_key) {
-            state.identity_trust_audit.lock().insert(audit_key);
-            state.kernel.security.log_action(
-                "tailscale",
-                "auth_trust",
-                &format!("user={user}"),
-            );
-        }
         return Ok(next.run(request).await);
     }
 
@@ -286,106 +204,5 @@ pub async fn require_ready(
         )
             .into_response();
         Ok(resp)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::body::Body;
-    use axum::http::Request as HttpRequest;
-    use std::net::SocketAddr;
-
-    fn req_with_peer(headers: &[(&str, &str)], peer: SocketAddr) -> Request<Body> {
-        let mut builder = HttpRequest::builder().uri("/api/agents");
-        for (k, v) in headers {
-            builder = builder.header(*k, *v);
-        }
-        let mut req = builder.body(Body::empty()).expect("build request");
-        req.extensions_mut().insert(ConnectInfo(peer));
-        req
-    }
-
-    #[test]
-    fn tailscale_identity_trust_disabled_returns_none() {
-        let req = req_with_peer(
-            &[("tailscale-user-login", "alice@example.com")],
-            "127.0.0.1:4200".parse().unwrap(),
-        );
-        let out = tailscale_identity_trust(&req, false, &[]);
-        assert!(out.is_none(), "tailscale_auth=false must skip trust");
-    }
-
-    #[test]
-    fn tailscale_identity_trust_happy_path() {
-        let req = req_with_peer(
-            &[("tailscale-user-login", "alice@example.com")],
-            "127.0.0.1:4200".parse().unwrap(),
-        );
-        let out = tailscale_identity_trust(&req, true, &[]);
-        assert_eq!(out.as_deref(), Some("alice@example.com"));
-    }
-
-    #[test]
-    fn tailscale_identity_trust_rejects_non_loopback_peer() {
-        // 100.64.x.x is the Tailscale CGNAT range; a request from
-        // there would be remote-spoofed (Caddy on the same host would
-        // still connect from 127.0.0.1, so this case is unreachable in
-        // practice — but the test pins the contract).
-        let req = req_with_peer(
-            &[("tailscale-user-login", "alice@example.com")],
-            "100.64.0.1:4200".parse().unwrap(),
-        );
-        let out = tailscale_identity_trust(&req, true, &[]);
-        assert!(out.is_none(), "non-loopback peer must not be trusted");
-    }
-
-    #[test]
-    fn tailscale_identity_trust_without_header_returns_none() {
-        let req = req_with_peer(&[], "127.0.0.1:4200".parse().unwrap());
-        let out = tailscale_identity_trust(&req, true, &[]);
-        assert!(out.is_none(), "missing identity header must not be trusted");
-    }
-
-    #[test]
-    fn tailscale_identity_trust_respects_allowlist() {
-        let allow = vec!["alice@example.com".to_string()];
-        let req_alice = req_with_peer(
-            &[("tailscale-user-login", "alice@example.com")],
-            "127.0.0.1:4200".parse().unwrap(),
-        );
-        assert_eq!(
-            tailscale_identity_trust(&req_alice, true, &allow).as_deref(),
-            Some("alice@example.com")
-        );
-
-        let req_eve = req_with_peer(
-            &[("tailscale-user-login", "eve@example.com")],
-            "127.0.0.1:4200".parse().unwrap(),
-        );
-        assert!(
-            tailscale_identity_trust(&req_eve, true, &allow).is_none(),
-            "user not in allowlist must be rejected"
-        );
-
-        // Empty allowlist = allow everyone.
-        let req_anyone = req_with_peer(
-            &[("tailscale-user-login", "anyone@anywhere.com")],
-            "127.0.0.1:4200".parse().unwrap(),
-        );
-        assert_eq!(
-            tailscale_identity_trust(&req_anyone, true, &[]).as_deref(),
-            Some("anyone@anywhere.com")
-        );
-    }
-
-    #[test]
-    fn tailscale_identity_trust_rejects_empty_header_value() {
-        let req = req_with_peer(
-            &[("tailscale-user-login", "   ")],
-            "127.0.0.1:4200".parse().unwrap(),
-        );
-        let out = tailscale_identity_trust(&req, true, &[]);
-        assert!(out.is_none(), "whitespace-only identity must be rejected");
     }
 }
