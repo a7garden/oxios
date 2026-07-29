@@ -779,8 +779,65 @@ auth_enabled = false  # Set to true to require API keys
 > **Warning:** When `auth_enabled = false`, the gateway accepts all requests
 > without authentication. Only use this in trusted local development.
 
----
+### Tailscale Identity-Header Trust (`tailscale_auth`)
 
+A second authentication path sits alongside Bearer tokens. When
+`tailscale_auth = true` (and `auth_enabled = true`), the daemon auto-trusts
+the `Tailscale-User-Login` header on requests that arrive from a loopback
+peer — i.e. from the local `tailscale` daemon, which is the only proxy
+that **strips** client-sent copies of the header before injecting its
+own. This is the `tailscale serve` auth-proxy model: remote tailnet
+members reach Oxios via `https://<host>.<tailnet>.ts.net` without
+needing to paste a Bearer token.
+
+```toml
+[security]
+auth_enabled = true
+tailscale_auth = true
+# Optional allowlist (empty = trust every tailnet member that
+# Tailscale Serve proxies):
+tailscale_allow_users = ["alice@example.com", "bob@example.com"]
+```
+
+**Trust contract.** Three conditions must ALL hold for identity-header
+trust to apply:
+
+1. `security.tailscale_auth = true`
+2. The TCP peer is a loopback address (the local `tailscale` daemon
+   connects from `127.0.0.1`).
+3. The `Tailscale-User-Login` header is present and non-empty, AND the
+   user is in `tailscale_allow_users` (or the list is empty).
+
+> **Failure mode — header spoofing.** The proof that the proxy in front
+> is actually `tailscale serve` comes from the fact that it strips
+> client-sent identity headers. Caddy, nginx, and bare reverse proxies
+> pass the header through unchanged, so a remote attacker could
+> trivially forge `Tailscale-User-Login: anything@evil` and gain full
+> unauthenticated API access (MCP spawn, update/run, config write,
+> backup). The daemon **cannot detect** a non-Tailscale proxy from
+> inside, so it surfaces a startup warning whenever `tailscale_auth`
+> is on. The operator must opt in knowingly.
+>
+ > **Why a warning, not a hard error.** The bind address is irrelevant
+ > to the attack — Caddy on the same host connects from `127.0.0.1`
+ > regardless of `gateway.host`. Refusing to start when bind ≠ loopback
+ > would give false confidence (the safe-looking `127.0.0.1` bind is
+ > also vulnerable to a misconfigured Caddy) while blocking legitimate
+ > use.
+
+**Audit.** The first request per user identity is recorded to the audit
+trail (`tailscale` / `auth_trust`). Subsequent requests from the same
+user do not generate additional rows to keep the trail signal-to-noise
+high.
+
+**WS / SSE / streaming.** Browser-side WebSocket and SSE cannot carry
+custom headers (`new WebSocket()` forbids them; `EventSource` is the
+same). After identity-trust bootstraps the session, the browser obtains
+a short-lived `?ticket=` (WS) or a Bearer token (SSE) via the standard
+authenticated routes. Identity headers are not needed on the wire after
+the initial REST auth.
+
+---
 ## 8. Credential Store
 
 The `CredentialStore` provides **multi-source credential resolution** for LLM

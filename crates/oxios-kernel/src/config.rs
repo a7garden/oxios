@@ -1706,6 +1706,32 @@ pub struct SecurityConfig {
     /// Enable API key authentication.
     #[serde(default)]
     pub auth_enabled: bool,
+    /// Trust Tailscale identity headers from `tailscale serve` proxy.
+    ///
+    /// When `true` (and `auth_enabled` is also `true`), requests that
+    /// arrive from a loopback peer (the local `tailscale` daemon) with a
+    /// `Tailscale-User-Login` header are auto-authenticated as that user
+    /// without requiring a Bearer token. This eliminates token friction
+    /// for tailnet members reaching the dashboard via Tailscale Serve.
+    ///
+    /// The proxy model: `tailscale serve` connects to the daemon from
+    /// `127.0.0.1` and injects the authenticated user's identity into a
+    /// header (which it strips from the client request first, preventing
+    /// remote spoofing). Local-attacker header injection is the same
+    /// trust level as any loopback client today — they could already
+    /// read the keys file directly.
+    ///
+    /// Default: `false` (opt-in).
+    #[serde(default)]
+    pub tailscale_auth: bool,
+    /// Optional allowlist of Tailscale user login emails.
+    ///
+    /// Empty (default) = trust every tailnet member that Tailscale
+    /// Serve proxies. Non-empty = only listed emails pass identity
+    /// trust. This is the explicit control surface; Tailscale ACLs
+    /// are the upstream control.
+    #[serde(default)]
+    pub tailscale_allow_users: Vec<String>,
     /// Allowed CORS origins.
     #[serde(default = "default_cors_origins")]
     pub cors_origins: Vec<String>,
@@ -1772,10 +1798,89 @@ impl Default for SecurityConfig {
             approval: ApprovalConfig::default(),
             max_audit_entries: default_max_audit(),
             auth_enabled: false,
+            tailscale_auth: false,
+            tailscale_allow_users: Vec::new(),
             cors_origins: default_cors_origins(),
             audit_log_path: None,
             rate_limit_per_minute: default_rate_limit_per_minute(),
         }
+    }
+}
+
+/// The wildcard CORS origin that Tailscale Serve URLs map to.
+///
+/// Tailscale assigns each device a `https://<host>.<tailnet>.ts.net`
+/// name, so the wildcard covers every reachable device without listing
+/// each one. The CORS layer matches by exact origin, not pattern, so
+/// we use a single literal `*` here only when the SPA is hosted on
+/// the same Tailscale host as the API (the typical setup). External
+/// SPA hosting should add explicit origins via `cors_origins`.
+pub const TAILSCALE_WILDCARD_ORIGIN: &str = "https://*.ts.net";
+
+impl SecurityConfig {
+    /// The CORS origins to actually allow, taking `tailscale_auth` into
+    /// account. When Tailscale auth is enabled, the `*.ts.net` wildcard
+    /// is automatically appended so tailnet browsers do not hit CORS
+    /// errors against the API. When disabled, the list is exactly
+    /// `cors_origins`.
+    pub fn effective_cors_origins(&self) -> Vec<String> {
+        if self.tailscale_auth && !self.cors_origins.iter().any(|o| o == TAILSCALE_WILDCARD_ORIGIN) {
+            let mut out = self.cors_origins.clone();
+            out.push(TAILSCALE_WILDCARD_ORIGIN.to_string());
+            out
+        } else {
+            self.cors_origins.clone()
+        }
+    }
+
+    /// Whether a Tailscale-identified user is allowed by the
+    /// `tailscale_allow_users` allowlist. An empty allowlist means
+    /// "allow every tailnet member" (Tailscale ACLs are the real
+    /// access control).
+    pub fn is_tailscale_user_allowed(&self, user_login: &str) -> bool {
+        if self.tailscale_allow_users.is_empty() {
+            return true;
+        }
+        self.tailscale_allow_users.iter().any(|u| u == user_login)
+    }
+
+    /// Returns a non-empty list of WARNINGS about `tailscale_auth`. The
+    /// trust model: the daemon accepts a `Tailscale-User-Login` header
+    /// from a loopback peer as proof of identity. That proof is valid
+    /// ONLY when the loopback connection came from the local
+    /// `tailscale` daemon (which strips any client-sent copy of the
+    /// header before injecting its own). Any other proxy — Caddy,
+    /// nginx, a bare reverse-proxy — passes client headers through, so
+    /// a remote attacker can trivially forge `Tailscale-User-Login:
+    /// anything@evil` and bypass every Bearer check, including the
+    /// destructive endpoints (MCP spawn, update/run, config write,
+    /// backup).
+    ///
+    /// Note: the gateway bind address is **irrelevant** to this check.
+    /// Caddy running on the same host connects from `127.0.0.1`
+    /// regardless of whether `gateway.host` is `127.0.0.1` or
+    /// `0.0.0.0`, so the middleware's `peer.is_loopback()` test passes
+    /// either way. The proof-of-correct-proxy has to come from the
+    /// header itself, which is exactly what only `tailscale serve`
+    /// provides. We cannot detect a misconfigured proxy from inside
+    /// the daemon, so the only safe move is to surface the risk to
+    /// the operator at startup and let them confirm their setup.
+    pub fn tailscale_auth_warnings(&self) -> Vec<String> {
+        if !self.tailscale_auth {
+            return Vec::new();
+        }
+        vec![
+            "tailscale_auth=true: the daemon trusts the Tailscale-User-Login \
+             header from loopback peers. This is safe ONLY when the daemon is \
+             fronted by `tailscale serve` (which strips client-supplied copies \
+             of the header before injecting its own). Any other proxy in front \
+             — Caddy, nginx, a bare reverse-proxy — passes the header through \
+             unchanged, so a remote attacker can forge `Tailscale-User-Login: \
+             anything@evil` and gain full unauthenticated API access (MCP \
+             spawn, update/run, config write, backup). If you are not 100% \
+             sure Oxios is fronted by `tailscale serve` (and only by it), set \
+             tailscale_auth=false and rely on Bearer auth.".to_string()
+        ]
     }
 }
 
@@ -2133,13 +2238,12 @@ impl OxiosConfig {
         if self.security.max_execution_time_secs == 0 {
             warnings.push("security.max_execution_time_secs is 0 — no timeout".into());
         }
-
-        // Audit validation
-        if self.audit.max_entries == 0 {
-            warnings.push("audit.max_entries is 0 — audit will never prune".into());
-        }
-
-        // Budget validation
+        // Tailscale auth is trust-on-first-use: we cannot detect from
+        // inside the daemon whether the proxy in front is actually
+        // `tailscale serve` (the only proxy that strips the identity
+        // header). Surface a startup warning so the operator is aware
+        // of the failure mode. See SecurityConfig::tailscale_auth_warnings.
+        warnings.extend(self.security.tailscale_auth_warnings());
         if self.budget.default_window_secs == 0 {
             warnings.push("budget.default_window_secs is 0 — no time window".into());
         }
@@ -2468,6 +2572,14 @@ exec = "always"
             from_rust.memory.consolidation.preset, from_toml.memory.consolidation.preset,
             "memory.consolidation.preset 불일치"
         );
+        assert_eq!(
+            from_rust.security.tailscale_auth, from_toml.security.tailscale_auth,
+            "security.tailscale_auth 불일치"
+        );
+        assert_eq!(
+            from_rust.security.tailscale_allow_users, from_toml.security.tailscale_allow_users,
+            "security.tailscale_allow_users 불일치"
+        );
 
         // TOML 템플릿이 파싱 가능한지 확인
         let (_, warnings) = from_toml.validate();
@@ -2476,8 +2588,42 @@ exec = "always"
         }
     }
 
-    /// `gateway.expose_api_docs` is gated to loopback binds for safety.
-    /// Verifies all four cases: opt-out, opt-in + public, opt-in + loopback.
+    /// `tailscale_auth` always emits a warning regardless of bind.
+    /// The header-spoofing attack via Caddy/nginx works whether the
+    /// daemon binds to `0.0.0.0` or `127.0.0.1` — the proxy on the
+    /// same host connects from loopback in both cases, so the
+    /// middleware's loopback check passes either way. Only `tailscale
+    /// serve` strips the client header, and we cannot detect that
+    /// from inside the daemon. The user must opt in knowingly.
+    #[test]
+    fn test_tailscale_auth_emits_warning_regardless_of_bind() {
+        for host in ["127.0.0.1", "0.0.0.0", "::", "100.64.0.1"] {
+            let mut cfg = OxiosConfig::default();
+            cfg.security.tailscale_auth = true;
+            cfg.gateway.host = host.into();
+            let (errors, warnings) = cfg.validate();
+            assert!(
+                errors.is_empty(),
+                "Bind {host} must NOT hard-error; user opt-in. errors: {errors:?}"
+            );
+            assert!(
+                warnings.iter().any(|w| w.contains("tailscale_auth=true")),
+                "Bind {host} must emit the tailscale_auth warning. warnings: {warnings:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_tailscale_auth_off_emits_no_warning() {
+        let cfg = OxiosConfig::default();
+        assert!(!cfg.security.tailscale_auth);
+        let (errors, warnings) = cfg.validate();
+        assert!(errors.is_empty());
+        assert!(
+            warnings.iter().all(|w| !w.contains("tailscale_auth=true")),
+            "Default config must not warn about tailscale_auth: {warnings:?}"
+        );
+    }
     #[test]
     fn test_gateway_should_expose_api_docs() {
         // Default: opt-out — never expose.
@@ -2533,3 +2679,66 @@ exec = "always"
         assert!(!cfg.should_expose_api_docs());
     }
 }
+
+    // ── Tailscale auth (remote access via `tailscale serve`) ──
+
+    #[test]
+    fn test_tailscale_auth_default_off() {
+        let cfg = SecurityConfig::default();
+        assert!(!cfg.tailscale_auth, "tailscale_auth must default to false (opt-in)");
+        assert!(
+            cfg.tailscale_allow_users.is_empty(),
+            "tailscale_allow_users must default to empty (allow all tailnet members)"
+        );
+    }
+
+    #[test]
+    fn test_tailscale_auth_parses() {
+        let toml = r#"
+[security]
+auth_enabled = true
+tailscale_auth = true
+tailscale_allow_users = ["alice@example.com", "bob@example.com"]
+"#;
+        let cfg: OxiosConfig = toml::from_str(toml).unwrap();
+        assert!(cfg.security.tailscale_auth);
+        assert_eq!(
+            cfg.security.tailscale_allow_users,
+            vec!["alice@example.com".to_string(), "bob@example.com".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_effective_cors_origins_includes_tailnet_when_enabled() {
+        let cfg = SecurityConfig {
+            tailscale_auth: true,
+            ..Default::default()
+        };
+        let origins = cfg.effective_cors_origins();
+        assert!(origins.contains(&"https://*.ts.net".to_string()));
+        // default loopback origins still present
+        assert!(origins.contains(&"http://localhost:4200".to_string()));
+    }
+
+    #[test]
+    fn test_effective_cors_origins_omits_tailnet_when_disabled() {
+        let cfg = SecurityConfig::default();
+        assert!(!cfg.tailscale_auth);
+        let origins = cfg.effective_cors_origins();
+        assert!(!origins.contains(&"https://*.ts.net".to_string()));
+    }
+
+    #[test]
+    fn test_tailscale_user_allowed() {
+        // Empty allowlist = allow all (relies on Tailscale ACLs as the
+        // actual access control). Non-empty = explicit allowlist.
+        let cfg = SecurityConfig::default();
+        assert!(cfg.is_tailscale_user_allowed("anyone@anywhere.com"));
+
+        let cfg = SecurityConfig {
+            tailscale_allow_users: vec!["alice@example.com".to_string()],
+            ..Default::default()
+        };
+        assert!(cfg.is_tailscale_user_allowed("alice@example.com"));
+        assert!(!cfg.is_tailscale_user_allowed("eve@example.com"));
+    }

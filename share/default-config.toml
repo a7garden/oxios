@@ -121,8 +121,22 @@ cache_limit_entries = 50
 # For a trusted single-user LOCAL machine you may opt out with false,
 # but never disable auth when binding to a non-loopback interface.
 auth_enabled = true
+
+# Trust Tailscale identity headers from a local `tailscale serve` proxy.
+# When ON (and auth_enabled = true), requests that arrive from a
+# loopback peer carrying a valid `Tailscale-User-Login` header are
+# auto-authenticated as that user — no Bearer token required. The
+# proxy MUST be `tailscale serve` (the only proxy that strips
+# client-supplied copies of the header). Fronting Oxios with any
+# other reverse proxy while this is on is a complete auth bypass.
+# A startup warning is emitted at boot. Off by default.
+# tailscale_auth = false
+# tailscale_allow_users = ["you@example.com"]  # empty = trust all tailnet members
+
 # Allowed CORS origins. Browsers treat `localhost` and `127.0.0.1` as distinct
 # origins, so both are included. 5173 covers the Vite dev server (`bun dev`).
+# When tailscale_auth = true, `https://*.ts.net` is appended automatically
+# so tailnet browsers do not need a per-device origin entry.
 cors_origins = ["http://localhost:4200", "http://127.0.0.1:4200", "http://localhost:5173", "http://127.0.0.1:5173"]
 # Default allowed tools for agents.
 allowed_tools = ["read", "write", "edit", "bash", "grep", "find", "exec"]
