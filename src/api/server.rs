@@ -46,6 +46,11 @@ pub struct AppState {
     pub readiness: std::sync::Arc<oxios_kernel::ReadinessGate>,
     /// Task store (RFC-043) — SQLite-backed task lifecycle management.
     pub task_store: std::sync::Arc<tokio::sync::Mutex<oxios_kernel::task::TaskStore>>,
+    /// Audit dedup set for Tailscale identity-trust sessions.
+    /// Keyed by `tailscale-session:<user>:<session-id>` so the same
+    /// browser session produces one audit row, not one per request.
+    /// Bounded by the auth-trust path — never holds unbounded data.
+    pub identity_trust_audit: std::sync::Arc<parking_lot::Mutex<std::collections::HashSet<String>>>,
 }
 
 impl std::fmt::Debug for AppState {

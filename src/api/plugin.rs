@@ -371,6 +371,16 @@ impl Surface for WebSurface {
             );
         }
 
+        // Tailscale auth: surface the trust-on-first-use risk at startup.
+        // The daemon cannot detect whether the proxy in front is actually
+        // `tailscale serve` (the only proxy that strips identity headers),
+        // so the operator must opt in knowingly. See
+        // `SecurityConfig::tailscale_auth_warnings` for the rationale.
+        for w in config.security.tailscale_auth_warnings() {
+            tracing::warn!("{w}");
+            eprintln!("⚠️  {w}");
+        }
+
         let rate_limit = config.security.rate_limit_per_minute;
 
         // Use the pre-resolved web dist path from SurfaceContext.
@@ -388,7 +398,6 @@ impl Surface for WebSurface {
         let response_timeout = std::time::Duration::from_secs(config.gateway.response_timeout_secs);
         let bridge_handle =
             WebBridgeHandle::from_bridge(&web_channel).with_response_timeout(response_timeout);
-
         // Build app state — all knowledge access goes through kernel.knowledge
         // Initialize task store (RFC-043)
         let task_db_path = config.kernel.workspace.clone() + "/tasks.db";
@@ -409,16 +418,19 @@ impl Surface for WebSurface {
             web_dist,
             readiness: ctx.kernel.readiness.clone(),
             task_store,
+            identity_trust_audit: std::sync::Arc::new(parking_lot::Mutex::new(
+                std::collections::HashSet::new(),
+            )),
         });
-
-        // Build API routes
         let api_routes = routes::build_routes(state.clone());
 
-        // CORS layer
+        // CORS layer. When Tailscale auth is enabled we automatically
+        // include `https://*.ts.net` so tailnet browsers do not need
+        // per-device origin entries. See `SecurityConfig::effective_cors_origins`.
         let cors_origins: Vec<_> = config
             .security
-            .cors_origins
-            .iter()
+            .effective_cors_origins()
+            .into_iter()
             .filter_map(|o| o.parse::<axum::http::HeaderValue>().ok())
             .collect();
         let cors = tower_http::cors::CorsLayer::new()
@@ -474,14 +486,21 @@ impl Surface for WebSurface {
         // completion and applies its policy (scoped restart on unexpected exit).
         // Under panic=abort in release, a panic aborts the process directly and
         // the OS supervisor restarts; the non-panic Err path is what the
-        // supervisor intercepts here.
         let handle = tokio::spawn(async move {
-            if let Err(e) = axum::serve(listener, app)
-                .with_graceful_shutdown(async move {
-                    shutdown.cancelled().await;
-                    tracing::info!("Web server shutting down (graceful)");
-                })
-                .await
+            // `into_make_service_with_connect_info::<SocketAddr>()` wires
+            // the peer IP into handlers that use `ConnectInfo<SocketAddr>`,
+            // which the auth middleware needs to decide whether a request
+            // is coming from a loopback peer (the local Tailscale daemon)
+            // or a remote client.
+            if let Err(e) = axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .with_graceful_shutdown(async move {
+                shutdown.cancelled().await;
+                tracing::info!("Web server shutting down (graceful)");
+            })
+            .await
             {
                 tracing::error!(error = %e, "Web server error");
             }
