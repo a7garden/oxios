@@ -1,6 +1,7 @@
 # Remote Access Architecture — Design
 
-> **Status:** Design (not yet implemented)
+> **Status:** SUPERSEDED on 2026-07-29 by [`2026-07-29-managed-relay-architecture.md`](2026-07-29-managed-relay-architecture.md).
+> The Tailscale-Serve-as-default recommendation in this doc was pivoted to a **managed relay model** (oxios.com SPA + Cloudflare Worker relay + outbound tunnel from the host binary). E2E encryption is a first-class requirement there. Retain this file for historical context and the analysis in §2–§3, which still informs the new design.
 > **Date:** 2026-07-29
 > **Scope:** How external devices reach the Oxios dashboard, and what to strengthen.
 
