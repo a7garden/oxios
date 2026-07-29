@@ -29,13 +29,50 @@ fn apply_patch(mut c: ApprovalConfig, p: ApprovalConfigPatch) -> ApprovalConfig 
     }
     c
 }
+
+/// Persist approval config to disk so it survives a daemon restart.
+///
+/// Reads the current `state.config`, patches `security.approval`, and writes
+/// back to `config.toml`. Non-fatal on failure — in-memory change has already
+/// taken effect for the current session.
+async fn persist_approval_config(state: &AppState, config: &ApprovalConfig) {
+    // Clone config out, drop the lock, serialize, THEN write to disk.
+    let content = {
+        let mut cfg = state.config.read().clone();
+        cfg.security.approval = config.clone();
+        match toml::to_string_pretty(&cfg) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Failed to serialize config for approval persistence"
+                );
+                return;
+            }
+        }
+    };
+    // No lock held during disk I/O.
+    if let Err(e) = tokio::fs::write(&state.config_path, content).await {
+        tracing::warn!(
+            error = %e,
+            path = %state.config_path.display(),
+            "Failed to persist approval config — change will be lost on restart"
+        );
+        return;
+    }
+    // Sync state.config so PUT /api/config won't overwrite with stale data.
+    state.config.write().security.approval = config.clone();
+}
+
 async fn update(state: &AppState, c: ApprovalConfig) -> Result<ApprovalConfig, AppError> {
-    state
+    let config = state
         .kernel
         .infra
         .set_approval_config(c)
         .await
-        .map_err(AppError::from)
+        .map_err(AppError::from)?;
+    persist_approval_config(state, &config).await;
+    Ok(config)
 }
 pub(crate) async fn handle_approval_config_get(
     State(s): State<Arc<AppState>>,
@@ -57,28 +94,30 @@ pub(crate) async fn handle_approval_grant_add(
     if b.key.trim().is_empty() {
         return Err(AppError::BadRequest("grant key must not be empty".into()));
     }
-    Ok(Json(
-        s.kernel
-            .infra
-            .add_grant(b.key)
-            .await
-            .map_err(AppError::from)?,
-    ))
+    let config = s.kernel
+        .infra
+        .add_grant(b.key)
+        .await
+        .map_err(AppError::from)?;
+    persist_approval_config(&s, &config).await;
+    Ok(Json(config))
 }
 pub(crate) async fn handle_approval_grant_remove(
     State(s): State<Arc<AppState>>,
     Path(k): Path<String>,
 ) -> Result<Json<ApprovalConfig>, AppError> {
-    Ok(Json(
-        s.kernel
-            .infra
-            .remove_grant(&k)
-            .await
-            .map_err(AppError::from)?,
-    ))
+    let config = s.kernel
+        .infra
+        .remove_grant(&k)
+        .await
+        .map_err(AppError::from)?;
+    persist_approval_config(&s, &config).await;
+    Ok(Json(config))
 }
 pub(crate) async fn remember_grant(s: &AppState, key: String) -> Result<ApprovalConfig, AppError> {
-    s.kernel.infra.add_grant(key).await.map_err(AppError::from)
+    let config = s.kernel.infra.add_grant(key).await.map_err(AppError::from)?;
+    persist_approval_config(s, &config).await;
+    Ok(config)
 }
 #[cfg(test)]
 mod tests {
