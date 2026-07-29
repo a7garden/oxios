@@ -34,7 +34,10 @@ export function NoteTitle() {
   const { data: tree } = useKnowledgeRecursiveTree()
 
   const fileName =
-    currentFilePath?.split('/').pop()?.replace(/\.(md|html)$/, '') ?? ''
+    currentFilePath
+      ?.split('/')
+      .pop()
+      ?.replace(/\.(md|html)$/, '') ?? ''
 
   // Snapshot of every known file path — used to pre-validate a rename whose
   // target would clobber a different existing note. Deduped with the editor's

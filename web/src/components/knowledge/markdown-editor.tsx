@@ -558,9 +558,7 @@ export function MarkdownEditor({
       const { state } = view
       // Locate the title line — first line after any leading frontmatter.
       // Mirrors headingEnforcer's logic exactly.
-      const fm = findFrontmatterRange(
-        state.sliceDoc(0, Math.min(state.doc.length, 8192)),
-      )
+      const fm = findFrontmatterRange(state.sliceDoc(0, Math.min(state.doc.length, 8192)))
       if (!fm && state.doc.line(1).text.trimEnd() === '---') return
       const fmEndLine = fm ? state.doc.lineAt(Math.max(0, fm.to - 1)).number : 0
       const titleLineNum = fmEndLine + 1
