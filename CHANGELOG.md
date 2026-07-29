@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-07-29
+
+### Added
+- **Knowledge editor typography (web)** — Redesigned markdown editor with improved
+  typography and inline title editing, featuring a dedicated note-title component
+  and biome-formatted CodeMirror integration.
+
+### Fixed
+- **Knowledge backlinks API (web)** — Registered missing backlinks API route
+  and hardened SPA fallback.
+- **Approval config persistence (security)** — Approval configuration is now
+  persisted to disk on every PATCH operation.
+
 ## [1.31.1] - 2026-07-28
 
 ### Changed
