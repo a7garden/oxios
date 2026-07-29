@@ -149,6 +149,9 @@ export function useKnowledgeBacklinks(path: string | null) {
     queryFn: () =>
       api.get<KnowledgeBacklink[]>('/api/knowledge/backlinks', path ? { path } : undefined),
     enabled: !!path,
+    // Guard against non-array responses (e.g. HTML SPA fallback when the
+    // route is misconfigured) — never let a string/object reach .map().
+    select: (data) => (Array.isArray(data) ? data : []),
   })
 }
 

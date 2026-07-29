@@ -239,9 +239,23 @@ async fn static_handler(
 
 /// SPA fallback — serves index.html for client-side routing.
 async fn spa_handler(
+    axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
     headers: axum::http::HeaderMap,
     state: axum::extract::State<Arc<AppState>>,
 ) -> Response {
+    // Never serve the SPA fallback for API paths. An unmatched /api/* route
+    // means the endpoint is missing or the backend binary is stale. Return a
+    // 404 JSON so the client's apiClient throws ApiError (instead of silently
+    // parsing the HTML index page as the response type and crashing on .map).
+    if uri.path().starts_with("/api/") {
+        return Response::builder()
+            .status(404)
+            .header("Content-Type", "application/json")
+            .body(Body::from(
+                r#"{"error":"Not Found","detail":"API route not registered"}"#,
+            ))
+            .unwrap();
+    }
     // RFC-024 SP3: load the atomic pointer per request.
     let dist = state.web_dist.path();
 
