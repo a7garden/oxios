@@ -1,6 +1,6 @@
 # Managed Relay Remote Access — Architecture
 
-> **Status:** Architecture (level-0). Decomposed into 5 sub-specs.
+> **Status:** DEFERRED — no implementation planned (2026-07-29). Architecture (level-0) decomposed into 5 sub-specs; revisit when remote-access becomes a priority again. File relocated to `docs/designs/deferred/` to keep active design space uncluttered.
 > **Date:** 2026-07-29
 > **Scope:** How an Oxios host (user's Mac) is securely reached from any device (iPhone, browser on another machine) without the user installing Tailscale or operating reverse proxies.
 > **Supersedes:** [`2026-07-29-remote-access-architecture-design.md.superseded`](2026-07-29-remote-access-architecture-design.md.superseded) (Tailscale-Serve-as-default → managed relay).

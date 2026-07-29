@@ -1,6 +1,6 @@
 # Sub-spec A — OAuth Broker (managed relay)
 
-> **Status:** Sub-spec (level-1). Decomposed from the level-0 architecture.
+> **Status:** DEFERRED — no implementation planned (2026-07-29). Sub-spec (level-1) of the (deferred) managed-relay architecture. File relocated to `docs/designs/deferred/`.
 > **Date:** 2026-07-29
 > **Parent:** [`2026-07-29-managed-relay-architecture.md`](2026-07-29-managed-relay-architecture.md) §6, §7.6, §11, §12.
 > **Owns:** The `auth.oxios.com` Worker, the device-code flow, JWT issuance, D1 schema for users / devices / audit.
