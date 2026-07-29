@@ -94,7 +94,8 @@ pub(crate) async fn handle_approval_grant_add(
     if b.key.trim().is_empty() {
         return Err(AppError::BadRequest("grant key must not be empty".into()));
     }
-    let config = s.kernel
+    let config = s
+        .kernel
         .infra
         .add_grant(b.key)
         .await
@@ -106,7 +107,8 @@ pub(crate) async fn handle_approval_grant_remove(
     State(s): State<Arc<AppState>>,
     Path(k): Path<String>,
 ) -> Result<Json<ApprovalConfig>, AppError> {
-    let config = s.kernel
+    let config = s
+        .kernel
         .infra
         .remove_grant(&k)
         .await
@@ -115,7 +117,12 @@ pub(crate) async fn handle_approval_grant_remove(
     Ok(Json(config))
 }
 pub(crate) async fn remember_grant(s: &AppState, key: String) -> Result<ApprovalConfig, AppError> {
-    let config = s.kernel.infra.add_grant(key).await.map_err(AppError::from)?;
+    let config = s
+        .kernel
+        .infra
+        .add_grant(key)
+        .await
+        .map_err(AppError::from)?;
     persist_approval_config(s, &config).await;
     Ok(config)
 }
