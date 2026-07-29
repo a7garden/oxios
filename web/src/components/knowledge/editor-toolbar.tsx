@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EventEditor } from '@/components/calendar/event-editor'
 import { EditorSettingsPopover } from '@/components/knowledge/editor-settings-popover'
+import { NoteTitle } from '@/components/knowledge/note-title'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCalendarCreate } from '@/hooks/use-calendar'
@@ -66,7 +67,7 @@ export function EditorToolbar() {
   }, [handleSave])
 
   return (
-    <div className="flex items-center gap-1 px-3 py-1.5 border-b bg-muted/30 min-h-[44px]">
+    <div className="flex items-center gap-1 px-3 py-1.5 border-b bg-background min-h-[44px]">
       <Button
         variant="ghost"
         size="icon"
@@ -90,9 +91,7 @@ export function EditorToolbar() {
         <ArrowRight className="h-4 w-4" />
       </Button>
 
-      <span className="text-sm font-medium truncate mx-3" title={currentFilePath ?? undefined}>
-        {fileName || 'Knowledge'}
-      </span>
+      <NoteTitle />
 
       <div className="flex-1" />
 

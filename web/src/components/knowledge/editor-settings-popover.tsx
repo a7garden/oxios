@@ -241,55 +241,44 @@ export function EditorSettingsPopover() {
               {t('knowledge.editorPrefMarkdownColors')}
             </Label>
           </div>
-          {/* Heading colors — compact grid, one swatch per level */}
-          <div className="px-4 py-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">{t('knowledge.editorPrefHeadingColors')}</span>
-              {Object.values(prefs.headingColors).some(Boolean) && (
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() =>
-                    prefs.setPref('headingColors', {
-                      h1: '',
-                      h2: '',
-                      h3: '',
-                      h4: '',
-                      h5: '',
-                      h6: '',
-                    })
-                  }
-                >
-                  <RotateCcw className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-            <div className="mt-2 grid grid-cols-6 gap-2">
-              {(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const).map((lvl) => {
-                const hasCustom = Boolean(prefs.headingColors[lvl])
-                return (
-                  <div key={lvl} className="flex flex-col items-center gap-1">
-                    <input
-                      type="color"
-                      value={prefs.headingColors[lvl] || '#71717a'}
-                      onChange={(e) =>
-                        prefs.setPref('headingColors', {
-                          ...prefs.headingColors,
-                          [lvl]: e.target.value,
-                        })
-                      }
-                      className={`h-7 w-full rounded border cursor-pointer bg-transparent ${
-                        hasCustom
-                          ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
-                          : 'border-border'
-                      }`}
-                    />
-                    <span className="text-[10px] text-muted-foreground">{lvl.toUpperCase()}</span>
-                  </div>
-                )
-              })}
-            </div>
+          {/* Heading colors — toggle controls monochrome vs custom */}
+          <div className="space-y-0.5 px-4 py-2">
+            <ToggleRow
+              label={t('knowledge.editorPrefHeadingColors')}
+              description={t('knowledge.editorPrefHeadingColorsDesc')}
+              checked={prefs.headingColorsEnabled}
+              onCheckedChange={(v) => prefs.setPref('headingColorsEnabled', v)}
+            />
           </div>
+          {prefs.headingColorsEnabled && (
+            <div className="px-4 pb-2">
+              <div className="grid grid-cols-6 gap-2">
+                {(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const).map((lvl) => {
+                  const hasCustom = Boolean(prefs.headingColors[lvl])
+                  return (
+                    <div key={lvl} className="flex flex-col items-center gap-1">
+                      <input
+                        type="color"
+                        value={prefs.headingColors[lvl] || '#71717a'}
+                        onChange={(e) =>
+                          prefs.setPref('headingColors', {
+                            ...prefs.headingColors,
+                            [lvl]: e.target.value,
+                          })
+                        }
+                        className={`h-7 w-full rounded border cursor-pointer bg-transparent ${
+                          hasCustom
+                            ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                            : 'border-border'
+                        }`}
+                      />
+                      <span className="text-2xs text-muted-foreground uppercase">{lvl}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           {/* Marker and link colors */}
           <div className="space-y-0.5 px-4 pb-2">
             <ColorRow

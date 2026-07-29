@@ -240,15 +240,15 @@ const linkClickHandler = EditorView.domEventHandlers({
 // ─────────────────────────────────────────────────────────────────────────
 const baseTheme = EditorView.theme({
   '&': {
-    fontSize: 'var(--editor-font-size, 0.875rem)',
+    fontSize: 'var(--editor-font-size, 0.9375rem)',
     height: '100%',
   },
   '.cm-scroller': {
-    fontFamily: 'var(--editor-font-mono, ui-monospace, monospace)',
-    lineHeight: 'var(--editor-line-height, 1.7)',
+    fontFamily: 'var(--editor-font-body, "Geist", system-ui, sans-serif)',
+    lineHeight: 'var(--editor-line-height, 1.75)',
   },
   '.cm-content': {
-    padding: '12px 8px',
+    padding: '24px 16px',
   },
 })
 
@@ -276,7 +276,7 @@ const darkTheme = EditorView.theme(
 // Component
 // ─────────────────────────────────────────────────────────────────────────
 export function MarkdownEditor({
-  filePath: _filePath,
+  filePath,
   initialContent,
   onSave,
   className,
@@ -301,6 +301,12 @@ export function MarkdownEditor({
   // read the latest path on each rebuild without being recreated.
   const filePathRef = useRef(currentFilePath)
   filePathRef.current = currentFilePath
+  // The filePath prop identifies which note THIS editor instance is editing
+  // (differs from the store's currentFilePath in split view). Path-scopes the
+  // knowledge:set-title event so a title edit in one pane never rewrites the
+  // H1 of a split-view sibling.
+  const propFilePath = useRef(filePath)
+  propFilePath.current = filePath
   const imageFoldExt = useMemo(
     () =>
       createImageFoldExtension(() => {
@@ -431,10 +437,11 @@ export function MarkdownEditor({
     // Inline live-preview styling — must stay last to win over oneDark.
     exts.push(syntaxHighlighting(livePreviewHighlight))
 
-    // ── User-defined markdown colors (override oneDark / defaults) ──
-    // Heading colors via HighlightStyle — oneDark styles `tags.heading`
-    // (the parent), so `tags.heading1`-`heading6` (children) override it.
-    const headingEntries: { tag: typeof lmTags.heading1; color: string }[] = []
+    // ── Heading colors ──
+    // oneDark styles `tags.heading` (the parent) with a reddish hue.
+    // Child tags (heading1–6) override it. When colors are disabled
+    // (default), we force all six to var(--foreground) for a clean
+    // monochrome look — size/weight alone distinguishes levels.
     const headingTagMap = {
       h1: lmTags.heading1,
       h2: lmTags.heading2,
@@ -443,13 +450,16 @@ export function MarkdownEditor({
       h5: lmTags.heading5,
       h6: lmTags.heading6,
     } as const
+    const headingEntries: { tag: typeof lmTags.heading1; color: string }[] = []
     for (const lvl of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const) {
-      const c = prefs.headingColors[lvl]
-      if (c) headingEntries.push({ tag: headingTagMap[lvl], color: c })
+      if (prefs.headingColorsEnabled) {
+        const c = prefs.headingColors[lvl]
+        if (c) headingEntries.push({ tag: headingTagMap[lvl], color: c })
+      } else {
+        headingEntries.push({ tag: headingTagMap[lvl], color: 'var(--foreground)' })
+      }
     }
-    if (headingEntries.length > 0) {
-      exts.push(syntaxHighlighting(HighlightStyle.define(headingEntries)))
-    }
+    exts.push(syntaxHighlighting(HighlightStyle.define(headingEntries)))
     // Markdown syntax markers (`#`, `*`, `` ` ``, `>`)
     if (prefs.markerColor) {
       exts.push(
@@ -484,8 +494,8 @@ export function MarkdownEditor({
     prefs.mathFold,
     prefs.imageFold,
     prefs.tableFold,
-    statsTracker,
     prefs.headingColors,
+    prefs.headingColorsEnabled,
     prefs.markerColor,
     prefs.linkColor,
   ])
@@ -533,6 +543,55 @@ export function MarkdownEditor({
     document.addEventListener('knowledge:open-file', handler)
     return () => document.removeEventListener('knowledge:open-file', handler)
   }, [openFile])
+  // Inline title edit (from toolbar NoteTitle) — rewrite the H1 line and save
+  // in one atomic handler. Path-scoped: only the editor editing the target
+  // file acts on it, so a split-view sibling is never corrupted. The toolbar
+  // pre-validates collisions/protected paths before dispatching, so the rename
+  // is guaranteed safe by the time we get here; onSave performs the move.
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent<{ path: string; title: string }>).detail
+      if (!detail?.path || detail.path !== propFilePath.current) return
+      const view = viewRef.current
+      if (!view || !detail.title) return
+
+      const { state } = view
+      // Locate the title line — first line after any leading frontmatter.
+      // Mirrors headingEnforcer's logic exactly.
+      const fm = findFrontmatterRange(
+        state.sliceDoc(0, Math.min(state.doc.length, 8192)),
+      )
+      if (!fm && state.doc.line(1).text.trimEnd() === '---') return
+      const fmEndLine = fm ? state.doc.lineAt(Math.max(0, fm.to - 1)).number : 0
+      const titleLineNum = fmEndLine + 1
+      if (titleLineNum > state.doc.lines) return
+      const titleLine = state.doc.line(titleLineNum)
+
+      // Suspend the heading enforcer so it doesn't re-dispatch on our
+      // programmatic rewrite (change → enforcer → change → …).
+      _headingEnforcerSuspended.add(view)
+      view.dispatch({
+        changes: { from: titleLine.from, to: titleLine.to, insert: `# ${detail.title}` },
+      })
+      _headingEnforcerSuspended.delete(view)
+
+      // Save immediately — reads the fresh doc (with the new H1) so onSave's
+      // extractH1 → desiredRenamePath performs the rename.
+      clearTimeout(saveTimerRef.current)
+      const next = view.state.doc.toString()
+      setIsDirty(true)
+      try {
+        await onSaveRef.current(next)
+        if (viewRef.current?.state.doc.toString() === next) {
+          setIsDirty(false)
+        }
+      } catch {
+        toast.error(t('knowledge.saveFailed'))
+      }
+    }
+    document.addEventListener('knowledge:set-title', handler)
+    return () => document.removeEventListener('knowledge:set-title', handler)
+  }, [])
 
   // Save on blur
   const handleBlur = useCallback(async () => {
@@ -638,7 +697,7 @@ export function MarkdownEditor({
         {
           '--editor-font-size': `${prefs.fontSize}px`,
           '--editor-line-height': String(prefs.lineHeight),
-          '--editor-font-mono': prefs.fontFamily,
+          '--editor-font-body': prefs.fontFamily,
         } as CSSProperties
       }
     >

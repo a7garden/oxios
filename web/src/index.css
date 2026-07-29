@@ -156,12 +156,13 @@
   --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
   --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.08);
   /* ── Knowledge editor typography ───────────────────────────
-     Semantic tokens for the CodeMirror markdown editor. Wired to
-     the design system's Geist Mono family + sm font-size so the
-     editor participates in the token hierarchy rather than
-     hardcoding px/monospace strings. */
-  --editor-font-size: 0.875rem; /* 14px — typography.fontSize.sm */
-  --editor-line-height: 1.7; /* relaxed prose editing */
+     Two-track font system: a proportional sans for prose (body,
+     headings, quotes) and a monospace for code blocks/inline code.
+     The editor scroller uses the body font; code explicitly opts
+     into the mono font via live-preview styles. */
+  --editor-font-size: 0.9375rem; /* 15px — comfortable prose reading */
+  --editor-line-height: 1.75; /* relaxed prose editing */
+  --editor-font-body: 'Geist', system-ui, -apple-system, sans-serif;
   --editor-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
 
@@ -229,8 +230,8 @@
 /* ── Mobile: bump editor font-size for touch readability ──── */
 @media (max-width: 767px) {
   :root {
-    --editor-font-size: 0.9375rem; /* 15px */
-    --editor-line-height: 1.65;
+    --editor-font-size: 1rem; /* 16px */
+    --editor-line-height: 1.6;
   }
 }
 

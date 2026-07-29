@@ -299,20 +299,19 @@ export function buildDecorations(state: EditorState): DecorationSet {
 // style-mod, so they render even though TagStyle only advertises colour.
 
 export const livePreviewHighlight = HighlightStyle.define([
-  // files.md brutal: "Heavy bold" = 800.
-  { tag: tags.strong, fontWeight: '800' },
+  // Strong: semibold, not ultra-heavy.
+  { tag: tags.strong, fontWeight: '600' },
   // Strikethrough (GFM): line-through. Paired with tokenHide hiding `~~`.
   { tag: tags.strikethrough, textDecoration: 'line-through' },
-  // Inline code: boxed, mono, slightly smaller — files.md brutal treatment.
+  // Inline code: subtle background, mono font, no border.
   {
     tag: tags.monospace,
     fontFamily: 'var(--editor-font-mono)',
     background: 'var(--muted)',
     color: 'var(--foreground)',
-    border: '1px solid var(--border)',
-    borderRadius: '3px',
+    borderRadius: '4px',
     padding: '0.1em 0.35em',
-    fontSize: '0.9em',
+    fontSize: '0.875em',
   },
 ])
 
@@ -338,79 +337,75 @@ export const livePreviewExtension = ViewPlugin.fromClass(
       EditorView.baseTheme({
         // ── Headings (files.md brutal theme, rem = px/16) ──
         '.ox-md-h1': {
-          fontSize: '2rem',
-          fontWeight: '700',
-          lineHeight: '2.375rem',
-          paddingTop: '1.125rem',
-          paddingBottom: '0.25rem',
+          fontSize: '1.5rem',
+          fontWeight: '600',
+          lineHeight: '2rem',
+          paddingTop: '1.5rem',
+          paddingBottom: '0.5rem',
         },
         '.ox-md-h1.ox-md-first': {
-          // Document title (Obsidian-style inline title). The note's
-          // first H1 IS its title — render it larger than in-body H1s
-          // so it reads as the document title. tokenHide strips the
-          // `#` on inactive lines, and editing it renames the note on
-          // save (see note-rename flow in editor-panel).
-          fontSize: '2.5rem',
-          fontWeight: '800',
-          lineHeight: '3rem',
-          paddingTop: '0.5rem',
-          paddingBottom: '1.25rem',
+          // Document title (Obsidian-style inline title). The note's first
+          // H1 IS its title — rendered prominently so it reads as the page
+          // identity. tokenHide strips the `#`; editing it renames on save.
+          fontSize: '1.875rem',
+          fontWeight: '700',
+          lineHeight: '2.375rem',
+          paddingTop: '0.75rem',
+          paddingBottom: '1rem',
         },
         '.ox-md-h2': {
-          fontSize: '1.5rem',
-          fontWeight: '700',
-          lineHeight: '1.875rem',
-          paddingTop: '1.125rem',
-          paddingBottom: '0.375rem',
+          fontSize: '1.25rem',
+          fontWeight: '600',
+          lineHeight: '1.75rem',
+          paddingTop: '1.25rem',
+          paddingBottom: '0.5rem',
         },
         '.ox-md-h3': {
-          fontSize: '1.375rem',
-          fontWeight: '700',
-          lineHeight: '1.75rem',
+          fontSize: '1.125rem',
+          fontWeight: '600',
+          lineHeight: '1.625rem',
           paddingTop: '1rem',
-          paddingBottom: '0.3125rem',
+          paddingBottom: '0.375rem',
         },
         '.ox-md-h4': {
-          fontSize: '1.25rem',
-          fontWeight: '700',
-          lineHeight: '1.625rem',
+          fontSize: '1rem',
+          fontWeight: '600',
+          lineHeight: '1.5rem',
           paddingTop: '0.875rem',
-          paddingBottom: '0.25rem',
+          paddingBottom: '0.375rem',
         },
         '.ox-md-h5': {
-          fontSize: '1.125rem',
-          fontWeight: '700',
-          lineHeight: '1.5rem',
+          fontSize: '0.9375rem',
+          fontWeight: '600',
+          lineHeight: '1.375rem',
           paddingTop: '0.75rem',
           paddingBottom: '0.25rem',
         },
         '.ox-md-h6': {
-          fontSize: '1rem',
-          fontWeight: '700',
+          fontSize: '0.875rem',
+          fontWeight: '600',
           lineHeight: '1.375rem',
           paddingTop: '0.75rem',
           paddingBottom: '0.25rem',
         },
         // ── Block elements ──
         '.ox-md-quote': {
-          background: 'var(--muted)',
           borderLeft: '3px solid var(--border)',
-          paddingLeft: '0.75rem',
+          paddingLeft: '1rem',
           paddingRight: '0.5rem',
-          borderRadius: '0 4px 4px 0',
           color: 'var(--muted-foreground)',
           fontStyle: 'italic',
         },
         '.ox-md-codeblock': {
           background: 'var(--muted)',
-          borderRadius: '4px',
-          paddingLeft: '0.75rem',
-          paddingRight: '0.5rem',
+          borderRadius: '6px',
+          paddingLeft: '1rem',
+          paddingRight: '0.75rem',
         },
         '.ox-md-hr': {
-          borderTop: '2px solid var(--border)',
+          borderTop: '1px solid var(--border)',
           height: '0',
-          margin: '0.75rem 0',
+          margin: '1rem 0',
         },
         '.ox-md-task': {
           marginRight: '0.4em',

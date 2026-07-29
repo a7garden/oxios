@@ -15,12 +15,12 @@ import { persist } from 'zustand/middleware'
 
 /** Font-family presets offered in the settings popover. */
 export const FONT_PRESETS: { label: string; value: string }[] = [
+  { label: 'Geist Sans', value: "'Geist', system-ui, sans-serif" },
+  { label: 'Serif', value: "ui-serif, Georgia, 'Times New Roman', serif" },
   { label: 'System Mono', value: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace' },
   { label: 'Menlo', value: 'Menlo, monospace' },
   { label: 'Monaco', value: 'Monaco, monospace' },
   { label: 'Courier', value: "'Courier New', monospace" },
-  { label: 'Sans', value: 'ui-sans-serif, system-ui, sans-serif' },
-  { label: 'Serif', value: "ui-serif, Georgia, 'Times New Roman', serif" },
 ]
 
 export interface EditorPrefs {
@@ -61,9 +61,12 @@ export interface EditorPrefs {
   // ── Status bar ───────────────────────────────────────────────
   /** Show the bottom status bar (word/char count, cursor position). */
   showStatusBar: boolean
+  /** Enable per-level heading colors. Off = monochrome (size-only hierarchy,
+   * overrides oneDark's default heading hue). On = use per-level custom colors. */
+  headingColorsEnabled: boolean
 
   // ── Markdown colors ──────────────────────────────────────────
-  /** Per-level heading text colors. Empty string = inherit foreground. */
+  /** Per-level heading text colors. Used only when headingColorsEnabled is true. */
   headingColors: {
     h1: string
     h2: string
@@ -83,9 +86,9 @@ export interface EditorPrefs {
 }
 
 const DEFAULTS: Omit<EditorPrefs, 'setPref' | 'reset'> = {
-  fontSize: 14,
-  lineHeight: 1.7,
-  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
+  fontSize: 15,
+  lineHeight: 1.75,
+  fontFamily: "'Geist', system-ui, sans-serif",
 
   lineNumbers: false,
   activeLineHighlight: true,
@@ -101,7 +104,15 @@ const DEFAULTS: Omit<EditorPrefs, 'setPref' | 'reset'> = {
   mermaidFold: true,
 
   showStatusBar: true,
-  headingColors: { h1: '', h2: '', h3: '', h4: '', h5: '', h6: '' },
+  headingColorsEnabled: false,
+  headingColors: {
+    h1: '',
+    h2: '',
+    h3: 'var(--muted-foreground)',
+    h4: 'var(--muted-foreground)',
+    h5: 'var(--muted-foreground)',
+    h6: 'var(--muted-foreground)',
+  },
   markerColor: '',
   linkColor: '',
 }
@@ -115,6 +126,20 @@ export const useEditorPrefs = create<EditorPrefs>()(
     }),
     {
       name: 'oxios-editor-prefs',
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Record<string, unknown>
+        // v2: default font switched from mono to Geist sans, font size
+        // bumped 14→15px, line height 1.7→1.75, and H3-H6 gained muted
+        // color defaults. Drop all changed keys so new DEFAULTS apply.
+        if (version < 2) {
+          delete state.fontFamily
+          delete state.headingColors
+          delete state.fontSize
+          delete state.lineHeight
+        }
+        return state
+      },
     },
   ),
 )
