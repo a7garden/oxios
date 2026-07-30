@@ -1,280 +1,216 @@
 /**
- * Oxios knowledge-base markdown editor — CodeMirror 6 (Phase 1).
+ * Oxios knowledge-base markdown editor — CodeMirror 6 via @atomic-editor/editor.
  *
- * Replaces HyperMD/CodeMirror 5 (deprecated, unmaintained since 2019)
- * with @uiw/react-codemirror + custom extensions.
+ * Replaces the previous @uiw/react-codemirror-based setup with a direct
+ * AtomicCodeMirrorEditor wrapper. Inline preview, WYSIWYG tables, image
+ * blocks, edit helpers, and search are provided by atomic-editor's built-in
+ * extensions. Oxios-specific features (frontmatter properties, heading
+ * enforcement, emoji/math/mermaid folds, heading colors, custom keymap,
+ * wikilink resolution against the knowledge tree, stats tracking) are layered
+ * as CM6 extensions via the `extensions` prop.
  *
- * Phase 1 preserves the Obsidian/Logseq editing UX:
- *   - Plain markdown source view (not pure WYSIWYG)
- *   - Active-line-only markup visibility (default CM6)
- *   - All 5+ preserved features: auto-save, heading enforcement,
- *     ⌘B/⌘I/⌘Y, wiki/emoji autocomplete, Mod-S, dark/light, link click
- *
- * Phase 2 will add: image/code inline fold, wikilink click handler
- * Phase 3 will add: token hiding on inactive lines, mermaid widget, dark theme
- *
- * Why not Tiptap? See worktree exp/frontend-markdown-editor-poc/DECISION.md
+ * Toggleable features (emojiFold, mathFold, mermaidFold) are encoded in the
+ * `documentId` so changing them triggers a clean remount. This loses undo
+ * history and scroll position; acceptable since these toggles are infrequent.
  */
+import {
+  AtomicCodeMirrorEditor,
+  type AtomicCodeMirrorEditorHandle,
+  wikiLinks,
+} from '@atomic-editor/editor'
+import { ATOMIC_CODE_LANGUAGES } from '@atomic-editor/editor/code-languages'
 
+// Wiki-link types matching atomic-editor's WikiLinksConfig callbacks.
+// Not re-exported from @atomic-editor/editor index, so defined locally.
+interface WikiLinkSuggestion {
+  target: string
+  label: string
+  detail?: string
+  boost?: number
+}
+interface WikiLinkResolvedTarget {
+  target: string
+  label: string
+  status?: 'resolved' | 'missing' | 'unresolved'
+}
+
+import '@atomic-editor/editor/styles.css'
 import {
   autocompletion,
-  type Completion,
   type CompletionContext,
   type CompletionResult,
 } from '@codemirror/autocomplete'
-import { history, indentWithTab } from '@codemirror/commands'
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import {
-  bracketMatching,
-  defaultHighlightStyle,
-  HighlightStyle,
-  syntaxHighlighting,
-} from '@codemirror/language'
-import { languages } from '@codemirror/language-data'
-import { EditorSelection, type Extension, Prec } from '@codemirror/state'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { keymap } from '@codemirror/view'
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { type Extension, Prec } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
 import { tags as lmTags } from '@lezer/highlight'
-import { Strikethrough, Table, TaskList } from '@lezer/markdown'
-import CodeMirror, { EditorView, type ReactCodeMirrorRef } from '@uiw/react-codemirror'
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { useKnowledgeRecursiveTree, useKnowledgeTree } from '@/hooks/use-knowledge'
-import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
+import { useKnowledgeRecursiveTree } from '@/hooks/use-knowledge'
 import { emojiFoldExtension } from '@/lib/emoji-fold-extension'
 import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
 import { findFrontmatterRange } from '@/lib/frontmatter'
-import { createImageFoldExtension } from '@/lib/image-fold-extension'
-import {
-  frontmatterExtension,
-  livePreviewExtension,
-  livePreviewHighlight,
-} from '@/lib/live-preview-extension'
+import { frontmatterExtension } from '@/lib/frontmatter-extension'
 import { mathFoldExtension } from '@/lib/math-fold-extension'
 import { mermaidDarkObserver, mermaidExtension } from '@/lib/mermaid-extension'
-import { tableFoldExtension } from '@/lib/table-fold-extension'
-import { tokenHideExtension } from '@/lib/token-hide-extension'
 import { cn } from '@/lib/utils'
-import { configureWikilinkResolver, wikilinkExtension } from '@/lib/wikilink-extension'
 import { buildWikilinkIndex, resolveWikilink, type WikilinkIndex } from '@/lib/wikilink-resolve'
 import { useEditorPrefs } from '@/stores/editor-prefs'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { countWords, type EditorStats } from './editor-status-bar'
 
-interface MarkdownEditorProps {
+// ── Props ───────────────────────────────────────────────────────────────
+
+export interface MarkdownEditorProps {
   filePath: string
   initialContent: string
   onSave: (content: string) => Promise<void>
   className?: string
-  onStatsChange?: (stats: EditorStats) => void
+  onStatsChange?: (stats: EditorStats | null) => void
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Custom keymap: ⌘B / Ctrl-B (bold), ⌘I / Ctrl-I (italic), ⌘Y (checklist),
-// ⌘S / Ctrl-S (manual save via global 'knowledge:save' event)
-// ─────────────────────────────────────────────────────────────────────────
-const customKeymap = keymap.of([
-  { key: 'Mod-b', run: wrapSelection('**', '**') },
-  { key: 'Mod-i', run: wrapSelection('*', '*') },
-  { key: 'Mod-y', run: insertCheckmark },
-  {
-    key: 'Mod-s',
-    run: () => {
-      document.dispatchEvent(new Event('knowledge:save'))
-      return true
-    },
-  },
-  indentWithTab,
-])
+// ── Image URL helpers ───────────────────────────────────────────────────
+// Resolve relative image URLs to backend asset routes so images render.
+// Reversed on save so the backend stores portable relative paths.
 
-function wrapSelection(before: string, after: string) {
-  return (view: EditorView): boolean => {
-    const { state } = view
-    const changes = state.selection.ranges.map((range) => {
-      const text = state.sliceDoc(range.from, range.to)
-      return { from: range.from, to: range.to, insert: before + text + after }
-    })
-    if (changes.length === 0) return false
-    view.dispatch({
-      changes,
-      selection: EditorSelection.create(
-        changes.map((c) => EditorSelection.range(c.from + before.length, c.to + before.length)),
-        1,
-      ),
-    })
-    return true
-  }
+const ASSET_ROUTE = '/api/knowledge/asset'
+
+function isAbsoluteUrl(url: string): boolean {
+  return /^(https?:|data:|blob:|about:)/.test(url) || url.startsWith(ASSET_ROUTE)
 }
 
-function insertCheckmark(view: EditorView): boolean {
-  const { state } = view
-  const line = state.doc.lineAt(state.selection.main.head)
-  view.dispatch({
-    changes: { from: line.from, insert: '- [x] ' },
+function resolveRelativeImages(md: string, fileDir: string): string {
+  return md.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt: string, url: string) => {
+    if (isAbsoluteUrl(url)) return _match
+    const resolved = url.startsWith('/')
+      ? `${ASSET_ROUTE}${url}`
+      : `${ASSET_ROUTE}/${fileDir}/${url}`
+    return `![${alt}](${resolved})`
   })
-  return true
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Heading enforcement — keep first line as `# ` even after edit.
-// Gated by a per-EditorView flag so the enforcer does NOT fire while
-// we're programmatically replacing the document content (which would
-// cause an infinite loop: the enforcer dispatches a change → enforcer
-// fires again → …).
-//
-// Per-view state is tracked via a WeakSet<EditorView>. Using a
-// module-level boolean (the previous design) was unsafe if more than
-// one MarkdownEditor ever mounted simultaneously — a programmatic
-// replacement on view A would suppress the enforcer for view B.
-// ─────────────────────────────────────────────────────────────────────────
-const _headingEnforcerSuspended = new WeakSet<EditorView>()
+function stripResolvedImages(md: string, fileDir: string): string {
+  const prefix = `${ASSET_ROUTE}/`
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return md.replace(
+    new RegExp('!\\[([^\\]]*)\\\(' + escapedPrefix + '([^)]+)\\)', 'g'),
+    (_match: string, alt: string, assetPath: string) => {
+      // If assetPath starts with fileDir/, the original was relative (no leading slash)
+      if (fileDir && assetPath.startsWith(`${fileDir}/`)) {
+        return `![${alt}](${assetPath.slice(fileDir.length + 1)})`
+      }
+      // Otherwise, the original was root-absolute: /img/logo.png -> /api/knowledge/asset/img/logo.png
+      return `![${alt}](/${assetPath})`
+    },
+  )
+}
+
+// ── Wikilink adapter ────────────────────────────────────────────────────
+// Maps the Oxios knowledge tree index to atomic-editor's wikiLinks() API.
+
+function resolveWikilinkTarget(
+  target: string,
+  currentPath: string | null,
+  index: WikilinkIndex | null,
+): WikiLinkResolvedTarget | null {
+  if (!index) return { target, label: target, status: 'missing' }
+  const path = resolveWikilink(target, currentPath, index)
+  if (path) return { target: path, label: target, status: 'resolved' }
+  return { target, label: target, status: 'missing' }
+}
+
+function suggestWikilinks(query: string, index: WikilinkIndex | null): WikiLinkSuggestion[] {
+  if (!index || !query) return []
+  const lower = query.toLowerCase()
+  const results: WikiLinkSuggestion[] = []
+  for (const [stem, paths] of index) {
+    if (stem.includes(lower)) {
+      const firstPath = paths[0]
+      if (firstPath) results.push({ target: firstPath, label: stem, detail: firstPath })
+    }
+  }
+  return results.slice(0, 12)
+}
+
+// ── Emoji completion source ────────────────────────────────────────────
+
+function emojiCompletionSource(context: CompletionContext): CompletionResult | null {
+  const match = context.matchBefore(/:([a-z0-9_+]*)$/)
+  if (!match || (match.from === match.to && !context.explicit)) return null
+  const query = match.text.slice(1).toLowerCase()
+  const options = Object.entries(EMOJI_SHORTCODES)
+    .filter(([code]) => code.includes(query))
+    .slice(0, 10)
+    .map(([code, emoji]) => ({
+      label: `${emoji}  :${code}:`,
+      type: 'keyword' as const,
+      apply: `:${code}:`,
+    }))
+  if (options.length === 0) return null
+  return { from: match.from, to: context.pos, options }
+}
+
+// ── Heading enforcer ────────────────────────────────────────────────────
+// Keep the first content line (after frontmatter) as `# <title>`.
+// No WeakSet suspension needed — atomic-editor has no value-prop echo.
+
 const headingEnforcer = EditorView.updateListener.of((update) => {
-  if (!update.docChanged) return
-  if (_headingEnforcerSuspended.has(update.view)) return
-  const { state } = update
-  // The title is the first line AFTER any leading frontmatter (line 1 when
-  // there is none) — mirroring the backend's frontmatter-at-byte-0 rule so a
-  // note carrying `oxios:`/Obsidian metadata still gets a renameable title
-  // instead of the enforcer clobbering the `---` delimiter.
-  const fm = findFrontmatterRange(state.sliceDoc(0, Math.min(state.doc.length, 8192)))
-  // Edge case: while the user edits frontmatter in raw mode they may
-  // temporarily delete the closing `---`, so `findFrontmatterRange` returns
-  // null. Don't then fall back to line 1 (which is the opening `---`) and
-  // rewrite it into `# ---` — bail until the block is well-formed again.
-  if (!fm && state.doc.line(1).text.trimEnd() === '---') return
-  const fmEndLine = fm ? state.doc.lineAt(Math.max(0, fm.to - 1)).number : 0
+  if (!update.docChanged || !update.view) return
+  const state = update.state
+  const doc = state.doc
+  const text = state.sliceDoc(0, Math.min(state.doc.length, 8192))
+  const fm = findFrontmatterRange(text)
+  if (!fm && doc.line(1).text.trimEnd() === '---') return
+  const fmEndLine = fm ? doc.lineAt(Math.max(0, fm.to - 1)).number : 0
   const titleLineNum = fmEndLine + 1
-  if (titleLineNum > state.doc.lines) return // frontmatter swallows the whole doc
-  const titleLine = state.doc.line(titleLineNum)
-  const text = titleLine.text
-  if (!text.startsWith('# ')) {
-    const content = text.replace(/^#*\s*/, '')
-    update.view.dispatch({
-      changes: { from: titleLine.from, to: titleLine.to, insert: `# ${content}` },
-    })
-  }
+  if (titleLineNum > doc.lines) return
+  const titleLine = doc.line(titleLineNum)
+  if (titleLine.text.startsWith('# ')) return
+  update.view.dispatch({
+    changes: { from: titleLine.from, to: titleLine.from, insert: '# ' },
+  })
 })
 
-// ─────────────────────────────────────────────────────────────────────────
-// Wiki link + emoji completion source
-// ─────────────────────────────────────────────────────────────────────────
-function makeCompletionSource(getEntries: () => FileEntry[], emojiDict: Record<string, string>) {
-  return (ctx: CompletionContext): CompletionResult | null => {
-    // Word range: alphanumeric + some markdown-safe chars
-    const word = ctx.matchBefore(/[\p{L}\p{N}_\s:-]*/u)
-    if (!word) return null
-    if (word.from === word.to && !ctx.explicit) return null
+// ── Custom keymap ──────────────────────────────────────────────────────
 
-    const before = ctx.state.sliceDoc(Math.max(0, word.from - 1), word.from)
-    const fullText = ctx.state.sliceDoc(word.from, word.to)
-    const lower = fullText.toLowerCase()
-
-    const options: Completion[] = []
-
-    // Wiki link: triggered by `[`
-    if (before === '[') {
-      const entries = getEntries()
-      for (const e of entries) {
-        if (!lower || e.key.toLowerCase().includes(lower)) {
-          options.push({
-            label: e.key,
-            detail: e.filePath,
-            apply: `${e.key}](${e.filePath.replace(/ /g, '%20')})`,
-          })
-          if (options.length >= 20) break
-        }
-      }
-    }
-
-    // Emoji: triggered by `:` at end
-    if (before === ':' || lower.startsWith(':')) {
-      const search = lower.replace(/^:/, '')
-      for (const [key, icon] of Object.entries(emojiDict)) {
-        if (!search || key.toLowerCase().includes(search)) {
-          options.push({
-            label: key,
-            detail: icon,
-            apply: `${icon} `,
-          })
-          if (options.length >= 20) break
-        }
-      }
-    }
-
-    if (options.length === 0) return null
-    return {
-      from: before === '[' || before === ':' ? word.from - 1 : word.from,
-      to: word.to,
-      options,
-      validFor: /[\p{L}\p{N}_\s:-]*/u,
-    }
-  }
+function makeKeymap(onSave: () => void) {
+  return Prec.highest(
+    keymap.of([
+      {
+        key: 'Mod-s',
+        run: () => {
+          onSave()
+          return true
+        },
+      },
+    ]),
+  )
 }
 
-// Simple emoji dict (subset — extended in lib/emoji.ts)
+// ── Stats tracker ──────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────
-// Link / wiki click handler — same semantics as HyperMD's hmdClick
-// ─────────────────────────────────────────────────────────────────────────
-const linkClickHandler = EditorView.domEventHandlers({
-  click(event, _view) {
-    const target = event.target as HTMLElement | null
-    if (target?.tagName !== 'A') return false
-    if (!(target instanceof HTMLAnchorElement)) return false
-    const href = target.getAttribute('href') ?? ''
-    if (!href) return false
-    if (href.startsWith('http://') || href.startsWith('https://')) {
-      window.open(href, '_blank', 'noopener')
-      return true
-    }
-    if (href.startsWith('cmd:')) return true
-    const path = href.endsWith('.md') ? href : `${href}.md`
-    document.dispatchEvent(new CustomEvent('knowledge:open-file', { detail: { path } }))
-    return true
-  },
-})
+function makeStatsTracker(onStats: ((s: EditorStats) => void) | undefined) {
+  const ref = { current: onStats }
+  ref.current = onStats
+  return EditorView.updateListener.of((update) => {
+    if (!update.docChanged && !update.selectionSet) return
+    const { state } = update.view
+    const text = state.doc.toString()
+    const sel = state.selection.main
+    const line = state.doc.lineAt(sel.head)
+    ref.current?.({
+      words: countWords(text),
+      chars: text.length,
+      lines: state.doc.lines,
+      cursorLine: line.number,
+      cursorCol: sel.head - line.from + 1,
+    })
+  })
+}
 
-// ─────────────────────────────────────────────────────────────────────────
-// Editor base theme
-// ─────────────────────────────────────────────────────────────────────────
-const baseTheme = EditorView.theme({
-  '&': {
-    fontSize: 'var(--editor-font-size, 0.9375rem)',
-    height: '100%',
-  },
-  '.cm-scroller': {
-    fontFamily: 'var(--editor-font-body, "Geist", system-ui, sans-serif)',
-    lineHeight: 'var(--editor-line-height, 1.75)',
-  },
-  '.cm-content': {
-    padding: '24px 16px',
-  },
-})
+// ── Component ───────────────────────────────────────────────────────────
 
-// Force the editor canvas transparent so it inherits the app's
-// --background token in both themes. Wrapped in Prec.highest to win
-// over oneDark (#282c34 bluish canvas) and @uiw's built-in theme,
-// regardless of extension order. Syntax-highlight colours are untouched.
-const transparentCanvas = Prec.highest(
-  EditorView.theme({
-    '&': { backgroundColor: 'transparent' },
-    '.cm-scroller': { backgroundColor: 'transparent' },
-    '.cm-content': { backgroundColor: 'transparent' },
-    '.cm-gutters': { backgroundColor: 'transparent' },
-  }),
-)
-
-const darkTheme = EditorView.theme(
-  {
-    '&': { colorScheme: 'dark' },
-  },
-  { dark: true },
-)
-
-// ─────────────────────────────────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────────────────────────────────
 export function MarkdownEditor({
   filePath,
   initialContent,
@@ -282,166 +218,53 @@ export function MarkdownEditor({
   className,
   onStatsChange,
 }: MarkdownEditorProps) {
-  const ref = useRef<ReactCodeMirrorRef | null>(null)
-  const viewRef = useRef<EditorView | null>(null)
-  const [isDirty, setIsDirty] = useState(false)
+  const { t } = useTranslation()
+  const editorRef = useRef<AtomicCodeMirrorEditorHandle | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  // B-2: Dirty-state ref — checked by the content-replace effect to
-  // prevent our own save echo (setQueryData in onSuccess → new
-  // initialContent → effect) from clobbering unsaved edits made
-  // during the PUT round-trip.
-  const dirtyRef = useRef(false)
-  dirtyRef.current = isDirty
-  const isSettingContent = useRef(false)
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
   const openFile = useKnowledgeStore((s) => s.openFile)
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
   const prefs = useEditorPrefs()
-  // Image fold needs the current note's directory to resolve relative image
-  // URLs against the backend asset route. A ref lets the (stable) extension
-  // read the latest path on each rebuild without being recreated.
-  const filePathRef = useRef(currentFilePath)
-  filePathRef.current = currentFilePath
-  // The filePath prop identifies which note THIS editor instance is editing
-  // (differs from the store's currentFilePath in split view). Path-scopes the
-  // knowledge:set-title event so a title edit in one pane never rewrites the
-  // H1 of a split-view sibling.
-  const propFilePath = useRef(filePath)
-  propFilePath.current = filePath
-  const imageFoldExt = useMemo(
-    () =>
-      createImageFoldExtension(() => {
-        const p = filePathRef.current ?? ''
-        const i = p.lastIndexOf('/')
-        return i >= 0 ? p.slice(0, i) : ''
-      }),
-    [],
+
+  // File directory for image URL resolution
+  const filePathRef = useRef(filePath)
+  filePathRef.current = filePath
+  const getFileDir = useCallback(() => {
+    const p = filePathRef.current ?? ''
+    const i = p.lastIndexOf('/')
+    return i >= 0 ? p.slice(0, i) : ''
+  }, [])
+
+  // Pre-resolve relative image URLs so they render in the editor
+  const resolvedContent = useMemo(
+    () => resolveRelativeImages(initialContent, getFileDir()),
+    [initialContent, getFileDir],
   )
-  const { data: treeEntries } = useKnowledgeTree()
-  // Recursive tree carries full note paths; used to build the wikilink
-  // resolver index. React Query dedupes this with the sidebar's own
-  // recursive-tree fetch, so the extra subscription is free.
+
+  // ── Wikilink index from knowledge tree ──────────────────────────────
   const { data: recursiveTree } = useKnowledgeRecursiveTree()
-  // Build the stem → paths index whenever the tree changes. Cheap for
-  // personal KBs (hundreds of files) and memoized so decoration rebuilds
-  // don't re-walk.
-  const wikilinkIndex: WikilinkIndex | null = useMemo(
+  const wikilinkIndex = useMemo(
     () => (recursiveTree ? buildWikilinkIndex(recursiveTree) : null),
     [recursiveTree],
   )
-  // Install the resolver into the (module-level) wikilink extension. The
-  // extension bumps an internal version counter via configureWikilinkResolver
-  // and re-resolves every visible link on the next update — so renaming a
-  // note makes its inbound `[[links]]` re-bind without an editor remount.
-  useEffect(() => {
-    if (!wikilinkIndex) {
-      configureWikilinkResolver(null)
-      return
-    }
-    const idx = wikilinkIndex
-    const path = currentFilePath
-    configureWikilinkResolver((target) => resolveWikilink(target, path, idx))
-    return () => configureWikilinkResolver(null)
-  }, [wikilinkIndex, currentFilePath])
-  const [isDark, setIsDark] = useState(false)
-  const { t } = useTranslation()
+  // Ref to latest index so the (mount-captured) wiki-links resolver reads
+  // current data on each call without needing a remount.
+  const wikilinkIndexRef = useRef(wikilinkIndex)
+  wikilinkIndexRef.current = wikilinkIndex
 
-  // Track dark mode via document class
-  useEffect(() => {
-    const obs = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'))
-    })
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    setIsDark(document.documentElement.classList.contains('dark'))
-    return () => obs.disconnect()
-  }, [])
-
-  const onSaveRef = useRef(onSave)
-  onSaveRef.current = onSave
-  const onStatsChangeRef = useRef(onStatsChange)
-  onStatsChangeRef.current = onStatsChange
-
-  const autocompleteEntries = useCallback(() => {
-    if (!treeEntries) return []
-    return buildAutocompleteDict(treeEntries, undefined, currentFilePath ?? undefined)
-  }, [treeEntries, currentFilePath])
-
-  const completionSource = useMemo(
-    () => makeCompletionSource(autocompleteEntries, EMOJI_SHORTCODES),
-    [autocompleteEntries],
+  const wikiLinkConfig = useMemo(
+    () => ({
+      resolve: async (target: string) =>
+        resolveWikilinkTarget(target, currentFilePath, wikilinkIndexRef.current),
+      suggest: async (query: string) => suggestWikilinks(query, wikilinkIndexRef.current),
+      onOpen: (target: string) => openFile(target),
+    }),
+    [currentFilePath, openFile],
   )
 
-  // Stats tracker — fires on doc/selection changes, reports to parent.
-  // Created once (stable identity); reads the latest callback via ref.
-  const statsTracker = useMemo(
-    () =>
-      EditorView.updateListener.of((update) => {
-        if (!update.docChanged && !update.selectionSet) return
-        const { state } = update.view
-        const text = state.doc.toString()
-        const sel = state.selection.main
-        const line = state.doc.lineAt(sel.head)
-        onStatsChangeRef.current?.({
-          words: countWords(text),
-          chars: text.length,
-          lines: state.doc.lines,
-          cursorLine: line.number,
-          cursorCol: sel.head - line.from + 1,
-        })
-      }),
-    [],
-  )
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Conditional extensions — built from editor prefs. Each live-rendering /
-  // fold extension can be toggled independently. The relative ordering is
-  // preserved from the pre-prefs hard-coded array: syntax-highlighting and
-  // transparentCanvas stay last so inline styling wins over oneDark.
-  // ─────────────────────────────────────────────────────────────────────────
-  const extensions = useMemo<Extension[]>(() => {
-    const exts: Extension[] = [
-      history(),
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      customKeymap,
-      headingEnforcer,
-      linkClickHandler,
-      autocompletion({
-        override: [completionSource],
-        activateOnTyping: true,
-        closeOnBlur: true,
-      }),
-      markdown({
-        base: markdownLanguage,
-        codeLanguages: languages,
-        extensions: [Strikethrough, Table, TaskList],
-      }),
-      baseTheme,
-      statsTracker,
-      frontmatterExtension,
-    ]
-    if (prefs.bracketMatching) exts.push(bracketMatching())
-    if (prefs.mermaidFold) {
-      exts.push(mermaidExtension)
-      exts.push(mermaidDarkObserver)
-    }
-    if (prefs.tokenHiding) exts.push(tokenHideExtension)
-    if (prefs.livePreview) exts.push(livePreviewExtension)
-    exts.push(wikilinkExtension)
-    if (prefs.emojiFold) exts.push(emojiFoldExtension)
-    if (prefs.mathFold) exts.push(mathFoldExtension)
-    if (prefs.imageFold) exts.push(imageFoldExt)
-    if (prefs.tableFold) exts.push(tableFoldExtension)
-    if (isDark) {
-      exts.push(oneDark)
-      exts.push(darkTheme)
-    }
-    // Inline live-preview styling — must stay last to win over oneDark.
-    exts.push(syntaxHighlighting(livePreviewHighlight))
-
-    // ── Heading colors ──
-    // oneDark styles `tags.heading` (the parent) with a reddish hue.
-    // Child tags (heading1–6) override it. When colors are disabled
-    // (default), we force all six to var(--foreground) for a clean
-    // monochrome look — size/weight alone distinguishes levels.
+  // ── Heading colors ──────────────────────────────────
+  const headingStyleExt = useMemo(() => {
     const headingTagMap = {
       h1: lmTags.heading1,
       h2: lmTags.heading2,
@@ -450,17 +273,21 @@ export function MarkdownEditor({
       h5: lmTags.heading5,
       h6: lmTags.heading6,
     } as const
-    const headingEntries: { tag: typeof lmTags.heading1; color: string }[] = []
+    const entries: { tag: typeof lmTags.heading1; color: string }[] = []
     for (const lvl of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const) {
       if (prefs.headingColorsEnabled) {
         const c = prefs.headingColors[lvl]
-        if (c) headingEntries.push({ tag: headingTagMap[lvl], color: c })
+        if (c) entries.push({ tag: headingTagMap[lvl], color: c })
       } else {
-        headingEntries.push({ tag: headingTagMap[lvl], color: 'var(--foreground)' })
+        entries.push({ tag: headingTagMap[lvl], color: 'var(--foreground)' })
       }
     }
-    exts.push(syntaxHighlighting(HighlightStyle.define(headingEntries)))
-    // Markdown syntax markers (`#`, `*`, `` ` ``, `>`)
+    return syntaxHighlighting(HighlightStyle.define(entries))
+  }, [prefs.headingColors, prefs.headingColorsEnabled])
+
+  // ── Marker / link color ─────────────────────────────────────────────
+  const markerStyleExt = useMemo(() => {
+    const exts: Extension[] = []
     if (prefs.markerColor) {
       exts.push(
         syntaxHighlighting(
@@ -468,7 +295,6 @@ export function MarkdownEditor({
         ),
       )
     }
-    // Links and URLs
     if (prefs.linkColor) {
       exts.push(
         syntaxHighlighting(
@@ -479,62 +305,39 @@ export function MarkdownEditor({
         ),
       )
     }
-
-    exts.push(transparentCanvas)
     return exts
-  }, [
-    completionSource,
-    imageFoldExt,
-    isDark,
-    prefs.bracketMatching,
-    prefs.mermaidFold,
-    prefs.tokenHiding,
-    prefs.livePreview,
-    prefs.emojiFold,
-    prefs.mathFold,
-    prefs.imageFold,
-    prefs.tableFold,
-    prefs.headingColors,
-    prefs.headingColorsEnabled,
-    prefs.markerColor,
-    prefs.linkColor,
-  ])
+  }, [prefs.markerColor, prefs.linkColor])
 
-  // Manual save handler (toolbar / ⌘S)
+  // ── Stats tracker ───────────────────────────────────────────────────
+  const statsTracker = useMemo(() => makeStatsTracker(onStatsChange), [])
+
+  // ── Keymap ──────────────────────────────────────────────────────────
+  const handleSave = useCallback(() => {
+    document.dispatchEvent(new CustomEvent('knowledge:save'))
+  }, [])
+  const keymapExt = useMemo(() => makeKeymap(handleSave), [handleSave])
+
+  // ── Manual save handler (⌘S / toolbar) ──────────────────────────────
   useEffect(() => {
     const handler = async () => {
-      const view = viewRef.current
-      if (!view) return
+      const md = editorRef.current?.getMarkdown()
+      if (!md) return
       clearTimeout(saveTimerRef.current)
-      const value = view.state.doc.toString()
       try {
-        await onSaveRef.current(value)
-        // B-3: Only clear dirty if the editor content hasn't drifted
-        // since the save was initiated. If the user typed during the
-        // PUT round-trip, dirty stays true so the dirty guard (B-2)
-        // blocks the save echo from clobbering their new edits.
-        if (viewRef.current?.state.doc.toString() === value) {
-          setIsDirty(false)
-        }
+        const cleaned = stripResolvedImages(md, getFileDir())
+        await onSaveRef.current(cleaned)
       } catch {
-        // I-1: Save failed — keep dirty so the unsaved indicator
-        // stays visible and the user knows their edits are at risk.
         toast.error(t('knowledge.saveFailed'))
       }
     }
     document.addEventListener('knowledge:save', handler)
     return () => {
-      // Cancel any pending debounce save on unmount so we don't
-      // call onSave on a stale editor instance.
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current)
-        saveTimerRef.current = undefined
-      }
+      clearTimeout(saveTimerRef.current)
       document.removeEventListener('knowledge:save', handler)
     }
-  }, [])
+  }, [t])
 
-  // External open-file listener (from link click)
+  // ── External open-file listener (from link click) ───────────────────
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ path: string }>).detail
@@ -543,205 +346,137 @@ export function MarkdownEditor({
     document.addEventListener('knowledge:open-file', handler)
     return () => document.removeEventListener('knowledge:open-file', handler)
   }, [openFile])
-  // Inline title edit (from toolbar NoteTitle) — rewrite the H1 line and save
-  // in one atomic handler. Path-scoped: only the editor editing the target
-  // file acts on it, so a split-view sibling is never corrupted. The toolbar
-  // pre-validates collisions/protected paths before dispatching, so the rename
-  // is guaranteed safe by the time we get here; onSave performs the move.
+
+  // ── Title edit handler (from NoteTitle) ─────────────────────────────
+  // Responds to knowledge:set-title events, rewrites the H1 line, saves.
   useEffect(() => {
     const handler = async (e: Event) => {
       const detail = (e as CustomEvent<{ path: string; title: string }>).detail
-      if (!detail?.path || detail.path !== propFilePath.current) return
-      const view = viewRef.current
-      if (!view || !detail.title) return
+      if (!detail?.path || detail.path !== filePath || !detail.title) return
+      // Access the view through the content DOM
+      const contentDOM = editorRef.current?.getContentDOM()
+      if (!contentDOM) return
+      const view = EditorView.findFromDOM(contentDOM)
+      if (!view) return
 
       const { state } = view
-      // Locate the title line — first line after any leading frontmatter.
-      // Mirrors headingEnforcer's logic exactly.
-      const fm = findFrontmatterRange(state.sliceDoc(0, Math.min(state.doc.length, 8192)))
+      const doc = state.doc.toString()
+      const fm = findFrontmatterRange(doc)
       if (!fm && state.doc.line(1).text.trimEnd() === '---') return
       const fmEndLine = fm ? state.doc.lineAt(Math.max(0, fm.to - 1)).number : 0
       const titleLineNum = fmEndLine + 1
       if (titleLineNum > state.doc.lines) return
       const titleLine = state.doc.line(titleLineNum)
 
-      // Suspend the heading enforcer so it doesn't re-dispatch on our
-      // programmatic rewrite (change → enforcer → change → …).
-      _headingEnforcerSuspended.add(view)
       view.dispatch({
         changes: { from: titleLine.from, to: titleLine.to, insert: `# ${detail.title}` },
       })
-      _headingEnforcerSuspended.delete(view)
 
-      // Save immediately — reads the fresh doc (with the new H1) so onSave's
-      // extractH1 → desiredRenamePath performs the rename.
+      // Save immediately
       clearTimeout(saveTimerRef.current)
-      const next = view.state.doc.toString()
-      setIsDirty(true)
       try {
-        await onSaveRef.current(next)
-        if (viewRef.current?.state.doc.toString() === next) {
-          setIsDirty(false)
-        }
+        const next = view.state.doc.toString()
+        const cleaned = stripResolvedImages(next, getFileDir())
+        await onSaveRef.current(cleaned)
       } catch {
         toast.error(t('knowledge.saveFailed'))
       }
     }
     document.addEventListener('knowledge:set-title', handler)
     return () => document.removeEventListener('knowledge:set-title', handler)
-  }, [])
+  }, [filePath])
 
-  // Save on blur
-  const handleBlur = useCallback(async () => {
-    const view = viewRef.current
-    if (!view || !isDirty) return
-    clearTimeout(saveTimerRef.current)
-    const value = view.state.doc.toString()
-    try {
-      await onSaveRef.current(value)
-      if (viewRef.current?.state.doc.toString() === value) {
-        setIsDirty(false)
-      }
-    } catch {
-      toast.error(t('knowledge.saveFailed'))
+  // ── Debounced onMarkdownChange ──────────────────────────────────────
+  const handleChange = useCallback(
+    (md: string) => {
+      clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(async () => {
+        try {
+          const cleaned = stripResolvedImages(md, getFileDir())
+          await onSaveRef.current(cleaned)
+        } catch {
+          toast.error(t('knowledge.saveFailed'))
+        }
+      }, 1000)
+    },
+    [getFileDir],
+  )
+
+  // ── Build extensions array ─────────────────────────────────────────
+  const extensions = useMemo<Extension[]>(() => {
+    const exts: Extension[] = [
+      frontmatterExtension,
+      headingEnforcer,
+      keymapExt,
+      statsTracker,
+      wikiLinks(wikiLinkConfig),
+      headingStyleExt,
+      ...markerStyleExt,
+      autocompletion({
+        override: [emojiCompletionSource],
+        activateOnTyping: true,
+        closeOnBlur: true,
+      }),
+    ]
+    // Toggleable Oxios fold extensions
+    if (prefs.emojiFold) exts.push(emojiFoldExtension)
+    if (prefs.mathFold) exts.push(mathFoldExtension)
+    if (prefs.mermaidFold) {
+      exts.push(mermaidExtension)
+      exts.push(mermaidDarkObserver)
     }
-  }, [isDirty])
+    return exts
+  }, [
+    keymapExt,
+    statsTracker,
+    wikiLinkConfig,
+    headingStyleExt,
+    markerStyleExt,
+    prefs.emojiFold,
+    prefs.mathFold,
+    prefs.mermaidFold,
+  ])
 
-  // Update content when initialContent changes (file loaded from API)
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    if (dirtyRef.current) return
-    const current = view.state.doc.toString()
-    if (current === initialContent) return
-    // Suspend the heading enforcer and onChange-driven autosave while
-    // we programmatically replace the document. Combining the change
-    // and the selection reset into a SINGLE dispatch avoids the
-    // enforcer firing on the intermediate state (which has the
-    // cursor at the end of the old content) and producing unwanted
-    // headings or selection drift.
-    isSettingContent.current = true
-    _headingEnforcerSuspended.add(view)
-    // Place the cursor at the body start (past any frontmatter) so a note
-    // with properties shows the PropertiesWidget on load rather than the
-    // raw YAML (cursor inside the block would trigger raw-edit mode).
-    const fm = findFrontmatterRange(initialContent)
-    view.dispatch({
-      changes: { from: 0, to: current.length, insert: initialContent },
-      selection: { anchor: fm ? fm.to : 0 },
-    })
-    // Release on the next macrotask. `queueMicrotask` is too soon:
-    // CM6 update listeners that schedule React state updates can
-    // resolve on the next macrotask, and onChange can fire AFTER the
-    // microtask. `setTimeout(0)` ensures the enforcer and onChange
-    // gate stay in place until the editor has fully settled.
-    const releaseTimer = setTimeout(() => {
-      isSettingContent.current = false
-      _headingEnforcerSuspended.delete(view)
-    }, 0)
-    return () => {
-      // Cleanup: if a new effect run supersedes us (e.g. fast file
-      // switching), cancel the pending release and release now.
-      clearTimeout(releaseTimer)
-      isSettingContent.current = false
-      _headingEnforcerSuspended.delete(view)
-    }
-  }, [initialContent])
-
-  // On a fresh mount, @uiw seeds the doc from `value` so the content-replace
-  // effect above early-returns and the cursor stays at its default (0) — inside
-  // any leading frontmatter, which would show raw YAML instead of the
-  // PropertiesWidget. The editor is keyed on `editorSessionId`, so it remounts
-  // on every file open: this mount effect places the cursor at the body start so
-  // a note with properties opens on the widget, not the raw block.
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    const fm = findFrontmatterRange(initialContent)
-    if (!fm) return
-    // Defer past @uiw/react-codemirror's own mount selection setup, which
-    // seeds the cursor at 0 from `value` after this component's effects run.
-    const hadFocus = view.hasFocus
-    const t = setTimeout(() => {
-      view.dispatch({ selection: { anchor: fm.to } })
-      if (hadFocus) view.focus()
-    }, 0)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Report initial stats on mount and when content is loaded — the
-  // updateListener only fires on *changes*, not on the initial state.
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    const text = view.state.doc.toString()
-    const sel = view.state.selection.main
-    const line = view.state.doc.lineAt(sel.head)
-    onStatsChangeRef.current?.({
-      words: countWords(text),
-      chars: text.length,
-      lines: view.state.doc.lines,
-      cursorLine: line.number,
-      cursorCol: sel.head - line.from + 1,
-    })
-  }, [initialContent])
+  // Extensions are captured at mount by atomic-editor. To make toggleable
+  // prefs reactive, encode them in documentId so changing a fold pref
+  // triggers a clean remount.
+  const foldKey = `${prefs.emojiFold ? 'E' : ''}${prefs.mathFold ? 'M' : ''}${prefs.mermaidFold ? 'D' : ''}`
+  const documentId = foldKey ? `${filePath}::fold:${foldKey}` : filePath
 
   return (
     <div
-      className={cn('h-full relative', className)}
-      onBlur={handleBlur}
+      className={cn('ox-knowledge-editor h-full relative', className)}
       style={
         {
-          '--editor-font-size': `${prefs.fontSize}px`,
-          '--editor-line-height': String(prefs.lineHeight),
-          '--editor-font-body': prefs.fontFamily,
+          '--atomic-editor-fg': 'var(--foreground)',
+          '--atomic-editor-fg-muted': 'var(--muted-foreground)',
+          '--atomic-editor-fg-faint': 'var(--muted-foreground)',
+          '--atomic-editor-bg': 'transparent',
+          '--atomic-editor-accent': 'var(--primary)',
+          '--atomic-editor-accent-bright': 'var(--primary)',
+          '--atomic-editor-link': 'var(--primary)',
+          '--atomic-editor-link-hover': 'var(--primary-foreground)',
+          '--atomic-editor-selection-bg': 'var(--accent)',
+          '--atomic-editor-code-bg': 'var(--muted)',
+          '--atomic-editor-border': 'var(--border)',
+          '--atomic-editor-bg-surface': 'var(--card)',
+          '--atomic-editor-bg-panel': 'var(--card)',
+          '--atomic-editor-body-size': `${prefs.fontSize}px`,
+          '--atomic-editor-font': prefs.fontFamily,
+          '--atomic-editor-body-leading': String(prefs.lineHeight),
+          '--atomic-editor-measure': '100%',
+          '--atomic-editor-font-mono': 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
         } as CSSProperties
       }
     >
-      {isDirty && (
-        <span className="absolute top-2 right-3 text-xs text-muted-foreground z-10">
-          {t('knowledge.unsavedChanges')}
-        </span>
-      )}
-      <CodeMirror
-        ref={(instance) => {
-          ref.current = instance
-          viewRef.current = instance?.view ?? null
-        }}
-        value={initialContent}
-        basicSetup={{
-          lineNumbers: prefs.lineNumbers,
-          highlightActiveLine: prefs.activeLineHighlight,
-          highlightActiveLineGutter: prefs.activeLineHighlight,
-          foldGutter: prefs.foldGutter,
-          foldKeymap: true,
-          autocompletion: false, // we provide our own
-          syntaxHighlighting: true,
-          bracketMatching: false, // controlled via the extensions array below
-          closeBrackets: false,
-          defaultKeymap: true,
-          history: true,
-        }}
+      <AtomicCodeMirrorEditor
+        documentId={documentId}
+        markdownSource={resolvedContent}
+        onMarkdownChange={handleChange}
+        onLinkClick={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
+        editorHandleRef={editorRef}
+        codeLanguages={ATOMIC_CODE_LANGUAGES}
         extensions={extensions}
-        theme={isDark ? 'dark' : 'light'}
-        onChange={(value) => {
-          if (isSettingContent.current) return
-          setIsDirty(true)
-          clearTimeout(saveTimerRef.current)
-          saveTimerRef.current = setTimeout(async () => {
-            try {
-              await onSaveRef.current(value)
-              if (viewRef.current?.state.doc.toString() === value) {
-                setIsDirty(false)
-              }
-            } catch {
-              toast.error(t('knowledge.saveFailed'))
-            }
-          }, 1000)
-        }}
-        height="100%"
-        className="h-full hypermd-container"
       />
     </div>
   )

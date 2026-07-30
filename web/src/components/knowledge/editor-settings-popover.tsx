@@ -150,33 +150,13 @@ export function EditorSettingsPopover() {
 
           <Separator />
 
-          {/* ── Editor chrome ──────────────────────────────────── */}
+          {/* ── Status bar ─────────────────────────────────────── */}
           <div className="px-4 pt-3">
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {t('knowledge.editorPrefEditor')}
+              {t('knowledge.editorPrefStatusBar')}
             </Label>
           </div>
           <div className="space-y-0.5 px-4 py-2">
-            <ToggleRow
-              label={t('knowledge.editorPrefLineNumbers')}
-              checked={prefs.lineNumbers}
-              onCheckedChange={(v) => prefs.setPref('lineNumbers', v)}
-            />
-            <ToggleRow
-              label={t('knowledge.editorPrefActiveLine')}
-              checked={prefs.activeLineHighlight}
-              onCheckedChange={(v) => prefs.setPref('activeLineHighlight', v)}
-            />
-            <ToggleRow
-              label={t('knowledge.editorPrefFoldGutter')}
-              checked={prefs.foldGutter}
-              onCheckedChange={(v) => prefs.setPref('foldGutter', v)}
-            />
-            <ToggleRow
-              label={t('knowledge.editorPrefBracketMatching')}
-              checked={prefs.bracketMatching}
-              onCheckedChange={(v) => prefs.setPref('bracketMatching', v)}
-            />
             <ToggleRow
               label={t('knowledge.editorPrefStatusBar')}
               description={t('knowledge.editorPrefStatusBarDesc')}
@@ -195,18 +175,6 @@ export function EditorSettingsPopover() {
           </div>
           <div className="space-y-0.5 px-4 py-2">
             <ToggleRow
-              label={t('knowledge.editorPrefLivePreview')}
-              description={t('knowledge.editorPrefLivePreviewDesc')}
-              checked={prefs.livePreview}
-              onCheckedChange={(v) => prefs.setPref('livePreview', v)}
-            />
-            <ToggleRow
-              label={t('knowledge.editorPrefTokenHiding')}
-              description={t('knowledge.editorPrefTokenHidingDesc')}
-              checked={prefs.tokenHiding}
-              onCheckedChange={(v) => prefs.setPref('tokenHiding', v)}
-            />
-            <ToggleRow
               label={t('knowledge.editorPrefMermaidFold')}
               checked={prefs.mermaidFold}
               onCheckedChange={(v) => prefs.setPref('mermaidFold', v)}
@@ -215,16 +183,6 @@ export function EditorSettingsPopover() {
               label={t('knowledge.editorPrefMathFold')}
               checked={prefs.mathFold}
               onCheckedChange={(v) => prefs.setPref('mathFold', v)}
-            />
-            <ToggleRow
-              label={t('knowledge.editorPrefImageFold')}
-              checked={prefs.imageFold}
-              onCheckedChange={(v) => prefs.setPref('imageFold', v)}
-            />
-            <ToggleRow
-              label={t('knowledge.editorPrefTableFold')}
-              checked={prefs.tableFold}
-              onCheckedChange={(v) => prefs.setPref('tableFold', v)}
             />
             <ToggleRow
               label={t('knowledge.editorPrefEmojiFold')}
