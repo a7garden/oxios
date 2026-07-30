@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-07-30
+
+### Changed
+- **Knowledge editor (web)** — Replaced @uiw/react-codemirror with
+  @atomic-editor/editor for the knowledge-base markdown editor. AtomicEditor
+  provides Obsidian-style inline live preview, WYSIWYG editable tables,
+  async wiki links with autocomplete, image blocks, read-only mode, and
+  smart edit helpers. Deleted 11 files (−2552 lines).
+
 ## [1.32.0] - 2026-07-29
 
 ### Added
