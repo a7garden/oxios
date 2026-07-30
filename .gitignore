@@ -52,5 +52,6 @@ report-*.json
 # Visual brainstorming companion
 .superpowers/
 .release-prep-status.md
+docs/archive/release-prep-status.md
 docs/superpowers/plans/
 web/src/components/knowledge/search-modal.tsx:*

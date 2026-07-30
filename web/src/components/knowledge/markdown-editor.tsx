@@ -37,6 +37,7 @@ interface WikiLinkResolvedTarget {
 import '@atomic-editor/editor/styles.css'
 import {
   autocompletion,
+  type Completion,
   type CompletionContext,
   type CompletionResult,
 } from '@codemirror/autocomplete'
@@ -151,6 +152,50 @@ function emojiCompletionSource(context: CompletionContext): CompletionResult | n
   return { from: match.from, to: context.pos, options }
 }
 
+// ── Wiki-link completion source ──────────────────────────────────────
+// atomic-editor's wikiLinks() bundles its own autocompletion(), and
+// CodeMirror's completion facet has no merge combiner for the `override`
+// field — a second autocompletion() with override throws
+// "Config merge conflict for field override". So we own ONE combined
+// autocompletion (emoji + wikilinks) here and call wikiLinks() without
+// `suggest` so it skips its bundled completion (decorations/resolver/click
+// handling are independent extensions and keep working). Mirrors
+// atomic-editor's completionSource/serialize logic so the inserted
+// `[[target|label]]` resolves correctly.
+const WIKI_LINK_QUERY_RE = /\[\[[^\]\n|]*$/
+
+function makeWikiLinkCompletionSource(
+  indexRef: { current: WikilinkIndex | null },
+): (context: CompletionContext) => CompletionResult | null {
+  return (context) => {
+    const match = context.matchBefore(WIKI_LINK_QUERY_RE)
+    if (!match || (match.from === match.to && !context.explicit)) return null
+    const query = match.text.slice(2)
+    const suggestions = suggestWikilinks(query, indexRef.current)
+    if (suggestions.length === 0) return null
+    return {
+      from: match.from + 2,
+      to: context.pos,
+      options: suggestions.map((s) => ({
+        label: s.label,
+        detail: s.detail,
+        type: 'text' as const,
+        apply: (view: EditorView, _completion: Completion, from: number, to: number) => {
+          // Escape wiki-link delimiters so `]`/`|` in a label can't break the link.
+          const label = s.label.replaceAll(']', ' ').replaceAll('|', ' ').replace(/\s+/g, ' ').trim()
+          const insert = `${s.target}|${label}]]`
+          const replaceTo = view.state.doc.sliceString(to, to + 2) === ']]' ? to + 2 : to
+          view.dispatch({
+            changes: { from, to: replaceTo, insert },
+            selection: { anchor: from + insert.length },
+          })
+        },
+      })),
+      validFor: /^[^\]\n|]*$/,
+    }
+  }
+}
+
 // ── Heading enforcer ────────────────────────────────────────────────────
 // Keep the first content line (after frontmatter) as `# <title>`.
 // No WeakSet suspension needed — atomic-editor has no value-prop echo.
@@ -257,7 +302,6 @@ export function MarkdownEditor({
     () => ({
       resolve: async (target: string) =>
         resolveWikilinkTarget(target, currentFilePath, wikilinkIndexRef.current),
-      suggest: async (query: string) => suggestWikilinks(query, wikilinkIndexRef.current),
       onOpen: (target: string) => openFile(target),
     }),
     [currentFilePath, openFile],
@@ -404,6 +448,11 @@ export function MarkdownEditor({
 
   // ── Build extensions array ─────────────────────────────────────────
   const extensions = useMemo<Extension[]>(() => {
+    // Single combined autocompletion: two autocompletion() calls both
+    // setting `override` throw "Config merge conflict for field override"
+    // (CM6 completion facet has no override merge combiner). wikiLinks() is
+    // called without `suggest` above so it skips its bundled completion.
+    const wikiLinkSource = makeWikiLinkCompletionSource(wikilinkIndexRef)
     const exts: Extension[] = [
       frontmatterExtension,
       headingEnforcer,
@@ -413,7 +462,7 @@ export function MarkdownEditor({
       headingStyleExt,
       ...markerStyleExt,
       autocompletion({
-        override: [emojiCompletionSource],
+        override: [emojiCompletionSource, wikiLinkSource],
         activateOnTyping: true,
         closeOnBlur: true,
       }),
