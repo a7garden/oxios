@@ -95,7 +95,7 @@ function stripResolvedImages(md: string, fileDir: string): string {
   const prefix = `${ASSET_ROUTE}/`
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return md.replace(
-    new RegExp('!\\[([^\\]]*)\\\(' + escapedPrefix + '([^)]+)\\)', 'g'),
+    new RegExp(`!\\[([^\\]]*)\\(${escapedPrefix}([^)]+)\\)`, 'g'),
     (_match: string, alt: string, assetPath: string) => {
       // If assetPath starts with fileDir/, the original was relative (no leading slash)
       if (fileDir && assetPath.startsWith(`${fileDir}/`)) {
@@ -164,9 +164,9 @@ function emojiCompletionSource(context: CompletionContext): CompletionResult | n
 // `[[target|label]]` resolves correctly.
 const WIKI_LINK_QUERY_RE = /\[\[[^\]\n|]*$/
 
-function makeWikiLinkCompletionSource(
-  indexRef: { current: WikilinkIndex | null },
-): (context: CompletionContext) => CompletionResult | null {
+function makeWikiLinkCompletionSource(indexRef: {
+  current: WikilinkIndex | null
+}): (context: CompletionContext) => CompletionResult | null {
   return (context) => {
     const match = context.matchBefore(WIKI_LINK_QUERY_RE)
     if (!match || (match.from === match.to && !context.explicit)) return null
@@ -182,7 +182,11 @@ function makeWikiLinkCompletionSource(
         type: 'text' as const,
         apply: (view: EditorView, _completion: Completion, from: number, to: number) => {
           // Escape wiki-link delimiters so `]`/`|` in a label can't break the link.
-          const label = s.label.replaceAll(']', ' ').replaceAll('|', ' ').replace(/\s+/g, ' ').trim()
+          const label = s.label
+            .replaceAll(']', ' ')
+            .replaceAll('|', ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
           const insert = `${s.target}|${label}]]`
           const replaceTo = view.state.doc.sliceString(to, to + 2) === ']]' ? to + 2 : to
           view.dispatch({

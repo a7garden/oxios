@@ -1,4 +1,8 @@
-import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import {
+  autocompletion,
+  type CompletionContext,
+  type CompletionResult,
+} from '@codemirror/autocomplete'
 import { EditorState } from '@codemirror/state'
 import { describe, expect, it } from 'vitest'
 
