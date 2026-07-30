@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.1] - 2026-07-30
+
+### Fixed
+- **Biome lint/format (web)** — Applied biome-safe fixes to `markdown-editor.tsx`
+  and `autocompletion-override-conflict.test.ts`.
+
 ## [1.33.0] - 2026-07-30
 
 ### Changed
