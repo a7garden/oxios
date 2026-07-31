@@ -38,7 +38,7 @@ function DetectedBadge({ detected }: { detected: IntegrationRow['detected'] }) {
   }
   return (
     <div className="flex items-center gap-2">
-      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+      <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
       {detected.version && (
         <span className="text-xs text-muted-foreground">{detected.version}</span>
       )}
@@ -56,7 +56,7 @@ function CredentialBadge({ configured, source }: { configured: boolean; source: 
       variant="outline"
       className={
         configured
-          ? 'border-emerald-500/30 text-emerald-500'
+          ? 'border-status-success/30 text-status-success'
           : 'border-muted-foreground/30 text-muted-foreground'
       }
     >

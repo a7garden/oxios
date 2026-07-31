@@ -32,8 +32,10 @@ function useSparkColors(sparkColor: SparkColor) {
     const fillBase = cssVarToRgb(vars.fill)
     // Convert fill to a semi-transparent version for the area fill
     // e.g. 'rgb(59 130 246)' → 'rgb(59 130 246 / 0.18)'
-    const fill = fillBase.replace('rgb(', 'rgba(').replace(')', ' / 0.18)')
-    return { stroke, fill }
+    const withAlpha = (alpha: number) =>
+      fillBase.replace(/^rgba?\(/, 'rgba(').replace(/\)$/, ` / ${alpha})`)
+    // gradient stops vary alpha; the area fill itself is 0.18.
+    return { stroke, fill: withAlpha(0.18) }
   }, [sparkColor])
 }
 
@@ -44,7 +46,7 @@ export interface StatCardProps {
   value: string | number
   /** Optional icon (e.g. lucide-react component) shown in the header. */
   icon?: React.ReactNode
-  /** Tailwind color class for the icon, e.g. "text-emerald-500". */
+  /** Tailwind color class for the icon, e.g. "text-status-success". */
   iconClassName?: string
   /**
    * Percent change vs. start of the sparkline window. Positive = up arrow,

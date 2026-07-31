@@ -264,7 +264,7 @@ function LogPanel() {
       isRunning={isLoading}
     >
       {showLog && logData && (
-        <div className="rounded-md bg-primary-foreground text-primary-foreground dark:bg-card p-3 max-h-80 overflow-y-auto font-mono text-xs leading-relaxed">
+        <div className="rounded-md bg-surface-sunken text-text p-3 max-h-80 overflow-y-auto font-mono text-xs leading-relaxed">
           {logData.lines.length === 0 ? (
             <span className="text-muted-foreground">{t('systemTools.noLogEntries')}</span>
           ) : (

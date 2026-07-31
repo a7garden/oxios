@@ -114,11 +114,11 @@ export const TASK_STATUS_META: Record<
   { label: string; color: string; bgColor: string }
 > = {
   backlog: { label: 'Backlog', color: 'text-muted-foreground', bgColor: 'bg-muted' },
-  scheduled: { label: 'Scheduled', color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
-  running: { label: 'Running', color: 'text-amber-500', bgColor: 'bg-amber-500/10' },
-  paused: { label: 'Paused', color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
-  completed: { label: 'Completed', color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' },
-  failed: { label: 'Failed', color: 'text-red-500', bgColor: 'bg-red-500/10' },
+  scheduled: { label: 'Scheduled', color: 'text-status-info', bgColor: 'bg-status-info/10' },
+  running: { label: 'Running', color: 'text-status-warning', bgColor: 'bg-status-warning/10' },
+  paused: { label: 'Paused', color: 'text-hue-purple', bgColor: 'bg-hue-purple/10' },
+  completed: { label: 'Completed', color: 'text-status-success', bgColor: 'bg-status-success/10' },
+  failed: { label: 'Failed', color: 'text-status-error', bgColor: 'bg-status-error/10' },
   canceled: { label: 'Canceled', color: 'text-muted-foreground', bgColor: 'bg-muted' },
 }
 

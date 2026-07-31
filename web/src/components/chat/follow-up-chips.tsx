@@ -63,7 +63,7 @@ export function FollowUpChips({ content, generating, onSelect, className }: Foll
           className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-card text-xs text-muted-foreground hover:border-primary/30 hover:text-foreground transition-all"
           style={{ animationDelay: `${i * 60}ms` }}
         >
-          <Lightbulb className="w-3 h-3 text-amber-500/70 group-hover:text-amber-500 transition-colors shrink-0" />
+          <Lightbulb className="w-3 h-3 text-hue-amber/70 group-hover:text-hue-amber transition-colors shrink-0" />
           <span className="truncate max-w-[240px]">{chip.label}</span>
         </button>
       ))}

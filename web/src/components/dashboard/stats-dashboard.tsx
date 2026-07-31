@@ -40,7 +40,7 @@ export function StatsDashboard({ className }: { className?: string }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard
             icon={<DollarSign className="w-4 h-4" />}
-            iconClassName="text-emerald-500"
+            iconClassName="text-status-success"
             label={t('dashboard.totalSpend')}
             value={overview ? formatCost(overview.total_cost_usd) : '—'}
             hint={
@@ -49,21 +49,21 @@ export function StatsDashboard({ className }: { className?: string }) {
           />
           <StatCard
             icon={<TrendingUp className="w-4 h-4" />}
-            iconClassName="text-blue-500"
+            iconClassName="text-status-info"
             label={t('dashboard.today')}
             value={todayStats ? formatCost(todayStats.total_cost_usd) : '—'}
             hint={todayStats ? formatTokens(todayStats.total_tokens) : undefined}
           />
           <StatCard
             icon={<Coins className="w-4 h-4" />}
-            iconClassName="text-amber-500"
+            iconClassName="text-status-warning"
             label={t('dashboard.totalTokens')}
             value={overview ? formatTokens(overview.total_tokens) : '—'}
             hint={t('dashboard.allTime')}
           />
           <StatCard
             icon={<Bot className="w-4 h-4" />}
-            iconClassName="text-purple-500"
+            iconClassName="text-hue-purple"
             label={t('dashboard.sessionsLabel')}
             value={overview ? String(overview.total_sessions ?? 0) : '—'}
             hint={t('dashboard.totalLabel')}

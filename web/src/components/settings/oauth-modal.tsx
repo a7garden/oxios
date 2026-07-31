@@ -160,7 +160,7 @@ export function OAuthModal({ row, onOpenChange }: OAuthModalProps) {
               </div>
             )}
             {phase === 'success' && (
-              <div className="flex items-center justify-center gap-2 text-sm text-emerald-500">
+              <div className="flex items-center justify-center gap-2 text-sm text-status-success">
                 <CheckCircle2 className="h-4 w-4" />
                 {t('settings.integrationsOAuthSuccess')}
               </div>

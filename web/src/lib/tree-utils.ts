@@ -23,12 +23,12 @@ export function indentStyle(depth: number): CSSProperties {
  */
 export function fileTint(name: string): string {
   const ext = (name.split('.').pop() ?? '').toLowerCase()
-  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return 'text-pink-500'
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return 'text-hue-teal'
   if (['rs', 'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'py', 'go', 'rb'].includes(ext)) {
-    return 'text-blue-500'
+    return 'text-hue-blue'
   }
   if (['md', 'mdx', 'markdown', 'txt', 'json', 'toml', 'yaml', 'yml'].includes(ext)) {
-    return 'text-amber-500'
+    return 'text-hue-amber'
   }
   return 'text-muted-foreground'
 }

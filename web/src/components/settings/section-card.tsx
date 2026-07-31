@@ -64,7 +64,7 @@ export function SectionCard({
         // inset-panel look instead of a white card with a tinted header.
         'bg-surface-section',
         'shadow-sm',
-        modified && 'ring-1 ring-modified-accent/30 dark:ring-modified-accent/40',
+        modified && 'ring-1 ring-modified-accent/30',
         className,
       )}
     >

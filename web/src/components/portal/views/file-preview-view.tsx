@@ -60,7 +60,7 @@ export function FilePreviewView({ view }: FilePreviewViewProps) {
       <div className="min-h-0 flex-1 overflow-auto">
         {isLoading ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            <span className="inline-block size-2 animate-pulse rounded-full bg-amber-500" />
+            <span className="inline-block size-2 animate-pulse rounded-full bg-status-warning" />
             <span className="ms-2">{t('portal.filePreview.loading')}</span>
           </div>
         ) : isMarkdown ? (

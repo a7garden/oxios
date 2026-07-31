@@ -14,9 +14,14 @@ import {
   YAxis,
 } from 'recharts'
 
+import { cssVarToRgb } from '@/lib/utils'
+
 function getChartColor(token: string): string {
-  if (typeof window === 'undefined') return '#888'
-  return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || '#888'
+  if (typeof window === 'undefined') return cssVarToRgb('--color-text-muted')
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue(token).trim() ||
+    cssVarToRgb('--color-text-muted')
+  )
 }
 
 import { ErrorState } from '@/components/shared/error-state'

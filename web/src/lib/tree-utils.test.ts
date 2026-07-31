@@ -105,17 +105,17 @@ describe('indentStyle', () => {
 
 describe('fileTint', () => {
   it('maps md/txt to amber, code to blue, images to pink, falls back to muted', () => {
-    expect(fileTint('notes.md')).toBe('text-amber-500')
-    expect(fileTint('README.txt')).toBe('text-amber-500')
-    expect(fileTint('main.ts')).toBe('text-blue-500')
-    expect(fileTint('script.py')).toBe('text-blue-500')
-    expect(fileTint('logo.png')).toBe('text-pink-500')
+    expect(fileTint('notes.md')).toBe('text-hue-amber')
+    expect(fileTint('README.txt')).toBe('text-hue-amber')
+    expect(fileTint('main.ts')).toBe('text-hue-blue')
+    expect(fileTint('script.py')).toBe('text-hue-blue')
+    expect(fileTint('logo.png')).toBe('text-hue-teal')
     expect(fileTint('archive.zip')).toBe('text-muted-foreground')
   })
 
   it('uses the extension, ignoring the dot files and case', () => {
-    expect(fileTint('CHANGELOG.MD')).toBe('text-amber-500')
-    expect(fileTint('.hidden.md')).toBe('text-amber-500')
+    expect(fileTint('CHANGELOG.MD')).toBe('text-hue-amber')
+    expect(fileTint('.hidden.md')).toBe('text-hue-amber')
   })
 
   it('returns the default for files with no extension', () => {

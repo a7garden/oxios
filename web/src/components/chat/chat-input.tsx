@@ -574,7 +574,7 @@ export function ChatInput({
           {attachedFiles.map((file, i) => (
             <span
               key={`${file.name}-${i}`}
-              className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 text-xs text-blue-700 dark:text-blue-300"
+              className="inline-flex items-center gap-1 rounded-full bg-status-info-subtle border border-info-subtle-border px-2.5 py-0.5 text-xs text-status-info-on-subtle"
             >
               {file.type.startsWith('image/') ? (
                 <Image className="h-3 w-3" />
@@ -585,7 +585,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={() => removeFile(i)}
-                className="ml-0.5 -mr-1 rounded-full p-0.5 hover:bg-blue-200 dark:hover:bg-blue-800"
+                className="ml-0.5 -mr-1 rounded-full p-0.5 hover:bg-status-info-muted"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -618,9 +618,9 @@ export function ChatInput({
               className="inline-flex items-center gap-1 rounded-full bg-muted/80 px-2.5 py-0.5 text-xs text-foreground"
             >
               {ctx.type === 'knowledge' ? (
-                <BookOpen className="h-3 w-3 text-blue-500" />
+                <BookOpen className="h-3 w-3 text-status-info" />
               ) : (
-                <Brain className="h-3 w-3 text-purple-500" />
+                <Brain className="h-3 w-3 text-hue-purple" />
               )}
               <span className="truncate max-w-[140px]">{ctx.label}</span>
               <button
@@ -672,13 +672,13 @@ export function ChatInput({
                   )}
                 >
                   {result.type === 'mount' ? (
-                    <HardDrive className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />
+                    <HardDrive className="h-4 w-4 mt-0.5 shrink-0 text-status-success" />
                   ) : result.type === 'knowledge' ? (
-                    <FileText className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+                    <FileText className="h-4 w-4 mt-0.5 shrink-0 text-status-info" />
                   ) : result.type === 'role' ? (
-                    <Sparkles className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
+                    <Sparkles className="h-4 w-4 mt-0.5 shrink-0 text-status-warning" />
                   ) : (
-                    <Brain className="h-4 w-4 mt-0.5 shrink-0 text-purple-500" />
+                    <Brain className="h-4 w-4 mt-0.5 shrink-0 text-hue-purple" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{result.label}</p>

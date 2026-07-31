@@ -23,17 +23,17 @@ import { ProviderSelect } from './provider-select'
 // ─── Category accent colors ──────────────────────────────────
 
 const CATEGORY_ACCENT: Record<string, string> = {
-  major: 'border-l-blue-500',
-  open: 'border-l-emerald-500',
-  regional: 'border-l-amber-500',
-  local: 'border-l-violet-500',
+  major: 'border-l-info-subtle-border',
+  open: 'border-l-success-subtle-border',
+  regional: 'border-l-warning-subtle-border',
+  local: 'border-l-hue-purple',
 }
 
 const CATEGORY_DOT: Record<string, string> = {
-  major: 'bg-blue-500',
-  open: 'bg-emerald-500',
-  regional: 'bg-amber-500',
-  local: 'bg-violet-500',
+  major: 'bg-status-info',
+  open: 'bg-status-success',
+  regional: 'bg-status-warning',
+  local: 'bg-hue-purple',
 }
 
 // ─── ProviderCard ────────────────────────────────────────────
@@ -84,7 +84,7 @@ export function ProviderCard({ provider, onChangeKey, onRemove, isPending }: Pro
     <div
       className={cn(
         'flex flex-col rounded-lg border border-l-[3px] bg-card p-4 transition-all',
-        CATEGORY_ACCENT[provider.category] ?? 'border-l-gray-400',
+        CATEGORY_ACCENT[provider.category] ?? 'border-l-line-strong',
         'hover:border-primary/30 hover:shadow-sm',
       )}
     >
@@ -94,7 +94,7 @@ export function ProviderCard({ provider, onChangeKey, onRemove, isPending }: Pro
           <span
             className={cn(
               'h-2.5 w-2.5 rounded-full shrink-0',
-              CATEGORY_DOT[provider.category] ?? 'bg-gray-400',
+              CATEGORY_DOT[provider.category] ?? 'bg-muted-foreground',
             )}
           />
           <span className="font-medium text-sm truncate">{provider.name}</span>
@@ -109,7 +109,10 @@ export function ProviderCard({ provider, onChangeKey, onRemove, isPending }: Pro
       {/* Status */}
       <div className="flex items-center gap-1.5 mt-2 text-xs">
         <Check
-          className={cn('h-3.5 w-3.5 shrink-0', isEnvKey ? 'text-amber-500' : 'text-emerald-500')}
+          className={cn(
+            'h-3.5 w-3.5 shrink-0',
+            isEnvKey ? 'text-status-warning' : 'text-status-success',
+          )}
         />
         <span className="text-muted-foreground">
           {isEnvKey ? t('engine.envKey') : t('engine.connected')}
@@ -124,8 +127,8 @@ export function ProviderCard({ provider, onChangeKey, onRemove, isPending }: Pro
           className={cn(
             'flex items-center gap-1.5 mt-1.5 rounded px-1.5 py-1 text-xs',
             validateState === 'validating' && 'bg-muted/50 text-muted-foreground',
-            validateState === 'valid' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-            validateState === 'invalid' && 'bg-red-500/10 text-red-500 dark:text-red-400',
+            validateState === 'valid' && 'bg-status-success-subtle text-status-success-on-subtle',
+            validateState === 'invalid' && 'bg-status-error-subtle text-status-error-on-subtle',
           )}
         >
           {validateState === 'validating' && <Loader2 className="h-3 w-3 shrink-0 animate-spin" />}
@@ -199,7 +202,10 @@ export function ProviderCard({ provider, onChangeKey, onRemove, isPending }: Pro
           <Button
             size="sm"
             variant="ghost"
-            className={cn('h-8 gap-1.5 text-xs', validateState === 'valid' && 'text-emerald-500')}
+            className={cn(
+              'h-8 gap-1.5 text-xs',
+              validateState === 'valid' && 'text-status-success',
+            )}
             onClick={handleValidate}
             disabled={validateState === 'validating' || isPending}
             title={t('engine.verify')}

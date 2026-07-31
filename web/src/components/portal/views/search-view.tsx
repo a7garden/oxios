@@ -281,7 +281,7 @@ export function SearchView({ query: propQuery, messageId }: SearchViewProps) {
                         </div>
                         <div className="flex gap-1 shrink-0 mt-0.5">
                           {cached && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-status-success-subtle text-status-success-on-subtle">
                               Browsed
                             </span>
                           )}

@@ -13,19 +13,19 @@ export const FileEditRender: ToolRenderComponent = ({ args, result, isRunning })
       </div>
       {isRunning ? (
         <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-block w-2 h-2 rounded-full bg-status-warning animate-pulse" />
           Editing...
         </div>
       ) : (
         <div className="space-y-1 text-xs font-mono">
           {oldText && (
-            <div className="p-1.5 rounded bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
-              <span className="text-red-600 dark:text-red-400">- {oldText.slice(0, 200)}</span>
+            <div className="p-1.5 rounded bg-status-error-subtle border border-error-subtle-border text-status-error-on-subtle">
+              <span>- {oldText.slice(0, 200)}</span>
             </div>
           )}
           {newText && (
-            <div className="p-1.5 rounded bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
-              <span className="text-green-600 dark:text-green-400">+ {newText.slice(0, 200)}</span>
+            <div className="p-1.5 rounded bg-status-success-subtle border border-success-subtle-border text-status-success-on-subtle">
+              <span>+ {newText.slice(0, 200)}</span>
             </div>
           )}
           {result != null && typeof result === 'string' && (

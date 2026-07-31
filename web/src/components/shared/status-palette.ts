@@ -9,17 +9,19 @@
  * agent-inspector, `pending` only in agent-node, etc.) — see
  * review P1-1.
  */
+import { cssVarToRgb } from '@/lib/utils'
 
 /** Visual style for a single agent status. */
 export interface StatusStyle {
-  /** Tailwind class for the agent's border (e.g. `border-emerald-500`). */
+  /** Tailwind class for the agent's border (e.g. `border-success`). */
   border: string
-  /** Tailwind class for the agent's status dot (e.g. `bg-emerald-500 animate-pulse`). */
+  /** Tailwind class for the agent's status dot (e.g. `bg-success animate-pulse`). */
   dot: string
   /**
-   * Hex color suitable for canvases (React Flow's `nodeColor` /
-   * `nodeStrokeColor`). Kept in sync with the Tailwind classes
-   * above; uses the Tailwind v3 palette defaults.
+   * Resolved CSS color (rgb string) suitable for canvases (React Flow's
+   * `nodeColor` / `nodeStrokeColor`). Kept in sync with the Tailwind
+   * classes above; resolved at module load via `cssVarToRgb` so it follows
+   * the current theme (light/dark) automatically.
    */
   hex: string
 }
@@ -40,52 +42,52 @@ export const STATUS_PALETTE: Record<string, StatusStyle> = {
   running: {
     border: 'border-success',
     dot: 'bg-success animate-pulse',
-    hex: '#10b981',
+    hex: cssVarToRgb('--color-status-success'),
   },
   active: {
     border: 'border-success',
     dot: 'bg-success animate-pulse',
-    hex: '#10b981',
+    hex: cssVarToRgb('--color-status-success'),
   },
   idle: {
     border: 'border-warning',
     dot: 'bg-warning',
-    hex: '#f59e0b',
+    hex: cssVarToRgb('--color-status-warning'),
   },
   pending: {
     border: 'border-warning',
     dot: 'bg-warning',
-    hex: '#f59e0b',
+    hex: cssVarToRgb('--color-status-warning'),
   },
   starting: {
     border: 'border-info',
     dot: 'bg-info',
-    hex: '#3b82f6',
+    hex: cssVarToRgb('--color-status-info'),
   },
   stopped: {
     border: 'border-error',
     dot: 'bg-error',
-    hex: '#ef4444',
+    hex: cssVarToRgb('--color-status-error'),
   },
   failed: {
     border: 'border-destructive',
     dot: 'bg-destructive',
-    hex: '#ef4444',
+    hex: cssVarToRgb('--color-status-error'),
   },
   error: {
     border: 'border-destructive',
     dot: 'bg-destructive',
-    hex: '#ef4444',
+    hex: cssVarToRgb('--color-status-error'),
   },
   archived: {
     border: 'border-muted-foreground',
     dot: 'bg-muted-foreground',
-    hex: '#a1a1aa',
+    hex: cssVarToRgb('--color-text-muted'),
   },
   rejected: {
     border: 'border-destructive',
     dot: 'bg-destructive',
-    hex: '#ef4444',
+    hex: cssVarToRgb('--color-status-error'),
   },
 }
 
@@ -93,7 +95,7 @@ export const STATUS_PALETTE: Record<string, StatusStyle> = {
 export const DEFAULT_STATUS_STYLE: StatusStyle = {
   border: 'border-border',
   dot: 'bg-muted-foreground',
-  hex: '#a1a1aa',
+  hex: cssVarToRgb('--color-text-muted'),
 }
 
 /** Tailwind class for the border of an agent with the given status. */

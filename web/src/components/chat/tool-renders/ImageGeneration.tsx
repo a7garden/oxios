@@ -55,9 +55,9 @@ export const ImageGenerationRender: ToolRenderComponent = ({ args, result, isRun
         <div className="flex items-center gap-2 text-xs">
           <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="truncate font-medium">{prompt || '(no prompt)'}</span>
-          <span className="ml-auto shrink-0 text-red-500">failed</span>
+          <span className="ml-auto shrink-0 text-status-error">failed</span>
         </div>
-        <p className="line-clamp-3 text-xs text-red-500/80">{errorMsg}</p>
+        <p className="line-clamp-3 text-xs text-status-error/80">{errorMsg}</p>
       </div>
     )
   }
@@ -70,7 +70,7 @@ export const ImageGenerationRender: ToolRenderComponent = ({ args, result, isRun
       <div className="flex items-center gap-2 text-xs">
         <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
         <span className="truncate font-medium">{prompt || '(no prompt)'}</span>
-        <span className="ml-auto shrink-0 text-emerald-500">
+        <span className="ml-auto shrink-0 text-status-success">
           {images.length} image{images.length === 1 ? '' : 's'}
         </span>
       </div>

@@ -84,7 +84,7 @@ export function DefaultToolRender({ args, result, isRunning }: ToolRenderProps) 
     <div className="space-y-2 text-sm">
       {isRunning && (
         <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-block w-2 h-2 rounded-full bg-status-warning animate-pulse" />
           Running...
         </div>
       )}

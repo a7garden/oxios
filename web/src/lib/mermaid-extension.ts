@@ -25,6 +25,7 @@ import {
   ViewPlugin,
   WidgetType,
 } from '@codemirror/view'
+import { cssVarToRgb } from '@/lib/utils'
 
 // ─── Mermaid lazy loader ─────────────────────────────────────────────
 type MermaidAPI = {
@@ -39,18 +40,17 @@ async function loadMermaid(): Promise<MermaidAPI> {
   if (mermaidLoad) return mermaidLoad
   mermaidLoad = import('mermaid').then((m) => {
     const mermaid = m.default as unknown as MermaidAPI
-    const root = getComputedStyle(document.documentElement)
     const isDark = document.documentElement.classList.contains('dark')
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: 'loose',
       theme: isDark ? 'dark' : 'default',
       themeVariables: {
-        primaryColor: isDark ? '#27272a' : '#f4f4f5',
-        primaryBorderColor: (root.getPropertyValue('--primary') || '').trim() || '#18181b',
-        primaryTextColor: isDark ? '#fafafa' : '#18181b',
-        lineColor: isDark ? '#a1a1aa' : '#52525b',
-        textColor: isDark ? '#fafafa' : '#18181b',
+        primaryColor: cssVarToRgb('--color-surface-raised'),
+        primaryBorderColor: cssVarToRgb('--color-border'),
+        primaryTextColor: cssVarToRgb('--color-text'),
+        lineColor: cssVarToRgb('--color-text-muted'),
+        textColor: cssVarToRgb('--color-text'),
       },
     })
     return mermaid

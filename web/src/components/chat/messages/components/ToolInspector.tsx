@@ -46,12 +46,12 @@ export const ToolInspector = memo(ToolInspectorImpl)
 function StatusIndicator({ status }: { status: ChatToolPayload['status'] }) {
   const cls =
     status === 'loading'
-      ? 'bg-amber-500 animate-pulse'
+      ? 'bg-status-warning animate-pulse'
       : status === 'error'
         ? 'bg-destructive'
         : status === 'aborted'
           ? 'bg-muted-foreground'
-          : 'bg-emerald-500'
+          : 'bg-status-success'
   return <span className={cn('inline-block w-2 h-2 rounded-full shrink-0', cls)} />
 }
 

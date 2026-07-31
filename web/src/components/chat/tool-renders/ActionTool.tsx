@@ -17,7 +17,7 @@ export const ActionToolRender: ToolRenderComponent = ({ args, result, isRunning,
         <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{toolName}</span>
         {action && <span className="text-primary font-medium">{action}</span>}
         {isRunning && (
-          <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-block w-2 h-2 rounded-full bg-status-warning animate-pulse" />
         )}
       </div>
       {resultStr && !isRunning && (

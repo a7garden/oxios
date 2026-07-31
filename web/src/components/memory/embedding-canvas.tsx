@@ -13,6 +13,7 @@ import {
 import { select } from 'd3-selection'
 import { type ZoomBehavior, zoom, zoomIdentity } from 'd3-zoom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cssVarToRgb } from '@/lib/utils'
 import type { MemoryMapEntry, MemoryMapNeighbor } from '@/types/memory'
 
 /**
@@ -58,11 +59,12 @@ type SimNode = MemoryMapEntry &
 type SimLink = SimulationLinkDatum<SimNode> & { similarity: number }
 
 // Tier colour map. Matches the rest of the memory UI (emerald/amber/zinc
-// with OKLCH-leaning values for dark mode).
+// with OKLCH-leaning values for dark mode). Resolved from the design-token
+// layer so it follows the current theme.
 const TIER_FILL: Record<string, string> = {
-  hot: '#10b981', // emerald-500
-  warm: '#f59e0b', // amber-500
-  cold: '#71717a', // zinc-500
+  hot: cssVarToRgb('--color-status-error'),
+  warm: cssVarToRgb('--color-status-warning'),
+  cold: cssVarToRgb('--color-status-info'),
 }
 
 // Memory-type shape mapping. We draw distinct shapes for the four
@@ -434,8 +436,11 @@ export function EmbeddingCanvas({
     const neighbourSet = sel != null ? new Set(neighboursRef.current.get(sel) ?? []) : null
 
     // Edges first so they sit under the nodes.
+
     if (links.length > 0) {
       ctx.lineWidth = 1 / k
+      // text-muted as rgb; inject per-iteration opacity via ' / a)' closure.
+      const edgeBase = cssVarToRgb('--color-text-muted')
       for (const link of links) {
         const s = link.source as SimNode
         const t = link.target as SimNode
@@ -447,7 +452,8 @@ export function EmbeddingCanvas({
             (s.id === sel && neighbourSet.has(t.id)) || (t.id === sel && neighbourSet.has(s.id))
           opacity = isHighlighted ? Math.min(0.85, opacity * 4) : 0.02
         }
-        ctx.strokeStyle = `rgba(120, 120, 140, ${Math.max(0.02, opacity)})`
+        const a = Math.max(0.02, opacity)
+        ctx.strokeStyle = `${edgeBase.replace(')', ` / ${a})`)}`
         ctx.beginPath()
         ctx.moveTo(s.x, s.y)
         ctx.lineTo(t.x, t.y)
@@ -459,7 +465,8 @@ export function EmbeddingCanvas({
     for (const n of nodes) {
       if (n.x == null || n.y == null) continue
       const r = nodeRadius(n)
-      const baseFill: string = TIER_FILL[n.tier] ?? TIER_FILL.warm ?? '#f59e0b'
+      const baseFill: string =
+        TIER_FILL[n.tier] ?? TIER_FILL.warm ?? cssVarToRgb('--color-status-warning')
       let alpha = 1
       if (sel != null) {
         if (n.id === sel) alpha = 1

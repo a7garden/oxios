@@ -87,7 +87,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'fork',
         summary: name ? `forked "${name}"` : 'agent forked',
         icon: Rocket,
-        color: 'text-emerald-500',
+        color: 'text-status-success',
       }
     }
     case 'agent_started':
@@ -96,7 +96,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'start',
         summary: 'agent started',
         icon: PlayCircle,
-        color: 'text-blue-500',
+        color: 'text-status-info',
       }
     case 'agent_stopped':
       return {
@@ -104,7 +104,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'kill',
         summary: 'agent stopped',
         icon: Square,
-        color: 'text-amber-500',
+        color: 'text-status-warning',
       }
     case 'agent_failed': {
       const err = safeStr(event.error, 50)
@@ -113,7 +113,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'failed',
         summary: err ? `agent failed: ${err}` : 'agent failed',
         icon: XCircle,
-        color: 'text-red-500',
+        color: 'text-status-error',
       }
     }
     case 'agent_output':
@@ -122,7 +122,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'output',
         summary: 'agent output',
         icon: MessageSquare,
-        color: 'text-blue-400',
+        color: 'text-status-info',
       }
     case 'tool_started': {
       const tool = safeStr(event.tool_name, 30)
@@ -131,7 +131,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'tool',
         summary: tool ? `▶ ${tool}` : 'tool started',
         icon: Wrench,
-        color: 'text-cyan-500',
+        color: 'text-status-info',
       }
     }
     case 'tool_finished': {
@@ -142,7 +142,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'tool',
         summary: tool ? (isError ? `✗ ${tool}` : `✓ ${tool}`) : 'tool finished',
         icon: isError ? XCircle : CheckCircle,
-        color: isError ? 'text-red-500' : 'text-emerald-500',
+        color: isError ? 'text-status-error' : 'text-status-success',
       }
     }
     case 'memory_recalled': {
@@ -155,7 +155,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
           ? `recalled ${count} for "${q}"`
           : `recalled ${count} memor${count === 1 ? 'y' : 'ies'}`,
         icon: Brain,
-        color: 'text-purple-500',
+        color: 'text-hue-purple',
       }
     }
     case 'memory_stored':
@@ -164,7 +164,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'memory',
         summary: 'memory stored',
         icon: Database,
-        color: 'text-violet-500',
+        color: 'text-hue-purple',
       }
     case 'approval_requested': {
       const action = safeStr(event.action, 24)
@@ -174,7 +174,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'approval',
         summary: resource ? `${action} → ${resource}` : action || 'approval requested',
         icon: AlertTriangle,
-        color: 'text-amber-500',
+        color: 'text-status-warning',
       }
     }
     case 'approval_resolved': {
@@ -184,7 +184,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'approval',
         summary: approved ? 'approved' : 'rejected',
         icon: approved ? CheckCircle : XCircle,
-        color: approved ? 'text-emerald-500' : 'text-red-500',
+        color: approved ? 'text-status-success' : 'text-status-error',
       }
     }
     case 'phase_started':
@@ -195,7 +195,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'phase',
         summary: phase ? `${type === 'phase_started' ? '→' : '✓'} ${phase}` : 'phase',
         icon: ListChecks,
-        color: 'text-indigo-500',
+        color: 'text-hue-blue',
       }
     }
     case 'evaluation_complete': {
@@ -205,7 +205,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'eval',
         summary: passed ? 'evaluation passed' : 'evaluation failed',
         icon: passed ? CheckCircle : XCircle,
-        color: passed ? 'text-emerald-500' : 'text-red-500',
+        color: passed ? 'text-status-success' : 'text-status-error',
       }
     }
     case 'project_created':
@@ -218,7 +218,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
           ? `${type === 'project_activated' ? 'activated' : 'created'} "${name}"`
           : 'project',
         icon: Bot,
-        color: 'text-blue-500',
+        color: 'text-status-info',
       }
     }
     case 'agent_group_created':
@@ -228,7 +228,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'group',
         summary: 'agent group update',
         icon: ChevronRight,
-        color: 'text-teal-500',
+        color: 'text-hue-teal',
       }
     case 'evolution_started':
     case 'evolution_max_reached':
@@ -237,7 +237,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'evolve',
         summary: type === 'evolution_max_reached' ? 'evolution max reached' : 'evolution started',
         icon: Sparkles,
-        color: 'text-violet-500',
+        color: 'text-hue-purple',
       }
     case 'token_usage_update': {
       const inT = Number(event.input_tokens ?? 0)
@@ -248,7 +248,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'tokens',
         summary: total ? `tokens ${total.toLocaleString()}` : 'token update',
         icon: Timer,
-        color: 'text-cyan-500',
+        color: 'text-status-info',
       }
     }
     case 'reasoning_fragment':
@@ -257,7 +257,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
         label: 'think',
         summary: 'reasoning fragment',
         icon: Sparkles,
-        color: 'text-indigo-400',
+        color: 'text-hue-purple',
       }
     case 'memory_recalled_used': {
       const count = typeof event.count === 'number' ? event.count : 0
@@ -269,7 +269,7 @@ export function formatEvent(event: OxiosEvent): FormattedEvent {
           ? `recalled ${count} for "${q}"`
           : `recalled ${count} memor${count === 1 ? 'y' : 'ies'}`,
         icon: Brain,
-        color: 'text-purple-500',
+        color: 'text-hue-purple',
       }
     }
     default: {

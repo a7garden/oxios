@@ -48,10 +48,10 @@ type SelectedFile = {
 /** Tailwind text tint for a file node by extension category — at-a-glance type ID. */
 function fileTint(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase() ?? ''
-  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return 'text-pink-500'
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return 'text-hue-teal'
   if (['rs', 'ts', 'tsx', 'js', 'jsx', 'py', 'go', 'java', 'c', 'cpp', 'rb'].includes(ext))
-    return 'text-blue-500'
-  if (['md', 'txt', 'json', 'toml', 'yaml', 'yml'].includes(ext)) return 'text-amber-500'
+    return 'text-hue-blue'
+  if (['md', 'txt', 'json', 'toml', 'yaml', 'yml'].includes(ext)) return 'text-hue-amber'
   return 'text-muted-foreground'
 }
 

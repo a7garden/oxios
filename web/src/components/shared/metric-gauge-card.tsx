@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cssVarToRgb } from '@/lib/utils'
 
 interface MetricGaugeCardProps {
   label: string
@@ -16,12 +17,13 @@ interface MetricGaugeCardProps {
  */
 export function MetricGaugeCard({ label, value, className }: MetricGaugeCardProps) {
   // 0–100 사용률 심각도: info(<75) · warning(75–90) · error(90+).
-  // SVG 인라인 style은 var()를 직접 쓸 수 없어 getComputedStyle로 해석.
-  const sevToken = value >= 90 ? '--error' : value >= 75 ? '--warning' : '--info'
-  const sevColor =
-    typeof window === 'undefined'
-      ? '#888'
-      : getComputedStyle(document.documentElement).getPropertyValue(sevToken).trim() || '#888'
+  const sevToken =
+    value >= 90
+      ? '--color-status-error'
+      : value >= 75
+        ? '--color-status-warning'
+        : '--color-status-info'
+  const sevColor = cssVarToRgb(sevToken)
 
   return (
     <Card className={className}>

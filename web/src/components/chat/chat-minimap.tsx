@@ -33,14 +33,14 @@ interface ChatMiniMapProps {
 function roleColor(role: ChatMessage['role']): string {
   switch (role) {
     case 'user':
-      return 'bg-blue-500'
+      return 'bg-status-info'
     case 'assistant':
-      return 'bg-emerald-500'
+      return 'bg-status-success'
     case 'tool':
-      return 'bg-gray-400'
+      return 'bg-muted-foreground'
     default:
       // system / unknown — kept neutral so the user can still see position.
-      return 'bg-gray-300'
+      return 'bg-muted-foreground'
   }
 }
 

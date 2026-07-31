@@ -22,7 +22,7 @@ export const WebSearchRender: ToolRenderComponent = ({ args, result, isRunning }
       {/* Results */}
       {isRunning ? (
         <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-block w-2 h-2 rounded-full bg-status-warning animate-pulse" />
           Searching...
         </div>
       ) : results.length > 0 ? (

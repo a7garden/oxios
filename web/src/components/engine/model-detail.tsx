@@ -30,13 +30,13 @@ export function ModelDetail({ model, className }: ModelDetailProps) {
         </h5>
         <div className="flex flex-wrap gap-1.5">
           {model.reasoning && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-warning-subtle text-status-warning-on-subtle text-xs">
               <Brain className="w-3 h-3" />
               Reasoning
             </span>
           )}
           {model.input.includes('image') && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-info-subtle text-status-info-on-subtle text-xs">
               <Eye className="w-3 h-3" />
               Vision
             </span>

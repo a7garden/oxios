@@ -4,12 +4,15 @@ import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useMemoryStats } from '@/hooks/use-memory'
+import { cssVarToRgb } from '@/lib/utils'
 
 const TIER_COLORS: Record<string, string> = {
-  hot: '#ef4444',
-  warm: '#eab308',
-  cold: '#3b82f6',
+  hot: cssVarToRgb('--color-status-error'),
+  warm: cssVarToRgb('--color-status-warning'),
+  cold: cssVarToRgb('--color-status-info'),
 }
+const FALLBACK_TIER_COLOR = cssVarToRgb('--color-text-muted')
+const TYPE_HUE_COLOR = cssVarToRgb('--color-hue-purple')
 
 /**
  * One horizontal distribution row: label · bar (scaled to `max`) · count.
@@ -107,7 +110,7 @@ export function MemoryOverview() {
                   label={t(`memory.${name}`, name)}
                   value={value}
                   max={tierMax}
-                  color={TIER_COLORS[name] ?? '#888'}
+                  color={TIER_COLORS[name] ?? FALLBACK_TIER_COLOR}
                 />
               ))
             ) : (
@@ -130,7 +133,7 @@ export function MemoryOverview() {
                   label={t(`memory.${name}`, name)}
                   value={value}
                   max={typeMax}
-                  color="#8884d8"
+                  color={TYPE_HUE_COLOR}
                 />
               ))
             ) : (

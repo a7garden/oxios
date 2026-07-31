@@ -21,11 +21,11 @@ export const BashRender: ToolRenderComponent = ({ args, result, isRunning, durat
       {/* Output */}
       {isRunning ? (
         <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-block w-2 h-2 rounded-full bg-status-warning animate-pulse" />
           Running...
         </div>
       ) : result != null ? (
-        <pre className="p-3 rounded bg-zinc-950 text-green-400 text-xs overflow-x-auto max-h-96 whitespace-pre-wrap font-mono leading-relaxed">
+        <pre className="p-3 rounded bg-surface-sunken text-status-success text-xs overflow-x-auto max-h-96 whitespace-pre-wrap font-mono leading-relaxed">
           {typeof result === 'string' ? result.slice(0, 10000) : JSON.stringify(result, null, 2)}
         </pre>
       ) : null}

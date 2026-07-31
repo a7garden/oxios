@@ -53,7 +53,6 @@ export function SaveDock({
       <div
         className={cn(
           'flex items-center gap-3 rounded-xl border bg-card/90 px-4 py-3 shadow-xl backdrop-blur',
-          'dark:border-white/[0.08]',
         )}
       >
         {/* Counts */}

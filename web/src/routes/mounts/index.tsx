@@ -138,13 +138,13 @@ function MountsPage() {
               {/* Name */}
               <div className="mb-2 flex items-center gap-2">
                 {mount.source === 'auto_promoted' ? (
-                  <Sparkles className="h-4 w-4 text-violet-500" />
+                  <Sparkles className="h-4 w-4 text-hue-purple" />
                 ) : (
                   <Wrench className="h-4 w-4" />
                 )}
                 <h3 className="font-semibold truncate">{mount.name}</h3>
                 {mount.source === 'auto_promoted' && (
-                  <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-xs text-violet-600">
+                  <span className="rounded-full bg-hue-purple/10 px-2 py-0.5 text-xs text-hue-purple">
                     {t('mounts.autoPromoted')}
                   </span>
                 )}
@@ -152,7 +152,7 @@ function MountsPage() {
                   <button
                     type="button"
                     onClick={() => handleRescan(mount)}
-                    className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 hover:bg-amber-500/20 transition-colors"
+                    className="rounded-full bg-status-warning/10 px-2 py-0.5 text-xs text-status-warning hover:bg-status-warning/20 transition-colors"
                     title={t('mounts.rescan')}
                   >
                     {t('mounts.needsRefresh')} ↻
