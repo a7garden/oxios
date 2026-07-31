@@ -55,3 +55,6 @@ report-*.json
 docs/archive/release-prep-status.md
 docs/superpowers/plans/
 web/src/components/knowledge/search-modal.tsx:*
+
+# OMP harness local state (auto-task scheduling, launchd plists)
+/.omp/
