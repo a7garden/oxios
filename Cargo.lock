@@ -436,7 +436,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "regex",
@@ -1124,7 +1124,7 @@ checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]
@@ -5491,7 +5491,7 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "1.33.1"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5542,7 +5542,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-calendar"
-version = "1.33.1"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5563,7 +5563,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-gateway"
-version = "1.33.1"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -5583,7 +5583,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-kernel"
-version = "1.33.1"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5641,7 +5641,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-markdown"
-version = "1.33.1"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5670,7 +5670,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-mcp"
-version = "1.33.1"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "parking_lot",
@@ -5682,7 +5682,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-memory"
-version = "1.33.1"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5705,7 +5705,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-ouroboros"
-version = "1.33.1"
+version = "1.34.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6115,7 +6115,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck",
- "itertools 0.12.1",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -6135,7 +6135,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn",

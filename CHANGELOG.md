@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-07-31
+
+### Changed
+- **Oxi design system (web)** — Adopted the canonical oxi design system: unified
+  design tokens (colors, typography, spacing, theme switching), replaced raw
+  palette colors and UI primitives with design-system tokens, and swapped
+  DESIGN.md for the canonical oxi design-system spec. Web UI is now styled
+  entirely from the token hierarchy.
+
+### Chore
+- **Project identity** — Migrated a7garden/oxios references to
+  project-oxi/oxios and unified the standard project-oxi MIT license.
+
 ## [1.33.1] - 2026-07-30
 
 ### Fixed
