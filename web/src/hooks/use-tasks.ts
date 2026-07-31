@@ -8,6 +8,7 @@ import type {
   SetScheduleParams,
   SetVerifyParams,
   Task,
+  TaskRun,
   TaskStatus,
 } from '@/types/task'
 
@@ -96,8 +97,21 @@ export function useSetTaskVerify() {
 export function useRunTask() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, prompt }: { id: string; prompt?: string }) =>
-      api.post(`/api/tasks/${id}/run`, { prompt }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
+    mutationFn: ({ id }: { id: string }) =>
+      api.post<{ id: string; success: boolean; summary: string }>(`/api/tasks/${id}/run`, {}),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      qc.invalidateQueries({ queryKey: ['task-runs', vars.id] })
+    },
+  })
+}
+
+// ── Run history ──
+
+export function useTaskRuns(id: string | null) {
+  return useQuery({
+    queryKey: ['task-runs', id],
+    queryFn: () => api.get<{ runs: TaskRun[]; count: number }>(`/api/tasks/${id}/runs`),
+    enabled: !!id,
   })
 }

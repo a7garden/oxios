@@ -2299,7 +2299,24 @@
     "run": "Run",
     "complete": "Complete",
     "runs": "{{count}} runs",
-    "every": "every {{secs}}s"
+    "every": "every {{secs}}s",
+    "automation": "Automation",
+    "automationNone": "Manual (no schedule)",
+    "automationSchedule": "Schedule (cron)",
+    "automationHeartbeat": "Heartbeat",
+    "intervalMinutes": "Interval (minutes)",
+    "scheduleLabel": "Schedule",
+    "nextRun": "Next run",
+    "lastResult": "Last result",
+    "history": "Run history",
+    "noRuns": "No runs yet",
+    "scheduleSaved": "Schedule saved",
+    "runFailed": "Run failed",
+    "details": "Details",
+    "triggerManual": "manual",
+    "triggerSchedule": "schedule",
+    "triggerHeartbeat": "heartbeat",
+    "statusRunning": "Running"
   },
   "search": {
     "panel": {
