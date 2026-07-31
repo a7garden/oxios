@@ -5,9 +5,59 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Oxios</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+    <!-- oxi type system: SUIT (body) + SUITE (headline) via jsDelivr.
+         Geist Mono is bundled at build time via @fontsource-variable/geist-mono. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css"
+    />
+    <link
+      rel="preload"
+      as="style"
+      href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/variable/woff2/SUITE-Variable.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/variable/woff2/SUITE-Variable.css"
+    />
+
+    <!-- FOUC prevention: resolve theme before first paint. Reads the oxi-theme
+         storage key (with one-time migration from the legacy oxios-theme key)
+         and prefers-color-scheme, then sets the .dark class on <html>. -->
+    <script>
+      (function () {
+        try {
+          var STORAGE_KEY = 'oxi-theme';
+          var LEGACY_KEY = 'oxios-theme';
+          var stored = localStorage.getItem(STORAGE_KEY);
+          if (stored === null) {
+            var legacy = localStorage.getItem(LEGACY_KEY);
+            if (legacy !== null) {
+              stored = legacy;
+              localStorage.setItem(STORAGE_KEY, legacy);
+              localStorage.removeItem(LEGACY_KEY);
+            }
+          }
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+          // Mirror theme.ts exactly: null/unknown → dark (oxios is dark-first),
+          // 'system' → OS preference, 'light' → light. Prevents a first-paint
+          // flash where the FOUC default disagrees with the store default.
+          var isDark = stored === 'system' ? prefersDark : stored !== 'light';
+          if (isDark) document.documentElement.classList.add('dark');
+        } catch (e) {
+          /* no-op — falls back to the store's dark default on hydration */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

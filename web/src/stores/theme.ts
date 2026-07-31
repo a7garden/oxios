@@ -20,7 +20,21 @@ function resolveTheme(theme: Theme): 'dark' | 'light' {
   return theme === 'system' ? getSystemTheme() : theme
 }
 
-const saved = (localStorage.getItem('oxios-theme') as Theme) || 'dark'
+// Canonical oxi storage key. Migrate any legacy 'oxios-theme' value once.
+const THEME_STORAGE_KEY = 'oxi-theme'
+function readStoredTheme(): Theme {
+  const current = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null
+  if (current !== null) return current
+  const legacy = localStorage.getItem('oxios-theme') as Theme | null
+  if (legacy !== null) {
+    localStorage.setItem(THEME_STORAGE_KEY, legacy)
+    localStorage.removeItem('oxios-theme')
+    return legacy
+  }
+  return 'dark'
+}
+
+const saved = readStoredTheme()
 const resolved = resolveTheme(saved)
 applyTheme(resolved)
 
@@ -29,7 +43,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
   resolved,
   setTheme: (theme) => {
     const r = resolveTheme(theme)
-    localStorage.setItem('oxios-theme', theme)
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
     applyTheme(r)
     set({ theme, resolved: r })
   },

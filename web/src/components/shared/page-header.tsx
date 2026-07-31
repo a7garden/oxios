@@ -10,6 +10,8 @@ interface PageHeaderProps {
   actions?: ReactNode
   /** 제목 행 옆 메타(버전 뱃지 · 카운트 · RFC 태그). 드물게 사용. */
   titleMeta?: ReactNode
+  /** SUITE display font for hero titles (dashboard only). §4.5 headline rule. */
+  display?: boolean
   className?: string
 }
 
@@ -29,12 +31,19 @@ interface PageHeaderProps {
  * Chat(/chat) · Knowledge(/knowledge)는 의도적으로 미사용 — 각기 중앙 정렬
  * 채팅 표면·브레드크럼 헤더 패러다임. Settings(/settings)는 3-zone SettingsShell.
  */
-export function PageHeader({ title, subtitle, actions, titleMeta, className }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  titleMeta,
+  display,
+  className,
+}: PageHeaderProps) {
   return (
     <div className={cn('flex items-center justify-between gap-4', className)}>
       <div className="min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-2xl font-bold truncate">{title}</h1>
+          <h1 className={cn('text-2xl font-bold truncate', display && 'font-display')}>{title}</h1>
           {titleMeta}
         </div>
         {subtitle && <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>}

@@ -105,6 +105,7 @@ function DashboardPage() {
       <PageHeader
         title={t('dashboard.title')}
         subtitle={t('dashboard.subtitle')}
+        display
         actions={
           status && (
             <div className="flex items-center gap-1.5">

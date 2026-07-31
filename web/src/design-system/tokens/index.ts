@@ -155,8 +155,9 @@ export const semanticColors = {
 
 export const typography = {
   fontFamily: {
-    sans: "'Geist', system-ui, -apple-system, sans-serif",
-    mono: "'Geist Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+    sans: "var(--font-sans, 'SUIT Variable', system-ui, sans-serif)",
+    display: "var(--font-display, 'SUITE Variable', system-ui, sans-serif)",
+    mono: "var(--font-mono, 'Geist Mono Variable', ui-monospace, monospace)",
   },
   fontSize: {
     '2xs': '10px', // Micro labels only (badges, metadata)

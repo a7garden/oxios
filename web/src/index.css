@@ -1,11 +1,27 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'highlight.js/styles/github-dark.css';
+/* Geist Mono — bundled via Fontsource (no runtime CDN dependency).
+   Registered family name is 'Geist Mono Variable'. */
+@import '@fontsource-variable/geist-mono';
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================================
+   @theme inline — utility generation.
+   EVERY legacy --color-* entry is preserved so existing utilities
+   (bg-background, text-muted-foreground, …) never silently no-op.
+   Canonical oxi tokens are ADDED alongside, not substituted.
+   `inline` emits utilities as var() references so .dark overrides resolve.
+   ============================================================================ */
 @theme inline {
+  /* ── Fonts — values in :root; self-ref so var(--font-sans) resolves in base layer ── */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  /* ── Legacy shadcn aliases (unchanged — keep working) ── */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -48,7 +64,7 @@
   --color-surface-section: var(--surface-section);
   --color-modified-accent: var(--modified-accent);
   --color-modified-row-bg: var(--modified-row-bg);
-  /* Semantic status colors — text, backgrounds, borders */
+  /* Legacy status tokens */
   --color-success: var(--success);
   --color-success-subtle: var(--success-subtle);
   --color-success-muted: var(--success-muted);
@@ -65,15 +81,64 @@
   --color-info-subtle: var(--info-subtle);
   --color-info-muted: var(--info-muted);
   --color-info-subtle-border: var(--info-subtle-border);
+
+  /* ── Canonical oxi semantic tokens (Tier 2 → utilities) ── */
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-sunken: var(--color-surface-sunken);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-subtle: var(--color-text-subtle);
+  --color-text-inverse: var(--color-text-inverse);
+  --color-line: var(--color-border);
+  --color-line-strong: var(--color-border-strong);
+  --color-focus-ring: var(--color-focus-ring);
+  /* Six-hue label palette */
+  --color-hue-red: var(--color-hue-red);
+  --color-hue-amber: var(--color-hue-amber);
+  --color-hue-green: var(--color-hue-green);
+  --color-hue-teal: var(--color-hue-teal);
+  --color-hue-blue: var(--color-hue-blue);
+  --color-hue-purple: var(--color-hue-purple);
+  /* Status — canonical names (values identical to legacy --success etc.) */
+  --color-status-success: var(--color-status-success);
+  --color-status-warning: var(--color-status-warning);
+  --color-status-error: var(--color-status-error);
+  --color-status-info: var(--color-status-info);
+  --color-status-success-subtle: var(--color-status-success-subtle);
+  --color-status-warning-subtle: var(--color-status-warning-subtle);
+  --color-status-error-subtle: var(--color-status-error-subtle);
+  --color-status-info-subtle: var(--color-status-info-subtle);
+  --color-status-success-on-subtle: var(--color-status-success-on-subtle);
+  --color-status-warning-on-subtle: var(--color-status-warning-on-subtle);
+  --color-status-error-on-subtle: var(--color-status-error-on-subtle);
+  --color-status-info-on-subtle: var(--color-status-info-on-subtle);
+  /* Status tinted bg + subtle borders (canonical names; values from legacy vars) */
+  --color-status-success-muted: var(--success-muted);
+  --color-status-warning-muted: var(--warning-muted);
+  --color-status-error-muted: var(--error-muted);
+  --color-status-info-muted: var(--info-muted);
+  --color-status-success-subtle-border: var(--success-subtle-border);
+  --color-status-warning-subtle-border: var(--warning-subtle-border);
+  --color-status-error-subtle-border: var(--error-subtle-border);
+  --color-status-info-subtle-border: var(--info-subtle-border);
+  /* Interactive primary — dedicated button fill (canonical blue) */
+  --color-interactive-primary: var(--color-interactive-primary);
+  --color-interactive-primary-foreground: var(--color-interactive-primary-foreground);
+
   /* Micro label text size — badges, metadata only. Prefer text-xs for readable text. */
   --text-2xs: 10px;
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Radius tiers — values in :root; utilities resolve via var() */
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-3xl: var(--radius-3xl);
+  --radius-4xl: var(--radius-4xl);
+  --radius-full: var(--radius-full);
   /* Animation tokens */
   --animate-in-duration: 200ms;
   --animate-in-duration-slow: 350ms;
@@ -85,30 +150,144 @@
 }
 
 /* ============================================================================
-   Oxios Design System — Geist base, OKLCH color space
+   Oxios Design System — oxi 3-tier token architecture
+   (canonical spec: ~/.omp/agent/managed-skills/oxi-design-system/DESIGN.md)
+   Neutral palette = canonical warm paper (hue 95 light / 265 ink).
+   Primary = canonical interactive-primary (blue). See §3, §6.2 of the oxi spec.
    ============================================================================ */
+
+/* ── Tier 1: Primitives (raw OKLCH; never consumed by components) ─────── */
 :root {
+  --p-neutral-0:   oklch(98.5% 0.004 95);
+  --p-neutral-50:  oklch(95% 0.006 95);
+  --p-neutral-100: oklch(90% 0.007 95);
+  --p-neutral-200: oklch(82% 0.008 95);
+  --p-neutral-300: oklch(75% 0.010 95);
+  --p-neutral-500: oklch(55% 0.012 95);
+  --p-neutral-700: oklch(35% 0.012 265);
+  --p-neutral-900: oklch(18% 0.015 265);
+  --p-neutral-950: oklch(13% 0.020 265);
+  --p-neutral-999: oklch(0% 0 0);
   --radius: 0.625rem;
-  --background: oklch(0.99 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  /* Primary with subtle blue chroma — technical authority */
-  --primary: oklch(0.23 0.025 265);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.23 0.025 265);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.003 265);
-  --accent-foreground: oklch(0.23 0.025 265);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.45 0.04 265);
+  /* Radius scale — concrete values (not calc-chained) so theme
+     tree-shaking can never drop a tier. Canonical per §5.2. */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+  --radius-full: 9999px;
+  /* Type families (SUIT body / SUITE display / Geist Mono code).
+     Declared in :root so var(--font-sans) resolves in the base layer. */
+  --font-sans: 'SUIT Variable', 'SUIT', system-ui, -apple-system, 'Inter', sans-serif;
+  --font-display: 'SUITE Variable', 'SUITE', system-ui, -apple-system, 'Inter', sans-serif;
+  --font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --text-2xs: 10px;
+}
+
+/* ── Tier 2: Semantic tokens (light) ─────────────────────────────────── */
+:root {
+  /* Surfaces */
+  --color-surface:        var(--p-neutral-0);
+  --color-surface-raised: oklch(1 0 0);
+  --color-surface-sunken: var(--p-neutral-50);
+  --color-surface-muted:  oklch(96% 0.005 265);
+  /* Text */
+  --color-text:        var(--p-neutral-900);
+  --color-text-muted:  var(--p-neutral-500);
+  --color-text-subtle: oklch(0.42 0.010 95);
+  --color-text-inverse: oklch(0.985 0 0);
+  /* Border / focus */
+  --color-border:        var(--p-neutral-100);
+  --color-border-strong: var(--p-neutral-200);
+  --color-focus-ring:    oklch(0.45 0.04 265);
+  /* Six-hue label palette (L≈0.70–0.75, C≈0.12–0.15) */
+  --color-hue-red:    oklch(0.75 0.15 25);
+  --color-hue-amber:  oklch(0.75 0.15 75);
+  --color-hue-green:  oklch(0.75 0.13 145);
+  --color-hue-teal:   oklch(0.75 0.12 195);
+  --color-hue-blue:   oklch(0.70 0.14 250);
+  --color-hue-purple: oklch(0.72 0.15 310);
+  /* Status (APCA-optimized) */
+  --color-status-success: oklch(0.596 0.145 163);
+  --color-status-warning: oklch(0.669 0.162 70);
+  --color-status-error:   oklch(0.577 0.245 27.325);
+  --color-status-info:    oklch(0.623 0.214 259.815);
+  --color-status-success-subtle: oklch(0.97 0.014 163);
+  --color-status-warning-subtle: oklch(0.97 0.014 70);
+  --color-status-error-subtle:   oklch(0.97 0.014 27);
+  --color-status-info-subtle:    oklch(0.97 0.014 259);
+  --color-status-success-on-subtle: oklch(0.40 0.13 163);
+  --color-status-warning-on-subtle: oklch(0.45 0.14 70);
+  --color-status-error-on-subtle:   oklch(0.42 0.18 27);
+  --color-status-info-on-subtle:    oklch(0.42 0.16 259);
+  /* Interactive primary (canonical blue button fill) */
+  --color-interactive-primary:           oklch(0.45 0.14 250);
+  --color-interactive-primary-foreground: oklch(0.985 0 0);
+
+  /* ── Tier 3: Component tokens ─────────────────────────────────────── */
+  --button-radius:         var(--radius-md);
+  --input-radius:          var(--radius-md);
+  --select-radius:         var(--radius-md);
+  --textarea-radius:       var(--radius-md);
+  --card-radius:           var(--radius-lg);
+  --dialog-radius:         var(--radius-lg);
+  --popover-radius:        var(--radius-xl);
+  --tooltip-radius:        var(--radius-xl);
+  --badge-radius:          var(--radius-full);
+  --avatar-radius:         var(--radius-full);
+  --tag-radius:            var(--radius-xs);
+  --nav-item-radius:       var(--radius-md);
+  --nav-item-dense-radius: var(--radius-sm);
+  /* Input borders: box-shadow (no 1px layout shift on state change) */
+  --input-shadow:        0 0 0 1px var(--color-border);
+  --input-shadow-focus:  0 0 0 1px var(--color-focus-ring), 0 0 0 4px oklch(0.45 0.04 265 / 0.15);
+  --input-shadow-error:  0 0 0 1px var(--color-status-error);
+
+  /* ── Legacy shadcn aliases → canonical (identity-preserving) ──────── */
+  --background: var(--color-surface);
+  --foreground: var(--color-text);
+  --card: var(--color-surface-raised);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface-raised);
+  --popover-foreground: var(--color-text);
+  /* Primary = canonical interactive-primary (blue) — CTAs, selection, checked.
+     Secondary/accent foregrounds stay text (not primary) so they don't turn blue. */
+  --primary: var(--color-interactive-primary);
+  --primary-foreground: var(--color-interactive-primary-foreground);
+  --secondary: var(--color-surface-muted);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-surface-muted);
+  --muted-foreground: var(--color-text-muted);
+  --accent: var(--color-surface-muted);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-status-error);
+  --destructive-foreground: var(--color-text-inverse);
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-focus-ring);
+  /* Status aliases */
+  --success: var(--color-status-success);
+  --warning: var(--color-status-warning);
+  --error:   var(--color-status-error);
+  --info:    var(--color-status-info);
+  --success-subtle: var(--color-status-success-subtle);
+  --warning-subtle: var(--color-status-warning-subtle);
+  --error-subtle:   var(--color-status-error-subtle);
+  --info-subtle:    var(--color-status-info-subtle);
+  --success-muted: oklch(0.596 0.145 163 / 0.15);
+  --warning-muted: oklch(0.669 0.162 70 / 0.15);
+  --error-muted:   oklch(0.577 0.245 27.325 / 0.15);
+  --info-muted:    oklch(0.623 0.214 259.815 / 0.15);
+  --success-subtle-border: oklch(0.91 0.05 163);
+  --warning-subtle-border: oklch(0.91 0.05 70);
+  --error-subtle-border:   oklch(0.91 0.05 27);
+  --info-subtle-border:    oklch(0.91 0.05 259);
+
+  /* Charts / messages / sidebar (oxios-specific, kept verbatim) */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -121,108 +300,102 @@
   --message-handshake: oklch(0.769 0.188 70.08);
   --message-default: oklch(0.704 0.04 256.788);
   --sidebar: oklch(0.978 0.002 265);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.23 0.025 265);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.003 265);
-  --sidebar-accent-foreground: oklch(0.23 0.025 265);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.45 0.04 265);
-  /* ── Semantic status tokens ─────────────────────────────── */
-  --success: oklch(0.596 0.145 163);
-  --warning: oklch(0.669 0.162 70);
-  --error: oklch(0.577 0.245 27.325);
-  --info: oklch(0.623 0.214 259.815);
-  --success-subtle: oklch(0.97 0.014 163);
-  --warning-subtle: oklch(0.97 0.014 70);
-  --error-subtle: oklch(0.97 0.014 27);
-  --info-subtle: oklch(0.97 0.014 259);
-  --success-muted: oklch(0.696 0.17 162.48 / 0.15);
-  --warning-muted: oklch(0.769 0.188 70.08 / 0.15);
-  --error-muted: oklch(0.577 0.245 27.325 / 0.15);
-  --info-muted: oklch(0.623 0.214 259.815 / 0.15);
-  --success-subtle-border: oklch(0.91 0.05 163);
-  --warning-subtle-border: oklch(0.91 0.05 70);
-  --error-subtle-border: oklch(0.91 0.05 27);
-  --info-subtle-border: oklch(0.91 0.05 259);
-  /* ── Settings panel surface + modified-state accents ─────────────────
-     Composed via color-mix over the theme's semantic vars so they
-     re-resolve correctly in both light and dark without duplication. */
+  --sidebar-foreground: var(--color-text);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--color-border);
+  --sidebar-ring: var(--color-focus-ring);
+
+  /* Settings panel surface + modified-state accents — composed via color-mix
+     over the theme's semantic vars so they re-resolve in both modes. */
   --surface-section: color-mix(in oklch, var(--muted) 30%, var(--background));
   --modified-accent: var(--primary);
   --modified-row-bg: color-mix(in oklch, var(--primary) 3%, transparent);
-  /* ── Elevation shadows ─────────────────────────────────── */
+
+  /* Elevation shadows */
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
   --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
   --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.08);
-  /* ── Knowledge editor typography ───────────────────────────
-     Two-track font system: a proportional sans for prose (body,
-     headings, quotes) and a monospace for code blocks/inline code.
-     The editor scroller uses the body font; code explicitly opts
-     into the mono font via live-preview styles. */
+
+  /* Knowledge editor typography — two-track: proportional sans for prose,
+     monospace for code. Body font migrated Geist→SUIT. */
   --editor-font-size: 0.9375rem; /* 15px — comfortable prose reading */
   --editor-line-height: 1.75; /* relaxed prose editing */
-  --editor-font-body: 'Geist', system-ui, -apple-system, sans-serif;
-  --editor-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --editor-font-body: var(--font-sans);
+  --editor-font-mono: var(--font-mono);
 }
 
+/* ── Dark theme: override canonical semantic tokens (aliases follow) ── */
 .dark {
-  --background: oklch(0.13 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.19 0.008 265);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.19 0.008 265);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.91 0.03 265);
-  --primary-foreground: oklch(0.15 0.02 265);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.01 265);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.6 0.05 265);
+  /* Primitives (dark) */
+  --p-neutral-50:  oklch(0.274 0.006 286.033);
+  --p-neutral-100: oklch(1 0 0 / 10%);
+  --p-neutral-200: oklch(1 0 0 / 15%);
+  --p-neutral-500: oklch(0.705 0.015 286.067);
+  --p-neutral-900: oklch(0.985 0 0);
+  --p-neutral-950: oklch(0.13 0.005 285.823);
+  /* Surfaces */
+  --color-surface:        var(--p-neutral-950);
+  --color-surface-raised: oklch(0.19 0.008 265);
+  --color-surface-sunken: oklch(0.11 0.005 285.823);
+  --color-surface-muted:  var(--p-neutral-50);
+  /* Text */
+  --color-text:        var(--p-neutral-900);
+  --color-text-muted:  var(--p-neutral-500);
+  --color-text-subtle: oklch(0.75 0.012 265);
+  --color-text-inverse: var(--p-neutral-900);
+  /* Border / focus */
+  --color-border:        var(--p-neutral-100);
+  --color-border-strong: var(--p-neutral-200);
+  --color-focus-ring:    oklch(0.6 0.05 265);
+  /* Hue labels: L +0.05 (C/H fixed per §3.1 L-only rule) */
+  --color-hue-red:    oklch(0.78 0.14 25);
+  --color-hue-amber:  oklch(0.78 0.14 75);
+  --color-hue-green:  oklch(0.78 0.12 145);
+  --color-hue-teal:   oklch(0.78 0.11 195);
+  --color-hue-blue:   oklch(0.74 0.13 250);
+  --color-hue-purple: oklch(0.76 0.14 310);
+  /* Status — APCA-optimized for dark (C/H may shift per §3.1) */
+  --color-status-success: oklch(0.723 0.219 149.579);
+  --color-status-warning: oklch(0.769 0.188 70.08);
+  --color-status-error:   oklch(0.704 0.191 22.216);
+  --color-status-info:    oklch(0.685 0.196 259);
+  --color-status-success-subtle: oklch(0.18 0.03 163);
+  --color-status-warning-subtle: oklch(0.18 0.03 70);
+  --color-status-error-subtle:   oklch(0.18 0.03 27);
+  --color-status-info-subtle:    oklch(0.18 0.03 259);
+  --color-status-success-on-subtle: oklch(0.80 0.10 163);
+  --color-status-warning-on-subtle: oklch(0.82 0.10 70);
+  --color-status-error-on-subtle:   oklch(0.78 0.12 27);
+  --color-status-info-on-subtle:    oklch(0.78 0.10 259);
+  /* Interactive primary — lighter fill for dark (dark text passes) */
+  --color-interactive-primary:           oklch(0.70 0.14 250);
+  --color-interactive-primary-foreground: oklch(0.15 0.02 265);
+
+  /* Primary follows --color-interactive-primary (dark value set above). */
+  --accent: var(--color-surface-muted);
+
+  /* Status muted (dark) */
+  --success-muted: oklch(0.723 0.219 149.579 / 0.15);
+  --warning-muted: oklch(0.769 0.188 70.08 / 0.15);
+  --error-muted:   oklch(0.704 0.191 22.216 / 0.15);
+  --info-muted:    oklch(0.685 0.196 259 / 0.15);
+  --success-subtle-border: oklch(0.28 0.04 163);
+  --warning-subtle-border: oklch(0.28 0.04 70);
+  --error-subtle-border:   oklch(0.28 0.04 27);
+  --info-subtle-border:    oklch(0.28 0.04 259);
+
+  /* Charts / messages / sidebar (dark) */
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.16 0.008 265);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.91 0.03 265);
-  --sidebar-primary-foreground: oklch(0.15 0.02 265);
-  --sidebar-accent: oklch(0.274 0.01 265);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.6 0.05 265);
-  /* ── Semantic status tokens (dark) ─────────────────────── */
-  --success: oklch(0.723 0.219 149.579);
-  --warning: oklch(0.769 0.188 70.08);
-  --error: oklch(0.704 0.191 22.216);
-  --info: oklch(0.685 0.196 259);
-  --success-subtle: oklch(0.18 0.03 163);
-  --warning-subtle: oklch(0.18 0.03 70);
-  --error-subtle: oklch(0.18 0.03 27);
-  --info-subtle: oklch(0.18 0.03 259);
-  --success-muted: oklch(0.723 0.219 149.579 / 0.15);
-  --warning-muted: oklch(0.769 0.188 70.08 / 0.15);
-  --error-muted: oklch(0.704 0.191 22.216 / 0.15);
-  --info-muted: oklch(0.685 0.196 259 / 0.15);
-  --success-subtle-border: oklch(0.28 0.04 163);
-  --warning-subtle-border: oklch(0.28 0.04 70);
-  --error-subtle-border: oklch(0.28 0.04 27);
-  --info-subtle-border: oklch(0.28 0.04 259);
-  /* ── Settings panel surface + modified-state accents (dark) ────────
-     Same color-mix expressions as :root — they re-resolve against the
-     dark overrides of --muted / --primary / --background above. */
-  --surface-section: color-mix(in oklch, var(--muted) 30%, var(--background));
-  --modified-accent: var(--primary);
-  --modified-row-bg: color-mix(in oklch, var(--primary) 3%, transparent);
-  /* ── Elevation shadows (dark — higher alpha for depth) ─── */
+
+  /* Elevation shadows (dark — higher alpha) */
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
   --shadow-md: 0 2px 8px oklch(0 0 0 / 0.3);
   --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.4);
@@ -241,11 +414,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family:
-      'Geist',
-      system-ui,
-      -apple-system,
-      sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -278,14 +447,14 @@
     -webkit-user-select: none;
     user-select: none;
   }
-  
+
   button, [role='button'], a {
     -webkit-tap-highlight-color: transparent;
   }
 
   /* Keyboard key indicator — shortcuts, command hints */
   kbd {
-    font-family: 'Geist Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 0.7rem;
     padding: 0.1rem 0.35rem;
     border-radius: 0.25rem;

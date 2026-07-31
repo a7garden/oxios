@@ -15,8 +15,7 @@ import { persist } from 'zustand/middleware'
 
 /** Font-family presets offered in the settings popover. */
 export const FONT_PRESETS: { label: string; value: string }[] = [
-  { label: 'Geist Sans', value: "'Geist', system-ui, sans-serif" },
-  { label: 'Serif', value: "ui-serif, Georgia, 'Times New Roman', serif" },
+  { label: 'SUIT', value: 'var(--font-sans)' },
   { label: 'System Mono', value: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace' },
   { label: 'Menlo', value: 'Menlo, monospace' },
   { label: 'Monaco', value: 'Monaco, monospace' },
@@ -69,7 +68,7 @@ export interface EditorPrefs {
 const DEFAULTS: Omit<EditorPrefs, 'setPref' | 'reset'> = {
   fontSize: 15,
   lineHeight: 1.75,
-  fontFamily: "'Geist', system-ui, sans-serif",
+  fontFamily: 'var(--font-sans)',
 
   emojiFold: true,
   mathFold: true,
@@ -98,7 +97,7 @@ export const useEditorPrefs = create<EditorPrefs>()(
     }),
     {
       name: 'oxios-editor-prefs',
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         const state = (persisted ?? {}) as Record<string, unknown>
         // v2: default font switched from mono to Geist sans, font size
@@ -109,6 +108,18 @@ export const useEditorPrefs = create<EditorPrefs>()(
           delete state.headingColors
           delete state.fontSize
           delete state.lineHeight
+        }
+        // v3: body font migrated Geist→SUIT and the Serif preset was removed
+        // (no serif in the oxi system). Drop persisted Geist or serif stacks so
+        // the new SUIT default applies; otherwise users keep a ghost font they
+        // can no longer select.
+        if (version < 3) {
+          if (
+            typeof state.fontFamily === 'string' &&
+            (state.fontFamily.includes('Geist') || state.fontFamily.includes('serif'))
+          ) {
+            delete state.fontFamily
+          }
         }
         return state
       },
