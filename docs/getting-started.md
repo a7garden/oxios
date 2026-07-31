@@ -80,7 +80,7 @@ $ cargo install oxios
 Clone the repository and build a distribution binary:
 
 ```bash
-$ git clone https://github.com/a7garden/oxios
+$ git clone https://github.com/project-oxi/oxios
 $ cd oxios
 $ cargo build --profile dist
   Compiling oxios v0.1.2 (...)
@@ -97,16 +97,16 @@ cp target/dist/oxios ~/.cargo/bin/
 
 ### Option C: Pre-built Binary
 
-Download the latest binary from [GitHub Releases](https://github.com/a7garden/oxios/releases):
+Download the latest binary from [GitHub Releases](https://github.com/project-oxi/oxios/releases):
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/a7garden/oxios/releases/latest/download/oxios-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/project-oxi/oxios/releases/latest/download/oxios-aarch64-apple-darwin.tar.gz | tar xz
 chmod +x oxios
 mv oxios ~/.cargo/bin/
 
 # Linux (x86_64)
-curl -L https://github.com/a7garden/oxios/releases/latest/download/oxios-x86_64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/project-oxi/oxios/releases/latest/download/oxios-x86_64-unknown-linux-gnu.tar.gz | tar xz
 chmod +x oxios
 mv oxios ~/.cargo/bin/
 ```
@@ -1111,4 +1111,4 @@ $ cargo uninstall oxios
 
 ---
 
-*Built by [a7garden](https://github.com/a7garden). Licensed under [MIT](https://github.com/a7garden/oxios/blob/main/LICENSE).*
+*Built by [a7garden](https://github.com/a7garden). Licensed under [MIT](https://github.com/project-oxi/oxios/blob/main/LICENSE).*

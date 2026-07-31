@@ -176,7 +176,7 @@ Create `docker-compose/production/` with:
 ```yaml
 services:
   oxios:
-    image: ghcr.io/a7garden/oxios:latest
+    image: ghcr.io/project-oxi/oxios:latest
     ports: ["9876:9876"]
     volumes:
       - oxios_data:/root/.oxios

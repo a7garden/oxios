@@ -151,7 +151,7 @@ jobs:
           for i in $(seq 1 60); do
             # Query crates.io API for the max stable version.
             # crates.io requires a User-Agent header — bare curl gets 403.
-            SEEN=$(curl -fsSL -H "User-Agent: oxios-publish-ci/1.0 (github.com/a7garden/oxios)" \
+            SEEN=$(curl -fsSL -H "User-Agent: oxios-publish-ci/1.0 (github.com/project-oxi/oxios)" \
               "https://crates.io/api/v1/crates/$WAIT" \
               | grep -oE '"max_stable_version":[[:space:]]*"[^"]+"' \
               | head -1 | sed -E 's/.*:[[:space:]]*"([^"]+)".*/\1/')

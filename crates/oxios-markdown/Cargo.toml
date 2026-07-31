@@ -4,7 +4,7 @@ version = "1.33.1"
 edition = "2024"
 license = "MIT"
 description = "Markdown knowledge management — ported from files.md by Artem Zakirullin"
-repository = "https://github.com/a7garden/oxios"
+repository = "https://github.com/project-oxi/oxios"
 keywords = ["markdown", "knowledge", "notes"]
 categories = ["text-processing"]
 

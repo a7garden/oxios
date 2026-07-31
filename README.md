@@ -10,7 +10,7 @@
 [![Version](https://img.shields.io/badge/Version-1.1.0-6E40C9?logo=rust&logoColor=white)](https://crates.io/crates/oxios)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Lines of Code](https://img.shields.io/badge/LOC-67K%2B-00A86B?logo=rust&logoColor=white)]()
-[![GitHub](https://img.shields.io/badge/GitHub-a7garden%2Foxios-181717?logo=github)](https://github.com/a7garden/oxios)
+[![GitHub](https://img.shields.io/badge/GitHub-a7garden%2Foxios-181717?logo=github)](https://github.com/project-oxi/oxios)
 
 **Built with**
 
@@ -81,7 +81,7 @@ Large language models are powerful, but they're stuck in chat boxes. Oxios gives
 **macOS (Apple Silicon)** — prebuilt binary, no Rust toolchain needed:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/a7garden/oxios/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/project-oxi/oxios/main/scripts/install.sh | bash
 ```
 
 **Other platforms** (or build from source):

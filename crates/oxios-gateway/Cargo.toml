@@ -4,7 +4,7 @@ version = "1.33.1"
 edition = "2024"
 description = "Channel-agnostic message gateway for Oxios"
 license = "MIT"
-repository = "https://github.com/a7garden/oxios"
+repository = "https://github.com/project-oxi/oxios"
 
 [dependencies]
 oxios-kernel = { version = "1.33.1", path = "../oxios-kernel", default-features = false, features = ["sqlite-memory"] }

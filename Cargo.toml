@@ -22,7 +22,7 @@ include = [
     "/AGENTS.md",
     "/CHANGELOG.md",
 ]
-repository = "https://github.com/a7garden/oxios"
+repository = "https://github.com/project-oxi/oxios"
 readme = "README.md"
 keywords = ["agent", "ai", "os", "automation"]
 categories = ["command-line-utilities", "asynchronous"]
