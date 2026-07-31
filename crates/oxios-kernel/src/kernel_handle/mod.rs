@@ -52,6 +52,7 @@ pub use state_api::StateApi;
 pub use token_maxing_api::TokenMaxingApi;
 
 use crate::git_layer::CommitInfo;
+use crate::orchestrator::{OrchestrationResult, Orchestrator};
 use crate::readiness::ReadinessGate;
 use parking_lot::RwLock;
 use serde::Serialize;
@@ -126,6 +127,12 @@ pub struct KernelHandle {
     /// the orchestrator and drops it after the collector completes; the
     /// `Weak` entries auto-clean.
     pub streaming_sinks: Arc<crate::streaming_sink::StreamingSinkRegistry>,
+    /// The Ouroboros orchestrator — the "brain". Attached by the kernel
+    /// assembler so background loops (cron auto-start, task auto-run) and
+    /// the HTTP task-run handler share ONE execution primitive (`run_goal`)
+    /// instead of each rebuilding the orchestration call. `None` on the
+    /// preliminary handle before full assembly.
+    pub orchestrator: Option<Arc<Orchestrator>>,
 }
 
 impl KernelHandle {
@@ -179,6 +186,7 @@ impl KernelHandle {
             // startup via `readiness.set_*` / a background task.
             readiness: Arc::new(ReadinessGate::new(0)),
             streaming_sinks: Arc::new(crate::streaming_sink::StreamingSinkRegistry::new()),
+            orchestrator: None,
         }
     }
 
@@ -237,9 +245,55 @@ impl KernelHandle {
         self
     }
 
+    /// Attach the orchestrator (the "brain"). Called by the kernel assembler
+    /// so background loops and the HTTP task-run handler share one execution
+    /// primitive via [`Self::run_goal`].
+    pub fn with_orchestrator(mut self, orchestrator: Arc<Orchestrator>) -> Self {
+        self.orchestrator = Some(orchestrator);
+        self
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // Convenience methods (cross-Facades orchestration)
     // ═══════════════════════════════════════════════════════════════════════
+    /// Execute a goal through the Ouroboros pipeline.
+    ///
+    /// The single shared execution primitive for autonomous/scheduled runs.
+    /// Used by:
+    /// - the CronScheduler auto-start loop (background cron job execution),
+    /// - the task auto-run tick loop (scheduled/heartbeat tasks),
+    /// - `POST /api/tasks/:id/run` (manual task execution).
+    ///
+    /// This calls `orchestrator.handle_unified` directly — the same in-process
+    /// path the CLI uses (`execute_prompt_with_session`). It does NOT route
+    /// through the gateway, so there is no HTTP response correlation: callers
+    /// simply `await` the [`OrchestrationResult`].
+    ///
+    /// Returns an error if the orchestrator was not attached (preliminary
+    /// handle) — the cached handle from `Kernel::handle()` always has it.
+    pub async fn run_goal(
+        &self,
+        goal: &str,
+        session_id: Option<&str>,
+    ) -> anyhow::Result<OrchestrationResult> {
+        let orch = self
+            .orchestrator
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("orchestrator not wired on this handle"))?;
+        let request_id = format!("run-goal-{}", uuid::Uuid::new_v4());
+        orch.handle_unified(
+            "system",
+            goal,
+            session_id,
+            None,
+            None,
+            None,
+            None,
+            None,
+            &request_id,
+        )
+        .await
+    }
 
     /// Save data and commit to git (State + Infra).
     ///

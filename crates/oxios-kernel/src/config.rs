@@ -15,8 +15,10 @@ use crate::types::Priority;
 /// Cron scheduler configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CronConfig {
-    /// Enable the cron scheduler.
-    #[serde(default)]
+    /// Enable the cron scheduler (auto-starts at boot; a no-op tick when no
+    /// jobs are registered). Defaults to `true` so registered cron jobs fire
+    /// out-of-the-box without requiring explicit opt-in.
+    #[serde(default = "default_cron_enabled")]
     pub enabled: bool,
     /// Tick interval in seconds.
     #[serde(default = "default_tick_interval")]
@@ -29,7 +31,7 @@ pub struct CronConfig {
 impl Default for CronConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: default_cron_enabled(),
             tick_interval_secs: default_tick_interval(),
             jobs: std::collections::HashMap::new(),
         }
@@ -38,6 +40,11 @@ impl Default for CronConfig {
 
 fn default_tick_interval() -> u64 {
     60
+}
+
+/// Cron is enabled by default so registered jobs auto-fire at boot.
+fn default_cron_enabled() -> bool {
+    true
 }
 
 /// Inline cron job definition in config.toml.
