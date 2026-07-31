@@ -277,6 +277,10 @@ impl Kernel {
                     self.build_calendar_api(),
                     Arc::new(parking_lot::RwLock::new(self.build_email_api())),
                 );
+                // Attach the orchestrator so background loops (cron auto-start,
+                // task auto-run) and the HTTP task-run handler share one
+                // execution primitive via KernelHandle::run_goal.
+                let kh = kh.with_orchestrator(self.orchestrator.clone());
                 // RFC-025: attach MountApi to the handle the HTTP API and CLI
                 // actually use. The orchestrator gets its own Arc directly; this
                 // facade is what `/api/mounts` reads (`state.kernel.mounts`).
@@ -591,6 +595,70 @@ impl Kernel {
     #[allow(dead_code)]
     pub async fn run_gateway(&self) -> Result<()> {
         self.gateway.run().await
+    }
+
+    /// Start the CronScheduler: restore persisted jobs, load config-defined
+    /// jobs, then run the tick loop. Each fired job's goal is executed through
+    /// the shared [`KernelHandle::run_goal`] primitive (direct orchestrator
+    /// path — no gateway correlation, since this is a background task with no
+    /// waiting HTTP client).
+    ///
+    /// Must be called after `handle()` is cached (so the orchestrator is
+    /// attached) and after the intent engine is wired — both are true once
+    /// `Kernel::build()` returns. The default 60 s tick also lands post-boot.
+    ///
+    /// Returns the loop's `JoinHandle` so the caller can track it for liveness,
+    /// or `None` when cron is disabled in config (no task to track — a
+    /// completed handle would otherwise look like a fatal critical-task exit).
+    pub fn start_cron_loop(&self) -> Option<tokio::task::JoinHandle<()>> {
+        if !self.config.cron.enabled {
+            tracing::info!("Cron scheduler disabled in config; not starting");
+            return None;
+        }
+        let scheduler = self.cron_scheduler.clone();
+        let handle = self.handle();
+        let cron_config = self.config.cron.clone();
+        Some(tokio::spawn(async move {
+            // Restore persisted jobs, then add config-defined ones (API jobs win).
+            scheduler.restore_jobs().await;
+            scheduler.load_from_config(&cron_config).await;
+
+            let handle_for_exec = handle.clone();
+            scheduler
+                .start(move |job_id, goal| {
+                    let handle = handle_for_exec.clone();
+                    async move {
+                        match handle.run_goal(&goal, None).await {
+                            Ok(result) => {
+                                // Success signal: no provider failure AND
+                                // evaluation passed. evaluation_passed is None
+                                // for goals with no acceptance criteria/review
+                                // (always, for cron jobs), so the default must
+                                // be true — a goal that ran without error is a
+                                // success.
+                                let success = result.failure_class.is_none()
+                                    && result.evaluation_passed.unwrap_or(true);
+                                let summary = result
+                                    .output
+                                    .clone()
+                                    .unwrap_or_else(|| result.response.clone());
+                                tracing::info!(
+                                    %job_id,
+                                    success,
+                                    phase = %result.phase_reached,
+                                    "Cron job executed"
+                                );
+                                (success, summary)
+                            }
+                            Err(e) => {
+                                tracing::error!(%job_id, error = %e, "Cron job execution failed");
+                                (false, format!("Error: {e}"))
+                            }
+                        }
+                    }
+                })
+                .await;
+        }))
     }
 
     // ── Initialization helpers (used by default mode only) ─────────────

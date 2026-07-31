@@ -156,8 +156,9 @@ pub(crate) use system::{
     handle_update_run,
 };
 pub(crate) use task_routes::{
-    handle_task_create, handle_task_delete, handle_task_get, handle_task_run,
-    handle_task_set_schedule, handle_task_set_verify, handle_task_update_status, handle_tasks_list,
+    execute_task_run, handle_task_create, handle_task_delete, handle_task_get, handle_task_run,
+    handle_task_runs, handle_task_set_schedule, handle_task_set_verify, handle_task_update_status,
+    handle_tasks_list,
 };
 pub(crate) use token_maxing_routes::{
     handle_token_maxing_providers, handle_token_maxing_session, handle_token_maxing_sessions,
@@ -512,6 +513,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/tasks/{id}/schedule", put(handle_task_set_schedule))
         .route("/api/tasks/{id}/verify", put(handle_task_set_verify))
         .route("/api/tasks/{id}/run", post(handle_task_run))
+        .route("/api/tasks/{id}/runs", get(handle_task_runs))
         // Calendar
         .route(
             "/api/calendar/events",

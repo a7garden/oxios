@@ -470,6 +470,9 @@ impl Surface for WebSurface {
                 "API docs disabled (set gateway.expose_api_docs=true on a loopback bind to enable)"
             );
         }
+        // Spawn the task auto-run tick loop BEFORE `state` is moved into the
+        // router. It clones the Arc internally.
+        let task_tick = spawn_task_auto_run(state.clone());
 
         let app = app.with_state(state);
 
@@ -503,7 +506,69 @@ impl Surface for WebSurface {
 
         Ok(SurfaceHandle {
             channel: Some(Box::new(web_channel)),
-            tasks: vec![handle],
+            tasks: vec![handle, task_tick],
         })
     }
+}
+
+/// Background loop that drives scheduled/heartbeat tasks.
+///
+/// Every 60 s, polls `list_due_tasks` and executes each due task on its own
+/// task (bounded concurrency via spawn; a stuck LLM call doesn't block the
+/// tick). Each run goes through the shared `execute_task_run` helper, so the
+/// manual run endpoint and this loop share ONE execution path.
+///
+/// On boot it first recovers tasks stranded at `running` by a prior crash
+/// (the Task model persists status to SQLite, unlike the CronScheduler's
+/// in-memory set).
+fn spawn_task_auto_run(state: Arc<AppState>) -> tokio::task::JoinHandle<()> {
+    use oxios_kernel::task::{TaskAutomationMode, TaskRunTrigger};
+
+    tokio::spawn(async move {
+        let task_store = state.task_store.clone();
+        let kernel = state.kernel.clone();
+
+        // Boot recovery: close orphaned runs + reset stranded tasks.
+        if let Err(e) = task_store.lock().await.recover_stranded().await {
+            tracing::warn!(error = %e, "Task stranded-recovery failed");
+        }
+
+        // First tick fires immediately (interval semantics); consume it so we
+        // don't double-fire right after recovery, then poll every 60 s.
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        interval.tick().await;
+
+        loop {
+            interval.tick().await;
+            let due = match task_store.lock().await.list_due_tasks().await {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::warn!(error = %e, "list_due_tasks failed");
+                    continue;
+                }
+            };
+            for task in due {
+                // Safety: skip exhausted tasks (list_due_tasks shouldn't
+                // return them, but guard against a race).
+                if task.is_exhausted() {
+                    continue;
+                }
+                let trigger = match task.automation_mode {
+                    Some(TaskAutomationMode::Schedule) => TaskRunTrigger::Schedule,
+                    _ => TaskRunTrigger::Heartbeat,
+                };
+                let ts = task_store.clone();
+                let kh = kernel.clone();
+                let id = task.id.clone();
+                let instr = task.instruction.clone();
+                tokio::spawn(async move {
+                    // Scheduled runs use the longer cron-style ceiling (600 s).
+                    let (_, success, summary) =
+                        routes::execute_task_run(ts, kh, &id, &instr, trigger, 600).await;
+                    tracing::info!(%id, success, "Scheduled task run completed");
+                    let _ = summary; // recorded in task_runs by the helper
+                });
+            }
+        }
+    })
 }
