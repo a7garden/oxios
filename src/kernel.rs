@@ -302,7 +302,22 @@ impl Kernel {
                 ));
                 let kh =
                     kh.with_compression(oxios_kernel::CompressionApi::new(compression_service));
-                Arc::new(kh)
+
+                // Unified asset store (~/.oxios/assets/).
+                let assets_root = oxios_kernel::config::expand_home("~/.oxios/assets");
+                match oxios_kernel::AssetStore::new(assets_root) {
+                    Ok(store) => {
+                        if let Err(e) = store.reconcile() {
+                            tracing::warn!(error = %e, "Asset store reconcile failed");
+                        }
+                        let kh = kh.with_asset_store(std::sync::Arc::new(store));
+                        Arc::new(kh)
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to initialize asset store");
+                        Arc::new(kh)
+                    }
+                }
             })
             .clone()
     }
@@ -1564,6 +1579,21 @@ impl KernelBuilder {
                 event_bus.clone(),
             ));
             let kh = kh.with_compression(oxios_kernel::CompressionApi::new(compression_svc));
+
+            // Unified asset store (~/.oxios/assets/).
+            let assets_root = oxios_kernel::config::expand_home("~/.oxios/assets");
+            let kh = match oxios_kernel::AssetStore::new(assets_root) {
+                Ok(store) => {
+                    if let Err(e) = store.reconcile() {
+                        tracing::warn!(error = %e, "Asset store reconcile failed");
+                    }
+                    kh.with_asset_store(Arc::new(store))
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to initialize asset store");
+                    kh
+                }
+            };
             Arc::new(kh)
         };
 

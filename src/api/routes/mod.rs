@@ -8,6 +8,7 @@
 //! - **infra**: Scheduler, audit, permissions, MCP
 //! - **events**: Sessions, SSE events, approvals
 
+mod asset_routes;
 mod a2a;
 mod audit_routes;
 mod budget_routes;
@@ -57,6 +58,10 @@ use crate::api::persona_routes;
 use crate::api::server::AppState;
 
 // Re-export all handlers for use in build_routes
+pub(crate) use asset_routes::{
+    handle_asset_delete, handle_asset_get, handle_asset_list, handle_asset_meta_get,
+    handle_asset_meta_update, handle_asset_upload,
+};
 pub(crate) use a2a::{
     handle_a2a_agent_detail, handle_a2a_agents, handle_a2a_messages, handle_a2a_topology,
 };
@@ -249,8 +254,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/marketplace/skills-sh/skill/{id}/audit",
             get(handle_skills_sh_skill_audit),
         )
-        .route("/api/images/{name}", get(image_routes::handle_image_get));
-
+        .route("/api/images/{name}", get(image_routes::handle_image_get))
+        // Unified asset store — public binary serving (same rationale as
+        // /api/images/{name}: <img> tags cannot send Authorization headers).
+        .route("/api/assets/{name}", get(handle_asset_get));
     // Protected API routes (auth middleware applied)
     let api = Router::new()
         // Chat
@@ -773,6 +780,13 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Search & Browse (Search Panel)
         .route("/api/search", post(handle_search))
         .route("/api/browse", post(handle_browse))
+        // Unified asset store — protected CRUD
+        .route("/api/assets", post(handle_asset_upload).get(handle_asset_list))
+        .route(
+            "/api/assets/{name}/meta",
+            get(handle_asset_meta_get).put(handle_asset_meta_update),
+        )
+        .route("/api/assets/{name}", delete(handle_asset_delete))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,

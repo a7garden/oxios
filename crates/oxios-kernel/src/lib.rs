@@ -90,6 +90,7 @@ pub mod task;
 
 // ─── Infrastructure ─────────────────────────────────────────────────
 // 엔진, 에러, 타입, 메트릭, 텔레메트리, 옵저버빌리티.
+pub mod asset_store;
 pub mod engine;
 pub mod error;
 pub mod image_gen;
@@ -270,6 +271,8 @@ pub use state_store::{
 
 // ─── Infrastructure ─────────────────────────────────────────────────
 pub use engine::{EngineHandle, EngineProvider, OxiosEngine};
+// ─── Unified Asset Store ────────────────────────────────────────────
+pub use asset_store::{Asset, AssetFilter, AssetSource, AssetStore, AssetStoreError, asset_type};
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};
 pub use observability::{

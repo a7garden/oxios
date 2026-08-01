@@ -133,6 +133,9 @@ pub struct KernelHandle {
     /// instead of each rebuilding the orchestration call. `None` on the
     /// preliminary handle before full assembly.
     pub orchestrator: Option<Arc<Orchestrator>>,
+    /// Unified asset store — central binary storage with metadata index.
+    /// Attached by the kernel assembler. `None` on the preliminary handle.
+    pub asset_store: Option<Arc<crate::asset_store::AssetStore>>,
 }
 
 impl KernelHandle {
@@ -182,11 +185,10 @@ impl KernelHandle {
             compression: None,
             host_tools: HostToolsApi::new(),
             // RFC-024 SP4: default Warming/no-deadline. The Kernel
-            // (src/kernel.rs) sets the actual state and deadline during
-            // startup via `readiness.set_*` / a background task.
             readiness: Arc::new(ReadinessGate::new(0)),
             streaming_sinks: Arc::new(crate::streaming_sink::StreamingSinkRegistry::new()),
             orchestrator: None,
+            asset_store: None,
         }
     }
 
@@ -198,6 +200,16 @@ impl KernelHandle {
     pub fn with_mounts(mut self, mounts: MountApi) -> Self {
         self.mounts = Some(mounts);
         self
+    }
+    /// Attach the unified AssetStore. Called by the kernel assembler.
+    pub fn with_asset_store(mut self, store: Arc<crate::asset_store::AssetStore>) -> Self {
+        self.asset_store = Some(store);
+        self
+    }
+
+    /// Set the AssetStore in place (post-construction wiring).
+    pub fn set_asset_store(&mut self, store: Arc<crate::asset_store::AssetStore>) {
+        self.asset_store = Some(store);
     }
 
     /// Set the Mounts facade in place (post-construction wiring).

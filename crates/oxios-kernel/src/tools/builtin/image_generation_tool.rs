@@ -13,7 +13,7 @@
 //! `kernel.infra.config()`); the tool registers per-agent, so Phase-1 does
 //! not need hot-reload.
 
-use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
@@ -21,12 +21,12 @@ use serde_json::{Value, json};
 
 use crate::credential::CredentialStore;
 use crate::image_gen::{
-    FalImageProvider, FsImageStore, GeneratedImage, ImageGenProvider, ImageGenRequest, ImageSize,
-    OpenAiImageProvider,
+    FalImageProvider, FsImageStore, GeneratedImage, ImageGenProvider, ImageGenRequest, ImageSink,
+    ImageSize, OpenAiImageProvider,
 };
 use crate::kernel_handle::KernelHandle;
 
-/// URL prefix under which persisted images are served (see `image_routes.rs`).
+/// URL prefix under which persisted images are served (fallback for FsImageStore).
 const IMAGE_SERVE_PREFIX: &str = "/api/images/";
 
 /// Agent tool for image generation (Phase 1: OpenAI-compatible providers).
@@ -37,24 +37,38 @@ pub struct ImageGenerationTool {
     default_num: u8,
     /// `[engine].api_key` override forwarded to credential resolution.
     engine_api_key: Option<String>,
-    images_dir: PathBuf,
+    /// Image sink — AssetStore when available, FsImageStore fallback.
+    image_sink: Arc<dyn ImageSink>,
 }
 
 impl ImageGenerationTool {
     /// Create from a [`KernelHandle`].
     ///
-    /// Reads the `[image-gen]` config snapshot once and resolves the
-    /// workspace `images/` dir for persisted results.
+    /// Reads the `[image-gen]` config snapshot once and resolves the image
+    /// sink: [`AssetStore`] when attached (unified store), falling back to
+    /// [`FsImageStore`] writing to `<workspace>/images/`.
+    ///
+    /// [`AssetStore`]: crate::asset_store::AssetStore
     pub fn from_kernel(kernel: &KernelHandle) -> Self {
         let cfg = kernel.infra.config();
         let ig = &cfg.image_gen;
+        let image_sink: Arc<dyn ImageSink> = kernel
+            .asset_store
+            .as_ref()
+            .map(|s| s.clone() as Arc<dyn ImageSink>)
+            .unwrap_or_else(|| {
+                Arc::new(FsImageStore::new(
+                    kernel.state.workspace_path().join("images"),
+                    IMAGE_SERVE_PREFIX.into(),
+                )) as Arc<dyn ImageSink>
+            });
         Self {
             provider: ig.provider.clone(),
             base_url: ig.base_url.clone(),
             default_model: ig.default_model.clone(),
             default_num: ig.default_num,
             engine_api_key: cfg.api_key(),
-            images_dir: kernel.state.workspace_path().join("images"),
+            image_sink,
         }
     }
 }
@@ -63,7 +77,7 @@ impl std::fmt::Debug for ImageGenerationTool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ImageGenerationTool")
             .field("provider", &self.provider)
-            .field("images_dir", &self.images_dir)
+            .field("image_sink", &"<dyn ImageSink>")
             .finish()
     }
 }
@@ -209,10 +223,7 @@ impl AgentTool for ImageGenerationTool {
             }
         };
 
-        let store = std::sync::Arc::new(FsImageStore::new(
-            self.images_dir.clone(),
-            IMAGE_SERVE_PREFIX.into(),
-        )) as std::sync::Arc<dyn crate::image_gen::ImageSink>;
+        let store = self.image_sink.clone();
 
         let provider: Box<dyn ImageGenProvider> = match self.provider.as_str() {
             "fal" => {
@@ -312,7 +323,10 @@ mod tests {
             default_model: "gpt-image-1".into(),
             default_num: 1,
             engine_api_key: None,
-            images_dir: PathBuf::from("/tmp"),
+            image_sink: Arc::new(FsImageStore::new(
+                std::path::PathBuf::from("/tmp"),
+                IMAGE_SERVE_PREFIX.into(),
+            )) as Arc<dyn ImageSink>,
         }
     }
 

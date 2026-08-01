@@ -21,6 +21,7 @@ import { useIsTouch } from '@/hooks/use-is-touch'
 import { useKnowledgeSearch } from '@/hooks/use-knowledge'
 import { useMemorySemanticSearch } from '@/hooks/use-memory'
 import { useMounts } from '@/hooks/use-mounts'
+import { api } from '@/lib/api-client'
 import { getInputHistory } from '@/lib/input-history-storage'
 import { cn } from '@/lib/utils'
 import { ApprovalModeSelector } from './approval-mode-selector'
@@ -479,15 +480,24 @@ export function ChatInput({
     }
   }, [mentionQuery, searchMentions])
 
-  // File handling
   const readFile = useCallback(async (file: File): Promise<AttachedFile> => {
     const result: AttachedFile = { name: file.name, size: file.size, type: file.type }
     if (file.type.startsWith('image/')) {
-      result.dataUrl = await new Promise<string>((resolve) => {
-        const r = new FileReader()
-        r.onload = () => resolve(r.result as string)
-        r.readAsDataURL(file)
-      })
+      // Upload to unified asset store — keeps message payloads lean and
+      // makes the image persistent + reusable. Falls back to base64 on error.
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('source', 'chat-attach')
+        const asset = await api.upload<{ url: string }>('/api/assets', fd)
+        result.dataUrl = asset.url
+      } catch {
+        result.dataUrl = await new Promise<string>((resolve) => {
+          const r = new FileReader()
+          r.onload = () => resolve(r.result as string)
+          r.readAsDataURL(file)
+        })
+      }
     } else if (/\.(md|json|txt|csv|yml|yaml|toml|xml|log|rs|ts|js|py|html|css)$/i.test(file.name)) {
       result.content = await file.text()
     }

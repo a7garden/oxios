@@ -48,6 +48,7 @@ import { tags as lmTags } from '@lezer/highlight'
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { api } from '@/lib/api-client'
 import { useKnowledgeRecursiveTree } from '@/hooks/use-knowledge'
 import { emojiFoldExtension } from '@/lib/emoji-fold-extension'
 import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
@@ -76,9 +77,14 @@ export interface MarkdownEditorProps {
 // Reversed on save so the backend stores portable relative paths.
 
 const ASSET_ROUTE = '/api/knowledge/asset'
+const UNIFIED_ASSET_ROUTE = '/api/assets/'
 
 function isAbsoluteUrl(url: string): boolean {
-  return /^(https?:|data:|blob:|about:)/.test(url) || url.startsWith(ASSET_ROUTE)
+  return (
+    /^(https?:|data:|blob:|about:)/.test(url) ||
+    url.startsWith(ASSET_ROUTE) ||
+    url.startsWith(UNIFIED_ASSET_ROUTE)
+  )
 }
 
 function resolveRelativeImages(md: string, fileDir: string): string {
@@ -272,6 +278,62 @@ export function MarkdownEditor({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  // ── Image paste/drop → upload to asset store, insert markdown ────
+  const insertMarkdownAtCursor = useCallback((md: string) => {
+    const cmDom = containerRef.current?.querySelector('.cm-editor')
+    if (!cmDom) return
+    const view = EditorView.findFromDOM(cmDom as HTMLElement)
+    if (!view) return
+    const sel = view.state.selection.main
+    view.dispatch({
+      changes: { from: sel.from, insert: md },
+      selection: { anchor: sel.from + md.length },
+    })
+  }, [])
+
+  const handleImageFiles = useCallback(
+    async (files: FileList | File[]) => {
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) continue
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('source', 'editor-paste')
+        try {
+          const asset = await api.upload<{ url: string; storage_name: string }>(
+            '/api/assets',
+            fd,
+          )
+          const alt = file.name.replace(/\.[^.]+$/, '')
+          insertMarkdownAtCursor(`![${alt}](${asset.url})\n`)
+        } catch {
+          toast.error('Failed to upload image')
+        }
+      }
+    },
+    [insertMarkdownAtCursor],
+  )
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      if (e.clipboardData.files.length > 0) {
+        e.preventDefault()
+        handleImageFiles(e.clipboardData.files)
+      }
+    },
+    [handleImageFiles],
+  )
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      if (e.dataTransfer.files.length > 0 && Array.from(e.dataTransfer.files).some((f) => f.type.startsWith('image/'))) {
+        e.preventDefault()
+        handleImageFiles(e.dataTransfer.files)
+      }
+    },
+    [handleImageFiles],
+  )
   const openFile = useKnowledgeStore((s) => s.openFile)
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
   const prefs = useEditorPrefs()
@@ -498,6 +560,9 @@ export function MarkdownEditor({
 
   return (
     <div
+      ref={containerRef}
+      onPaste={handlePaste}
+      onDrop={handleDrop}
       className={cn('ox-knowledge-editor h-full relative', className)}
       style={
         {

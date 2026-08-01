@@ -5,6 +5,7 @@ import {
   Bot,
   Brain,
   CheckSquare,
+  Images,
   FilePlus,
   Flame,
   FolderKanban,
@@ -115,6 +116,7 @@ export const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
     labelKey: 'common.storage',
     items: [
       { labelKey: 'common.memory', href: '/memory', icon: <Brain className="h-4 w-4" /> },
+      { labelKey: 'common.assets', href: '/assets', icon: <Images className="h-4 w-4" /> },
       {
         labelKey: 'common.workspace',
         href: '/workspace',

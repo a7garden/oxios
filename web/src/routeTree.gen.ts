@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssetsRouteImport } from './routes/assets'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CronJobsRouteImport } from './routes/cron-jobs'
@@ -40,6 +41,11 @@ import { Route as AgentsAgentIdTraceRouteImport } from './routes/agents/$agentId
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssetsRoute = AssetsRouteImport.update({
+  id: '/assets',
+  path: '/assets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BudgetRoute = BudgetRouteImport.update({
@@ -175,6 +181,7 @@ const AgentsAgentIdTraceRoute = AgentsAgentIdTraceRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assets': typeof AssetsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assets': typeof AssetsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
@@ -234,6 +242,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/assets': typeof AssetsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
@@ -265,6 +274,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/assets'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/assets'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/assets'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
@@ -353,6 +365,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AssetsRoute: typeof AssetsRoute
   BudgetRoute: typeof BudgetRoute
   ChatRoute: typeof ChatRoute
   CronJobsRoute: typeof CronJobsRoute
@@ -387,6 +400,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assets': {
+      id: '/assets'
+      path: '/assets'
+      fullPath: '/assets'
+      preLoaderRoute: typeof AssetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/budget': {
@@ -588,6 +608,7 @@ const AgentsAgentIdRouteWithChildren = AgentsAgentIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AssetsRoute: AssetsRoute,
   BudgetRoute: BudgetRoute,
   ChatRoute: ChatRoute,
   CronJobsRoute: CronJobsRoute,
