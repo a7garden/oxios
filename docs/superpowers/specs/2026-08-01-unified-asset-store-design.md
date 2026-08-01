@@ -78,11 +78,19 @@ A single central asset store at `~/.oxios/assets/`, served via `/api/assets/{nam
 
 **Dedup:** On upload, compute SHA256. If an asset with the same hash exists, return the existing asset instead of duplicating.
 
-## 5. Backend API
+## 5. Backend Architecture
 
-All routes in `src/api/routes/asset_routes.rs`, following the existing axum patterns.
+### 5.1 Module Placement: Kernel (not Binary)
 
-### 5.1 Routes
+The `AssetStore` lives in `oxios-kernel` as a new `asset_store` module, following the same pattern as `image_gen` and `agent_log_db`. This is essential because:
+
+- `AssetStore` implements the `ImageSink` trait directly → every image generation path (chat, CLI, cron, A2A) writes file + metadata atomically. No registration gap by construction.
+- The binary crate's API routes call through `KernelHandle`, which exposes the store.
+- `FsImageStore` is replaced entirely — `AssetStore` is the single sink for all binary writes.
+
+### 5.2 Routes (Binary Crate)
+
+All HTTP handlers in `src/api/routes/asset_routes.rs`, calling through `KernelHandle`:
 
 | Method | Route | Auth | Purpose |
 |--------|-------|------|---------|
@@ -93,7 +101,7 @@ All routes in `src/api/routes/asset_routes.rs`, following the existing axum patt
 | `PUT` | `/api/assets/{name}/meta` | protected | Update title/tags |
 | `DELETE` | `/api/assets/{name}` | protected | Delete asset + file + index entry |
 
-### 5.2 Path-Based Serving (Critical Design Decision)
+### 5.3 Path-Based Serving (Critical Design Decision)
 
 `GET /api/assets/{name}` is **path-based**, not index-based. It serves the file `{name}` directly from `~/.oxios/assets/` with:
 
@@ -101,11 +109,9 @@ All routes in `src/api/routes/asset_routes.rs`, following the existing axum patt
 - Canonicalization guard: resolved path must be under the assets root
 - MIME guessing from extension (same as `image_routes.rs`)
 
-**Why path-based:** Generated images are written to disk by `FsImageStore` before the chat handler registers them in the index. If serving were index-based, a streaming/cron/A2A race would 404. Path-based serving works the moment the file hits disk — the index is metadata-only for browsing/filtering, not a prerequisite for retrieval.
+Path-based serving works the moment a file hits disk — the index is metadata-only for browsing/filtering, not a prerequisite for retrieval. This is the same pattern as the existing `GET /api/images/{name}` route.
 
-This is the same pattern as the existing `GET /api/images/{name}` route.
-
-### 5.3 List Endpoint
+### 5.4 List Endpoint
 
 `GET /api/assets?type=image&source=generated&search=screenshot&page=1&limit=24`
 
@@ -125,51 +131,60 @@ Filters:
 - `search` — substring match on filename + title + tags
 - `page` / `limit` — pagination (default 24)
 
-### 5.4 AssetStore Struct
+### 5.5 AssetStore Struct (Kernel)
 
-In the binary crate, initialized in `AppState`:
+In `crates/oxios-kernel/src/asset_store/mod.rs`:
 
 ```rust
 pub struct AssetStore {
     root: PathBuf,               // ~/.oxios/assets/
+    serve_prefix: String,        // /api/assets/
     index: RwLock<Vec<Asset>>,
 }
 ```
 
-- `new(root)` — creates dir, loads `index.json` (or starts empty)
-- `save(&self, bytes, filename, source, ...) -> Asset` — writes file, computes SHA256, dedup check, appends to index, persists atomically
-- `list(&self, filter) -> (Vec<&Asset>, total)` — filter + paginate
-- `get_meta(&self, name) -> Option<&Asset>`
-- `update_meta(&self, name, title, tags) -> Result`
-- `delete(&self, name) -> Result` — removes file + index entry
-- `register(&self, name, filename, source, source_ref) -> Asset` — registers an existing file (for generated images, migration)
+- `new(root) -> Result<Self>` — creates dir, loads `index.json` (or starts empty)
+- `store(&self, bytes, filename, source, source_ref) -> Result<Asset>` — full write with metadata, dedup check
+- `list(&self, filter) -> Vec<Asset>` — filter + paginate (returns clones)
+- `get_meta(&self, name) -> Option<Asset>`
+- `update_meta(&self, name, title, tags) -> Result<Option<Asset>>`
+- `delete(&self, name) -> Result<bool>`
+- `reconcile(&self) -> Result<usize>` — scan dir for unindexed files (startup + on-demand)
+- `root(&self) -> &Path`
 
-Index persistence: `index.json` written atomically (temp file + rename) on every mutation. Loaded once at startup.
+Implements `ImageSink`:
+```rust
+impl ImageSink for AssetStore {
+    fn save(&self, bytes: Vec<u8>, ext: &str) -> Result<String, ImageGenError> {
+        // Writes file, registers metadata (source: Generated), returns URL
+    }
+}
+```
+
+Exposed via `KernelHandle` as `kernel.asset_store()` → `Arc<AssetStore>`.
+
+Index persistence: `index.json` written atomically (temp file + rename) on every mutation.
 
 ## 6. Generated Images Integration
 
-### 6.1 FsImageStore Redirect
+### 6.1 FsImageStore Replacement
 
-`oxios-kernel/src/image_gen/store.rs` — `FsImageStore` currently:
-- dir: `<workspace>/images/`
-- serve_prefix: `/api/images/`
+`AssetStore` implements `ImageSink`, replacing `FsImageStore` entirely. The `image_generation_tool.rs` gets the `AssetStore` from `KernelHandle` instead of constructing `FsImageStore`:
 
-Changes:
-- dir: `~/.oxios/assets/` (resolved from oxios home, not workspace)
-- serve_prefix: `/api/assets/`
+```rust
+// Before:
+let store = Arc::new(FsImageStore::new(images_dir, serve_prefix));
+// After:
+let store = kernel.asset_store().clone();  // Arc<AssetStore>
+```
 
-The `image_generation_tool.rs` sets `images_dir: kernel.state.workspace_path().join("images")` — change to resolve the oxios home assets directory.
+Every image generation (chat, CLI, cron, A2A) writes the file AND registers metadata atomically — no gap, no separate registration step.
 
-### 6.2 Registration Flow
-
-When the chat handler processes a completed `image_generation` tool result, it extracts image URLs (`/api/assets/{uuid}.ext`) and calls `AssetStore::register()` with `source: "generated"` and `source_ref: session_id`. This adds the metadata entry.
-
-If registration is skipped (cron, A2A), the image still serves correctly via path-based serving — it just won't appear in the gallery until a lazy scan registers it.
-
-### 6.3 Backward Compatibility
+### 6.2 Backward Compatibility
 
 - `GET /api/images/{name}` stays registered as a fallback — serves from `<workspace>/images/` if the file exists there (for notes that already reference old URLs).
-- On startup, `AssetStore` scans `~/.oxios/assets/` for files not in the index and registers them (handles the lazy registration case).
+- On startup, `AssetStore::reconcile()` scans `~/.oxios/assets/` for files not in the index and registers them.
+- Old images in `<workspace>/images/` can be migrated via a one-time copy + reconcile.
 
 ## 7. Frontend — Asset Gallery
 
@@ -233,17 +248,24 @@ Uses `api.upload()` (FormData helper) for uploads, `api.get/post/put/delete` for
 
 ## 11. File Inventory
 
-### Backend (Rust)
+### Kernel (Rust)
+
+| File | Action |
+|------|--------|
+| `crates/oxios-kernel/src/asset_store/mod.rs` | **New** — AssetStore struct, Asset metadata type, CRUD, JSON index, ImageSink impl |
+| `crates/oxios-kernel/src/lib.rs` | **Edit** — `pub mod asset_store;` + re-exports |
+| `crates/oxios-kernel/src/kernel_handle/mod.rs` | **Edit** — add `asset_store: Option<Arc<AssetStore>>` field + accessor |
+| `crates/oxios-kernel/src/image_gen/store.rs` | **Keep** — FsImageStore stays for backward compat (existing `/api/images/` route) |
+| `crates/oxios-kernel/src/tools/builtin/image_generation_tool.rs` | **Edit** — use `kernel.asset_store()` instead of constructing FsImageStore |
+
+### Binary (Rust)
 
 | File | Action |
 |------|--------|
 | `src/api/routes/asset_routes.rs` | **New** — HTTP handlers (upload, list, serve, meta, delete) |
 | `src/api/routes/mod.rs` | **Edit** — register asset routes (public + protected) |
-| `src/api/server.rs` | **Edit** — add `AssetStore` to `AppState` |
-| `src/api/plugin.rs` | **Edit** — initialize `AssetStore` on startup |
-| `crates/oxios-kernel/src/image_gen/store.rs` | **Edit** — redirect dir to `~/.oxios/assets/`, serve prefix to `/api/assets/` |
-| `crates/oxios-kernel/src/tools/builtin/image_generation_tool.rs` | **Edit** — update `images_dir` resolution |
-| `src/main.rs` or `src/kernel.rs` | **Edit** — pass assets dir to FsImageStore |
+| `src/api/server.rs` | **No edit** — AssetStore accessed via KernelHandle, no new AppState field |
+| `src/kernel.rs` | **Edit** — initialize AssetStore, attach to KernelHandle |
 
 ### Frontend (TypeScript/React)
 
