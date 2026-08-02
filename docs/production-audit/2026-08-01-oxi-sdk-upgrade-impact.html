@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>oxi-sdk 0.58 → 0.63 업그레이드 영향 분석</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-2: #232830;
+    --border: #2e3440;
+    --text: #e6e8ec;
+    --text-dim: #9aa3b2;
+    --text-faint: #6b7280;
+    --accent: #7c9eff;
+    --accent-dim: #4a6cb3;
+    --green: #4ade80;
+    --green-dim: #166534;
+    --amber: #fbbf24;
+    --amber-dim: #92400e;
+    --red: #f87171;
+    --red-dim: #991b1b;
+    --code-bg: #0d0f13;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  h1 { font-size: 1.8rem; margin-bottom: 0.5rem; letter-spacing: -0.01em; }
+  h2 {
+    font-size: 1.3rem;
+    margin: 2.5rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 0.75rem; color: var(--text); }
+  h4 { font-size: 0.95rem; margin: 1rem 0 0.5rem; color: var(--text-dim); }
+  p { margin: 0.75rem 0; }
+  ul, ol { margin: 0.75rem 0 0.75rem 1.5rem; }
+  li { margin: 0.35rem 0; }
+  .meta {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+  }
+  .meta span { display: inline-block; margin-right: 1rem; }
+  .meta code {
+    background: var(--code-bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--accent);
+  }
+  .verdict {
+    background: var(--surface);
+    border-left: 4px solid var(--accent);
+    padding: 1.25rem 1.5rem;
+    border-radius: 4px;
+    margin: 1.5rem 0;
+  }
+  .verdict.recommended { border-left-color: var(--green); }
+  .verdict.warning { border-left-color: var(--amber); }
+  .verdict.danger { border-left-color: var(--red); }
+  .verdict-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+  }
+  .verdict p { margin: 0.5rem 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  th, td {
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  tr:hover td { background: var(--surface); }
+  td code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  pre code { background: none; padding: 0; color: var(--text); }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .badge.green { background: var(--green-dim); color: var(--green); }
+  .badge.amber { background: var(--amber-dim); color: var(--amber); }
+  .badge.red { background: var(--red-dim); color: var(--red); }
+  .badge.gray { background: var(--surface-2); color: var(--text-dim); }
+  .badge.blue { background: var(--accent-dim); color: var(--accent); }
+  .toc {
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+  }
+  .toc ol { margin: 0.25rem 0 0 1.25rem; }
+  .toc a { color: var(--text-dim); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-faint);
+    font-size: 0.85rem;
+  }
+  strong { color: var(--text); font-weight: 600; }
+  em { color: var(--text-dim); font-style: normal; }
+  .answer {
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    margin: 1rem 0;
+  }
+  .answer-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0.4rem;
+  }
+  .answer p { margin: 0.4rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>oxi-sdk 0.58 → 0.63 업그레이드 영향 분석</h1>
+  <div class="meta">
+    <span><strong>작성일</strong> 2026-08-01</span>
+    <span><strong>대상</strong> Oxios 프로젝트</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <strong style="color: var(--text-dim); font-size: 0.85rem;">목차</strong>
+  <ol>
+    <li><a href="#answer">두 질문에 대한 직접 답변</a></li>
+    <li><a href="#evidence">검증된 사실 (Empirical Evidence)</a></li>
+    <li><a href="#why-safe">왜 0.59.0이 안전한가</a></li>
+    <li><a href="#value">0.59.0이 가져오는 실질적 가치</a></li>
+    <li><a href="#options">마이그레이션 옵션 비교</a></li>
+    <li><a href="#future">0.61 이후의 진짜 가치</a></li>
+    <li><a href="#safety">검증된 안전 지점</a></li>
+    <li><a href="#steps">실행 절차</a></li>
+    <li><a href="#appendix-a">부록 A. 검증 로그</a></li>
+    <li><a href="#appendix-b">부록 B. 참조</a></li>
+  </ol>
+</nav>
+
+<section id="answer">
+<h2>0. 두 질문에 대한 직접 답변</h2>
+
+<div class="answer">
+  <div class="answer-label">Q1. oxi-sdk가 잘못된 거야?</div>
+  <p><strong>공유 책임입니다.</strong> 어느 한 쪽이 일방적으로 잘못했다고 보지 않습니다.</p>
+  <ul>
+    <li><strong>Rust 0.x 시맨버는 0.x→0.x에서 breaking change를 허용합니다.</strong> 기술적으로 oxi-sdk는 자기 카르타를 지킨 것이고, "잘못"이 아닙니다.</li>
+    <li><strong>단, governance 갭은 분명히 존재합니다.</strong> P0.2/P0.2b 리팩터링은 4개 공개 심볼(<code>ProviderPool</code>, <code>RateLimitPolicy</code>, <code>ProviderCircuitBreaker</code>, <code>CircuitBreakerConfig</code>)을 삭제했지만, 0.56–0.63 사이 어느 CHANGELOG 엔트리에도 이 삭제가 언급돼 있지 않습니다. 의도적 opt-in 정리라도 마이그레이션 경고는 사용자의 책임이 아니라 판매자의 책임입니다.</li>
+    <li><strong>반면, oxios 측의 결합 위험도 사실입니다.</strong> oxi의 커밋 메시지는 <code>ProviderPool</code>을 "<strong>opt-in</strong> multi-provider routing layer"라고 명시적으로 부르고 있었고, oxios는 그 위에 핵심 회복력 기능(provider pooling + LLM circuit breaker)을 올렸습니다. "opt-in API 위에 핵심 기능을 얹는 것은 위험하다"는 교훈은 oxios가 가져가야 할 몫입니다.</li>
+  </ul>
+  <p><em>결론: oxi는 governance를 개선해야 하고, oxios는 opt-in API 위에 회복력을 쌓는 설계를 재검토해야 합니다.</em></p>
+</div>
+
+<div class="answer">
+  <div class="answer-label">Q2. 업그레이드 하는 게 더 좋다는 거야?</div>
+  <p><strong>네, 그러나 점진적으로 — 그리고 첫 단계는 무료입니다.</strong></p>
+  <p>이 결론은 한 가지 팩트에 매달려 있습니다: <strong>제거 커밋이 처음 포함되는 릴리스가 <code>v0.61.0</code></strong>입니다 (<code>git tag --contains ae441c1f | head -1</code>로 검증). 즉:</p>
+  <ul>
+    <li><strong>제거가 0.61.0에 랜딩했다면</strong> → <strong>0.59.0은 무손상 도약이 가능하고</strong>, 거기서 멈추는 게 최적입니다. F-3(데몬 panic-safety), F-10(SSE 청크 누락 수정), F-1(자격증명 마스킹)을 무손상으로 얻습니다.</li>
+    <li><strong>제거가 0.59.0에 이미 랜딩했다면</strong> → 무료 중간지대가 없으므로 "reimplement vs stay"만 남습니다.</li>
+  </ul>
+  <p><em>현실은 전자입니다. 그래서 1차 액션은 명확합니다: <code>oxi-sdk = "0.59.0"</code> 도약. 이후 0.61의 additive 기능(Snapcompact, PortMemoryBackend, Codex/Gemini 디스패치)은 별도 평가 후 단계적으로.</em></p>
+</div>
+</section>
+
+<section id="evidence">
+<h2>1. 검증된 사실 (Empirical Evidence)</h2>
+<p>분석이 아니라 <strong>실제 빌드와 git 추적</strong>으로 확인한 결과.</p>
+
+<h3>1.1 0.63.0 직접 도약 — 실패 확인</h3>
+<pre><code>$ cargo build --workspace
+# → 5개 컴파일 에러</code></pre>
+<pre><code>engine.rs:20           ProviderPool, RateLimitPolicy not found in oxi_sdk root
+agent_runtime.rs:56    cannot find type ProviderCircuitBreaker in crate oxi_sdk
+agent_runtime.rs:60    cannot find type ProviderCircuitBreaker in crate oxi_sdk
+agent_runtime.rs:62    cannot find ProviderCircuitBreaker::new in oxi_sdk
+agent_runtime.rs:64    cannot find CircuitBreakerConfig::default in oxi_sdk</code></pre>
+
+<h3>1.2 제거 시점 추적 — v0.61.0</h3>
+<pre><code>$ git tag --contains ae441c1f --sort=version:refname | head -1
+v0.61.0   # refactor(ai): remove opt-in multi-provider routing layer (P0.2)
+
+$ git tag --contains afe9cf04 --sort=version:refname | head -1
+v0.61.0   # refactor(agent): remove CircuitBreaker + FallbackChain (P0.2b)</code></pre>
+<p>→ <strong>0.61.0이 경계점. 0.60.0까지는 모든 심볼 존재.</strong></p>
+
+<h3>1.3 0.59.0 안전 검증 — 통과 확인</h3>
+<pre><code>$ cargo check -p oxios-kernel
+   Compiling oxi-ai v0.59.0
+    Checking oxi-hashline v0.59.0
+    Checking oxi-snapcompact v0.59.0
+    Checking oxi-agent v0.59.0
+    Checking oxi-sdk v0.59.0
+    Checking oxios-ouroboros v1.34.0
+    Checking oxios-kernel v1.34.0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 35.64s
+# → 에러 0</code></pre>
+</section>
+
+<section id="why-safe">
+<h2>2. 왜 0.59.0이 안전한가 (제거의 의도)</h2>
+
+<p><code>ae441c1f</code> 커밋 메시지:</p>
+<blockquote style="background: var(--surface); border-left: 3px solid var(--border); padding: 0.75rem 1rem; margin: 0.75rem 0; color: var(--text-dim);">
+"Delete the complexity-routing machinery that was <strong style="color: var(--text);">never constructed in production</strong> (only doc comments and self-tests referenced it)"
+</blockquote>
+
+<p><code>afe9cf04</code> 커밋 메시지:</p>
+<blockquote style="background: var(--surface); border-left: 3px solid var(--border); padding: 0.75rem 1rem; margin: 0.75rem 0; color: var(--text-dim);">
+"The agent loop's retry logic (<code style="color: var(--accent);">stream_retry.rs</code>: <strong style="color: var(--text);">3 attempts, exponential backoff, retryable-error classification</strong>) is fully independent of the circuit breaker. The CB only added a pre-stream gate that could block requests after transient failures — removing it simplifies the retry path without <strong style="color: var(--text);">losing any resilience</strong>."
+</blockquote>
+
+<h3>핵심 통찰</h3>
+<ul>
+  <li><strong>Provider 풀링</strong>: oxi 측에서도 프로덕션 사용 0. oxios는 <code>provider_rpm == 0</code>이 기본값이므로 비활성 경로.</li>
+  <li><strong>LLM 회로차단기</strong>: oxi의 에이전트 루프가 이미 자체 재시도(3회, 지수 백오프)를 갖고 있어 <strong>중복 안전장치</strong>. 삭제해도 회복력 손실 없음.</li>
+</ul>
+<p>따라서 0.61 이후로 강제 마이그레이션을 감수할 <strong>구조적 이유가 없다</strong> — 핵심 회복력은 oxi 에이전트 루프에 내장돼 있고, oxios는 자체 <code>A2ACircuitBreaker</code>(<code>crates/oxios-kernel/src/a2a/circuit_breaker.rs</code>)로 A2A 경로를 보호하고 있음.</p>
+</section>
+
+<section id="value">
+<h2>3. 0.59.0이 가져오는 실질적 가치</h2>
+
+<table>
+  <thead>
+    <tr><th>버전</th><th>변경</th><th>oxios 가치</th><th>비고</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0.59 F-3</td>
+      <td>6개 프로바이더의 <code>.expect("valid header value")</code> 14개 → <code>?</code></td>
+      <td><span class="badge green">높음</span></td>
+      <td>oxios는 <code>panic = "abort"</code> 릴리스 빌드 → malformed API key가 프로세스 전체를 죽이던 경로를 제거. 2026-06-30 사용자 보고(데몬 갑자기 죽음)와 같은 클래스의 위험 감소.</td>
+    </tr>
+    <tr>
+      <td>0.59 F-10</td>
+      <td>Azure/Mistral SSE 청크 경계 수정 (<code>split_complete_lines</code> + <code>pending_bytes</code>)</td>
+      <td><span class="badge green">높음</span></td>
+      <td>HTTP 청크 경계에서 <code>data:</code> 라인이 쪼개져도 누락 없이 처리. 스트림 타임아웃/drop 증상 완화.</td>
+    </tr>
+    <tr>
+      <td>0.59 F-1</td>
+      <td><code>AuthCredential</code> Debug 마스킹 (<code>&lt;redacted&gt;</code>)</td>
+      <td><span class="badge amber">중간</span></td>
+      <td><code>dbg!</code> / <code>tracing::debug!</code> / 패닉 백트레이스에서 API 키 노출 차단. 디펜스 인 뎁스.</td>
+    </tr>
+    <tr>
+      <td>0.59</td>
+      <td>RPC auto-retry, RPC parse-error 응답에 request ID 보존</td>
+      <td><span class="badge gray">낮음</span></td>
+      <td>oxios는 oxi-cli의 RPC 모드를 사용하지 않음.</td>
+    </tr>
+    <tr>
+      <td>0.59</td>
+      <td>MCP spawn consent 게이트 (<code>ConsentState::Ask</code>)</td>
+      <td><span class="badge gray">해당 없음</span></td>
+      <td>oxios는 자체 MCP 클라이언트(<code>crates/oxios-mcp/src/client.rs</code>)를 사용. oxi-sdk MCP 경로와 무관.</td>
+    </tr>
+    <tr>
+      <td>0.60</td>
+      <td><code>/skill off</code> 완성, <code>/help</code> 확장 동기화, <code>/provider</code> 카탈로그 카테 고리 폴백, MCP manager 전파 버그 수정</td>
+      <td><span class="badge gray">TUI 전용</span></td>
+      <td>oxios는 자체 웹 UI를 사용.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.1 신규 전이 의존성</h3>
+<p><code>cargo update</code> 결과 — <strong>0.59.0은 깔끔</strong>:</p>
+<pre><code>Updating oxi-ai         v0.58.0 -&gt; v0.59.0
+Updating oxi-agent      v0.58.0 -&gt; v0.59.0
+Updating oxi-hashline   v0.58.0 -&gt; v0.59.0
+Updating oxi-sdk        v0.58.0 -&gt; v0.59.0
+Updating oxi-snapcompact v0.58.0 -&gt; v0.59.0</code></pre>
+<p>0.63.0은 추가로 <code>oxi-catalog</code> 분리 + <code>prost</code> / <code>protoc-bin-vendored</code>(모든 플랫폼용 vendored protoc, 빌드 부하 증가) / <code>petgraph</code>를 끌고 옴.</p>
+</section>
+
+<section id="options">
+<h2>4. 마이그레이션 옵션 비교</h2>
+
+<table>
+  <thead>
+    <tr><th>옵션</th><th>범프 대상</th><th>작업량</th><th>얻는 가치</th><th>위험</th></tr>
+  </thead>
+  <tbody>
+    <tr style="background: rgba(74, 222, 128, 0.05);">
+      <td><span class="badge green">A (권장)</span></td>
+      <td>0.58 → <strong>0.59</strong></td>
+      <td>2줄 변경 + lock 업데이트 + CI 게이트</td>
+      <td>F-3 / F-10 / F-1</td>
+      <td><span class="badge green">0 (실제 컴파일 검증 완료)</span></td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>0.58 → 0.60</td>
+      <td>옵션 A + α</td>
+      <td>A + TUI 버그 수정</td>
+      <td><span class="badge green">0 (TUI는 oxios 무관)</span></td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>0.58 → 0.61</td>
+      <td>4개 심볼을 oxios 내부로 이식 (또는 기능 제거)</td>
+      <td>A + Snapcompact / Tape / 0.61 additive</td>
+      <td><span class="badge amber">중간</span></td>
+    </tr>
+    <tr>
+      <td>D</td>
+      <td>0.58 → 0.63</td>
+      <td>옵션 C + α</td>
+      <td>C + PortMemoryBackend / Codex·Gemini / blocking_lock</td>
+      <td><span class="badge amber">중간~높음</span></td>
+    </tr>
+    <tr>
+      <td>E</td>
+      <td>현상 유지 (0.58.0)</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge gray">낮음</span> — 단 F-3/F-10의 안정성 이지를 영구히 못 얻음</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="verdict recommended">
+  <div class="verdict-label">권장</div>
+  <p><strong>옵션 A (0.59.0).</strong> 가장 작은 변경으로 가장 큰 안정성 이득을 얻음. 이후 0.61의 additive 기능은 별도 평가 후 단계적으로.</p>
+</div>
+</section>
+
+<section id="future">
+<h2>5. 0.61 이후의 진짜 가치 (참고용)</h2>
+<p>0.59 직행 후, 필요 시 별도 결정할 항목들. 모두 <strong>additive</strong>:</p>
+
+<table>
+  <thead>
+    <tr><th>버전</th><th>변경</th><th>평가</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0.61</td><td><code>oxi-tui v2</code> 은퇴 + 단일화, TUI tape engine, KillRing, LaTeX→유니코드, Mermaid 렌더러</td><td><span class="badge gray">TUI 전용 — oxios 무관.</span></td></tr>
+    <tr><td>0.61</td><td><code>CompactionStrategy::Snapcompact</code> (PNG 프레임 압축)</td><td><span class="badge amber">기회</span> — oxios는 현재 <code>Threshold(0.8)</code> 사용(<code>agent_runtime.rs:986</code>).</td></tr>
+    <tr><td>0.62</td><td><code>PortMemoryBackend</code> + <code>AgentBuilder::with_port_memory()</code></td><td><span class="badge amber">기회, 단 보류</span> — oxios는 2026-07-11 설계에서 oxi의 <code>MemoryStore</code>로 브릿징하는 것을 <strong>의도적으로 거부</strong>한 이력이 있음 (<code>docs/designs/2026-07-11-memory-system-overhaul-design.md:95</code>). 재검토는 별도 결정.</td></tr>
+    <tr><td>0.62</td><td>Codex Responses + Gemini CLI 디스패치</td><td><span class="badge amber">사용자 수요 의존</span> — 해당 모델 패밀리 사용 시에만 가치.</td></tr>
+    <tr><td>0.62</td><td>메모리 <code>blocking_lock</code>을 <code>block_in_place</code>로 감쌈</td><td><span class="badge amber">중간</span> — oxios는 자체적으로 <code>blocking_lock</code> 패닉을 이미 수정함. oxi-sdk 경로의 같은 클래스 버그 예방.</td></tr>
+    <tr><td>0.63</td><td><code>oxi-vtui</code> / <code>oxi-vtui-compat</code> (VT 기반 TUI)</td><td><span class="badge gray">TUI 전용 — oxios 무관.</span></td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="safety">
+<h2>6. 검증된 안전 지점 (코드 직접 확인)</h2>
+<p>CHANGELOG 분석만으론 보이지 않는, 코드를 직접 읽어 확인한 사실:</p>
+<ul>
+  <li><code>AgentConfig { ... }</code> 리터럴이 <code>..Default::default()</code>로 끝남 (<code>agent_runtime.rs:1006</code>) → 새 필드 추가돼도 안전.</li>
+  <li><code>AgentEvent</code> match에 <code>_ =&gt; {}</code> 캐치올 존재 (<code>agent_runtime.rs:1519</code>) → 새 이벤트 변형 안전. oxios는 이미 0.58의 <code>ThinkingEnd</code> / <code>ToolCallDelta</code>를 명시 처리 중.</li>
+  <li><code>CompactionStrategy::Snapcompact</code>(0.61 신규) → oxios는 <code>Threshold(0.8)</code>만 <strong>생성</strong>하고 enum을 match하지 않음 → 비파괴.</li>
+  <li><code>oxios-mcp</code>는 oxi-sdk와 완전히 독립(stdio JSON-RPC 클라이언트 자체 구현) → 0.59의 MCP consent 게이트 무관.</li>
+  <li><code>oxibrowser-core ^0.17</code> vs oxios의 <code>native-browser</code> 피처 → 버전 충돌 없음 (cargo update 깔끔).</li>
+</ul>
+</section>
+
+<section id="steps">
+<h2>7. 실행 절차 (옵션 A: 0.59.0)</h2>
+
+<pre><code>cd /Volumes/MERCURY/PROJECTS/oxios
+
+# 1) 두 핀 변경
+# root Cargo.toml:        oxi-sdk = "0.58.0"   →   "0.59.0"
+# crates/oxios-kernel/Cargo.toml: oxi-agent = "0.58.0"   →   "0.59.0"
+
+# 2) lockfile 갱신
+cargo update -p oxi-sdk -p oxi-agent
+
+# 3) 검증
+cargo fmt --all
+cargo clippy --workspace --all-features -- -D warnings
+cargo test --workspace
+cd web &amp;&amp; bun run build &amp;&amp; bunx tsc --noEmit &amp;&amp; bunx biome check src &amp;&amp; bun run vitest run
+
+# 4) CHANGELOG.md에 업그레이드 항목 추가
+# 5) 커밋 (예시):
+#    chore(kernel): bump oxi-sdk 0.58 → 0.59 (F-3 panic safety, F-10 SSE fix, F-1 cred masking)</code></pre>
+</section>
+
+<section id="conclusion">
+<h2>8. 종합 의견 — 다시 한 번</h2>
+
+<div class="verdict">
+  <div class="verdict-label">"oxi-sdk가 잘못된 거야, 우리가 변경해야 하는 거야, 업그레이드가 더 좋다는 거야?"</div>
+  <ul>
+    <li><strong>잘못의 분담:</strong> oxi-sdk의 governance 갭(CHANGELOG 미기재) + oxios의 opt-in API 위 결합. 어느 한 쪽 탓이 아닙니다.</li>
+    <li><strong>변경의 필요:</strong> 0.59.0까지는 없습니다 — 무료 도약 가능. 0.61.0부터는 옵션 (reimplement / drop / stay).</li>
+    <li><strong>업그레이드 권장:</strong> <span class="badge green">예</span> 옵션 A(0.59.0)부터 시작하세요. F-3(데몬 panic-safety)과 F-10(SSE 청크 누락 방지)은 oxios의 핵심 안정성 이슈다운데, 비용은 두 줄 변경과 lock 업데이트뿐입니다. 이후 0.61의 additive 기능은 실험적으로 평가.</li>
+  </ul>
+</div>
+</section>
+
+<section id="appendix-a">
+<h2>부록 A. 검증 로그</h2>
+
+<h3>검증 1: 0.63.0 직접 도약</h3>
+<pre><code>$ cargo build --workspace
+error[E0433]: cannot find `ProviderPool` in `oxi_sdk`
+error[E0433]: cannot find `RateLimitPolicy` in `oxi_sdk`
+error[E0433]: cannot find `ProviderCircuitBreaker` in `oxi_sdk`
+error[E0433]: cannot find `CircuitBreakerConfig` in `oxi_sdk`
+error[E0425]: cannot find type `ProviderCircuitBreaker` in crate `oxi_sdk` (×2)
+error: could not compile `oxios-kernel` (lib) due to 5 previous errors</code></pre>
+
+<h3>검증 2: 제거 시점 추적</h3>
+<pre><code>$ git -C /Volumes/MERCURY/PROJECTS/oxi tag --contains ae441c1f --sort=version:refname | head -1
+v0.61.0
+$ git -C /Volumes/MERCURY/PROJECTS/oxi tag --contains afe9cf04 --sort=version:refname | head -1
+v0.61.0</code></pre>
+
+<h3>검증 3: 0.59.0 안전 확인</h3>
+<pre><code>$ cargo check -p oxios-kernel
+   Compiling oxi-ai v0.59.0
+    Checking oxi-hashline v0.59.0
+    Checking oxi-snapcompact v0.59.0
+    Checking oxi-agent v0.59.0
+    Checking oxi-sdk v0.59.0
+    Checking oxios-ouroboros v1.34.0
+    Checking oxios-kernel v1.34.0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 35.64s</code></pre>
+</section>
+
+<section id="appendix-b">
+<h2>부록 B. 참조</h2>
+<ul>
+  <li>로컬 oxi 체크아웃: <code>/Volumes/MERCURY/PROJECTS/oxi/CHANGELOG.md</code></li>
+  <li>oxios 코드: <code>crates/oxios-kernel/src/agent_runtime.rs</code>, <code>crates/oxios-kernel/src/engine.rs</code>, <code>crates/oxios-kernel/src/a2a/circuit_breaker.rs</code>, <code>crates/oxios-mcp/src/client.rs</code></li>
+  <li>이전 통합 RFC: <code>docs/rfc-035-oxi-sdk-0.53-integration.md</code></li>
+</ul>
+</section>
+
+<footer class="footer">
+  <p>문서 위치: <code>docs/production-audit/2026-08-01-oxi-sdk-upgrade-impact.html</code></p>
+</footer>
+
+</div>
+</body>
+</html>

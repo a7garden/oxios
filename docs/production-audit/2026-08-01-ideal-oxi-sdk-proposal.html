@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oxios에 이상적인 oxi-sdk — 요청서</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-2: #232830;
+    --border: #2e3440;
+    --text: #e6e8ec;
+    --text-dim: #9aa3b2;
+    --text-faint: #6b7280;
+    --accent: #7c9eff;
+    --accent-dim: #4a6cb3;
+    --green: #4ade80;
+    --green-dim: #166534;
+    --amber: #fbbf24;
+    --amber-dim: #92400e;
+    --red: #f87171;
+    --red-dim: #991b1b;
+    --code-bg: #0d0f13;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.7; padding: 2rem 1rem;
+  }
+  .container { max-width: 1000px; margin: 0 auto; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; }
+  h1 { font-size: 1.8rem; margin-bottom: 0.5rem; letter-spacing: -0.01em; }
+  h2 {
+    font-size: 1.3rem; margin: 2.5rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 0.75rem; color: var(--text); }
+  h4 { font-size: 0.95rem; margin: 1rem 0 0.5rem; color: var(--text-dim); }
+  p { margin: 0.75rem 0; }
+  ul, ol { margin: 0.75rem 0 0.75rem 1.5rem; }
+  li { margin: 0.35rem 0; }
+  .meta { color: var(--text-dim); font-size: 0.9rem; margin-top: 0.5rem; }
+  .meta span { display: inline-block; margin-right: 1rem; }
+  .verdict {
+    background: var(--surface);
+    border-left: 4px solid var(--accent);
+    padding: 1.25rem 1.5rem;
+    border-radius: 4px;
+    margin: 1.5rem 0;
+  }
+  .verdict-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  th, td {
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  tr:hover td { background: var(--surface); }
+  td code, li code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--accent);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; }
+  pre code { background: none; padding: 0; color: var(--text); }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .badge.green { background: var(--green-dim); color: var(--green); }
+  .badge.amber { background: var(--amber-dim); color: var(--amber); }
+  .badge.red { background: var(--red-dim); color: var(--red); }
+  .badge.gray { background: var(--surface-2); color: var(--text-dim); }
+  .badge.blue { background: var(--accent-dim); color: var(--accent); }
+  .toc {
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+  }
+  .toc ol { margin: 0.25rem 0 0 1.25rem; }
+  .toc a { color: var(--text-dim); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .footer {
+    margin-top: 3rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-faint); font-size: 0.85rem;
+  }
+  blockquote {
+    background: var(--surface);
+    border-left: 3px solid var(--border);
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+    color: var(--text-dim);
+    border-radius: 0 4px 4px 0;
+  }
+  strong { color: var(--text); font-weight: 600; }
+  em { color: var(--text-dim); font-style: normal; }
+  .request {
+    background: rgba(74, 222, 128, 0.06);
+    border-left: 3px solid var(--green);
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .request p { margin: 0.4rem 0; }
+  .request-id {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--green);
+    margin-bottom: 0.3rem;
+    font-weight: 700;
+  }
+  .p0 { border-left-color: var(--red); }
+  .p0 .request-id { color: var(--red); }
+  .p0 { background: rgba(248, 113, 113, 0.06); }
+  .delta { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  @media (max-width: 720px) { .delta { grid-template-columns: 1fr; } }
+  .delta-col {
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+  }
+  .delta-col h4 {
+    color: var(--text-dim);
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .delta-col.ideal h4 { color: var(--green); }
+  .delta-col.current h4 { color: var(--red); }
+  .axis-bar {
+    display: flex;
+    height: 24px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1rem 0;
+    border: 1px solid var(--border);
+  }
+  .axis-bar > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--bg);
+  }
+  .axis-bar .gov { flex: 1; background: var(--red); }
+  .axis-bar .own { flex: 1; background: var(--green); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Oxios에 이상적인 oxi-sdk — 요청서</h1>
+  <div class="meta">
+    <span><strong>작성일</strong> 2026-08-01</span>
+    <span><strong>대상</strong> oxi-sdk / oxi-agent / oxi-ai 유지보수자</span>
+    <span><strong>근거</strong> oxios 코드베이스 실측 + 0.58→0.63 마이그레이션 검증</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <strong style="color: var(--text-dim); font-size: 0.85rem;">목차</strong>
+  <ol>
+    <li><a href="#thesis">테제: 거버넌스 + 소유 경계가 함께 가야 한다</a></li>
+    <li><a href="#root-cause">근본 원인: P0.2 사태는 거버넌스 + 소유 불명의 합작품</a></li>
+    <li><a href="#baseline">베이스라인: 현재 oxi-sdk 0.63 구조</a></li>
+    <li><a href="#pain-table">고통 → 해법 매핑</a></li>
+    <li><a href="#requests">구체적 요청 항목 (R0–R8)</a></li>
+    <li><a href="#delta">현재 vs 이상 구조 delta</a></li>
+    <li><a href="#contribution">기여 형태 제안</a></li>
+    <li><a href="#appendix">부록</a></li>
+  </ol>
+</nav>
+
+<section id="thesis">
+<h2>0. 테제: 거버넌스 + 소유 경계가 함께 가야 한다</h2>
+
+<div class="verdict">
+  <div class="verdict-label">이 문서의 균형점</div>
+  <p>이번 세션에서 oxios는 두 종류의 고통을 동시에 겪었습니다. 하나는 <strong>거버넌스</strong>(7개 root 심볼이 CHANGELOG 0건으로 사라짐, <code>#[deprecated]</code> 0건)이고, 다른 하나는 <strong>소유 경계의 부재</strong>(oxios가 MCP·메모리·회로차단기를 자체 구현했는데 oxi-sdk에도 동등 기능이 있어서, 어느 쪽이 진짜 owner인지 모호했고 결국 양쪽이 평행으로 진화함).</p>
+  <p>두 축을 분리해서 보면 해결책이 보이지 않습니다. 거버넌스만 강화하면 consumer는 안정적 API 위에 잘못된 추상화를 올리는 위험을 막지 못하고, ownership만 명확히 하면 그 owner가 다시 변할 때 같은 파괴가 일어납니다. <strong>두 축을 함께 가져가야</strong> — ownership을 명확히 한 다음, 그 ownership 경계선 위에 stability tier 어노테이션과 deprecation 규약을 얹어야 — P0.2 사태가 재발하지 않습니다.</p>
+
+  <div class="axis-bar">
+    <div class="gov">거버넌스 50%</div>
+    <div class="own">소유 경계 50%</div>
+  </div>
+  <p style="text-align: center; color: var(--text-dim); font-size: 0.85rem; margin-top: 0.5rem;">
+    요청 R0(소유 계약)이 P0. ownership을 못 박으면 R1·R2·R3(거버넌스)은 무의미.
+  </p>
+</div>
+</section>
+
+<section id="root-cause">
+<h2>1. 근본 원인: P0.2 사태는 거버넌스 + 소유 불명의 합작품</h2>
+
+<p>이번에 부러진 4개 심볼(<code>ProviderPool</code>, <code>RateLimitPolicy</code>, <code>ProviderCircuitBreaker</code>, <code>CircuitBreakerConfig</code>)의 삭제는 <strong>두 구조적 결함의 동시 발생</strong> 때문에 일어났습니다.</p>
+
+<h3>1.1 결함 A — 소유 경계 불명 (ownership 불명)</h3>
+
+<p>oxios는 자체적으로 다음을 구현했습니다. 각 항목은 <strong>oxios 도메인 정책</strong> 때문에 oxi-sdk가 제공한 동등 기능을 의도적으로 우회한 결과입니다.</p>
+
+<table>
+  <thead>
+    <tr><th>기능</th><th>oxios 자체 구현</th><th>oxi-sdk 동등</th><th>분리 사유 (실측)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>MCP 클라이언트</td>
+      <td><code>crates/oxios-mcp/src/{client,protocol,validation}.rs</code></td>
+      <td><code>oxi_agent::mcp</code></td>
+      <td><strong>spawn validation chokepoint</strong>: <code>validate_mcp_command</code>(FORBIDDEN 메타문자·<code>..</code>·<code>BLOCKED_MCP_SHELLS</code> 차단), <code>sanitize_env</code>(<code>LD_PRELOAD</code>/<code>LD_LIBRARY_PATH</code>/<code>DYLD_*</code>/<code>PYTHONPATH</code> 제거) — oxios의 audit remediation 설계(<code>docs/designs/2026-07-12-audit-remediation-design.md:18-23</code>)에서 정의된 도메인 정책.</td>
+    </tr>
+    <tr>
+      <td>메모리 백엔드</td>
+      <td><code>crates/oxios-memory/src/memory/backend.rs</code> (<code>MemoryBackend</code> trait)</td>
+      <td><code>oxi_agent::tools::MemoryBackend</code></td>
+      <td><strong>3-tier 정책</strong>: Hot/Warm/Cold + Dream consolidation + HNSW + hyperbolic embedding. 2026-07-11 설계(<code>docs/designs/2026-07-11-memory-system-overhaul-design.md:95</code>)에서 oxi의 <code>MemoryStore</code>로 브릿징하는 안을 <strong>의도적으로 reject</strong>.</td>
+    </tr>
+    <tr>
+      <td>회로차단기</td>
+      <td><code>crates/oxios-kernel/src/a2a/circuit_breaker.rs</code> (<code>A2ACircuitBreaker</code>)</td>
+      <td><code>oxi_ai::circuit_breaker::ProviderCircuitBreaker</code> (제거됨)</td>
+      <td><strong>A2A delegation 도메인</strong>: 임계값 (3 failures / 30s reset), HalfOpen 상태 머신, A2A 메시지 라우터에 직접 wire. LLM 호출 회로차단기와는 다른 트래픽 클래스.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>여기서 핵심 문제는: <strong>oxios가 자체 구현한 이유는 합리적이지만, 그 사실이 oxi-sdk에는 전달되지 않았다</strong>. oxi-sdk 입장에서 자기 <code>ProviderCircuitBreaker</code>는 oxios가 쓸 줄 모르는 자체 기능이고, oxios 입장에서 자기 <code>A2ACircuitBreaker</code>는 도메인 정책의 표현이다. 두 owner가 자기 영역을 모르고 있다가, 어느 쪽이 망가질 때 양쪽이 같이 무너집니다.</p>
+
+<h3>1.2 결함 B — 거버넌스 부재 (silence on removal)</h3>
+
+<p>동일한 사실이 다른 각도에서 보입니다:</p>
+
+<ul>
+  <li><strong>7개 root-level 심볼</strong> (<code>ProviderPool</code>, <code>RateLimitPolicy</code>, <code>CircuitBreakerConfig</code>, <code>ProviderCircuitBreaker</code>, <code>MultiProviderBuilder</code>, <code>RoutingConfig</code>, <code>MultiProviderConfig</code>)이 0.61에서 사라짐.</li>
+  <li>CHANGELOG 0.56–0.63 (166개 섹션) 중 <code>## Removed</code> 또는 <code>## Breaking</code>로 분류된 항목 <strong>0건</strong>.</li>
+  <li>CHANGELOG에서 <code>ProviderPool</code>/<code>ProviderCircuitBreaker</code>/<code>RateLimitPolicy</code>/<code>CircuitBreakerConfig</code> 언급 <strong>1회</strong> (제거 기재 아님).</li>
+  <li>0.63의 <code>oxi-sdk/src</code>에서 <code>#[deprecated]</code> 어노테이션 <strong>0건</strong>.</li>
+  <li>Stability tier 어노테이션 (<code>#[stable]</code> / <code>#[unstable]</code> / <code>#[internal]</code>) <strong>0건</strong>.</li>
+</ul>
+
+<h3>1.3 두 결함의 합작: P0.2의 작동 메커니즘</h3>
+
+<blockquote>
+<strong>단계 1 — oxi-sdk</strong>: <code>ProviderCircuitBreaker</code>를 opt-in 표지(<em>커밋 메시지에만 존재</em>)로 도입.
+</blockquote>
+<blockquote>
+<strong>단계 2 — oxios</strong>: 표지가 기계 판독 불가라 opt-in임을 모르고, 핵심 회복력 위에 사용. 같은 시점에 자체 <code>A2ACircuitBreaker</code>도 만듦 (다른 트래픽 클래스).
+</blockquote>
+<blockquote>
+<strong>단계 3 — oxi-sdk</strong>: P0.2b 리팩터링에서 "프로덕션 미사용" 판단(<code>ae441c1f</code>: "<em>never constructed in production</em>")으로 회로차단기 삭제. deprecation 경고 없이, CHANGELOG 기록 없이.
+</blockquote>
+<blockquote>
+<strong>단계 4 — oxios</strong>: 빌드 깨짐. 자체 <code>A2ACircuitBreaker</code>는 oxios 도메인 정책의 표현이라 그대로지만, LLM 경로의 회복력 보강 코드는 죽음.
+</blockquote>
+
+<p><strong>두 결함 중 하나만 있었어도 이 사태는 막혔습니다</strong>. ownership만 명확했다면 oxios는 <code>ProviderCircuitBreaker</code> 위에 안 얹고 자체 도메인 구현만 했을 것이고, 거버넌스만 있었다면 oxios가 opt-in 표지를 미리 보고 정책 결정을 했을 것입니다.</p>
+
+<p>따라서 이 문서의 요청은 두 축을 <strong>동시에</strong> 다룹니다. 거버넌스(R1·R2·R3·R7)는 <em>owner가 변할 때의 안전망</em>이고, ownership(R0·R5·R6)은 <em>owner를 처음에 명확히 하는 첫 단계</em>입니다.</p>
+</section>
+
+<section id="baseline">
+<h2>2. 베이스라인: 현재 oxi-sdk 0.63 구조 (consumer-visible)</h2>
+
+<p>0.58 → 0.63 사이에 <strong>consumer-visible root re-export 7개가 사라지고</strong> 12개가 추가됐습니다.</p>
+
+<table>
+  <thead>
+    <tr><th>변화</th><th>root-level 심볼</th><th>출처 모듈</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="badge red">제거됨</span></td>
+      <td><code>ProviderPool</code>, <code>RateLimitPolicy</code></td>
+      <td><code>oxi_ai::provider_pool</code> (203 LOC)</td>
+    </tr>
+    <tr>
+      <td><span class="badge red">제거됨</span></td>
+      <td><code>CircuitBreakerConfig</code>, <code>ProviderCircuitBreaker</code></td>
+      <td><code>oxi_ai::circuit_breaker</code> (944 LOC)</td>
+    </tr>
+    <tr>
+      <td><span class="badge red">제거됨</span></td>
+      <td><code>MultiProviderBuilder</code>, <code>RoutingConfig</code>, <code>MultiProviderConfig</code></td>
+      <td><code>oxi_ai::multi_provider</code> + <code>oxi-sdk/multi_provider</code> (1283 + 359 LOC)</td>
+    </tr>
+    <tr>
+      <td><span class="badge green">추가됨</span></td>
+      <td><code>PortMemoryBackend</code></td>
+      <td><code>oxi-sdk/port_memory_backend</code> (0.62)</td>
+    </tr>
+    <tr>
+      <td><span class="badge green">추가됨</span></td>
+      <td><code>BashTool</code>, <code>SubagentRunner</code></td>
+      <td><code>oxi_agent</code> (이미 직접 의존)</td>
+    </tr>
+    <tr>
+      <td><span class="badge green">추가됨</span></td>
+      <td><code>MemoryBackend</code>, <code>MemoryItem</code>, <code>ResolvedContent</code>, <code>UrlResolver</code></td>
+      <td><code>oxi_agent::tools</code> (0.62)</td>
+    </tr>
+    <tr>
+      <td><span class="badge green">추가됨</span></td>
+      <td><code>AgentHubStatus</code>, <code>AgentInfo</code>, <code>AgentKind</code>, <code>AgentPoolProvider</code></td>
+      <td><code>oxi_agent</code> (0.62)</td>
+    </tr>
+    <tr>
+      <td><span class="badge green">추가됨</span></td>
+      <td><code>LspAction</code>, <code>LspProvider</code></td>
+      <td><code>oxi_agent</code> (0.62)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>oxios의 oxi-sdk 호출 빈도 상위 (전체 호출 표면: <strong>70개 distinct root symbol</strong>):</p>
+
+<table>
+  <thead>
+    <tr><th>사용 횟수</th><th>심볼</th><th>분류</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>34</td><td><code>oxi_sdk::ToolError</code></td><td>tool error path</td></tr>
+    <tr><td>14</td><td><code>oxi_sdk::TokenBundle</code></td><td>credentials</td></tr>
+    <tr><td>10</td><td><code>oxi_sdk::Provider</code></td><td>core trait</td></tr>
+    <tr><td>9</td><td><code>oxi_sdk::get_provider_models</code></td><td>catalog</td></tr>
+    <tr><td>6</td><td><code>oxi_sdk::load_token</code>, <code>oxi_sdk::BrowserEngine</code></td><td>credentials / browser feature</td></tr>
+    <tr><td>4</td><td><code>oxi_sdk::Tracer</code>, <code>oxi_sdk::SdkError</code>, <code>oxi_sdk::RoutingControl</code>, <code>oxi_sdk::ProviderOptions</code>, <code>oxi_sdk::Authorizer</code>, <code>oxi_sdk::CostTracker</code></td><td>middleware + error</td></tr>
+    <tr><td>3</td><td><code>oxi_sdk::ToolRegistry</code>, <code>oxi_sdk::AgentConfig</code>, <code>oxi_sdk::ProviderCircuitBreaker</code> ⚠, <code>oxi_sdk::Oxi</code>, <code>oxi_sdk::MessageBus</code>, <code>oxi_sdk::AgentTool</code>, <code>oxi_sdk::Model</code></td><td>core agent + middleware</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="pain-table">
+<h2>3. 고통 → 해법 매핑</h2>
+
+<table>
+  <thead>
+    <tr><th>고통 (실측)</th><th>원인</th><th>구조적 해법</th><th>요청 ID</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>P0.2 사태</strong>: 7개 root 심볼이 oxios 빌드를 깨뜨림 (그 중 4개가 oxios 코드 경로에 존재)</td>
+      <td>소유 불명 (oxios는 opt-in임을 모르고 사용) + 거버넌스 부재 (deprecation 0건)</td>
+      <td><strong>소유 계약</strong>(R0)으로 경계 설정 + <strong>stability tier 어노테이션</strong>(R3)으로 opt-in 표지 기계 판독화</td>
+      <td><strong>R0, R3</strong></td>
+    </tr>
+    <tr>
+      <td><strong>undocumented breaking removal</strong><br>CHANGELOG에 <code>## Removed</code> 0건</td>
+      <td>governance 절차 부재</td>
+      <td>제거 전 1~2 릴리스 <code>#[deprecated]</code> (R2) + <code>## Removed</code> / <code>## Breaking</code> 섹션 의무화 (R1)</td>
+      <td>R1, R2</td>
+    </tr>
+    <tr>
+      <td><strong>oxios가 3개 영역을 평행 구현</strong><br>MCP·메모리·회로차단기 모두 SDK와 중복</td>
+      <td>SDK ↔ Consumer 책임 경계 불명확</td>
+      <td>Ownership contract(R0)로 어느 쪽이 owner인지 명시 + composable trait(R6)으로 domain 추가만 가능하게</td>
+      <td><strong>R0, R5, R6</strong></td>
+    </tr>
+    <tr>
+      <td><strong>F-3: 14개 <code>.expect()</code> across 6 providers</strong><br>malformed API key → <code>panic=abort</code> 데몬 사망</td>
+      <td>회복 가능 에러를 panic으로 표현</td>
+      <td>SDK 내부 zero-panic 보장 + <code>Result</code> 일관화, 공개된 <code>thiserror</code>-based 에러 타입 강제</td>
+      <td>R4</td>
+    </tr>
+    <tr>
+      <td><strong>ToolError 34회 매칭</strong><br>에러 variant 의미 변경 시 silent break 위험</td>
+      <td>에러 variant 안정성 보장 부재</td>
+      <td>에러 타입 <code>#[non_exhaustive]</code> + named variant 의미 변경 금지 정책</td>
+      <td>R7</td>
+    </tr>
+    <tr>
+      <td><strong>신규 transitive dep이 빌드 무게 증가</strong><br>0.63은 <code>prost</code>, vendored <code>protoc-bin-vendored</code> 추가</td>
+      <td>의존성 추가에 대한 영향 평가 부재</td>
+      <td>의존성 추가 시 CHANGELOG/RFC에 빌드 영향 명시 + 선택적 feature 분리</td>
+      <td>R8</td>
+    </tr>
+  </tbody>
+</table>
+</section>
+
+<section id="requests">
+<h2>4. 구체적 요청 항목 (R0–R8)</h2>
+
+<div class="request p0">
+  <div class="request-id">R0 · [P0] Ownership Contract — 누가 무엇을 소유하는지 명시</div>
+  <p><strong>P0.2 사태의 구조적 근본 원인입니다.</strong> 이걸 못 박기 전엔 R1–R3(거버넌스)도 무의미합니다.</p>
+  <p><strong>요청</strong>: <code>docs/oxi-sdk-ownership.md</code>에 다음을 명시적으로 기술:</p>
+
+  <table>
+    <thead>
+      <tr><th>SDK가 소유 (구현 제공 + 안정성 보장)</th><th>SDK가 의도적으로 안 함 (consumer 책임, SDK는 trait/composable 인터페이스만 제공)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <ul>
+            <li>에이전트 루프 (<code>Agent::run_streaming</code>)</li>
+            <li>프로바이더 transport (Anthropic, OpenAI, …)</li>
+            <li>Tool calling 프로토콜</li>
+            <li>기본 재시도 (3회, 지수 백오프)</li>
+            <li>Credential store</li>
+            <li>Catalog (models.dev sync)</li>
+            <li>Token usage tracking</li>
+            <li><strong>MCP 프로토콜</strong> (전송·메시지 형식) — <em>SDK 소유</em></li>
+            <li><strong>메모리 포트 trait</strong> (<code>MemoryStore</code>) — <em>SDK 소유</em></li>
+            <li><strong>회로차단기 behavior trait</strong> (<code>CircuitBreaker</code>) — <em>SDK 소유</em></li>
+          </ul>
+        </td>
+        <td>
+          <ul>
+            <li>도메인-특화 도구 (브라우저, 캘린더, …)</li>
+            <li>채널 (Web, CLI, Telegram)</li>
+            <li>프로세스 스케줄링, 작업 큐</li>
+            <li>A2A / inter-agent 메시징 프로토콜</li>
+            <li>지식 베이스 (markdown/vector)</li>
+            <li>RBAC / path sandbox</li>
+            <li>메모리 압축 (<code>Snapcompact</code>)</li>
+            <li>UI (TUI / Web)</li>
+            <li><strong>MCP spawn validation 정책</strong> — <em>consumer 책임</em></li>
+            <li><strong>메모리 tiering 정책</strong> (Hot/Warm/Cold) — <em>consumer 책임</em></li>
+            <li><strong>A2A / 도메인 트래픽 임계값</strong> — <em>consumer 책임</em></li>
+          </ul>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p><strong>왜 두 컬럼?</strong> SDK가 동작 인터페이스(<em>behavior</em>)는 소유하고, 정책(<em>policy</em>)은 consumer에 위임하면 양쪽이 평행 진화하지 않습니다. 예:</p>
+  <ul>
+    <li>SDK: <code>pub trait CircuitBreaker { fn check(&self); fn record_success(&self); fn record_failure(&self); }</code> + reference 구현.</li>
+    <li>Consumer: 자기 도메인 트래픽 (A2A / LLM / HTTP)에 맞춰 임계값 결정, SDK trait impl만 작성.</li>
+    <li>SDK가 reference 구현을 변경해도 consumer는 trait impl만 안정성 보장.</li>
+  </ul>
+  <p><strong>검증</strong>: oxios가 자체 <code>A2ACircuitBreaker</code>를 <code>oxi_sdk::CircuitBreaker</code> trait impl로 표현할 수 있고, oxi-sdk가 <code>DefaultCircuitBreaker</code>를 옵션으로 제공하면서도 oxios 도메인 정책은 보존되는 구조.</p>
+</div>
+
+<div class="request">
+  <div class="request-id">R1 · CHANGELOG의 `Removed` / `Breaking` 섹션 의무화</div>
+  <p><strong>요청</strong>: 0.56 → 0.63 사이 166개 섹션 중 <code>## Removed</code> 또는 <code>## Breaking</code>로 분류된 항목이 0개였습니다. 2730 LOC의 <code>multi_provider</code> / <code>complexity_router</code> / <code>provider_pool</code>와 2061 LOC의 <code>circuit_breaker</code> / <code>fallback_chain</code> 삭제는 <strong>단 한 줄의 <code>## Breaking</code> 항목도 없이 일어났습니다</strong>.</p>
+  <p><strong>기대 동작</strong>: 0.x 시맨버이므로 breaking change가 허용되더라도, 제거/시그니처 변경/의미 변경은 <code>## Removed</code> 섹션에 다음을 포함:</p>
+  <ul>
+    <li>심볼명 (full path: <code>oxi_sdk::ProviderPool</code>)</li>
+    <li>대체 API 또는 마이그레이션 경로</li>
+    <li>최소 deprecation 윈도우 (제거 N 릴리스 전)</li>
+    <li>영향을 받는 알려진 consumer (GitHub 코드 검색으로 자동 산출 가능)</li>
+  </ul>
+</div>
+
+<div class="request">
+  <div class="request-id">R2 · 공개 심볼 제거 전 `#[deprecated]` 주기 의무화</div>
+  <p><strong>요청</strong>: 0.63의 <code>oxi-sdk/src</code> 전체에서 <code>#[deprecated]</code> 어노테이션이 <strong>0건</strong>입니다. oxios가 사용하던 4개 심볼은 <strong>사전 경고 없이 제거</strong>됐습니다.</p>
+  <p><strong>기대 동작</strong>:</p>
+  <ul>
+    <li>제거 후보가 된 공개 심볼은 <strong>최소 1개 릴리스 (이상적으로 2개)</strong> 동안 <code>#[deprecated(since = "0.XX.0", note = "use X instead; will be removed in 0.YY.0")]</code> 마킹.</li>
+    <li><code>cargo build</code> 시 consumer가 경고를 받게 함 → 마이그레이션 작업의 <strong>기계 판독 가능한 신호</strong>.</li>
+    <li>deprecation과 removal 사이에 API 시그니처 변경은 금지 (의미적 안정성 유지).</li>
+  </ul>
+</div>
+
+<div class="request">
+  <div class="request-id">R3 · Stability Tier 어노테이션 (opt-in 표지 기계 판독화)</div>
+  <p><strong>요청</strong>: oxi-sdk의 모든 <code>pub</code> API에 다음 tier 어노테이션 중 하나 부여:</p>
+<pre><code>#[stable(since = "0.XX.0")]            // semver-stable, 1 minor 동안 deprecation 없이 제거 금지
+#[unstable(feature = "...")]          // 언제든 변경 가능, consumer는 명시적 opt-in
+#[deprecated(since = "...", note = "...")]
+#[internal]                            // pub이지만 consumer 대상 아님, 문서화/모듈 path 통제</code></pre>
+  <p><strong>근거</strong>: <code>ae441c1f</code> 커밋 메시지는 <code>ProviderPool</code>을 "<strong>opt-in</strong> multi-provider routing layer"라고 부르지만, "opt-in"은 oxios가 자동으로 감지할 수 있는 표식이 아닙니다. tier 어노테이션이 있었다면 oxios는 <code>#[unstable]</code> 위에 핵심 회복력을 얹지 않았을 것입니다.</p>
+  <p><strong>기대 동작</strong>:</p>
+  <ul>
+    <li><code>cargo doc</code>에서 tier별 색상 구분.</li>
+    <li><code>#![warn(deprecated)]</code> + <code>#![warn(unstable_used)]</code> 같은 lint 토글이 consumer 측에서 강제 가능하도록.</li>
+    <li>SemVer 정책 문서(<code>docs/release-process.md</code>)에 tier별 변경 규칙 명시.</li>
+  </ul>
+</div>
+
+<div class="request p0">
+  <div class="request-id">R4 · SDK 내부 zero-panic 보장 + `Result` 일관화</div>
+  <p><strong>요청</strong>: oxi-sdk/oxi-ai/oxi-agent 내부의 <code>.expect()</code>, <code>panic!()</code>, <code>unreachable!()</code>를 <strong>에러가 회복 가능한 모든 경로에서 제거</strong>. 0.59의 F-3 수정(14개 <code>.expect()</code> → <code>?</code>)이 그 방향의 첫걸음이었습니다.</p>
+  <p><strong>현재 상태</strong>:</p>
+  <pre><code>// Before 0.59 (실제 있던 코드)
+let headers = HeaderMap::try_from(value)
+    .expect("valid header value");  // malformed API key → panic → panic=abort 데몬 사망
+
+// 0.59+ (수정 후)
+let headers = HeaderMap::try_from(value)
+    .map_err(ProviderError::InvalidResponse)?;  // SDK가 Result로 변환</code></pre>
+  <p><strong>기대 동작</strong>:</p>
+  <ul>
+    <li>공개 에러 타입을 <code>thiserror</code>-based 단일 enum (<code>SdkError</code>)으로 통합하고 <code>#[non_exhaustive]</code>로 표시.</li>
+    <li>SDK 내부 코드베이스에 <code>deny(clippy::expect_used, clippy::panic, clippy::unwrap_used)</code> 같은 lint 적용 (테스트 코드 제외).</li>
+    <li>0.59의 F-3처럼 각 프로바이더 transport에 동일한 변환 적용 (Anthropic, OpenAI, Azure, Mistral, Bedrock, Vertex, Google).</li>
+  </ul>
+</div>
+
+<div class="request">
+  <div class="request-id">R5 · SDK Ownership Manifest (R0의 공개 문서화)</div>
+  <p><strong>요청</strong>: R0의 ownership contract를 <code>docs/oxi-sdk-ownership.md</code> 또는 <code>oxi-sdk/README.md</code>에 명시적으로 문서화. 위 R0 테이블 그대로.</p>
+  <p><strong>왜 R0와 별개인가</strong>: R0는 ownership 정의 자체, R5는 그것을 <strong>consumer가 발견 가능한 위치</strong>(README·docs 사이트)에 배치하는 운영 항목. R0만으로 oxios가 <em>기여 시점에</em> 합의한다면 좋고, R5는 그 합의가 <em>영구히</em> 노출되도록 보장.</p>
+</div>
+
+<div class="request">
+  <div class="request-id">R6 · Composable Trait 노출로 평행 진화 방지</div>
+  <p><strong>현재 패턴</strong>: SDK가 <code>ProviderCircuitBreaker</code>를 직접 구현해서 consumer가 그것을 사용. SDK가 <code>MemoryBackend</code>를 trait으로 노출하지만 이미 <code>MemoryStore</code> trait이 있어서 이중화.</p>
+  <p><strong>이상 패턴</strong>:</p>
+  <pre><code>// SDK가 behavior trait만 노출 (R0에서 owner로 선언)
+pub trait CircuitBreaker: Send + Sync {
+    fn check(&self) -> Result<(), BreakerError>;
+    fn record_success(&self);
+    fn record_failure(&self);
+}
+
+// SDK가 default 구현도 제공 (opt-in, reference)
+pub struct DefaultCircuitBreaker { /* 기존 impl */ }
+impl CircuitBreaker for DefaultCircuitBreaker { ... }
+
+// Consumer는 자체 구현 가능 (도메인 정책)
+impl CircuitBreaker for MyDomainBreaker { ... }
+
+// 그리고 SDK가 "reference composition"으로 wire
+pub trait AgentResilience: Send + Sync {
+    fn breaker(&self) -> &dyn CircuitBreaker;
+    fn retry_policy(&self) -> RetryPolicy;
+}</code></pre>
+  <p><strong>기대 효과</strong>: oxios가 자체 <code>A2ACircuitBreaker</code>를 동일한 trait으로 wire할 수 있고, SDK가 제공한 default 구현을 domain-specific 구현으로 교체 가능. <strong>기능을 잃지 않으면서도 consumer 도메인을 존중</strong> — 평행 진화가 일어나지 않음.</p>
+</div>
+
+<div class="request">
+  <div class="request-id">R7 · 공개 에러 타입에 `#[non_exhaustive]` + named variant 안정성 보장</div>
+  <p><strong>요청</strong>: oxios는 <code>oxi_sdk::ToolError</code>를 34회 매칭합니다. <code>SdkError</code>, <code>ProviderError</code> 등도 다수. 공개 에러 타입에 다음 보장:</p>
+  <ul>
+    <li><code>#[non_exhaustive]</code> 어노테이션 — 새 variant 추가는 자유롭게 허용 (consumer는 catch-all 필요).</li>
+    <li>단, <strong>기존 named variant의 의미는 변경 불가</strong> — variant 이름이 같아도 의미가 바뀌면 사실상 silent break.</li>
+    <li>의미 변경 시 <code>RenameVariant</code> 같은 명시적 신호 + deprecation.</li>
+    <li>이 규칙을 <code>docs/release-process.md</code>에 명문화.</li>
+  </ul>
+</div>
+
+<div class="request">
+  <div class="request-id">R8 · 신규 transitive 의존성 영향 명시 + feature 분리</div>
+  <p><strong>요청</strong>: 0.63이 <code>prost</code> + vendored <code>protoc-bin-vendored</code>를 새로 끌고 온 것은 oxios의 빌드 시간을 비약적으로 증가시킵니다. 컨테이너/edge 빌드에서 큰 부담입니다.</p>
+  <p><strong>기대 동작</strong>:</p>
+  <ul>
+    <li>신규 transitive 의존성 추가 시 CHANGELOG에 빌드 영향 (예: <code>+~120 crates, +~150s cold build time</code>) 명시.</li>
+    <li>큰 빌드 의존성(<code>protoc</code>, <code>lalrpop</code>, <code>tonic</code>, <code>protobuf</code> 등)은 <strong>feature gate 뒤로</strong> 분리. 예: <code>oxi-sdk/proto-catalog = ["oxi-catalog"]</code>.</li>
+    <li>consumer가 정말 필요로 하는 기능이 아닌 한, default feature에 heavy build dep을 포함시키지 않기.</li>
+  </ul>
+</div>
+</section>
+
+<section id="delta">
+<h2>5. 현재 vs 이상 구조 delta</h2>
+
+<div class="delta">
+  <div class="delta-col current">
+    <h4>현재 (oxi-sdk 0.63)</h4>
+    <ul>
+      <li><strong>Ownership</strong>: 불명 (코드와 README 어느 쪽에도 "누가 무엇을 갖는지" 없음)</li>
+      <li>oxios가 자체 MCP / 메모리 / 회로차단기 구현 (평행 진화)</li>
+      <li><code>pub use</code> 80줄, root-level re-export 50여 개</li>
+      <li><code>#[deprecated]</code> 0건</li>
+      <li>stability tier 어노테이션 0건</li>
+      <li>CHANGELOG의 <code>## Removed</code> / <code>## Breaking</code> 분류 0건 (0.56–0.63)</li>
+      <li>SDK 내부 zero-panic 미보장 (F-3 수정 0.59에서 시작)</li>
+      <li>에러 타입 일부 <code>#[non_exhaustive]</code> 적용</li>
+      <li>신규 build dep (<code>prost</code>, <code>protoc-bin-vendored</code>) default에 포함</li>
+    </ul>
+  </div>
+  <div class="delta-col ideal">
+    <h4>이상 (제안)</h4>
+    <ul>
+      <li><strong>Ownership</strong>: README + <code>docs/oxi-sdk-ownership.md</code>에 behavior ↔ policy 분류 명시</li>
+      <li>SDK가 behavior trait + reference 구현, consumer가 policy impl</li>
+      <li><code>pub use</code> 동일 + 각 라인에 stability tier 명시</li>
+      <li>제거 후보는 최소 1~2 릴리스 <code>#[deprecated]</code> 경고</li>
+      <li><code>#[stable]</code> / <code>#[unstable]</code> / <code>#[internal]</code> tier 어노테이션</li>
+      <li>CHANGELOG <code>## Removed</code> 섹션 의무, 대체 API 명시</li>
+      <li>SDK 내부 <code>deny(clippy::expect_used, panic, unwrap_used)</code></li>
+      <li>모든 공개 에러 타입 <code>#[non_exhaustive]</code> + 의미 변경 금지 정책</li>
+      <li>heavy build dep는 feature gate, default는 경량</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<section id="contribution">
+<h2>6. 기여 형태 제안</h2>
+
+<p>oxios는 fork를 만들거나 자체 패치를 유지하기보다는, 다음 중 하나를 선호합니다 (우선순위 순):</p>
+
+<ol>
+  <li><strong>R0 (ownership contract) + R5 (manifest) 공동 작성</strong>: 가장 임팩트가 큰 변경. oxios가 1차 초안 작성 → oxi 측과 합의. 양 측 도메인 전문가 1~2명이 합의하면 영구 해결.</li>
+  <li><strong>R6 (composable trait) PR</strong>: <code>CircuitBreaker</code> / <code>MemoryStore</code> / <code>McpTransport</code>를 trait + reference 구현으로 리팩터링. 호환성 유지하면서 단계적 도입 가능.</li>
+  <li><strong>R1·R2 (CHANGELOG + <code>#[deprecated]</code>) PR</strong>: governance 개선. 도메인 중립이라 upstream 흡수가 가장 자연스러움.</li>
+  <li><strong>R3 (tier 어노테이션) PR</strong>: 어노테이션 추가만이라 위험 0. 거버넌스 작업의 첫 걸음으로 적합.</li>
+  <li><strong>R4 (zero-panic) PR</strong>: F-3 작업의 후속. 프로바이더별로 분할 가능 (단일 PR 부담 적음).</li>
+  <li><strong>R7·R8 문서화</strong>: <code>docs/release-process.md</code> 업데이트 + feature 분리 제안.</li>
+</ol>
+
+<p>oxios의 시간/자원 한계상, <strong>1번(R0+R5)이 구조적으로 가장 가치 있고</strong>, <strong>3번(R1·R2)이 가장 빠르게 흡수 가능</strong>합니다. 1번 합의 시 3~6번의 작업은 자연스럽게 따라옵니다.</p>
+</section>
+
+<section id="appendix">
+<h2>부록 A. oxios가 의존하는 oxi-sdk root-level 심볼 (70개)</h2>
+
+<pre><code>Agent, AgentConfig, AgentTool, AgentToolResult, Api, AuditAction, AuditLog,
+AuthStore, Authorizer, BrowseConfig, BrowseExtractTool, BrowseScriptTool,
+BrowseSessionTool, BrowseTool, BrowserEngine, CatalogModelEntry,
+CircuitBreakerConfig (removed 0.61 ⚠), CompactionEvent, Context, CostTracker,
+CostTrackerConfig, EventBus, InputModality, InterAgentMessage, KernelToolProvider,
+Message, MessageBus, MiddlewarePipeline, Model, ModelCatalog, ModelEntry,
+ModelRegistry, NoopModelCatalog, OAuthError, OpenAiProvider, Oxi, OxiBrowserEngine,
+OxiBuilder, Provider, ProviderCircuitBreaker (removed 0.61 ⚠), ProviderEvent,
+ProviderOptions, ReadTool, RoutingControl, SdkError, SdkSubagentRunner, SearchCache,
+SpanKind, TokenBundle, TokenUsage, Tracer, ... (총 70개)</code></pre>
+
+<h2>부록 B. 0.58 → 0.63 사이의 제거/추가 (consumer-visible)</h2>
+
+<table>
+  <thead>
+    <tr><th>카테고리</th><th>심볼</th><th>0.58</th><th>0.63</th><th>비고</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="badge red">제거</span></td><td><code>ProviderPool</code>, <code>RateLimitPolicy</code></td><td>✓</td><td>✗</td><td><code>oxi_ai::provider_pool</code> 전체 삭제 (203 LOC)</td></tr>
+    <tr><td><span class="badge red">제거</span></td><td><code>CircuitBreakerConfig</code>, <code>ProviderCircuitBreaker</code></td><td>✓</td><td>✗</td><td><code>oxi_ai::circuit_breaker</code> 전체 삭제 (944 LOC)</td></tr>
+    <tr><td><span class="badge red">제거</span></td><td><code>MultiProviderBuilder</code>, <code>RoutingConfig</code>, <code>MultiProviderConfig</code></td><td>✓</td><td>✗</td><td><code>oxi_ai::multi_provider</code> + <code>oxi-sdk/multi_provider</code> 삭제</td></tr>
+    <tr><td><span class="badge green">추가</span></td><td><code>PortMemoryBackend</code></td><td>✗</td><td>✓</td><td><code>oxi-sdk/port_memory_backend</code> (0.62 도입)</td></tr>
+    <tr><td><span class="badge green">추가</span></td><td><code>BashTool</code>, <code>SubagentRunner</code></td><td>✗</td><td>✓</td><td><code>oxi_agent</code>에서 root로 승격</td></tr>
+    <tr><td><span class="badge green">추가</span></td><td><code>MemoryBackend</code>, <code>MemoryItem</code></td><td>✗</td><td>✓</td><td><code>oxi_agent::tools</code>에서 root로 승격</td></tr>
+    <tr><td><span class="badge green">추가</span></td><td><code>AgentHubStatus</code>, <code>AgentInfo</code>, <code>AgentKind</code>, <code>AgentPoolProvider</code></td><td>✗</td><td>✓</td><td><code>oxi_agent</code>에서 root로 승격</td></tr>
+    <tr><td><span class="badge green">추가</span></td><td><code>LspAction</code>, <code>LspProvider</code></td><td>✗</td><td>✓</td><td><code>oxi_agent</code>에서 root로 승격</td></tr>
+  </tbody>
+</table>
+
+<h2>부록 C. P0.2 사태 작동 메커니즘 (시각화)</h2>
+
+<pre><code>단계 1 [oxi-sdk]    opt-in 표지 (커밋 메시지에만)
+단계 2 [oxios]      표지 기계 판독 불가 → opt-in 모름 → 핵심 회복력 위에 사용
+단계 3 [oxi-sdk]    "프로덕션 미사용" 판단 (ae441c1f) → 회로차단기 삭제
+단계 4 [oxios]      빌드 깨짐 (5개 컴파일 에러)
+                    자체 A2ACircuitBreaker는 oxios 도메인 정책이라 손상 없음
+                    그러나 LLM 경로 회복력 보강 코드는 죽음
+
+        R0 (ownership contract)        R1·R2·R3 (governance)
+        ─────────────────────          ─────────────────────────
+        어느 owner도 모르는 상태에서    owner가 변할 때의 안전망
+        양쪽이 평행으로 진화하는 것을   (opt-in 표시, deprecation 주기,
+        막음. SDK는 behavior trait +    ## Removed 섹션)
+        reference 구현, consumer는
+        policy impl만 작성.</code></pre>
+
+<h2>부록 D. 검증 로그</h2>
+
+<pre><code>$ grep -rE "#\[deprecated|#\[unstable|#\[stable" --include="*.rs" \
+      /Volumes/MERCURY/PROJECTS/oxi/oxi-sdk/src
+(빈 결과 — zero deprecation/tier annotations)
+
+$ awk '/^## \[0\.5[6789]\.0\]|^## \[0\.6[0-3]\.0\]/{flag=1} flag' \
+      /Volumes/MERCURY/PROJECTS/oxi/CHANGELOG.md | grep -ciE "removed|breaking"
+3
+
+$ grep -cE "ProviderPool|ProviderCircuitBreaker|RateLimitPolicy|CircuitBreakerConfig" \
+      /Volumes/MERCURY/PROJECTS/oxi/CHANGELOG.md
+1
+
+$ cargo check -p oxios-kernel    # 0.59 도약 (안전 지대)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 35.64s
+
+$ cargo build --workspace        # 0.63 도약 (breakage)
+error: could not compile `oxios-kernel` (lib) due to 5 previous errors
+
+$ git -C /Volumes/MERCURY/PROJECTS/oxi tag --contains ae441c1f --sort=version:refname | head -1
+v0.61.0
+$ git -C /Volumes/MERCURY/PROJECTS/oxi tag --contains afe9cf04 --sort=version:refname | head -1
+v0.61.0</code></pre>
+</section>
+
+<footer class="footer">
+  <p>문서 위치: <code>docs/production-audit/2026-08-01-ideal-oxi-sdk-proposal.html</code></p>
+  <p>관련 문서: <a href="2026-08-01-oxi-sdk-upgrade-impact.html" style="color: var(--accent);">oxi-sdk 0.58→0.63 업그레이드 영향 분석</a></p>
+</footer>
+
+</div>
+</body>
+</html>

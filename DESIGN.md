@@ -1,4 +1,9 @@
 # Oxios — Agent Operating System
+> **Canonical unified design system:** `project-oxi/.github/DESIGN.md` (v1.0).
+> **This file is the legacy oxios project-specific doc** (Agent Operating System
+> philosophy + architecture sketch, predates the unified system). Kept for
+> historical reference; the unified oxi design system governs current UI work.
+
 
 > *"Do one thing well. Specify before you build. Evolve, don't repeat."*
 

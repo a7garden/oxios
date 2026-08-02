@@ -1,10 +1,11 @@
 # Oxios Design System
 
-> **This is the canonical oxi design system spec**, adopted verbatim as oxios's
-> source of truth (per `oxi-design-system/DESIGN.md` v1.0). The shared grammar
-> below governs all oxi-family projects; oxios-specific notes live in §10.3 and
-> the migration state in §12.3. Where this file and any older oxios design note
-> disagree, **this file wins**.
+> **Canonical unified design system:** `project-oxi/.github/DESIGN.md` (v1.0).
+>
+> This file is a verbatim copy of the canonical spec (above) with a 16-line oxios
+> migration-status header prepended. oxios-specific notes live in §10.3 and the
+> migration state in §12.3. Where this file and any older oxios design note
+> disagree, **the canonical document wins**.
 >
 > **oxios migration status (2026-07-31):** token layer rewritten to the 3-tier
 > architecture (§2); warm-paper neutrals + canonical blue primary adopted (§3);
