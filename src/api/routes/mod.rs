@@ -8,8 +8,8 @@
 //! - **infra**: Scheduler, audit, permissions, MCP
 //! - **events**: Sessions, SSE events, approvals
 
-mod asset_routes;
 mod a2a;
+mod asset_routes;
 mod audit_routes;
 mod budget_routes;
 mod calendar_routes;
@@ -58,12 +58,12 @@ use crate::api::persona_routes;
 use crate::api::server::AppState;
 
 // Re-export all handlers for use in build_routes
+pub(crate) use a2a::{
+    handle_a2a_agent_detail, handle_a2a_agents, handle_a2a_messages, handle_a2a_topology,
+};
 pub(crate) use asset_routes::{
     handle_asset_delete, handle_asset_get, handle_asset_list, handle_asset_meta_get,
     handle_asset_meta_update, handle_asset_upload,
-};
-pub(crate) use a2a::{
-    handle_a2a_agent_detail, handle_a2a_agents, handle_a2a_messages, handle_a2a_topology,
 };
 pub(crate) use audit_routes::{
     handle_audit_by_agent, handle_audit_entries, handle_audit_export, handle_audit_flush,
@@ -781,7 +781,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/search", post(handle_search))
         .route("/api/browse", post(handle_browse))
         // Unified asset store — protected CRUD
-        .route("/api/assets", post(handle_asset_upload).get(handle_asset_list))
+        .route(
+            "/api/assets",
+            post(handle_asset_upload).get(handle_asset_list),
+        )
         .route(
             "/api/assets/{name}/meta",
             get(handle_asset_meta_get).put(handle_asset_meta_update),

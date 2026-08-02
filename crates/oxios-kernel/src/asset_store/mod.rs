@@ -268,11 +268,12 @@ impl AssetStore {
             let lower = search.to_ascii_lowercase();
             filtered.retain(|a| {
                 a.filename.to_ascii_lowercase().contains(&lower)
-                    || a
-                        .title
+                    || a.title
                         .as_ref()
                         .is_some_and(|t| t.to_ascii_lowercase().contains(&lower))
-                    || a.tags.iter().any(|t| t.to_ascii_lowercase().contains(&lower))
+                    || a.tags
+                        .iter()
+                        .any(|t| t.to_ascii_lowercase().contains(&lower))
             });
         }
 
@@ -296,7 +297,10 @@ impl AssetStore {
     /// Get metadata for a single asset by storage name.
     pub fn get_meta(&self, storage_name: &str) -> Option<Asset> {
         let index = self.index.read();
-        index.iter().find(|a| a.storage_name == storage_name).cloned()
+        index
+            .iter()
+            .find(|a| a.storage_name == storage_name)
+            .cloned()
     }
 
     /// Update metadata (title, tags) for an asset.
@@ -374,11 +378,7 @@ impl AssetStore {
                 let bytes = std::fs::read(&path)?;
                 hex::encode(Sha256::digest(&bytes))
             };
-            let id = name
-                .split('.')
-                .next()
-                .unwrap_or(&name)
-                .to_string();
+            let id = name.split('.').next().unwrap_or(&name).to_string();
 
             let asset = Asset {
                 id,
@@ -583,8 +583,12 @@ mod tests {
     fn dedup_returns_existing() {
         let (store, _dir) = tmp_store();
         let bytes = vec![1, 2, 3, 4, 5];
-        let a1 = store.store(bytes.clone(), "a.png", AssetSource::Upload, None).unwrap();
-        let a2 = store.store(bytes, "b.png", AssetSource::Upload, None).unwrap();
+        let a1 = store
+            .store(bytes.clone(), "a.png", AssetSource::Upload, None)
+            .unwrap();
+        let a2 = store
+            .store(bytes, "b.png", AssetSource::Upload, None)
+            .unwrap();
 
         assert_eq!(a1.id, a2.id);
         assert_eq!(a1.storage_name, a2.storage_name);
@@ -593,9 +597,15 @@ mod tests {
     #[test]
     fn list_filters_by_type_and_source() {
         let (store, _dir) = tmp_store();
-        store.store(vec![1], "img.png", AssetSource::Upload, None).unwrap();
-        store.store(vec![2], "song.mp3", AssetSource::Generated, None).unwrap();
-        store.store(vec![3], "pic.jpg", AssetSource::EditorPaste, None).unwrap();
+        store
+            .store(vec![1], "img.png", AssetSource::Upload, None)
+            .unwrap();
+        store
+            .store(vec![2], "song.mp3", AssetSource::Generated, None)
+            .unwrap();
+        store
+            .store(vec![3], "pic.jpg", AssetSource::EditorPaste, None)
+            .unwrap();
 
         let (_, img_total) = store.list(&AssetFilter {
             type_filter: Some("image".into()),
@@ -614,7 +624,9 @@ mod tests {
     #[test]
     fn delete_removes_file_and_index() {
         let (store, dir) = tmp_store();
-        let asset = store.store(vec![9], "del.png", AssetSource::Upload, None).unwrap();
+        let asset = store
+            .store(vec![9], "del.png", AssetSource::Upload, None)
+            .unwrap();
         let file_path = dir.path().join(&asset.storage_name);
         assert!(file_path.exists());
 
@@ -633,7 +645,9 @@ mod tests {
 
         {
             let store = AssetStore::new(root.clone()).unwrap();
-            store.store(vec![42], "persist.png", AssetSource::Upload, None).unwrap();
+            store
+                .store(vec![42], "persist.png", AssetSource::Upload, None)
+                .unwrap();
         }
 
         // Re-open: index should load from disk.
@@ -676,7 +690,9 @@ mod tests {
     #[test]
     fn update_meta_changes_title_and_tags() {
         let (store, _dir) = tmp_store();
-        let asset = store.store(vec![1], "edit.png", AssetSource::Upload, None).unwrap();
+        let asset = store
+            .store(vec![1], "edit.png", AssetSource::Upload, None)
+            .unwrap();
 
         let updated = store
             .update_meta(
@@ -694,8 +710,12 @@ mod tests {
     #[test]
     fn search_matches_filename_and_title() {
         let (store, _dir) = tmp_store();
-        store.store(vec![1], "vacation.png", AssetSource::Upload, None).unwrap();
-        store.store(vec![2], "work.png", AssetSource::Upload, None).unwrap();
+        store
+            .store(vec![1], "vacation.png", AssetSource::Upload, None)
+            .unwrap();
+        store
+            .store(vec![2], "work.png", AssetSource::Upload, None)
+            .unwrap();
 
         let (_, total) = store.list(&AssetFilter {
             search: Some("vac".into()),

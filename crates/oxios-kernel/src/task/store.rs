@@ -718,7 +718,10 @@ mod tests {
         let fetched = store.get_task_by_id(&t.id).await.unwrap();
         assert_eq!(fetched.status, TaskStatus::Scheduled);
         assert_eq!(fetched.schedule_pattern.as_deref(), Some("0 9 * * *"));
-        assert!(fetched.next_run_at.is_some(), "next_run_at must be computed");
+        assert!(
+            fetched.next_run_at.is_some(),
+            "next_run_at must be computed"
+        );
     }
 
     #[tokio::test]
@@ -847,7 +850,10 @@ mod tests {
 
         // Two failures.
         for _ in 0..2 {
-            let rid = store.mark_running(&t.id, TaskRunTrigger::Heartbeat).await.unwrap();
+            let rid = store
+                .mark_running(&t.id, TaskRunTrigger::Heartbeat)
+                .await
+                .unwrap();
             store
                 .mark_finished(&t.id, &rid, false, String::new(), Some("boom".into()))
                 .await
@@ -857,7 +863,10 @@ mod tests {
         assert_eq!(after_fails.consecutive_failures, 2);
 
         // Then a success — consecutive_failures must reset to 0.
-        let rid = store.mark_running(&t.id, TaskRunTrigger::Heartbeat).await.unwrap();
+        let rid = store
+            .mark_running(&t.id, TaskRunTrigger::Heartbeat)
+            .await
+            .unwrap();
         store
             .mark_finished(&t.id, &rid, true, "recovered".into(), None)
             .await
@@ -885,7 +894,10 @@ mod tests {
             .await
             .unwrap();
         for _ in 0..2 {
-            let rid = store.mark_running(&t.id, TaskRunTrigger::Heartbeat).await.unwrap();
+            let rid = store
+                .mark_running(&t.id, TaskRunTrigger::Heartbeat)
+                .await
+                .unwrap();
             store
                 .mark_finished(&t.id, &rid, true, "ok".into(), None)
                 .await
@@ -921,15 +933,29 @@ mod tests {
         let t_plain = store.create_task(sample_params("plain")).await.unwrap();
 
         // Simulate a crash mid-run: mark both running.
-        store.mark_running(&t_auto.id, TaskRunTrigger::Manual).await.unwrap();
-        store.mark_running(&t_plain.id, TaskRunTrigger::Manual).await.unwrap();
+        store
+            .mark_running(&t_auto.id, TaskRunTrigger::Manual)
+            .await
+            .unwrap();
+        store
+            .mark_running(&t_plain.id, TaskRunTrigger::Manual)
+            .await
+            .unwrap();
 
         store.recover_stranded().await.unwrap();
 
         let auto = store.get_task_by_id(&t_auto.id).await.unwrap();
-        assert_eq!(auto.status, TaskStatus::Scheduled, "automated task rescheduled");
+        assert_eq!(
+            auto.status,
+            TaskStatus::Scheduled,
+            "automated task rescheduled"
+        );
         let plain = store.get_task_by_id(&t_plain.id).await.unwrap();
-        assert_eq!(plain.status, TaskStatus::Backlog, "plain task back to backlog");
+        assert_eq!(
+            plain.status,
+            TaskStatus::Backlog,
+            "plain task back to backlog"
+        );
 
         // Orphaned task_runs rows closed as failed.
         let runs = store.list_runs(&t_auto.id).await.unwrap();
