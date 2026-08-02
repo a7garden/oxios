@@ -105,10 +105,7 @@ export function useUpdateAssetMeta() {
     ): Promise<Asset | null> => {
       setSaving(true)
       try {
-        return await api.put<Asset>(
-          `/api/assets/${encodeURIComponent(storageName)}/meta`,
-          body,
-        )
+        return await api.put<Asset>(`/api/assets/${encodeURIComponent(storageName)}/meta`, body)
       } catch (e) {
         console.error('Asset meta update failed:', e)
         return null

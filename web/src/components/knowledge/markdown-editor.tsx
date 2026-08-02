@@ -48,8 +48,8 @@ import { tags as lmTags } from '@lezer/highlight'
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { api } from '@/lib/api-client'
 import { useKnowledgeRecursiveTree } from '@/hooks/use-knowledge'
+import { api } from '@/lib/api-client'
 import { emojiFoldExtension } from '@/lib/emoji-fold-extension'
 import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
 import { findFrontmatterRange } from '@/lib/frontmatter'
@@ -301,10 +301,7 @@ export function MarkdownEditor({
         fd.append('file', file)
         fd.append('source', 'editor-paste')
         try {
-          const asset = await api.upload<{ url: string; storage_name: string }>(
-            '/api/assets',
-            fd,
-          )
+          const asset = await api.upload<{ url: string; storage_name: string }>('/api/assets', fd)
           const alt = file.name.replace(/\.[^.]+$/, '')
           insertMarkdownAtCursor(`![${alt}](${asset.url})\n`)
         } catch {
@@ -327,7 +324,10 @@ export function MarkdownEditor({
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
-      if (e.dataTransfer.files.length > 0 && Array.from(e.dataTransfer.files).some((f) => f.type.startsWith('image/'))) {
+      if (
+        e.dataTransfer.files.length > 0 &&
+        Array.from(e.dataTransfer.files).some((f) => f.type.startsWith('image/'))
+      ) {
         e.preventDefault()
         handleImageFiles(e.dataTransfer.files)
       }

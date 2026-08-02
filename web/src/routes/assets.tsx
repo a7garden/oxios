@@ -1,22 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  Copy,
-  Download,
-  FileText,
-  Film,
-  ImageIcon,
-  Music,
-  Trash2,
-  Upload,
-  X,
-} from 'lucide-react'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { Copy, Download, FileText, Film, ImageIcon, Music, Trash2, Upload, X } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
 import { PageHeader } from '@/components/shared/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useDeleteAsset, useAssets, useUploadAsset } from '@/hooks/use-assets'
+import { useAssets, useDeleteAsset, useUploadAsset } from '@/hooks/use-assets'
 import { cn } from '@/lib/utils'
-import { formatBytes, mimeTypeToCategory, type Asset, type AssetType } from '@/types/asset'
+import { type Asset, type AssetType, formatBytes, mimeTypeToCategory } from '@/types/asset'
 
 export const Route = createFileRoute('/assets')({ component: AssetsPage })
 
@@ -90,7 +80,10 @@ function AssetsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Assets" subtitle="Unified asset library — images, audio, video, and documents" />
+      <PageHeader
+        title="Assets"
+        subtitle="Unified asset library — images, audio, video, and documents"
+      />
 
       {/* Upload zone */}
       <div
@@ -180,7 +173,12 @@ function AssetsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-4">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
             Prev
           </Button>
           <span className="text-sm text-muted-foreground">
@@ -301,10 +299,12 @@ function AssetDetail({
               className="max-h-[400px] rounded-lg object-contain"
             />
           ) : category === 'audio' ? (
+            // biome-ignore lint/a11y/useMediaCaption: arbitrary user-uploaded asset preview — no caption track available
             <audio controls className="w-full">
               <source src={`/api/assets/${asset.storage_name}`} type={asset.mime_type} />
             </audio>
           ) : category === 'video' ? (
+            // biome-ignore lint/a11y/useMediaCaption: arbitrary user-uploaded asset preview — no caption track available
             <video controls className="max-h-[400px] rounded-lg">
               <source src={`/api/assets/${asset.storage_name}`} type={asset.mime_type} />
             </video>
