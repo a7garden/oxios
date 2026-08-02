@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-08-02
+
+### Added
+- **Scheduled tasks & cron (kernel/gateway/web)** — Added a `run_goal`
+  primitive and `TaskStore` lifecycle to the kernel, wired a task
+  run/schedule API and cron auto-start in the gateway, and built a task
+  schedule config UI with a detail drawer and run history on the web.
+  Cron auto-start is now enabled by default.
+- **Unified asset store (web)** — Central binary storage with a metadata
+  index. Browse, upload, preview (image/audio/video), and delete assets
+  with per-asset title/tag metadata.
+
 ### Changed
 - **oxi-sdk 0.58 → 0.64 (kernel)** — Migrated to oxi-sdk 0.64 / oxi-agent 0.64.
   oxi-sdk 0.64 moved the unstable re-export surface behind opt-in cargo
@@ -25,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own `McpClient` and does not use the SDK MCP transport, so the trait has no
   consumer today; see `docs/designs/2026-08-02-oxi-sdk-0.64-migration-design.md`
   §부록 D.
+
+### Fixed
+- **Frontend CI (web)** — Removed an unused `useMemo` import (tsc TS6133),
+  applied `biome --write` format/import-sort, and suppressed
+  `lint/a11y/useMediaCaption` on audio/video asset previews. Frontend gate
+  (typecheck/lint/test/build) is green again.
 
 ## [1.34.0] - 2026-07-31
 
