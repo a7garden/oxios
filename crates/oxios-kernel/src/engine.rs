@@ -16,9 +16,7 @@
 //! ```
 
 use anyhow::Result;
-use oxi_sdk::{
-    CatalogConfig, FileModelCatalog, ModelCatalog, Oxi, OxiBuilder, ProviderPool, RateLimitPolicy,
-};
+use oxi_sdk::{CatalogConfig, FileModelCatalog, ModelCatalog, Oxi, OxiBuilder};
 use std::sync::Arc;
 
 use oxios_ouroboros::{ModelResolver, ResolvedModel};
@@ -43,9 +41,6 @@ pub struct OxiosEngine {
     default_model_id: String,
     /// Runtime routing control for dynamic model selection.
     routing_control: Option<oxi_sdk::RoutingControl>,
-    /// Pooled providers with rate limiting.
-    /// Key: provider name (e.g. "anthropic"), Value: ProviderPool wrapper.
-    pools: parking_lot::RwLock<std::collections::HashMap<String, Arc<dyn oxi_sdk::Provider>>>,
     /// ── RFC-014 Phase D: engine-level observability/security handles ──
     /// When `Some`, these are attached to every `Agent` built via the
     /// `AgentBuilder` API in `agent_runtime.rs::run_agent()`.
@@ -67,7 +62,6 @@ impl OxiosEngine {
             oxi,
             default_model_id: model_id,
             routing_control: None,
-            pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
             // RFC-014 Phase D: optional, off by default
             authorizer: None,
             tracer: None,
@@ -190,7 +184,6 @@ impl OxiosEngine {
             oxi,
             default_model_id: model_id,
             routing_control: None,
-            pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
             // RFC-014 Phase D: optional, off by default
             authorizer: None,
             tracer: None,
@@ -310,12 +303,14 @@ impl OxiosEngine {
 
     /// Resolve a model ID to a Model.
     pub fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model> {
-        self.oxi.resolve_model(model_id)
+        // oxi-sdk 0.64 returns `Result<_, SdkError>` (R7 typed errors); convert
+        // into the kernel's `anyhow::Result` via `?`.
+        Ok(self.oxi.resolve_model(model_id)?)
     }
 
     /// Create a provider for the given provider name.
     pub fn create_provider(&self, name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
-        self.oxi.create_provider(name)
+        Ok(self.oxi.create_provider(name)?)
     }
 
     /// Get the default model ID.
@@ -326,38 +321,6 @@ impl OxiosEngine {
     /// Get the routing control, if routing is enabled.
     pub fn routing_control(&self) -> Option<&oxi_sdk::RoutingControl> {
         self.routing_control.as_ref()
-    }
-
-    /// Get a rate-limited provider from the pool.
-    ///
-    /// On first call for a provider name, creates a `ProviderPool` wrapping
-    /// the base provider with the given RPM/concurrency limits.
-    /// Subsequent calls return the same pooled instance.
-    ///
-    /// If no rate limit is needed, returns the base provider directly.
-    pub fn pooled_provider(&self, name: &str, rpm: u32) -> Result<Arc<dyn oxi_sdk::Provider>> {
-        // Check if already pooled.
-        {
-            let pools = self.pools.read();
-            if let Some(pooled) = pools.get(name) {
-                return Ok(pooled.clone());
-            }
-        }
-
-        // Create new pool.
-        let base = self.create_provider(name)?;
-        let policy = RateLimitPolicy::rpm(rpm);
-        let pool = ProviderPool::new(base, policy, name);
-        let pooled: Arc<dyn oxi_sdk::Provider> = Arc::new(pool);
-
-        // Cache it.
-        {
-            let mut pools = self.pools.write();
-            pools.insert(name.to_string(), pooled.clone());
-        }
-
-        tracing::info!(provider = name, rpm, "Created provider pool");
-        Ok(pooled)
     }
 }
 
@@ -427,7 +390,6 @@ impl OxiosEngineBuilder {
             oxi: self.inner.build(),
             default_model_id: self.default_model_id,
             routing_control: None,
-            pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
             // RFC-014 Phase D: optional, off by default
             authorizer: self.authorizer,
             tracer: self.tracer,
@@ -447,7 +409,6 @@ impl OxiosEngineBuilder {
             oxi: self.inner.build(),
             default_model_id: self.default_model_id,
             routing_control: Some(routing_control.clone()),
-            pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
             // RFC-014 Phase D: optional, off by default
             authorizer: self.authorizer,
             tracer: self.tracer,

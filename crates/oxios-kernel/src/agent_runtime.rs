@@ -29,9 +29,7 @@
 
 use anyhow::Result;
 use oxi_sdk::observability::AuditTrail;
-use oxi_sdk::{
-    Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, ProviderResolver,
-};
+use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy};
 use oxi_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -52,19 +50,23 @@ use crate::session_context::SessionContext;
 use crate::types::AgentId;
 use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 
-/// Global LLM circuit breaker instance — delegates to oxi-sdk's ProviderCircuitBreaker.
-static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<oxi_sdk::ProviderCircuitBreaker> =
-    std::sync::OnceLock::new();
+use oxi_sdk::{BreakerState, CircuitBreaker, DefaultCircuitBreaker};
+use std::time::Duration;
 
-/// Get the global LLM circuit breaker.
-fn get_llm_circuit_breaker() -> &'static oxi_sdk::ProviderCircuitBreaker {
-    LLM_CIRCUIT_BREAKER.get_or_init(|| {
-        oxi_sdk::ProviderCircuitBreaker::new(
-            "global".to_string(),
-            oxi_sdk::CircuitBreakerConfig::default(),
-        )
-    })
-}
+/// Global LLM circuit breaker — oxi-sdk 0.64 `DefaultCircuitBreaker` (R6).
+///
+/// Metrics-only today: it records success/failure and surfaces `.state()` to
+/// the `llm_circuit_breaker_state` gauge, but does not gate calls. The
+/// dedicated per-provider health registry (`resilience/health.rs`) owns actual
+/// gating. oxi-sdk 0.61 removed the old `ProviderCircuitBreaker`/
+/// `CircuitBreakerConfig`; 0.64 reintroduced a minimal `CircuitBreaker` trait
+/// + this reference impl (R6) which oxios now adopts.
+///
+/// Thresholds (5 consecutive failures, 30 s reset) mirror the per-provider
+/// health registry's documented policy. They are SDK-illustrative reference
+/// values — this breaker is observational, not a reliability boundary.
+static LLM_CIRCUIT_BREAKER: std::sync::LazyLock<DefaultCircuitBreaker> =
+    std::sync::LazyLock::new(|| DefaultCircuitBreaker::new(5, Duration::from_secs(30)));
 
 /// Streaming delta emitted by the runtime's `AgentEvent` callback.
 ///
@@ -127,9 +129,6 @@ pub struct AgentRuntimeConfig {
     pub token_budget: usize,
     /// Enable audit logging for all tool executions.
     pub audit_tool_calls: bool,
-    /// Provider-level RPM for rate-limited provider pool. 0 = no pooling.
-    /// When set, uses `OxiosEngine::pooled_provider()` instead of `create_provider()`.
-    pub provider_rpm: u32,
     /// Maximum bytes of a tool result before truncation (RFC-035 gap 1).
     /// When set, tool results exceeding this are truncated in the message
     /// history with a `"... [truncated: N bytes omitted]"` marker.
@@ -157,7 +156,6 @@ impl Default for AgentRuntimeConfig {
             rate_limit_per_minute: 0,
             token_budget: 0,
             audit_tool_calls: false,
-            provider_rpm: 0,
             max_tool_result_bytes: None,
             model_params: None,
         }
@@ -1006,125 +1004,69 @@ async fn run_agent(
         ..Default::default()
     };
 
-    // ── Build Agent (RFC-014 Phase D) ──
+    // ── Build Agent via AgentBuilder (RFC-014 Phase D) ──
     //
-    // Two paths:
-    //   1. `provider_rpm == 0` (common): use oxi-sdk 0.26.2's new
-    //      `AgentBuilder` API. The builder unifies model resolution, provider
-    //      creation, and (optionally) middleware wiring. Engine-level
-    //      `authorizer` / `tracer` / `cost_tracker` are propagated through
-    //      the new builder methods.
-    //   2. `provider_rpm > 0` (rare): keep the legacy
-    //      `Agent::new_with_resolver` + `set_hooks` path because the
-    //      AgentBuilder does not expose a way to inject a pre-built
-    //      `ProviderPool` for rate-limited access. This is a deliberate
-    //      scope-limit per RFC-014/phase-d-agentbuilder.md §2 "Provider
-    //      선택 로직은 보존".
-    let agent = if config.provider_rpm > 0 {
-        // ── Legacy path: rate-limited provider pool ──
-        let resolver: Arc<dyn ProviderResolver> = Arc::new(engine.oxi().clone());
-        let provider_name = engine.resolve_model(&config.model_id)?.provider;
-        let provider = engine.pooled_provider(&provider_name, config.provider_rpm)?;
+    // The legacy rate-limited `ProviderPool` path (oxi-sdk `ProviderPool` /
+    // `RateLimitPolicy`) was removed in oxi-sdk 0.61 with no direct
+    // replacement; oxios never set `provider_rpm > 0` in production, so the
+    // single AgentBuilder path below is the only path. Engine-level
+    // `authorizer` / `tracer` / `cost_tracker` are propagated through the
+    // builder methods.
+    let mut builder = engine
+        .oxi()
+        .agent(agent_config)
+        .workspace(&workspace)
+        .system_prompt(system_prompt);
 
-        // Build middleware pipeline.
-        let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
-        if config.rate_limit_per_minute > 0 {
-            pipeline = pipeline.push(oxi_sdk::middleware::builtins::RateLimitMiddleware::new(
-                config.rate_limit_per_minute,
-            ));
-        }
-        if config.token_budget > 0 {
-            pipeline = pipeline.push(oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(
-                config.token_budget,
-            ));
-        }
-        if config.audit_tool_calls {
-            pipeline = pipeline.push(oxi_sdk::middleware::builtins::LoggingMiddleware::new(
-                tracing::Level::INFO,
-            ));
-        }
+    // CSpace-based tool registration is oxios-specific and is preserved.
+    //
+    // The builder's `.tool()` method takes `impl AgentTool + 'static`
+    // (a concrete value), but oxios' CSpace tools are `Arc<dyn AgentTool>`.
+    // The SDK does not expose a way to inject a pre-built `ToolRegistry`
+    // into the builder, so we register them on the agent's tool registry
+    // after `build()` returns. This keeps CSpace semantics intact.
+    //
+    // We capture the tool names now and apply them once the agent exists.
+    let cspace_tool_arcs: Vec<Arc<dyn oxi_sdk::AgentTool>> = registry
+        .names()
+        .into_iter()
+        .filter_map(|name| registry.get(&name))
+        .collect();
 
-        // Create Agent with CSpace tool registry and provider resolver.
-        let agent = Arc::new(Agent::new_with_resolver(
-            provider,
-            agent_config,
-            Arc::new(registry),
-            resolver,
-        ));
+    // Engine-level observability/security → AgentBuilder (new API).
+    if let Some(auth) = engine.authorizer() {
+        builder = builder.authorizer(auth.clone());
+    }
+    if let Some(tracer) = engine.tracer() {
+        builder = builder.tracer(tracer.clone());
+    }
+    if let Some(ct) = engine.cost_tracker() {
+        builder = builder.cost_tracker(ct.clone());
+    }
 
-        // Wire middleware pipeline → AgentHooks.
-        if !pipeline.is_empty() {
-            let terminate_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let agent_id_for_hooks = agent_id.to_string();
-            let hooks = oxi_sdk::middleware::build_hooks(
-                Arc::new(pipeline),
-                agent_id_for_hooks,
-                terminate_flag,
-            );
-            agent.set_hooks(hooks);
-        }
+    // Middleware: AgentBuilder convenience helpers replace the manual
+    // `MiddlewarePipeline` + `build_hooks()` + `set_hooks()` triple.
+    if config.rate_limit_per_minute > 0 {
+        builder = builder.with_rate_limit(config.rate_limit_per_minute);
+    }
+    if config.token_budget > 0 {
+        builder = builder.with_token_budget(config.token_budget);
+    }
+    if config.audit_tool_calls {
+        builder = builder.with_logging();
+    }
 
-        agent
-    } else {
-        // ── New path: AgentBuilder (RFC-014 Phase D) ──
-        let mut builder = engine
-            .oxi()
-            .agent(agent_config)
-            .workspace(&workspace)
-            .system_prompt(system_prompt);
+    let built = builder.build()?;
+    let agent = Arc::new(built);
 
-        // CSpace-based tool registration is oxios-specific and is preserved.
-        //
-        // The builder's `.tool()` method takes `impl AgentTool + 'static`
-        // (a concrete value), but oxios' CSpace tools are `Arc<dyn AgentTool>`.
-        // The SDK does not expose a way to inject a pre-built `ToolRegistry`
-        // into the builder, so we register them on the agent's tool registry
-        // after `build()` returns. This keeps CSpace semantics intact.
-        //
-        // We capture the tool names now and apply them once the agent exists.
-        let cspace_tool_arcs: Vec<Arc<dyn oxi_sdk::AgentTool>> = registry
-            .names()
-            .into_iter()
-            .filter_map(|name| registry.get(&name))
-            .collect();
-
-        // Engine-level observability/security → AgentBuilder (new API).
-        if let Some(auth) = engine.authorizer() {
-            builder = builder.authorizer(auth.clone());
-        }
-        if let Some(tracer) = engine.tracer() {
-            builder = builder.tracer(tracer.clone());
-        }
-        if let Some(ct) = engine.cost_tracker() {
-            builder = builder.cost_tracker(ct.clone());
-        }
-
-        // Middleware: AgentBuilder convenience helpers replace the manual
-        // `MiddlewarePipeline` + `build_hooks()` + `set_hooks()` triple.
-        if config.rate_limit_per_minute > 0 {
-            builder = builder.with_rate_limit(config.rate_limit_per_minute);
-        }
-        if config.token_budget > 0 {
-            builder = builder.with_token_budget(config.token_budget);
-        }
-        if config.audit_tool_calls {
-            builder = builder.with_logging();
-        }
-
-        let built = builder.build()?;
-        let agent = Arc::new(built);
-
-        // Attach CSpace tools to the agent's tool registry.
-        // `Agent::tools()` returns the same `Arc<ToolRegistry>` that
-        // `AgentBuilder` populated, so `register_arc` is the canonical
-        // extension point for `Arc<dyn AgentTool>` values.
-        let agent_tools = agent.tools();
-        for tool in cspace_tool_arcs {
-            agent_tools.register_arc(tool);
-        }
-
-        agent
-    };
+    // Attach CSpace tools to the agent's tool registry.
+    // `Agent::tools()` returns the same `Arc<ToolRegistry>` that
+    // `AgentBuilder` populated, so `register_arc` is the canonical
+    // extension point for `Arc<dyn AgentTool>` values.
+    let agent_tools = agent.tools();
+    for tool in cspace_tool_arcs {
+        agent_tools.register_arc(tool);
+    }
 
     // RFC-029 P2b: restore conversation state from a prior failed run
     // so the new agent (with a fallback model) continues from the
@@ -1521,19 +1463,22 @@ async fn run_agent(
         })
         .await;
 
-    // Record circuit breaker result after agent execution.
-    let circuit = get_llm_circuit_breaker();
+    // Record circuit breaker result after agent execution. The breaker is
+    // observational (see `LLM_CIRCUIT_BREAKER`); the gauge reflects its real
+    // state machine rather than just "last call errored".
     if result.is_err() {
-        circuit.record_failure();
-        crate::metrics::get_metrics()
-            .llm_circuit_breaker_state
-            .set(1.0);
+        LLM_CIRCUIT_BREAKER.record_failure();
     } else {
-        circuit.record_success();
-        crate::metrics::get_metrics()
-            .llm_circuit_breaker_state
-            .set(0.0);
+        LLM_CIRCUIT_BREAKER.record_success();
     }
+    let breaker_state = match LLM_CIRCUIT_BREAKER.state() {
+        BreakerState::Closed => 0.0,
+        BreakerState::HalfOpen => 0.5,
+        BreakerState::Open => 1.0,
+    };
+    crate::metrics::get_metrics()
+        .llm_circuit_breaker_state
+        .set(breaker_state);
 
     if let Err(e) = result {
         tracing::error!(exec_id = %exec_id, error = %e, "Agent failed");

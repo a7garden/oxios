@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **oxi-sdk 0.58 → 0.64 (kernel)** — Migrated to oxi-sdk 0.64 / oxi-agent 0.64.
+  oxi-sdk 0.64 moved the unstable re-export surface behind opt-in cargo
+  features (R3), so the workspace now enables `browser`, `delegation`, and
+  `circuit-breaker` explicitly. The LLM circuit breaker
+  (`agent_runtime::LLM_CIRCUIT_BREAKER`) adopts the new `CircuitBreaker` trait
+  + `DefaultCircuitBreaker` reference impl (R6) — replacing the
+  `ProviderCircuitBreaker`/`CircuitBreakerConfig` types removed in 0.61 — and
+  the `llm_circuit_breaker_state` metric now reflects the breaker's real
+  state machine (Closed/HalfOpen/Open) instead of "last call errored". The
+  dead rate-limited `ProviderPool`/`pooled_provider` path
+  (`provider_rpm`, never set > 0 in production) is removed; agent construction
+  is now a single `AgentBuilder` path. `OxiosEngine::resolve_model`/
+  `create_provider` wrap the SDK's new typed `SdkError` (R7) into `anyhow`.
+  SpawnValidator (R6) is intentionally not wired: `oxios-mcp` spawns via its
+  own `McpClient` and does not use the SDK MCP transport, so the trait has no
+  consumer today; see `docs/designs/2026-08-02-oxi-sdk-0.64-migration-design.md`
+  §부록 D.
+
 ## [1.34.0] - 2026-07-31
 
 ### Changed

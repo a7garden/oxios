@@ -3694,7 +3694,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core",
 ]
 
 [[package]]
@@ -5211,9 +5211,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.58.0"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e4cb8fa467141c48d2077b4046b0e695b6bc1349762692aabeaf31902e55b5a"
+checksum = "0d2d87b873efef25b4393fc69fe32b2d244ba022e3a34b3c4f1959837dd62682"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5223,6 +5223,7 @@ dependencies = [
  "glob",
  "libc",
  "oxi-ai",
+ "oxi-api-stability",
  "oxi-hashline",
  "oxibrowser",
  "oxibrowser-core 0.16.0",
@@ -5241,9 +5242,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.58.0"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9038afa14fbf3b6bb57361aa584000b036eca979df05df2d5e1422b7db30f76a"
+checksum = "7e1b7eeeefbcdf9fb83d52634037b0cd6e03b98b410ca578eb4a7aa360b8c555"
 dependencies = [
  "anyhow",
  "base64",
@@ -5257,6 +5258,8 @@ dependencies = [
  "futures",
  "hmac",
  "jsonschema",
+ "oxi-api-stability",
+ "oxi-catalog",
  "parking_lot",
  "pkcs8",
  "raii_flock",
@@ -5269,6 +5272,8 @@ dependencies = [
  "signature",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-stream",
+ "tokio-tungstenite 0.26.2",
  "toml 0.9.12+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
@@ -5277,10 +5282,40 @@ dependencies = [
 ]
 
 [[package]]
-name = "oxi-hashline"
-version = "0.58.0"
+name = "oxi-api-stability"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14404bfba96197fcbd174c201e90ba5e83fe71b4493c9a5ecf1651057cb82532"
+checksum = "3f9f9510b5f9f0f002466b60b6a29d941f7920c63262c66e483daeb9dcb9b4c4"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "oxi-catalog"
+version = "0.64.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93fbc9d57604569453ee0bc3f58d2424351fe926fbb3a1380026ead9cf7a99e1"
+dependencies = [
+ "dirs",
+ "filetime",
+ "flate2",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml 0.9.12+spec-1.1.0",
+ "tracing",
+]
+
+[[package]]
+name = "oxi-hashline"
+version = "0.64.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b71e2b0a2caa6d2a9dad29d10d57bcf5914147d2ea11bab8cc0e5583bc1f1321"
 dependencies = [
  "async-trait",
  "lru 0.18.0",
@@ -5292,9 +5327,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.58.0"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b107298cf86bf90cf133c5b94f87b530c93bb04df597d9b8d7c87539d9074e3"
+checksum = "d6c24f6a09f75bb73b3e07200b7656177c79ce50a32e7044575ea6c21be8b9fd"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5307,6 +5342,8 @@ dependencies = [
  "glob",
  "oxi-agent",
  "oxi-ai",
+ "oxi-api-stability",
+ "oxi-hashline",
  "oxi-snapcompact",
  "oxibrowser-core 0.17.0",
  "parking_lot",
@@ -5326,9 +5363,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-snapcompact"
-version = "0.58.0"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f09a949390d8b29b811ca3ad77b5ac7afde035996dafaca16d5784ea14efab1a"
+checksum = "ad28b4f169b475b8669c0c894d6e8ec3db60ce3ec20d894a695a7314d8e0d790"
 dependencies = [
  "fontdue",
  "png 0.17.16",
@@ -7775,8 +7812,12 @@ checksum = "7a9daff607c6d2bf6c16fd681ccb7eecc83e4e2cdc1ca067ffaadfca5de7f084"
 dependencies = [
  "futures-util",
  "log",
+ "rustls",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls",
  "tungstenite 0.26.2",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -8098,6 +8139,8 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.9.4",
+ "rustls",
+ "rustls-pki-types",
  "sha1",
  "thiserror 2.0.18",
  "utf-8",
@@ -9082,7 +9125,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9babd3a767a4c1aef6900409f85f5d53ce2544ccdfaa86dad48c91782c6d6893"
 dependencies = [
  "windows-collections",
- "windows-core 0.61.2",
+ "windows-core",
  "windows-future",
  "windows-link 0.1.3",
  "windows-numerics",
@@ -9094,7 +9137,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3beeceb5e5cfd9eb1d76b381630e82c4241ccd0d27f1a39ed41b2760b255c5e8"
 dependencies = [
- "windows-core 0.61.2",
+ "windows-core",
 ]
 
 [[package]]
@@ -9111,25 +9154,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement",
- "windows-interface",
- "windows-link 0.2.1",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
-]
-
-[[package]]
 name = "windows-future"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc6a41e98427b19fe4b73c550f060b59fa592d7d686537eebf9385621bfbad8e"
 dependencies = [
- "windows-core 0.61.2",
+ "windows-core",
  "windows-link 0.1.3",
  "windows-threading",
 ]
@@ -9174,7 +9204,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9150af68066c4c5c07ddc0ce30421554771e528bde427614c61038bc2c92c2b1"
 dependencies = [
- "windows-core 0.61.2",
+ "windows-core",
  "windows-link 0.1.3",
 ]
 

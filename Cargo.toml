@@ -109,8 +109,13 @@ regex = "1"
 parking_lot = "0.12"
 arc-swap = "1.7"
 
-# oxi engine — single dependency for everything (oxi-ai re-exported via oxi-sdk)
-oxi-sdk = "0.58.0"
+# oxi engine — single dependency for everything (oxi-ai re-exported via oxi-sdk).
+# 0.64: the unstable re-export surface moved behind opt-in cargo features (R3).
+# oxios enables only the features it consumes:
+#   browser         — BrowseConfig / BrowserEngine (kernel_handle/browser_api.rs)
+#   delegation      — SdkSubagentRunner (subagent_runner.rs)
+#   circuit-breaker — CircuitBreaker trait + DefaultCircuitBreaker (agent_runtime LLM breaker)
+oxi-sdk = { version = "0.64.0", features = ["browser", "delegation", "circuit-breaker"] }
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
