@@ -1,76 +1,131 @@
-// review-bar — collapsible bar that surfaces "N files changed" above
-// the composer whenever the agent has produced pending edits.
-//
-// The bar stays out of the layout entirely when there are no pending
-// changes; expanding it mounts the ReviewDiff list so we don't pay for
-// parsing diffs that the user never opens.
-
-import { CheckCheck, ChevronDown, ChevronUp, FileCode2 } from 'lucide-react'
 import { useState } from 'react'
-import { useCodeSessionStore } from '@/stores/code/code-session'
-import { cn } from '@/lib/utils'
+import { ChevronDown, ChevronUp, Check, X, FilePlus, FileEdit, FileMinus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ReviewDiff } from './review-diff'
-
-export interface ReviewBarProps {
-  /** Optional className for the outer wrapper. */
-  className?: string
-}
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import { useCodeSessionStore } from '@/stores/code/code-session'
+import { codeApi } from '@/lib/code-api'
+import type { FileChange } from '@/types/code'
 
 /**
- * ReviewBar — thin accordion rendered above the agent composer.
- * Shows the count of pending file changes and toggles the diff viewer.
+ * Change review bar + diff viewer.
+ * Shows "N files changed" above the agent input. Expands to show
+ * per-file diffs with accept/reject buttons.
  */
-export function ReviewBar({ className }: ReviewBarProps) {
-  const pendingChanges = useCodeSessionStore((s) => s.pendingChanges)
-  const count = pendingChanges.length
-
-  // Local UI state — the user has to opt in to seeing the diffs, so
-  // we don't reset this on store changes.
+export function ReviewBar() {
+  const { pendingChanges, session } = useCodeSessionStore()
   const [expanded, setExpanded] = useState(false)
 
-  if (count === 0) return null
+  if (pendingChanges.length === 0) return null
+
+  const pendingCount = pendingChanges.filter((c) => !c.accepted).length
+
+  async function acceptAll() {
+    if (!session) return
+    await codeApi.acceptAllChanges(session.id)
+  }
+
+  async function rejectAll() {
+    if (!session) return
+    await codeApi.rejectAllChanges(session.id)
+  }
 
   return (
-    <div
-      className={cn(
-        'border-t border-line bg-surface-sunken text-foreground',
-        className,
-      )}
-    >
-      <div className="flex items-center gap-2 px-3 py-1.5">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setExpanded((v) => !v)}
-          className="h-7 px-2 text-xs gap-1.5"
-          aria-expanded={expanded}
-          aria-controls="review-bar-content"
-        >
-          <FileCode2 className="size-3.5 text-primary" />
-          <span className="font-medium">
-            {count} {count === 1 ? 'file changed' : 'files changed'}
-          </span>
-          {expanded ? (
-            <ChevronUp className="size-3.5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="size-3.5 text-muted-foreground" />
-          )}
+    <div className="border-t border-border">
+      <button
+        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-surface-sunken transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {expanded ? (
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+        )}
+        <span className="font-medium">{pendingCount} file{pendingCount !== 1 ? 's' : ''} changed</span>
+        <div className="flex-1" />
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); acceptAll() }}>
+          <Check className="mr-1 h-3 w-3" /> Accept All
         </Button>
-        <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
-          <CheckCheck className="size-3" />
-          <span>Review before continuing</span>
-        </span>
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-red-500" onClick={(e) => { e.stopPropagation(); rejectAll() }}>
+          <X className="mr-1 h-3 w-3" /> Reject All
+        </Button>
+      </button>
+
+      {expanded && (
+        <ScrollArea className="max-h-96 border-t border-border">
+          <div className="p-2 space-y-2">
+            {pendingChanges.map((change, i) => (
+              <DiffCard key={`${change.path}-${i}`} change={change} />
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  )
+}
+
+function DiffCard({ change }: { change: FileChange }) {
+  const { session } = useCodeSessionStore()
+  const [accepted, setAccepted] = useState(change.accepted)
+
+  const fileName = change.path.split('/').pop() || change.path
+  const actionConfig = {
+    create: { icon: FilePlus, label: 'Created', variant: 'success' as const },
+    modify: { icon: FileEdit, label: 'Modified', variant: 'warning' as const },
+    delete: { icon: FileMinus, label: 'Deleted', variant: 'destructive' as const },
+  }
+  const config = actionConfig[change.action]
+  const Icon = config.icon
+
+  async function accept() {
+    if (!session) return
+    setAccepted(true)
+  }
+
+  async function reject() {
+    if (!session) return
+    setAccepted(true)
+  }
+
+  if (accepted) return null
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <span className="font-mono text-sm truncate flex-1">{fileName}</span>
+        <Badge variant={config.variant}>{config.label}</Badge>
       </div>
-      {expanded ? (
-        <div
-          id="review-bar-content"
-          className="px-3 pb-3 max-h-96 overflow-auto"
-        >
-          <ReviewDiff />
-        </div>
-      ) : null}
+
+      {change.diff && (
+        <pre className="text-xs font-mono bg-surface-sunken rounded-md p-2 overflow-x-auto max-h-48">
+          {change.diff.split('\n').map((line, i) => {
+            let className = 'text-muted-foreground'
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+              className = 'text-green-600'
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+              className = 'text-red-600'
+            }
+            return (
+              <div key={i} className={className}>
+                {line || ' '}
+              </div>
+            )
+          })}
+        </pre>
+      )}
+
+      <Separator className="my-2" />
+
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={reject}>
+          <X className="mr-1 h-3 w-3" /> Reject
+        </Button>
+        <Button variant="default" size="sm" className="h-7 text-xs" onClick={accept}>
+          <Check className="mr-1 h-3 w-3" /> Accept
+        </Button>
+      </div>
     </div>
   )
 }
