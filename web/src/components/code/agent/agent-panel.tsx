@@ -1,9 +1,10 @@
 // agent-panel — right-side container for the coding agent.
 //
-// Three vertical regions:
+// Vertical regions (top to bottom):
 //   1. Header — session title + status pill (running/idle).
 //   2. ConversationView — message timeline (flex-1).
-//   3. AgentInput — composer at the bottom.
+//   3. ReviewBar — collapsible pending-changes review (only when non-empty).
+//   4. AgentInput — composer at the bottom.
 //
 // Renders empty-state copy when no session is active so the panel
 // always has a presentable appearance.
@@ -13,6 +14,7 @@ import { useCodeSessionStore } from '@/stores/code/code-session'
 import { cn } from '@/lib/utils'
 import { ConversationView } from './conversation-view'
 import { AgentInput } from './agent-input'
+import { ReviewBar } from '../review/review-bar'
 
 export interface AgentPanelProps {
   /** Optional className for the outer wrapper. */
@@ -66,6 +68,8 @@ export function AgentPanel({ className }: AgentPanelProps) {
       </header>
 
       <ConversationView />
+
+      <ReviewBar />
 
       <AgentInput />
     </div>
