@@ -9,6 +9,7 @@
 //! - **events**: Sessions, SSE events, approvals
 
 mod a2a;
+mod coding_routes;
 mod asset_routes;
 mod audit_routes;
 mod budget_routes;
@@ -179,6 +180,14 @@ pub(crate) use workspace::{
     handle_skill_import_text, handle_skill_import_url, handle_skills_list,
     handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
     handle_workspace_file_put, handle_workspace_tree,
+};
+pub(crate) use coding_routes::{
+    handle_code_checkpoint_create, handle_code_checkpoint_revert, handle_code_checkpoints_list,
+    handle_code_changes_accept_all, handle_code_changes_list, handle_code_changes_reject_all,
+    handle_code_fs_browse, handle_code_fs_create, handle_code_fs_delete, handle_code_fs_move,
+    handle_code_fs_read, handle_code_fs_write, handle_code_session_create, handle_code_session_delete,
+    handle_code_session_get, handle_code_sessions_list, handle_code_terminal_create,
+    handle_code_terminal_delete, handle_code_terminal_ws,
 };
 
 // ---------------------------------------------------------------------------
@@ -790,6 +799,55 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             get(handle_asset_meta_get).put(handle_asset_meta_update),
         )
         .route("/api/assets/{name}", delete(handle_asset_delete))
+        // Code Workspace — coding agent IDE
+        .route("/api/code/sessions", post(handle_code_session_create))
+        .route("/api/code/sessions", get(handle_code_sessions_list))
+        .route(
+            "/api/code/sessions/{id}",
+            get(handle_code_session_get).delete(handle_code_session_delete),
+        )
+        // Code Workspace — filesystem
+        .route("/api/code/fs/browse", get(handle_code_fs_browse))
+        .route("/api/code/fs/read", get(handle_code_fs_read))
+        .route("/api/code/fs/write", put(handle_code_fs_write))
+        .route("/api/code/fs/create", post(handle_code_fs_create))
+        .route("/api/code/fs/delete", delete(handle_code_fs_delete))
+        .route("/api/code/fs/move", post(handle_code_fs_move))
+        // Code Workspace — changes
+        .route(
+            "/api/code/sessions/{id}/changes",
+            get(handle_code_changes_list),
+        )
+        .route(
+            "/api/code/sessions/{id}/changes/accept-all",
+            post(handle_code_changes_accept_all),
+        )
+        .route(
+            "/api/code/sessions/{id}/changes/reject-all",
+            post(handle_code_changes_reject_all),
+        )
+        // Code Workspace — checkpoints
+        .route(
+            "/api/code/sessions/{id}/checkpoint",
+            post(handle_code_checkpoint_create),
+        )
+        .route(
+            "/api/code/sessions/{id}/checkpoints",
+            get(handle_code_checkpoints_list),
+        )
+        .route(
+            "/api/code/sessions/{id}/checkpoints/{cp}/revert",
+            post(handle_code_checkpoint_revert),
+        )
+        // Code Workspace — terminal
+        .route(
+            "/api/code/sessions/{id}/terminal",
+            post(handle_code_terminal_create),
+        )
+        .route(
+            "/api/code/terminal/{tid}",
+            get(handle_code_terminal_ws).delete(handle_code_terminal_delete),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,
