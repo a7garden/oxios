@@ -1,10 +1,9 @@
 // agent-input — auto-resizing textarea + model selector + send/stop button.
 //
-// Sends a POST to /api/code/sessions/:id/message. The backend endpoint
-// isn't wired yet; for now we hit it directly and swallow 404s so the
-// UI remains usable while the agent pipeline is implemented. The
-// message is also optimistically appended to the session store so the
-// user sees it immediately.
+// Sends messages via the streaming WebSocket (useCodeStream), not a
+// blocking POST. The user message is optimistically appended to the
+// session store; the streaming hook creates the assistant message and
+// accumulates tokens in real-time.
 
 import { AlertCircle, Loader2, Send, Square } from 'lucide-react'
 import {
@@ -24,6 +23,10 @@ export interface AgentInputProps {
   className?: string
   /** When true, the input is collapsed / disabled. */
   disabled?: boolean
+  /** Send handler from useCodeStream — returns false if WS not ready. */
+  onSend: (content: string, model?: string | null) => boolean
+  /** Stop handler from useCodeStream. */
+  onStop: () => void
 }
 
 /** Minimum rows for the textarea — keeps the bar present even when empty. */
@@ -40,16 +43,6 @@ function rowsFor(text: string): number {
   return Math.min(MAX_ROWS, Math.max(MIN_ROWS, lines))
 }
 
-/** Detect an AbortError from a fetch promise. */
-function isAbortError(e: unknown): boolean {
-  return (
-    typeof e === 'object' &&
-    e !== null &&
-    'name' in e &&
-    (e as { name?: unknown }).name === 'AbortError'
-  )
-}
-
 /**
  * AgentInput — the bottom of the right-side agent panel. Combines a
  * model selector, auto-resizing textarea, and a send/stop button.
@@ -58,22 +51,16 @@ function isAbortError(e: unknown): boolean {
  *   • Enter sends, Shift+Enter inserts a newline.
  *   • Cmd+Enter (or Ctrl+Enter) also sends.
  *   • While the agent is running, the send button becomes a stop button.
- *   • While a send is in flight, both buttons are disabled with a spinner.
  */
-export function AgentInput({ className, disabled = false }: AgentInputProps) {
+export function AgentInput({ className, disabled = false, onSend, onStop }: AgentInputProps) {
   const session = useCodeSessionStore((s) => s.session)
   const isAgentRunning = useCodeSessionStore((s) => s.isAgentRunning)
   const addMessage = useCodeSessionStore((s) => s.addMessage)
-  const setAgentRunning = useCodeSessionStore((s) => s.setAgentRunning)
-  const setAgentPhase = useCodeSessionStore((s) => s.setAgentPhase)
 
   const [value, setValue] = useState('')
   const [model, setModel] = useState<string | null>(session?.model ?? null)
-  const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const taRef = useRef<HTMLTextAreaElement | null>(null)
-  // Keep a ref to the in-flight request so the stop handler can abort it.
-  const inFlightRef = useRef<AbortController | null>(null)
 
   // Sync the local model when the session changes (initial load or switch).
   useEffect(() => {
@@ -84,84 +71,53 @@ export function AgentInput({ className, disabled = false }: AgentInputProps) {
     setValue(e.target.value)
   }, [])
 
-  const send = useCallback(async () => {
+  const send = useCallback(() => {
     const text = value.trim()
     if (!text || !session) return
     setError(null)
-    setSending(true)
-    setAgentRunning(true)
-    setAgentPhase('Thinking…')
 
     // Optimistic user message.
-    const optimistic = {
+    addMessage({
       id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      role: 'user' as const,
+      role: 'user',
       content: text,
       timestamp: new Date().toISOString(),
       model: model ?? undefined,
-    }
-    addMessage(optimistic)
+    })
     setValue('')
 
-    const ac = new AbortController()
-    inFlightRef.current = ac
-    try {
-      // The endpoint is not yet implemented; the fetch will likely 404
-      // until the backend lands. Surface other failures, but tolerate 404.
-      const res = await fetch(`/api/code/sessions/${encodeURIComponent(session.id)}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text, model }),
-        signal: ac.signal,
-      })
-      if (!res.ok && res.status !== 404) {
-        throw new Error(`Server responded ${res.status}`)
-      }
-    } catch (e) {
-      if (isAbortError(e)) {
-        setAgentPhase('Stopped')
-      } else {
-        setError(e instanceof Error ? e.message : 'Failed to send message')
-        setAgentPhase(null)
-      }
-    } finally {
-      inFlightRef.current = null
-      setSending(false)
-      setAgentRunning(false)
-      // Phase is cleared by the agent's stream lifecycle once wired; for
-      // now we reset it so the indicator doesn't get stuck.
-      setAgentPhase(null)
+    const ok = onSend(text, model)
+    if (!ok) {
+      setError('Not connected — try again in a moment.')
     }
-  }, [value, session, model, addMessage, setAgentRunning, setAgentPhase])
+  }, [value, session, model, addMessage, onSend])
 
   const stop = useCallback(() => {
-    inFlightRef.current?.abort()
-    inFlightRef.current = null
-  }, [])
+    onStop()
+  }, [onStop])
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
-        if (!sending && !disabled) void send()
+        if (!isAgentRunning && !disabled) void send()
         return
       }
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        if (!sending && !disabled) void send()
+        if (!isAgentRunning && !disabled) void send()
         return
       }
-      if (e.key === 'Escape' && sending) {
+      if (e.key === 'Escape' && isAgentRunning) {
         e.preventDefault()
         stop()
       }
     },
-    [send, stop, sending, disabled],
+    [send, stop, isAgentRunning, disabled],
   )
 
   const trimmed = value.trim()
-  const canSend = trimmed.length > 0 && !!session && !sending && !disabled
-  const isRunning = sending || isAgentRunning
+  const canSend = trimmed.length > 0 && !!session && !isAgentRunning && !disabled
 
   return (
     <div
@@ -201,7 +157,7 @@ export function AgentInput({ className, disabled = false }: AgentInputProps) {
             <span className="text-[10px] text-muted-foreground hidden sm:inline">
               {navigator?.platform?.includes('Mac') ? '⌘' : 'Ctrl'}+↵ to send
             </span>
-            {isRunning ? (
+            {isAgentRunning ? (
               <Button
                 type="button"
                 size="sm"
@@ -222,7 +178,7 @@ export function AgentInput({ className, disabled = false }: AgentInputProps) {
                 className="h-7 px-2.5 text-xs"
                 aria-label="Send message"
               >
-                {sending ? (
+                {isAgentRunning ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
                   <Send className="size-3.5" />

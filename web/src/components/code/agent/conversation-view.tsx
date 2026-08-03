@@ -64,7 +64,7 @@ function ToolCallCard({ call }: ToolCallCardProps) {
             className={cn(
               'ml-auto shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded',
               call.exit_code === 0
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                ? 'bg-success/10 text-success'
                 : 'bg-destructive/10 text-destructive',
             )}
           >

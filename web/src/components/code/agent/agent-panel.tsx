@@ -10,6 +10,7 @@
 // always has a presentable appearance.
 
 import { Bot, Power, PowerOff } from 'lucide-react'
+import { useCodeStream } from '@/hooks/code/use-code-stream'
 import { useCodeSessionStore } from '@/stores/code/code-session'
 import { cn } from '@/lib/utils'
 import { ConversationView } from './conversation-view'
@@ -25,10 +26,14 @@ export interface AgentPanelProps {
  * AgentPanel — the right-hand conversation column. Wires together
  * the conversation view (top) and the input (bottom) and exposes a
  * minimal header with the active session title + a status pill.
+ *
+ * The `useCodeStream` hook manages the WebSocket lifecycle for
+ * real-time agent streaming (token chunks, tool calls, phase updates).
  */
 export function AgentPanel({ className }: AgentPanelProps) {
   const session = useCodeSessionStore((s) => s.session)
   const isAgentRunning = useCodeSessionStore((s) => s.isAgentRunning)
+  const { sendMessage, stop } = useCodeStream()
 
   return (
     <div
@@ -53,7 +58,7 @@ export function AgentPanel({ className }: AgentPanelProps) {
           className={cn(
             'flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
             isAgentRunning
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              ? 'bg-success/10 text-success'
               : 'bg-surface-sunken text-muted-foreground',
           )}
           aria-live="polite"
@@ -71,7 +76,7 @@ export function AgentPanel({ className }: AgentPanelProps) {
 
       <ReviewBar />
 
-      <AgentInput />
+      <AgentInput onSend={sendMessage} onStop={stop} />
     </div>
   )
 }

@@ -7,8 +7,8 @@ import type {
   TodoItem,
   CodeMessage,
   EditorTab,
+  ToolCallInfo,
 } from '@/types/code'
-
 interface CodeSessionStore {
   session: CodeSession | null
   pendingChanges: FileChange[]
@@ -30,7 +30,8 @@ interface CodeSessionStore {
   }) => void
   addMessage: (msg: CodeMessage) => void
   updateMessage: (id: string, updates: Partial<CodeMessage>) => void
-  setPendingChanges: (c: FileChange[]) => void
+  appendMessageContent: (id: string, content: string) => void
+  addToolCall: (messageId: string, call: ToolCallInfo) => void
   setCheckpoints: (c: Checkpoint[]) => void
   setTodos: (t: TodoItem[]) => void
   addTab: (tab: EditorTab) => void
@@ -67,6 +68,20 @@ export const useCodeSessionStore = create<CodeSessionStore>((set) => ({
   updateMessage: (id, updates) =>
     set((s) => ({
       messages: s.messages.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+    })),
+  appendMessageContent: (id, content) =>
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === id ? { ...m, content: m.content + content } : m,
+      ),
+    })),
+  addToolCall: (messageId, call) =>
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === messageId
+          ? { ...m, tool_calls: [...(m.tool_calls ?? []), call] }
+          : m,
+      ),
     })),
   setPendingChanges: (changes) => set({ pendingChanges: changes }),
   setCheckpoints: (cps) => set({ checkpoints: cps }),

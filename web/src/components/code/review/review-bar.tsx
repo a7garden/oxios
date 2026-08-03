@@ -103,9 +103,9 @@ function DiffCard({ change }: { change: FileChange }) {
           {change.diff.split('\n').map((line, i) => {
             let className = 'text-muted-foreground'
             if (line.startsWith('+') && !line.startsWith('+++')) {
-              className = 'text-green-600'
+              className = 'text-success'
             } else if (line.startsWith('-') && !line.startsWith('---')) {
-              className = 'text-red-600'
+              className = 'text-error'
             }
             return (
               <div key={i} className={className}>

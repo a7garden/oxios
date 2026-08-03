@@ -17,7 +17,7 @@ export function WorkspaceStatusBar() {
       )}
 
       {dirtyCount > 0 && (
-        <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+        <span className="flex items-center gap-1 text-warning">
           <Circle className="h-2 w-2 fill-current" />
           {dirtyCount} unsaved
         </span>
@@ -32,13 +32,13 @@ export function WorkspaceStatusBar() {
       <div className="flex-1" />
 
       {isAgentRunning ? (
-        <span className="flex items-center gap-1 text-blue-500">
+        <span className="flex items-center gap-1 text-info">
           <Loader2 className="h-3 w-3 animate-spin" />
           {agentPhase ?? 'Working...'}
         </span>
       ) : (
         <span className="flex items-center gap-1">
-          <Circle className="h-2 w-2 fill-green-500 text-green-500" />
+          <Circle className="h-2 w-2 fill-success text-success" />
           Ready
         </span>
       )}
