@@ -478,26 +478,71 @@ pub(crate) async fn handle_code_message(
         .get_session(&id)
         .ok_or_else(|| AppError::NotFound("session not found".into()))?;
 
-    let project_path = session_state.session.project_path.to_string_lossy().to_string();
+    let project_path = session_state.session.project_path.clone();
+    let project_path_str = project_path.to_string_lossy().to_string();
+
+    // ── Fix 1: Activate the "code" persona ──────────────────────────
+    // The agent runtime reads persona_manager.active_system_prompt() to
+    // build the system prompt. Without this, the agent runs with whatever
+    // persona was previously active (likely the default), NOT the coding-
+    // specialized prompt. set_active persists to disk + re-seeds intent.
+    if state.kernel.persona.get("code").is_some() {
+        if let Err(e) = state.kernel.persona.set_active("code").await {
+            tracing::warn!("Failed to activate 'code' persona: {e}");
+        }
+    } else {
+        tracing::warn!("'code' persona not found in store — agent will use default persona");
+    }
+
+    // ── Fix 2: Snapshot git state before agent turn ─────────────────
+    // Capture the set of modified files BEFORE the agent runs, so we can
+    // detect what the agent changed afterwards.
+    let pre_changes = git_changed_files(&project_path);
 
     // Build the incoming message with coding-specific metadata.
     let mut msg = oxios_gateway::message::IncomingMessage::new("web", "code-user", &req.content);
     msg.metadata.insert("session_id".to_owned(), id.clone());
     msg.metadata.insert("persona_role".to_owned(), "code".to_owned());
     msg.metadata.insert("cspace_hint".to_owned(), "coder".to_owned());
-    msg.metadata.insert("workspace_dir".to_owned(), project_path);
+    msg.metadata.insert("workspace_dir".to_owned(), project_path_str);
 
     if let Some(model) = &session_state.session.model {
         msg.metadata.insert("model_override".to_owned(), model.clone());
     }
-
     if !req.context_files.is_empty() {
         msg.metadata
             .insert("context_files".to_owned(), req.context_files.join(","));
     }
 
-    // Send through the gateway bridge (same path as /api/chat).
-    match state.bridge.send_and_wait(msg).await {
+    // Send through the gateway bridge.
+    let result = state.bridge.send_and_wait(msg).await;
+
+    // ── Fix 2 (cont): Detect changes AFTER agent turn ───────────────
+    // Compare post-turn git state to pre-turn. New changes = agent work.
+    let post_changes = git_changed_files(&project_path);
+    let new_changes: Vec<&GitChangedFile> = post_changes
+        .iter()
+        .filter(|post| {
+            !pre_changes.iter().any(|pre| pre.path == post.path && pre.status == post.status)
+        })
+        .collect();
+
+    if !new_changes.is_empty() {
+        tracing::info!("Detected {} file changes from agent turn", new_changes.len());
+        let mut tracker = session_state.changes.write().await;
+        for change in new_changes {
+            let abs_path = project_path.join(&change.path);
+            let original = git_show_head(&project_path, &change.path);
+            let new_content = if abs_path.exists() {
+                std::fs::read_to_string(&abs_path).ok()
+            } else {
+                None
+            };
+            tracker.record_write(&abs_path, new_content.as_deref().unwrap_or(""), None)?;
+        }
+    }
+
+    match result {
         Ok(response) => Ok(Json(serde_json::json!({
             "reply": response.content,
             "session_id": id,
@@ -506,5 +551,56 @@ pub(crate) async fn handle_code_message(
             tracing::error!("Code agent message failed: {e}");
             Err(AppError::Internal(format!("agent error: {e}")))
         }
+    }
+}
+
+// ── Git change detection helpers ─────────────────────────────────────
+
+#[derive(Debug, Clone)]
+struct GitChangedFile {
+    path: String,
+    status: char, // 'M' = modified, 'A'/'?' = added/untracked, 'D' = deleted
+}
+
+/// Get all changed files in a git repo (modified, untracked, deleted).
+fn git_changed_files(project_root: &std::path::Path) -> Vec<GitChangedFile> {
+    let output = std::process::Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(project_root)
+        .output();
+
+    match output {
+        Ok(o) if o.status.success() => {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter_map(|line| {
+                    if line.len() < 4 {
+                        return None;
+                    }
+                    let status = line.chars().next().unwrap_or(' ');
+                    let path = line[3..].trim().to_string();
+                    if path.is_empty() {
+                        return None;
+                    }
+                    Some(GitChangedFile { path, status })
+                })
+                .collect()
+        }
+        _ => Vec::new(), // Not a git repo or git unavailable
+    }
+}
+
+/// Get the original content of a file from HEAD (before any changes).
+fn git_show_head(project_root: &std::path::Path, path: &str) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(["show", &format!("HEAD:{path}")])
+        .current_dir(project_root)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        None // File doesn't exist in HEAD (newly created)
     }
 }
