@@ -452,3 +452,59 @@ pub(crate) async fn handle_code_terminal_ws(
         let _ = tokio::join!(relay_out, relay_in);
     }))
 }
+
+// ── Agent messaging ─────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CodeMessageRequest {
+    pub content: String,
+    #[serde(default)]
+    pub context_files: Vec<String>,
+}
+
+/// POST /api/code/sessions/:id/message — Send a message to the coding agent.
+///
+/// Builds an IncomingMessage with persona="code", cspace_hint="coder",
+/// and workspace_dir set to the session's project path. Sends via the
+/// gateway bridge (same path as /api/chat).
+pub(crate) async fn handle_code_message(
+    State(state): State<Arc<AppState>>,
+    AxumPath(id): AxumPath<String>,
+    Json(req): Json<CodeMessageRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let session_state = state
+        .kernel
+        .coding
+        .get_session(&id)
+        .ok_or_else(|| AppError::NotFound("session not found".into()))?;
+
+    let project_path = session_state.session.project_path.to_string_lossy().to_string();
+
+    // Build the incoming message with coding-specific metadata.
+    let mut msg = oxios_gateway::message::IncomingMessage::new("web", "code-user", &req.content);
+    msg.metadata.insert("session_id".to_owned(), id.clone());
+    msg.metadata.insert("persona_role".to_owned(), "code".to_owned());
+    msg.metadata.insert("cspace_hint".to_owned(), "coder".to_owned());
+    msg.metadata.insert("workspace_dir".to_owned(), project_path);
+
+    if let Some(model) = &session_state.session.model {
+        msg.metadata.insert("model_override".to_owned(), model.clone());
+    }
+
+    if !req.context_files.is_empty() {
+        msg.metadata
+            .insert("context_files".to_owned(), req.context_files.join(","));
+    }
+
+    // Send through the gateway bridge (same path as /api/chat).
+    match state.bridge.send_and_wait(msg).await {
+        Ok(response) => Ok(Json(serde_json::json!({
+            "reply": response.content,
+            "session_id": id,
+        }))),
+        Err(e) => {
+            tracing::error!("Code agent message failed: {e}");
+            Err(AppError::Internal(format!("agent error: {e}")))
+        }
+    }
+}
