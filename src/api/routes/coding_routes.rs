@@ -228,6 +228,62 @@ pub(crate) async fn handle_code_fs_move(
     Ok(StatusCode::OK)
 }
 
+// ── File search ─────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct FsSearchQuery {
+    pub path: String,
+    pub q: String,
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct FsSearchResult {
+    pub file: String,
+    pub line: usize,
+    pub text: String,
+}
+
+/// GET /api/code/fs/search — Search file contents recursively.
+/// Uses `grep -rn` with common ignore patterns (.git, node_modules, target).
+pub(crate) async fn handle_code_fs_search(
+    Query(query): Query<FsSearchQuery>,
+) -> Result<Json<Vec<FsSearchResult>>, AppError> {
+    let limit = query.limit.unwrap_or(100);
+    let output = std::process::Command::new("grep")
+        .args([
+            "-rnI",
+            "--exclude-dir=.git",
+            "--exclude-dir=node_modules",
+            "--exclude-dir=target",
+            "--exclude-dir=.next",
+            "--exclude-dir=dist",
+            &query.q,
+            &query.path,
+        ])
+        .output()
+        .map_err(|e| AppError::Internal(format!("search failed: {e}")))?;
+
+    let results: Vec<FsSearchResult> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .take(limit)
+        .filter_map(|line| {
+            let mut parts = line.splitn(3, ':');
+            let file = parts.next()?.to_string();
+            let line_num: usize = parts.next()?.parse().ok()?;
+            let text = parts.next()?.to_string();
+            Some(FsSearchResult {
+                file,
+                line: line_num,
+                text,
+            })
+        })
+        .collect();
+
+    Ok(Json(results))
+}
+
 // ── Changes ──────────────────────────────────────────────────────────
 
 /// GET /api/code/sessions/:id/changes — List pending file changes.

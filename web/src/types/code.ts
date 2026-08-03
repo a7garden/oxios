@@ -62,6 +62,12 @@ export interface TerminalInfo {
   terminal_id: string
 }
 
+export interface FsSearchResult {
+  file: string
+  line: number
+  text: string
+}
+
 /** WebSocket chunk types for the coding session stream. */
 export interface CodeWsChunk {
   type: string

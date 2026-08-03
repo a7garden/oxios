@@ -7,6 +7,7 @@ import type {
   FileContent,
   FileChange,
   Checkpoint,
+  FsSearchResult,
   TerminalInfo,
 } from '@/types/code'
 
@@ -52,6 +53,12 @@ export const codeApi = {
 
   moveFile: (from: string, to: string) =>
     apiClient<void>('/api/code/fs/move', { method: 'POST', body: { from, to } }),
+
+  // Search
+  searchFiles: (path: string, q: string, limit?: number) =>
+    apiClient<FsSearchResult[]>('/api/code/fs/search', {
+      params: { path, q, ...(limit ? { limit } : {}) },
+    }),
 
   // Changes
   listChanges: (sessionId: string) =>
