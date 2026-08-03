@@ -156,6 +156,8 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 proptest = "1"
 # CLI channel (RFC-026: moved from channels/oxios-cli)
 reedline = "0.38"
+portable-pty = "0.8"
+dashmap = "6"
 
 [features]
 default = ["web", "cli", "browser", "sqlite-memory"]

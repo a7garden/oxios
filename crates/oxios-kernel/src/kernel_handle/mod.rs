@@ -20,6 +20,7 @@ pub mod project_api;
 pub mod security_api;
 pub mod state_api;
 pub mod token_maxing_api;
+pub mod coding_api;
 
 pub use crate::host_tools::HostToolsApi;
 pub use a2a_api::A2aApi;
@@ -49,6 +50,7 @@ pub use project_api::{ProjectApi, ProjectInfo};
 
 pub use security_api::SecurityApi;
 pub use state_api::StateApi;
+pub use coding_api::CodeApi;
 pub use token_maxing_api::TokenMaxingApi;
 
 use crate::git_layer::CommitInfo;
@@ -136,6 +138,8 @@ pub struct KernelHandle {
     /// Unified asset store — central binary storage with metadata index.
     /// Attached by the kernel assembler. `None` on the preliminary handle.
     pub asset_store: Option<Arc<crate::asset_store::AssetStore>>,
+    /// Code Workspace: session management, file ops, PTY terminals.
+    pub coding: CodeApi,
 }
 
 impl KernelHandle {
@@ -187,6 +191,7 @@ impl KernelHandle {
             // RFC-024 SP4: default Warming/no-deadline. The Kernel
             readiness: Arc::new(ReadinessGate::new(0)),
             streaming_sinks: Arc::new(crate::streaming_sink::StreamingSinkRegistry::new()),
+            coding: CodeApi::new(),
             orchestrator: None,
             asset_store: None,
         }

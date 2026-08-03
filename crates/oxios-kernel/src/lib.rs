@@ -75,6 +75,12 @@ pub mod tools;
 pub mod wasm_sandbox;
 pub mod workers;
 
+// ─── Code Workspace ─────────────────────────────────────────────────
+// AI coding agent IDE: session management, file ops, PTY terminals,
+// change tracking, git-based checkpoints.
+pub mod code;
+pub mod pty;
+
 // ─── State & Config ─────────────────────────────────────────────────
 // 영속 상태, 설정, 백업, 리소스 모니터링.
 pub mod backup;
