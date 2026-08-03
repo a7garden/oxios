@@ -26,7 +26,7 @@ export function useTabShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return
-      const idx = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code)
+      const idx = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(e.code)
       if (idx === -1 || idx >= SIDEBAR_MODES.length) return
       const mode = SIDEBAR_MODES[idx]
       if (!mode) return

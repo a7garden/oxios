@@ -1,5 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboard, MessageSquare, NotebookPen } from 'lucide-react'
+import { Code2, LayoutDashboard, MessageSquare, NotebookPen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -18,6 +18,7 @@ export const SIDEBAR_MODES: {
   { key: 'console', icon: LayoutDashboard, labelKey: 'sidebar.console', href: '/' },
   { key: 'knowledge', icon: NotebookPen, labelKey: 'sidebar.knowledge', href: '/knowledge' },
   { key: 'chat', icon: MessageSquare, labelKey: 'sidebar.chat', href: '/chat' },
+  { key: 'code', icon: Code2, labelKey: 'sidebar.code', href: '/code' },
 ]
 
 /**

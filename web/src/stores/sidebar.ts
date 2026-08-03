@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type SidebarMode = 'console' | 'knowledge' | 'chat'
+export type SidebarMode = 'console' | 'knowledge' | 'chat' | 'code'
 
 interface SidebarState {
   collapsed: boolean
@@ -40,5 +40,6 @@ export const useSidebarStore = create<SidebarState>()(
 export function deriveSidebarMode(pathname: string): SidebarMode {
   if (pathname.startsWith('/knowledge')) return 'knowledge'
   if (pathname === '/chat') return 'chat'
+  if (pathname.startsWith('/code')) return 'code'
   return 'console'
 }
