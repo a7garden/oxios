@@ -3,6 +3,7 @@ import { FileExplorer } from '@/components/code/explorer/file-explorer'
 import { AgentPanel } from '@/components/code/agent/agent-panel'
 import { CodeEditor } from '@/components/code/editor/code-editor'
 import { TerminalPanel } from '@/components/code/terminal/terminal-panel'
+import { ProjectCanvas } from '@/components/code/canvas/project-canvas'
 import { WorkspaceHeader } from './workspace-header'
 import { WorkspaceStatusBar } from './workspace-status-bar'
 
@@ -16,7 +17,7 @@ import { WorkspaceStatusBar } from './workspace-status-bar'
  * Panel sizes are controlled by CSS flex-basis from useCodeLayoutStore.
  */
 export function CodeWorkspace() {
-  const { showExplorer, showAgent, showTerminal } = useCodeLayoutStore()
+  const { showExplorer, showAgent, showTerminal, showCanvas } = useCodeLayoutStore()
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-surface">
@@ -34,7 +35,7 @@ export function CodeWorkspace() {
 
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 overflow-hidden">
-            <CodeEditor />
+            {showCanvas ? <ProjectCanvas /> : <CodeEditor />}
           </div>
           {showTerminal && (
             <div

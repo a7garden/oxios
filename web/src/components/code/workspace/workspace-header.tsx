@@ -1,4 +1,4 @@
-import { Terminal as TerminalIcon, PanelRight, PanelLeft, Save, Sparkles } from 'lucide-react'
+import { LayoutGrid, PanelRight, PanelLeft, Save, Sparkles, Terminal as TerminalIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
@@ -7,7 +7,7 @@ import { useCodeActions } from './use-code-actions'
 
 export function WorkspaceHeader() {
   const { session } = useCodeSessionStore()
-  const { toggleExplorer, toggleAgent, toggleTerminal, showExplorer, showAgent, showTerminal } = useCodeLayoutStore()
+  const { toggleExplorer, toggleAgent, toggleTerminal, toggleCanvas, showExplorer, showAgent, showTerminal, showCanvas } = useCodeLayoutStore()
   const { saveAll } = useCodeActions()
 
   return (
@@ -60,6 +60,20 @@ export function WorkspaceHeader() {
             </Button>
           </TooltipTrigger>
           <TooltipContent>Toggle Terminal</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={showCanvas ? 'secondary' : 'ghost'}
+              size="icon"
+              className="h-8 w-8"
+              onClick={toggleCanvas}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Toggle Project Canvas</TooltipContent>
         </Tooltip>
 
         <Tooltip>
