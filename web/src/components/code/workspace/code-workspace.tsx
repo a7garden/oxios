@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
  import { Group, Panel, Separator } from 'react-resizable-panels'
 import { useCodeLayoutStore } from '@/stores/code/code-session'
 import { FileExplorer } from '@/components/code/explorer/file-explorer'
@@ -8,6 +8,8 @@ import { TerminalPanel } from '@/components/code/terminal/terminal-panel'
 import { ProjectCanvas } from '@/components/code/canvas/project-canvas'
 import { WorkspaceHeader } from './workspace-header'
 import { WorkspaceStatusBar } from './workspace-status-bar'
+import { QuickOpen } from './quick-open'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 
 /**
  * Horizontal resize handle (between left/right panels).
@@ -44,17 +46,21 @@ function VSeparator() {
  * layout storage. Toggle visibility lives in useCodeLayoutStore.
  */
 export function CodeWorkspace() {
-  const { showExplorer, showAgent, showTerminal, showCanvas } = useCodeLayoutStore()
   const toggleExplorer = useCodeLayoutStore((s) => s.toggleExplorer)
   const toggleAgent = useCodeLayoutStore((s) => s.toggleAgent)
   const toggleTerminal = useCodeLayoutStore((s) => s.toggleTerminal)
+  const session = useCodeSessionStore((s) => s.session)
+  const [showQuickOpen, setShowQuickOpen] = useState(false)
 
-  // IDE keyboard shortcuts: ⌘B (explorer), ⌘J (terminal), ⌘⇧A (agent).
+  // IDE keyboard shortcuts: ⌘P (quick open), ⌘B (explorer), ⌘J (terminal), ⌘⇧A (agent).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
       if (!mod) return
-      if (e.key === 'b' && !e.shiftKey) {
+      if (e.key === 'p' && !e.shiftKey) {
+        e.preventDefault()
+        setShowQuickOpen(true)
+      } else if (e.key === 'b' && !e.shiftKey) {
         e.preventDefault()
         toggleExplorer()
       } else if (e.key === 'j' && !e.shiftKey) {
@@ -115,6 +121,13 @@ export function CodeWorkspace() {
       </div>
 
       <WorkspaceStatusBar />
+
+      {showQuickOpen && session && (
+        <QuickOpen
+          projectPath={session.project_path}
+          onClose={() => setShowQuickOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -284,6 +284,34 @@ pub(crate) async fn handle_code_fs_search(
     Ok(Json(results))
 }
 
+/// GET /api/code/fs/list — List all files recursively (for quick open).
+/// Uses `find` with common ignore patterns. Capped at 1000 results.
+pub(crate) async fn handle_code_fs_list(
+    Query(query): Query<BrowseQuery>,
+) -> Result<Json<Vec<String>>, AppError> {
+    let output = std::process::Command::new("find")
+        .args([
+            &query.path,
+            "-type", "f",
+            "-not", "-path", "*/.git/*",
+            "-not", "-path", "*/node_modules/*",
+            "-not", "-path", "*/target/*",
+            "-not", "-path", "*/dist/*",
+            "-not", "-path", "*/.next/*",
+            "-not", "-path", "*/__pycache__/*",
+        ])
+        .output()
+        .map_err(|e| AppError::Internal(format!("list failed: {e}")))?;
+
+    let files: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .take(1000)
+        .map(|s| s.to_string())
+        .collect();
+
+    Ok(Json(files))
+}
+
 // ── Changes ──────────────────────────────────────────────────────────
 
 /// GET /api/code/sessions/:id/changes — List pending file changes.

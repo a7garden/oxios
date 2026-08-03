@@ -60,6 +60,9 @@ export const codeApi = {
       params: { path, q, ...(limit ? { limit } : {}) },
     }),
 
+  listFiles: (path: string) =>
+    apiClient<string[]>('/api/code/fs/list', { params: { path } }),
+
   // Changes
   listChanges: (sessionId: string) =>
     apiClient<FileChange[]>(`/api/code/sessions/${sessionId}/changes`),

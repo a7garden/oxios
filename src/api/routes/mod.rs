@@ -185,7 +185,8 @@ pub(crate) use coding_routes::{
     handle_code_checkpoint_create, handle_code_checkpoint_revert, handle_code_checkpoints_list,
     handle_code_changes_accept_all, handle_code_changes_list, handle_code_changes_reject_all,
     handle_code_fs_browse, handle_code_fs_create, handle_code_fs_delete, handle_code_fs_move,
-    handle_code_fs_read, handle_code_fs_search, handle_code_fs_write, handle_code_message,
+    handle_code_fs_read, handle_code_fs_list, handle_code_fs_search, handle_code_fs_write,
+    handle_code_message,
     handle_code_session_create, handle_code_session_delete, handle_code_session_get,
     handle_code_sessions_list, handle_code_terminal_create, handle_code_terminal_delete,
     handle_code_terminal_ws,
@@ -815,6 +816,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/code/fs/delete", delete(handle_code_fs_delete))
         .route("/api/code/fs/move", post(handle_code_fs_move))
         .route("/api/code/fs/search", get(handle_code_fs_search))
+        .route("/api/code/fs/list", get(handle_code_fs_list))
         // Code Workspace — changes
         .route(
             "/api/code/sessions/{id}/changes",
