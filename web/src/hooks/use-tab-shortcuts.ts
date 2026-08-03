@@ -3,8 +3,8 @@ import { useEffect } from 'react'
 import { SIDEBAR_MODES } from '@/components/layout/mode-tabs'
 
 /**
- * Registers global ⌃1 / ⌃2 / ⌃3 shortcuts for switching between the three
- * top-level surfaces (Console / Knowledge / Chat).
+ * Registers global ⌃1 / ⌃2 / ⌃3 / ⌃4 shortcuts for switching between the
+ * four top-level surfaces (Console / Knowledge / Chat / Code).
  *
  * Uses Control+number (not ⌘+number) because every major browser binds
  * ⌘1-⌘9 to browser-tab switching — a menu-level shortcut that fires
