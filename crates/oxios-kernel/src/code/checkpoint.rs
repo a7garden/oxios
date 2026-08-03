@@ -56,10 +56,7 @@ impl CheckpointManager {
 
         for abs_path in paths {
             let content = if abs_path.exists() {
-                match std::fs::read_to_string(abs_path) {
-                    Ok(c) => Some(c),
-                    Err(_) => None, // binary file — can't snapshot as text
-                }
+                std::fs::read_to_string(abs_path).ok() // binary → None
             } else {
                 None // file didn't exist yet
             };

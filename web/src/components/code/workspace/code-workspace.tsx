@@ -1,4 +1,5 @@
-import { Group, Panel, Separator } from 'react-resizable-panels'
+import { useEffect } from 'react'
+ import { Group, Panel, Separator } from 'react-resizable-panels'
 import { useCodeLayoutStore } from '@/stores/code/code-session'
 import { FileExplorer } from '@/components/code/explorer/file-explorer'
 import { AgentPanel } from '@/components/code/agent/agent-panel'
@@ -44,6 +45,29 @@ function VSeparator() {
  */
 export function CodeWorkspace() {
   const { showExplorer, showAgent, showTerminal, showCanvas } = useCodeLayoutStore()
+  const toggleExplorer = useCodeLayoutStore((s) => s.toggleExplorer)
+  const toggleAgent = useCodeLayoutStore((s) => s.toggleAgent)
+  const toggleTerminal = useCodeLayoutStore((s) => s.toggleTerminal)
+
+  // IDE keyboard shortcuts: ⌘B (explorer), ⌘J (terminal), ⌘⇧A (agent).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod) return
+      if (e.key === 'b' && !e.shiftKey) {
+        e.preventDefault()
+        toggleExplorer()
+      } else if (e.key === 'j' && !e.shiftKey) {
+        e.preventDefault()
+        toggleTerminal()
+      } else if (e.key === 'a' && e.shiftKey) {
+        e.preventDefault()
+        toggleAgent()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [toggleExplorer, toggleTerminal, toggleAgent])
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-surface">

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Code2, FolderOpen, ChevronRight, Home, Loader2, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -41,9 +41,10 @@ function CodeSessionPicker() {
   )
 
   // Initial browse on mount
-  useState(() => {
+  useEffect(() => {
     browse(browsePath)
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function openProject(path: string) {
     setCreating(true)
@@ -122,7 +123,7 @@ function CodeSessionPicker() {
                 </div>
               )}
               {error && (
-                <div className="px-3 py-4 text-sm text-red-500">{error}</div>
+                <div className="px-3 py-4 text-sm text-destructive">{error}</div>
               )}
               {!loading && !error && entries.length === 0 && (
                 <div className="px-3 py-4 text-sm text-muted-foreground">

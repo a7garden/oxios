@@ -33,6 +33,30 @@ impl CodeApi {
             anyhow::bail!("project path does not exist: {}", project_path.display());
         }
 
+        // Ensure the project is a git repo — change detection relies on
+        // `git status` / `git show HEAD` to compute diffs and originals.
+        // Auto-init silently if .git is absent; this is non-destructive.
+        if !project_path.join(".git").exists() {
+            match std::process::Command::new("git")
+                .arg("init")
+                .current_dir(&project_path)
+                .output()
+            {
+                Ok(o) if o.status.success() => {
+                    tracing::info!("Auto-initialized git repo in {}", project_path.display());
+                }
+                Ok(o) => {
+                    tracing::warn!(
+                        "git init failed (non-fatal): {}",
+                        String::from_utf8_lossy(&o.stderr)
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!("git init failed (non-fatal): {e}");
+                }
+            }
+        }
+
         let title = project_path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
