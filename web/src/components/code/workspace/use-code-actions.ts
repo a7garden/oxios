@@ -1,0 +1,32 @@
+import { useEffect } from 'react'
+import { useCodeSessionStore } from '@/stores/code/code-session'
+import { codeApi } from '@/lib/code-api'
+
+export function useCodeActions() {
+  const { tabs, updateTab, session } = useCodeSessionStore()
+
+  // Cmd+S saves all dirty tabs
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        saveAll()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  async function saveAll() {
+    if (!session) return
+    const dirty = tabs.filter((t) => t.isDirty)
+    await Promise.all(
+      dirty.map(async (tab) => {
+        await codeApi.writeFile(tab.path, tab.content)
+        updateTab(tab.id, { isDirty: false })
+      }),
+    )
+  }
+
+  return { saveAll }
+}
