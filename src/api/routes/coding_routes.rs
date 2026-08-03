@@ -3,6 +3,7 @@
 //! Session management, host filesystem operations, change tracking,
 //! checkpoints, and PTY terminal management for the Code Workspace tab.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -436,6 +437,39 @@ pub(crate) async fn handle_code_terminal_ws(
             while let Some(Ok(msg)) = ws_stream.next().await {
                 match msg {
                     Message::Text(text) => {
+                        // Distinguish control messages (JSON with a "type"
+                        // field) from raw terminal input. The frontend sends
+                        // keystrokes as plain text and resize/input commands
+                        // as JSON objects.
+                        let trimmed = text.trim_start();
+                        if trimmed.starts_with('{')
+                            && let Ok(ctrl) =
+                                serde_json::from_str::<serde_json::Value>(&text)
+                        {
+                            match ctrl.get("type").and_then(|t| t.as_str()) {
+                                Some("resize") => {
+                                    let cols = ctrl
+                                        .get("cols")
+                                        .and_then(|c| c.as_u64())
+                                        .unwrap_or(80) as u16;
+                                    let rows = ctrl
+                                        .get("rows")
+                                        .and_then(|r| r.as_u64())
+                                        .unwrap_or(24) as u16;
+                                    let _ = pty.resize(&tid, rows, cols).await;
+                                    continue;
+                                }
+                                Some("input") => {
+                                    if let Some(data) =
+                                        ctrl.get("data").and_then(|d| d.as_str())
+                                    {
+                                        let _ = pty.write(&tid, data.as_bytes()).await;
+                                    }
+                                    continue;
+                                }
+                                _ => {} // fall through to raw write
+                            }
+                        }
                         let _ = pty.write(&tid, text.as_bytes()).await;
                     }
                     Message::Binary(data) => {
@@ -494,10 +528,19 @@ pub(crate) async fn handle_code_message(
         tracing::warn!("'code' persona not found in store — agent will use default persona");
     }
 
-    // ── Fix 2: Snapshot git state before agent turn ─────────────────
-    // Capture the set of modified files BEFORE the agent runs, so we can
-    // detect what the agent changed afterwards.
-    let pre_changes = git_changed_files(&project_path);
+    // ── Snapshot pre-turn file contents ──────────────────────────────
+    // Capture the content of every git-modified file BEFORE the agent
+    // runs. After the turn we compare to detect which files the agent
+    // actually changed — including re-edits of already-modified files.
+    // For files new to this turn, the original comes from `git show
+    // HEAD:path`.
+    let pre_snapshot: HashMap<String, String> = git_changed_files(&project_path)
+        .iter()
+        .filter_map(|f| {
+            let abs = project_path.join(&f.path);
+            std::fs::read_to_string(&abs).ok().map(|c| (f.path.clone(), c))
+        })
+        .collect();
 
     // Build the incoming message with coding-specific metadata.
     let mut msg = oxios_gateway::message::IncomingMessage::new("web", "code-user", &req.content);
@@ -517,28 +560,53 @@ pub(crate) async fn handle_code_message(
     // Send through the gateway bridge.
     let result = state.bridge.send_and_wait(msg).await;
 
-    // ── Fix 2 (cont): Detect changes AFTER agent turn ───────────────
-    // Compare post-turn git state to pre-turn. New changes = agent work.
+    // ── Detect changes AFTER agent turn ──────────────────────────────
+    // For every file git reports as changed, compare its current content
+    // to the pre-turn snapshot. If it differs (or the file is brand-new),
+    // record it with the correct original baseline so the diff is accurate
+    // and "reject" actually reverts to the pre-edit state.
     let post_changes = git_changed_files(&project_path);
-    let new_changes: Vec<&GitChangedFile> = post_changes
-        .iter()
-        .filter(|post| {
-            !pre_changes.iter().any(|pre| pre.path == post.path && pre.status == post.status)
-        })
-        .collect();
-
-    if !new_changes.is_empty() {
-        tracing::info!("Detected {} file changes from agent turn", new_changes.len());
+    if !post_changes.is_empty() {
         let mut tracker = session_state.changes.write().await;
-        for change in new_changes {
+        let mut detected = 0;
+        for change in &post_changes {
             let abs_path = project_path.join(&change.path);
-            let original = git_show_head(&project_path, &change.path);
             let new_content = if abs_path.exists() {
                 std::fs::read_to_string(&abs_path).ok()
             } else {
+                // File was deleted during the turn.
                 None
             };
-            tracker.record_write(&abs_path, new_content.as_deref().unwrap_or(""), None)?;
+
+            // Determine the true pre-edit baseline:
+            // 1. If the file was already modified before the turn, use the
+            //    pre-turn snapshot (not HEAD — the user may have had their
+            //    own changes that we must preserve on reject).
+            // 2. If the file is new this turn, use HEAD content (or None
+            //    for untracked/created files).
+            let original = pre_snapshot
+                .get(&change.path)
+                .cloned()
+                .or_else(|| git_show_head(&project_path, &change.path));
+
+            // Skip files whose content didn't actually change during the
+            // turn (pre-snapshot identical to current disk content).
+            if let (Some(orig), Some(new)) = (&original, &new_content)
+                && orig == new
+            {
+                continue;
+            }
+
+            tracker.record_write_with_original(
+                &abs_path,
+                original.as_deref(),
+                new_content.as_deref().unwrap_or(""),
+                None,
+            )?;
+            detected += 1;
+        }
+        if detected > 0 {
+            tracing::info!("Detected {detected} file changes from agent turn");
         }
     }
 
@@ -557,6 +625,7 @@ pub(crate) async fn handle_code_message(
 // ── Git change detection helpers ─────────────────────────────────────
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct GitChangedFile {
     path: String,
     status: char, // 'M' = modified, 'A'/'?' = added/untracked, 'D' = deleted

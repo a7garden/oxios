@@ -1247,6 +1247,38 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 if incoming_ephemeral {
                                     incoming.metadata.insert("ephemeral".into(), "true".into());
                                 }
+                                // Code Workspace metadata: persona, CSpace,
+                                // workspace dir, and context files.
+                                for key in [
+                                    "persona_role",
+                                    "cspace_hint",
+                                    "workspace_dir",
+                                    "context_files",
+                                ] {
+                                    if let Some(val) = parsed
+                                        .get(key)
+                                        .and_then(|v| v.as_str())
+                                        .filter(|s| !s.is_empty())
+                                    {
+                                        incoming
+                                            .metadata
+                                            .insert(key.to_string(), val.to_string());
+                                    }
+                                }
+                                // Activate persona if specified (Code
+                                // Workspace sends persona_role="code").
+                                if let Some(persona_role) = parsed
+                                    .get("persona_role")
+                                    .and_then(|v| v.as_str())
+                                    .filter(|s| !s.is_empty())
+                                    && state.kernel.persona.get(persona_role).is_some()
+                                    && let Err(e) =
+                                        state.kernel.persona.set_active(persona_role).await
+                                {
+                                    tracing::warn!(
+                                        "Failed to activate '{persona_role}' persona: {e}"
+                                    );
+                                }
 
                                 // Ephemeral (one-shot) requests skip the
                                 // pending map: the send task's persist guard

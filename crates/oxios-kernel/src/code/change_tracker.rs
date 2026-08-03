@@ -97,6 +97,50 @@ impl ChangeTracker {
         Ok(())
     }
 
+    /// Record a write with an explicitly-provided original baseline.
+    ///
+    /// Unlike [`record_write`], this does NOT re-snapshot the file from
+    /// disk — the caller supplies the true pre-edit content (e.g. from
+    /// `git show HEAD:path` or a pre-turn snapshot). Use this whenever the
+    /// file may have already been modified on disk by the time the call is
+    /// made, since `record_write` would otherwise read the post-edit
+    /// content as the "original" and yield an empty diff.
+    pub fn record_write_with_original(
+        &mut self,
+        path: &Path,
+        original: Option<&str>,
+        new_content: &str,
+        tool_call_id: Option<&str>,
+    ) -> anyhow::Result<()> {
+        let abs = self.resolve(path);
+        let old = original.unwrap_or("");
+        let action = if original.is_some() {
+            ChangeAction::Modify
+        } else {
+            ChangeAction::Create
+        };
+
+        let change = self.changes.entry(abs.clone()).or_insert(FileChange {
+            path: abs.clone(),
+            action: ChangeAction::Modify,
+            original_content: None,
+            new_content: None,
+            diff: String::new(),
+            timestamp: Utc::now(),
+            accepted: false,
+            tool_call_id: None,
+        });
+
+        // Always trust the caller's baseline over any stale snapshot.
+        change.original_content = original.map(|s| s.to_string());
+        change.action = action;
+        change.new_content = Some(new_content.to_string());
+        change.timestamp = Utc::now();
+        change.tool_call_id = tool_call_id.map(|s| s.to_string());
+        change.diff = compute_unified_diff(&abs.to_string_lossy(), old, new_content);
+        Ok(())
+    }
+
     /// Record a file deletion.
     pub fn record_delete(&mut self, path: &str, tool_call_id: Option<&str>) -> anyhow::Result<()> {
         let abs = self.resolve(Path::new(path));
@@ -231,5 +275,42 @@ mod tests {
 
         tracker.reject(&path).unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "original");
+    }
+
+    #[test]
+    fn test_record_write_with_original_correct_diff() {
+        // Regression test: when the agent has ALREADY written the file to
+        // disk, record_write_with_original must still produce a correct
+        // diff (old → new) and reject must restore the true pre-edit
+        // content. The old record_write would re-snapshot the already-
+        // modified file, yielding an empty diff and a no-op reject.
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("test.rs");
+        // Simulate the agent having already modified the file.
+        std::fs::write(&path, "new content").unwrap();
+
+        let mut tracker = ChangeTracker::new(tmp.path().to_path_buf());
+        tracker
+            .record_write_with_original(&path, Some("old content"), "new content", None)
+            .unwrap();
+
+        let changes = tracker.list_changes();
+        assert_eq!(changes.len(), 1);
+        assert!(
+            changes[0].diff.contains("-old content"),
+            "diff should contain removed lines"
+        );
+        assert!(
+            changes[0].diff.contains("+new content"),
+            "diff should contain added lines"
+        );
+
+        // Reject must restore the true original, not the post-edit content.
+        tracker.reject(&path).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "old content",
+            "reject must restore true pre-edit content"
+        );
     }
 }
