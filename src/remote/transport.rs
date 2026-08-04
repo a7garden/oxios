@@ -98,7 +98,16 @@ where
                 return Ok(());
             }
             accepted = listener.accept() => {
-                let (stream, peer) = accepted.context("accept remote WebSocket connection")?;
+                let (stream, peer) = match accepted {
+                    Ok(accepted) => accepted,
+                    Err(error) => {
+                        // Per-connection accept failures are transient (e.g. EMFILE/ENFILE
+                        // under FD pressure, ECONNABORTED, resets before accept). A single
+                        // bad connection must not tear down the long-running listener.
+                        tracing::warn!(%addr, %error, "remote WebSocket accept failed; continuing");
+                        continue;
+                    }
+                };
                 let handler = Arc::clone(&handler);
                 let server_static = Arc::clone(&server_static);
                 let connection_shutdown = shutdown.clone();
