@@ -1,6 +1,8 @@
 //! Remote companion surface (RFC-044): E2EE WS for paired mobile/web clients.
 #![cfg(feature = "remote")]
 
+pub mod identity;
+
 use anyhow::Result;
 use oxios_gateway::surface::{Surface, SurfaceContext, SurfaceHandle};
 
