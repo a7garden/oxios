@@ -56,21 +56,30 @@ fn read_tailscale_ip() -> Option<String> {
 }
 
 /// Order endpoints Tailscale-first, deduped, as full ws:// URLs.
+///
+/// Order is **preserved**: the partition is built Tailscale-then-LAN and then
+/// deduplicated by an order-preserving pass (a `HashSet<String>` seen-set). A
+/// naive `sort() + dedup()` would re-shuffle by string comparison and break the
+/// Tailscale-first contract when a Tailscale URL sorts after a LAN URL
+/// (e.g. `ws://my-mac.ts.net:6768` vs `ws://192.168.1.20:6768`, or the
+/// CGNAT-vs-LAN string case `ws://10...` vs `ws://100...`).
 pub fn build_offer_endpoints(list: &[(String, EndpointKind)]) -> Vec<String> {
-    let mut ts: Vec<_> = list
+    let mut ts: Vec<&str> = list
         .iter()
         .filter(|(_, k)| *k == EndpointKind::Tailscale)
-        .map(|(u, _)| u.clone())
+        .map(|(u, _)| u.as_str())
         .collect();
-    let mut lan: Vec<_> = list
+    let lan: Vec<&str> = list
         .iter()
         .filter(|(_, k)| *k == EndpointKind::Lan)
-        .map(|(u, _)| u.clone())
+        .map(|(u, _)| u.as_str())
         .collect();
-    ts.append(&mut lan);
-    ts.sort();
-    ts.dedup();
-    ts
+    ts.extend(lan);
+    let mut seen = std::collections::HashSet::with_capacity(ts.len());
+    ts.into_iter()
+        .filter(|u| seen.insert(*u))
+        .map(str::to_string)
+        .collect()
 }
 
 #[cfg(test)]
@@ -102,5 +111,32 @@ mod tests {
         ];
         let urls = build_offer_endpoints(&list);
         assert_eq!(urls[0], "ws://100.64.1.20:6768");
+    }
+    #[test]
+    fn build_offer_tailscale_first_when_ts_sorts_after_lan() {
+        // Regression: `ts.net` host sorts AFTER a `192.168.x.x` LAN host under
+        // string comparison, so a naive `sort() + dedup()` would re-shuffle
+        // and put the LAN URL first, breaking the Tailscale-first contract.
+        let list = vec![
+            ("ws://192.168.1.20:6768".into(), EndpointKind::Lan),
+            ("ws://my-mac.ts.net:6768".into(), EndpointKind::Tailscale),
+        ];
+        let urls = build_offer_endpoints(&list);
+        assert_eq!(urls[0], "ws://my-mac.ts.net:6768");
+        assert_eq!(urls[1], "ws://192.168.1.20:6768");
+    }
+    #[test]
+    fn build_offer_tailscale_first_when_ts_string_less_than_lan() {
+        // Regression: the CGNAT `100.64.1.20` URL string sorts AFTER the LAN
+        // `10.0.0.5` URL (`'1' == '1', '0' == '0', '0' < '0'` then `100...` vs
+        // `10...` — `'0' < '.'`), so a naive `sort() + dedup()` would put
+        // the LAN URL first.
+        let list = vec![
+            ("ws://10.0.0.5:6768".into(), EndpointKind::Lan),
+            ("ws://100.64.1.20:6768".into(), EndpointKind::Tailscale),
+        ];
+        let urls = build_offer_endpoints(&list);
+        assert_eq!(urls[0], "ws://100.64.1.20:6768");
+        assert_eq!(urls[1], "ws://10.0.0.5:6768");
     }
 }
