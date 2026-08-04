@@ -20,14 +20,7 @@ import { cn } from '@/lib/utils'
 import type { ProviderInfo } from '@/types/engine'
 import { ProviderSelect } from './provider-select'
 
-// ─── Category accent colors ──────────────────────────────────
-
-const CATEGORY_ACCENT: Record<string, string> = {
-  major: 'border-l-info-subtle-border',
-  open: 'border-l-success-subtle-border',
-  regional: 'border-l-warning-subtle-border',
-  local: 'border-l-hue-purple',
-}
+// ─── Category indicator dots ─────────────────────────────────
 
 const CATEGORY_DOT: Record<string, string> = {
   major: 'bg-status-info',
@@ -81,13 +74,7 @@ export function ProviderCard({ provider, onChangeKey, onRemove, isPending }: Pro
   }
 
   return (
-    <div
-      className={cn(
-        'flex flex-col rounded-lg border border-l-[3px] bg-card p-4 transition-all',
-        CATEGORY_ACCENT[provider.category] ?? 'border-l-line-strong',
-        'hover:border-primary/30 hover:shadow-sm',
-      )}
-    >
+    <div className="flex flex-col rounded-lg border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
