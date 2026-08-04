@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { useCodeSessionStore } from '@/stores/code/code-session'
 import { codeApi } from '@/lib/code-api'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 
 export function useCodeActions() {
   const { tabs, updateTab, session } = useCodeSessionStore()

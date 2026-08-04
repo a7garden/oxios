@@ -4,6 +4,7 @@ pub mod a2a_api;
 pub mod agent_api;
 pub mod browser_api;
 pub mod calendar_api;
+pub mod coding_api;
 pub mod compression_api;
 pub mod email_api;
 pub mod engine_api;
@@ -20,7 +21,6 @@ pub mod project_api;
 pub mod security_api;
 pub mod state_api;
 pub mod token_maxing_api;
-pub mod coding_api;
 
 pub use crate::host_tools::HostToolsApi;
 pub use a2a_api::A2aApi;
@@ -48,9 +48,9 @@ pub use mount_api::{MountApi, MountInfo};
 pub use persona_api::PersonaApi;
 pub use project_api::{ProjectApi, ProjectInfo};
 
+pub use coding_api::CodeApi;
 pub use security_api::SecurityApi;
 pub use state_api::StateApi;
-pub use coding_api::CodeApi;
 pub use token_maxing_api::TokenMaxingApi;
 
 use crate::git_layer::CommitInfo;

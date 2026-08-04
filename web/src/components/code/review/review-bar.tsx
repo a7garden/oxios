@@ -1,11 +1,11 @@
+import { Check, ChevronDown, ChevronUp, FileEdit, FileMinus, FilePlus, X } from 'lucide-react'
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Check, X, FilePlus, FileEdit, FileMinus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { useCodeSessionStore } from '@/stores/code/code-session'
 import { codeApi } from '@/lib/code-api'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 import type { FileChange } from '@/types/code'
 
 /**
@@ -34,6 +34,7 @@ export function ReviewBar() {
   return (
     <div className="border-t border-border">
       <button
+        type="button"
         className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-surface-sunken transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
@@ -42,12 +43,30 @@ export function ReviewBar() {
         ) : (
           <ChevronUp className="h-4 w-4 text-muted-foreground" />
         )}
-        <span className="font-medium">{pendingCount} file{pendingCount !== 1 ? 's' : ''} changed</span>
+        <span className="font-medium">
+          {pendingCount} file{pendingCount !== 1 ? 's' : ''} changed
+        </span>
         <div className="flex-1" />
-        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); acceptAll() }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={(e) => {
+            e.stopPropagation()
+            acceptAll()
+          }}
+        >
           <Check className="mr-1 h-3 w-3" /> Accept All
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 text-xs text-red-500" onClick={(e) => { e.stopPropagation(); rejectAll() }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-red-500"
+          onClick={(e) => {
+            e.stopPropagation()
+            rejectAll()
+          }}
+        >
           <X className="mr-1 h-3 w-3" /> Reject All
         </Button>
       </button>

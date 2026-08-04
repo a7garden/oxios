@@ -72,7 +72,11 @@ impl CodeApi {
 
         let state = Arc::new(CodeSessionState::new(session.clone()));
         self.sessions.insert(session.id.clone(), state);
-        tracing::info!("Created code session {} for {}", session.id, project_path.display());
+        tracing::info!(
+            "Created code session {} for {}",
+            session.id,
+            project_path.display()
+        );
         Ok(session)
     }
 
@@ -101,7 +105,11 @@ impl CodeApi {
                 path: entry.path(),
                 is_dir: metadata.is_dir(),
                 is_file: metadata.is_file(),
-                size: if metadata.is_file() { Some(metadata.len()) } else { None },
+                size: if metadata.is_file() {
+                    Some(metadata.len())
+                } else {
+                    None
+                },
                 modified: metadata
                     .modified()
                     .ok()
@@ -217,11 +225,12 @@ fn detect_language(path: &Path) -> String {
         Some("php") => "php",
         Some("dart") => "dart",
         Some("lua") => "lua",
-        Some("dockerfile") | Some(_) if path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n.eq_ignore_ascii_case("dockerfile"))
-            .unwrap_or(false) =>
+        Some("dockerfile") | Some(_)
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.eq_ignore_ascii_case("dockerfile"))
+                .unwrap_or(false) =>
         {
             "dockerfile"
         }

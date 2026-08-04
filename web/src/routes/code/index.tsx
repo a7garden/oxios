@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useCallback, useEffect } from 'react'
-import { Code2, FolderOpen, ChevronRight, Home, Loader2, ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Code2, FolderOpen, Home, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
@@ -21,24 +21,21 @@ function CodeSessionPicker() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const browse = useCallback(
-    async (path: string) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const result = await codeApi.browse(path)
-        setEntries(result)
-        setBrowsePath(path)
-        sessionStorage.setItem('oxios-code-last-path', path)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to browse directory')
-        setEntries([])
-      } finally {
-        setLoading(false)
-      }
-    },
-    [],
-  )
+  const browse = useCallback(async (path: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await codeApi.browse(path)
+      setEntries(result)
+      setBrowsePath(path)
+      sessionStorage.setItem('oxios-code-last-path', path)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to browse directory')
+      setEntries([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   // Initial browse on mount
   useEffect(() => {
@@ -89,18 +86,20 @@ function CodeSessionPicker() {
             <Separator orientation="vertical" className="h-4 mx-1" />
             <div className="flex items-center gap-0.5 overflow-x-auto text-sm">
               <button
+                type="button"
                 className="px-1.5 py-0.5 rounded hover:bg-surface-sunken text-muted-foreground"
                 onClick={() => browse('/')}
               >
                 /
               </button>
               {pathParts.map((part, i) => {
-                const fullPath = '/' + pathParts.slice(0, i + 1).join('/')
+                const fullPath = `/${pathParts.slice(0, i + 1).join('/')}`
                 const isLast = i === pathParts.length - 1
                 return (
                   <div key={fullPath} className="flex items-center gap-0.5">
                     <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
                     <button
+                      type="button"
                       className={`px-1.5 py-0.5 rounded hover:bg-surface-sunken ${
                         isLast ? 'font-medium text-text' : 'text-muted-foreground'
                       }`}
@@ -122,17 +121,14 @@ function CodeSessionPicker() {
                   Loading...
                 </div>
               )}
-              {error && (
-                <div className="px-3 py-4 text-sm text-destructive">{error}</div>
-              )}
+              {error && <div className="px-3 py-4 text-sm text-destructive">{error}</div>}
               {!loading && !error && entries.length === 0 && (
-                <div className="px-3 py-4 text-sm text-muted-foreground">
-                  No directories found.
-                </div>
+                <div className="px-3 py-4 text-sm text-muted-foreground">No directories found.</div>
               )}
               {!loading &&
                 entries.map((entry) => (
                   <button
+                    type="button"
                     key={entry.path}
                     className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-sunken transition-colors text-left"
                     onClick={() => entry.is_dir && browse(entry.path)}
@@ -142,9 +138,7 @@ function CodeSessionPicker() {
                       className={`h-4 w-4 ${entry.is_dir ? 'text-primary' : 'text-muted-foreground'}`}
                     />
                     <span className="flex-1 truncate">{entry.name}</span>
-                    {entry.is_dir && (
-                      <span className="text-xs text-muted-foreground">Open →</span>
-                    )}
+                    {entry.is_dir && <span className="text-xs text-muted-foreground">Open →</span>}
                   </button>
                 ))}
             </div>

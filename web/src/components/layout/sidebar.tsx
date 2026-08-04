@@ -673,9 +673,7 @@ function CodeNav() {
         <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
         <p className={sectionHeader}>{t('code.sessions')}</p>
       </div>
-      <div className="px-2 py-1 text-xs text-sidebar-foreground/50">
-        {t('code.noSessions')}
-      </div>
+      <div className="px-2 py-1 text-xs text-sidebar-foreground/50">{t('code.noSessions')}</div>
     </>
   )
 }

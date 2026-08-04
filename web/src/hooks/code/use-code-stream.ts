@@ -18,8 +18,8 @@
  * where done fires before the POST's server-side detection finishes.
  */
 import { useCallback, useEffect, useRef } from 'react'
-import { useCodeSessionStore } from '@/stores/code/code-session'
 import { codeApi } from '@/lib/code-api'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 
 export function useCodeStream() {
   const wsRef = useRef<WebSocket | null>(null)

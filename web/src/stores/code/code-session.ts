@@ -1,17 +1,19 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
-  CodeSession,
-  FileChange,
   Checkpoint,
-  TodoItem,
   CodeMessage,
+  CodeSession,
   EditorTab,
+  FileChange,
+  TodoItem,
   ToolCallInfo,
 } from '@/types/code'
+
 interface CodeSessionStore {
   session: CodeSession | null
   pendingChanges: FileChange[]
+  setPendingChanges: (changes: FileChange[]) => void
   checkpoints: Checkpoint[]
   todos: TodoItem[]
   messages: CodeMessage[]
@@ -71,16 +73,12 @@ export const useCodeSessionStore = create<CodeSessionStore>((set) => ({
     })),
   appendMessageContent: (id, content) =>
     set((s) => ({
-      messages: s.messages.map((m) =>
-        m.id === id ? { ...m, content: m.content + content } : m,
-      ),
+      messages: s.messages.map((m) => (m.id === id ? { ...m, content: m.content + content } : m)),
     })),
   addToolCall: (messageId, call) =>
     set((s) => ({
       messages: s.messages.map((m) =>
-        m.id === messageId
-          ? { ...m, tool_calls: [...(m.tool_calls ?? []), call] }
-          : m,
+        m.id === messageId ? { ...m, tool_calls: [...(m.tool_calls ?? []), call] } : m,
       ),
     })),
   setPendingChanges: (changes) => set({ pendingChanges: changes }),
@@ -108,8 +106,7 @@ export const useCodeSessionStore = create<CodeSessionStore>((set) => ({
       tabs: s.tabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
     })),
   addTerminal: (id) => set((s) => ({ terminalIds: [...s.terminalIds, id] })),
-  removeTerminal: (id) =>
-    set((s) => ({ terminalIds: s.terminalIds.filter((t) => t !== id) })),
+  removeTerminal: (id) => set((s) => ({ terminalIds: s.terminalIds.filter((t) => t !== id) })),
   setAgentRunning: (running) => set({ isAgentRunning: running }),
   setAgentPhase: (phase) => set({ agentPhase: phase }),
   reset: () =>

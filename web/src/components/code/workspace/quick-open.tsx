@@ -14,11 +14,12 @@ function fuzzy(query: string, target: string): boolean {
   }
   return qi === query.length
 }
+
 import { File, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { codeApi } from '@/lib/code-api'
-import { useCodeSessionStore } from '@/stores/code/code-session'
 import { cn } from '@/lib/utils'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 
 interface QuickOpenProps {
   projectPath: string
@@ -146,6 +147,7 @@ export function QuickOpen({ projectPath, onClose }: QuickOpenProps) {
             className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
           />
           <button
+            type="button"
             onClick={onClose}
             className="rounded p-0.5 text-muted-foreground hover:text-foreground"
           >
@@ -167,14 +169,13 @@ export function QuickOpen({ projectPath, onClose }: QuickOpenProps) {
           )}
           {!loading &&
             filtered.map((file, i) => {
-              const rel = file.startsWith(projectPath)
-                ? file.slice(projectPath.length + 1)
-                : file
+              const rel = file.startsWith(projectPath) ? file.slice(projectPath.length + 1) : file
               const parts = rel.split('/')
               const name = parts.pop() ?? rel
               const dir = parts.join('/')
               return (
                 <button
+                  type="button"
                   key={file}
                   className={cn(
                     'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors',
@@ -185,9 +186,7 @@ export function QuickOpen({ projectPath, onClose }: QuickOpenProps) {
                 >
                   <File className="size-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate font-medium">{name}</span>
-                  {dir && (
-                    <span className="truncate text-xs text-muted-foreground">{dir}</span>
-                  )}
+                  {dir && <span className="truncate text-xs text-muted-foreground">{dir}</span>}
                 </button>
               )
             })}

@@ -10,20 +10,14 @@
 // endpoints so the backend stays consistent when the local cache
 // diverges (e.g. other tabs added the same change).
 
-import {
-  Check,
-  FileMinus2,
-  FilePlus2,
-  FileText,
-  X,
-} from 'lucide-react'
+import { Check, FileMinus2, FilePlus2, FileText, X } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
-import { useCodeSessionStore } from '@/stores/code/code-session'
-import { codeApi } from '@/lib/code-api'
-import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { codeApi } from '@/lib/code-api'
+import { cn } from '@/lib/utils'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 import type { ChangeAction, FileChange } from '@/types/code'
 
 export interface ReviewDiffProps {
@@ -49,11 +43,7 @@ function classifyDiffLine(raw: string): DiffLine {
   // Strip trailing newline so the rendered text matches `original_content`
   // without an extra whitespace.
   const text = raw.endsWith('\n') ? raw.slice(0, -1) : raw
-  if (
-    text.startsWith('--- ') ||
-    text.startsWith('+++ ') ||
-    text.startsWith('@@')
-  ) {
+  if (text.startsWith('--- ') || text.startsWith('+++ ') || text.startsWith('@@')) {
     return { kind: 'header', text }
   }
   if (text.startsWith('+')) return { kind: 'add', text: text.slice(1) }
@@ -82,12 +72,11 @@ const ACTION_LABEL: Record<ChangeAction, string> = {
   delete: 'Deleted',
 }
 
-const ACTION_VARIANT: Record<ChangeAction, 'success' | 'warning' | 'error'> =
-  {
-    create: 'success',
-    modify: 'warning',
-    delete: 'error',
-  }
+const ACTION_VARIANT: Record<ChangeAction, 'success' | 'warning' | 'error'> = {
+  create: 'success',
+  modify: 'warning',
+  delete: 'error',
+}
 
 function ActionIcon({ action }: { action: ChangeAction }) {
   if (action === 'create') return <FilePlus2 className="size-3.5" />
@@ -122,9 +111,7 @@ function FileChangeCard({ change, onAccept, onReject, busy }: FileChangeCardProp
         <pre className="m-0 px-3 py-2 text-[11px] leading-relaxed font-mono whitespace-pre-wrap break-words">
           {lines.length === 0 ? (
             <span className="text-muted-foreground">
-              {change.action === 'delete'
-                ? 'File removed.'
-                : 'No diff available.'}
+              {change.action === 'delete' ? 'File removed.' : 'No diff available.'}
             </span>
           ) : (
             lines.map((line, idx) => (
@@ -135,8 +122,7 @@ function FileChangeCard({ change, onAccept, onReject, busy }: FileChangeCardProp
                   line.kind === 'add' && 'text-success bg-success-muted/40',
                   line.kind === 'del' && 'text-error bg-error-muted/40',
                   line.kind === 'context' && 'text-muted-foreground',
-                  line.kind === 'header' &&
-                    'text-foreground/70 font-semibold',
+                  line.kind === 'header' && 'text-foreground/70 font-semibold',
                 )}
               >
                 <span className="select-none mr-2 opacity-60">

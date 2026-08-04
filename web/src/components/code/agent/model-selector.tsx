@@ -8,8 +8,6 @@
 
 import { Check, ChevronDown, Cpu, Loader2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useModels } from '@/hooks/use-engine'
-import type { ModelInfo } from '@/types/engine'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -19,7 +17,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useModels } from '@/hooks/use-engine'
 import { cn } from '@/lib/utils'
+import type { ModelInfo } from '@/types/engine'
 
 export interface ModelSelectorProps {
   /** Currently selected model id (e.g. "anthropic/claude-sonnet-4"). */
@@ -71,7 +71,10 @@ export function ModelSelector({
     // Stable ordering: sort providers alphabetically, models within by id.
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([provider, list]) => [provider, [...list].sort((a, b) => a.id.localeCompare(b.id))] as const)
+      .map(
+        ([provider, list]) =>
+          [provider, [...list].sort((a, b) => a.id.localeCompare(b.id))] as const,
+      )
   }, [models])
 
   const triggerLabel = value ? modelShortName(value) : 'Select model'
@@ -90,11 +93,7 @@ export function ModelSelector({
           )}
           aria-label="Select model"
         >
-          {isLoading ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Cpu className="size-3.5" />
-          )}
+          {isLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Cpu className="size-3.5" />}
           <span className="max-w-[160px] truncate">{triggerLabel}</span>
           <ChevronDown className="size-3 opacity-60" />
         </Button>

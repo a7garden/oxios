@@ -23,9 +23,8 @@ import {
 import { FileText, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
-
-import { codeApi } from '@/lib/code-api'
 import { getLanguageExtension } from '@/lib/cm6-language'
+import { codeApi } from '@/lib/code-api'
 import { useCodeSessionStore } from '@/stores/code/code-session'
 import type { EditorTab } from '@/types/code'
 

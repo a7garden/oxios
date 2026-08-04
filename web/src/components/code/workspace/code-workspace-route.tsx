@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { useCodeSessionStore } from '@/stores/code/code-session'
+import { useEffect } from 'react'
 import { codeApi } from '@/lib/code-api'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 import { CodeWorkspace } from './code-workspace'
 
 /**

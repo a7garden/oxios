@@ -14,9 +14,9 @@ import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
+import { cn } from '@/lib/utils'
 import { useCodeSessionStore } from '@/stores/code/code-session'
 import type { CodeMessage, ToolCallInfo } from '@/types/code'
-import { cn } from '@/lib/utils'
 
 export interface ConversationViewProps {
   /** Optional className for the outer wrapper. */
@@ -187,11 +187,9 @@ export function ConversationView({ className }: ConversationViewProps) {
         {empty ? (
           <div className="flex-1 flex items-center justify-center py-12">
             <div className="text-center text-sm text-muted-foreground max-w-xs">
-              <div className="text-base font-medium text-foreground mb-1">
-                Ready when you are
-              </div>
-              Ask the agent to refactor a file, add a feature, or explain how
-              something works. Tool calls and edits will appear here.
+              <div className="text-base font-medium text-foreground mb-1">Ready when you are</div>
+              Ask the agent to refactor a file, add a feature, or explain how something works. Tool
+              calls and edits will appear here.
             </div>
           </div>
         ) : (

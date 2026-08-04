@@ -7,9 +7,9 @@ import {
   Image as ImageIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type { EditorTab } from '@/types/code'
 import { cn } from '@/lib/utils'
 import { useCodeSessionStore } from '@/stores/code/code-session'
+import type { EditorTab } from '@/types/code'
 
 /** Pick a Lucide icon based on the file extension. Falls back to FileText. */
 function fileIcon(name: string): LucideIcon {

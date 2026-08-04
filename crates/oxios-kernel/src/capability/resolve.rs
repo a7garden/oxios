@@ -27,6 +27,7 @@ const ROLE_WORKER: &str = "worker";
 const ROLE_STANDARD: &str = "standard";
 const ROLE_OPERATOR: &str = "operator";
 const ROLE_CODER: &str = "coder";
+const ROLE_SUPERVISOR: &str = "supervisor";
 
 /// Resolve an agent's initial CSpace from the available context.
 ///

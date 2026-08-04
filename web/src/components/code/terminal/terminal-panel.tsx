@@ -11,13 +11,13 @@
  * route unmounts (see code-workspace-route.tsx), which keeps the backend PTYs
  * in lock-step with their visible tabs.
  */
-import { Plus, Terminal as TerminalIcon, X, Loader2 } from 'lucide-react'
+import { Loader2, Plus, Terminal as TerminalIcon, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { codeApi } from '@/lib/code-api'
-import { useCodeSessionStore, useCodeLayoutStore } from '@/stores/code/code-session'
 import { cn } from '@/lib/utils'
+import { useCodeLayoutStore, useCodeSessionStore } from '@/stores/code/code-session'
 import { TerminalView } from './terminal-view'
 
 export function TerminalPanel() {
@@ -78,7 +78,9 @@ export function TerminalPanel() {
 
         <div className="ml-2 flex h-full flex-1 items-center gap-1 overflow-x-auto">
           {tabs.length === 0 && (
-            <span className="text-xs text-muted-foreground/70">No terminals — click + to start one</span>
+            <span className="text-xs text-muted-foreground/70">
+              No terminals — click + to start one
+            </span>
           )}
           {tabs.map((tid) => {
             const isActive = tid === activeTid
@@ -88,6 +90,7 @@ export function TerminalPanel() {
                 key={tid}
                 role="tab"
                 aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
                 className={cn(
                   'group flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs transition-colors',
                   isActive
@@ -157,9 +160,7 @@ export function TerminalPanel() {
             </div>
           </div>
         ) : (
-          tabs.map((tid) => (
-            <TerminalView key={tid} terminalId={tid} active={tid === activeTid} />
-          ))
+          tabs.map((tid) => <TerminalView key={tid} terminalId={tid} active={tid === activeTid} />)
         )}
       </div>
     </div>

@@ -46,11 +46,7 @@ impl CheckpointManager {
 
     /// Create a checkpoint by snapshotting the current content of every
     /// file in `paths`. Returns the public `Checkpoint` metadata.
-    pub fn create(
-        &mut self,
-        description: &str,
-        paths: &[PathBuf],
-    ) -> anyhow::Result<Checkpoint> {
+    pub fn create(&mut self, description: &str, paths: &[PathBuf]) -> anyhow::Result<Checkpoint> {
         let mut contents = HashMap::new();
         let mut file_names = Vec::with_capacity(paths.len());
 
@@ -190,7 +186,10 @@ mod tests {
         manager.revert_to(&cp.id).unwrap();
 
         // file_a is restored
-        assert_eq!(std::fs::read_to_string(&file_a).unwrap(), "exists at checkpoint");
+        assert_eq!(
+            std::fs::read_to_string(&file_a).unwrap(),
+            "exists at checkpoint"
+        );
         // file_b is NOT deleted (it wasn't in the snapshot)
         assert!(file_b.exists());
     }
@@ -206,7 +205,9 @@ mod tests {
         let mut manager = CheckpointManager::new(root.clone());
 
         // Checkpoint includes file_c as None (doesn't exist)
-        let cp = manager.create("before c exists", &[file_c.clone()]).unwrap();
+        let cp = manager
+            .create("before c exists", &[file_c.clone()])
+            .unwrap();
 
         // Create file_c after checkpoint
         std::fs::write(&file_c, "newly created").unwrap();

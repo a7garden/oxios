@@ -1,4 +1,4 @@
-import { GitBranch, Circle, Loader2 } from 'lucide-react'
+import { Circle, GitBranch, Loader2 } from 'lucide-react'
 import { useCodeSessionStore } from '@/stores/code/code-session'
 
 export function WorkspaceStatusBar() {

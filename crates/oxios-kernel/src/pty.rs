@@ -9,8 +9,8 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-use tokio::sync::{broadcast, Mutex};
+use portable_pty::{CommandBuilder, PtySize, native_pty_system};
+use tokio::sync::{Mutex, broadcast};
 use uuid::Uuid;
 
 /// Manages interactive PTY terminal sessions.
@@ -41,11 +41,7 @@ impl PtyManager {
     }
 
     /// Create a new PTY session. Returns the session ID.
-    pub async fn create(
-        &self,
-        project_path: &Path,
-        shell: Option<&str>,
-    ) -> anyhow::Result<String> {
+    pub async fn create(&self, project_path: &Path, shell: Option<&str>) -> anyhow::Result<String> {
         let id = Uuid::new_v4().to_string();
 
         let pty_system = native_pty_system();
@@ -56,8 +52,7 @@ impl PtyManager {
             pixel_height: 0,
         })?;
 
-        let default_shell =
-            std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+        let default_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
         let shell_cmd = shell.unwrap_or(&default_shell);
 
         let mut cmd = CommandBuilder::new(shell_cmd);
@@ -122,9 +117,12 @@ impl PtyManager {
         let session = sessions
             .get(id)
             .ok_or_else(|| anyhow::anyhow!("terminal session not found: {id}"))?;
-        session
-            .master
-            .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })?;
+        session.master.resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })?;
         Ok(())
     }
 

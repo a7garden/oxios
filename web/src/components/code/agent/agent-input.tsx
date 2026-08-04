@@ -14,8 +14,8 @@ import {
   useRef,
   useState,
 } from 'react'
-import { useCodeSessionStore } from '@/stores/code/code-session'
 import { Button } from '@/components/ui/button'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 import { ModelSelector } from './model-selector'
 
 export interface AgentInputProps {
@@ -121,9 +121,7 @@ export function AgentInput({ className, disabled = false, onSend, onStop }: Agen
 
   return (
     <div
-      className={
-        'border-t border-line bg-surface px-3 py-3 flex flex-col gap-2 ' + (className ?? '')
-      }
+      className={`border-t border-line bg-surface px-3 py-3 flex flex-col gap-2 ${className ?? ''}`}
     >
       {error ? (
         <div className="flex items-center gap-1.5 text-xs text-destructive">

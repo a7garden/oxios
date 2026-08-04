@@ -1,13 +1,29 @@
-import { LayoutGrid, PanelRight, PanelLeft, Save, Sparkles, Terminal as TerminalIcon } from 'lucide-react'
+import {
+  LayoutGrid,
+  PanelLeft,
+  PanelRight,
+  Save,
+  Sparkles,
+  Terminal as TerminalIcon,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
-import { useCodeSessionStore, useCodeLayoutStore } from '@/stores/code/code-session'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useCodeLayoutStore, useCodeSessionStore } from '@/stores/code/code-session'
 import { useCodeActions } from './use-code-actions'
 
 export function WorkspaceHeader() {
   const { session } = useCodeSessionStore()
-  const { toggleExplorer, toggleAgent, toggleTerminal, toggleCanvas, showExplorer, showAgent, showTerminal, showCanvas } = useCodeLayoutStore()
+  const {
+    toggleExplorer,
+    toggleAgent,
+    toggleTerminal,
+    toggleCanvas,
+    showExplorer,
+    showAgent,
+    showTerminal,
+    showCanvas,
+  } = useCodeLayoutStore()
   const { saveAll } = useCodeActions()
 
   return (
@@ -15,9 +31,7 @@ export function WorkspaceHeader() {
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-primary" />
         <span className="font-semibold text-sm">{session?.title ?? 'Code Workspace'}</span>
-        {session?.model && (
-          <span className="text-xs text-muted-foreground">· {session.model}</span>
-        )}
+        {session?.model && <span className="text-xs text-muted-foreground">· {session.model}</span>}
       </div>
 
       <div className="flex-1" />

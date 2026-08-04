@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { memo } from 'react'
-import { Handle, Position, type NodeProps } from 'reactflow'
+import { Handle, type NodeProps, Position } from 'reactflow'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -71,7 +71,11 @@ function CanvasFileNodeInner({ data }: NodeProps<CanvasNodeData>) {
         <span className="truncate text-xs font-medium text-muted-foreground" title={path}>
           {label}
         </span>
-        <Handle type="source" position={Position.Bottom} className="!h-0 !w-0 !border-0 !opacity-0" />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!h-0 !w-0 !border-0 !opacity-0"
+        />
       </div>
     )
   }

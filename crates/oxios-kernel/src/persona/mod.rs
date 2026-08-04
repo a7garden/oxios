@@ -499,7 +499,7 @@ mod tests {
     #[test]
     fn test_default_personas_count_and_ids() {
         let personas = default_personas();
-        assert_eq!(personas.len(), 9);
+        assert_eq!(personas.len(), 10);
 
         let ids: Vec<&str> = personas.iter().map(|p| p.id.as_str()).collect();
         assert!(ids.contains(&"dev"));
@@ -511,6 +511,7 @@ mod tests {
         assert!(ids.contains(&"security"));
         assert!(ids.contains(&"writer"));
         assert!(ids.contains(&"planner"));
+        assert!(ids.contains(&"code"));
 
         // All should be enabled with non-empty prompts and traits
         for p in &personas {
@@ -525,7 +526,7 @@ mod tests {
         let personas = default_personas();
         let roles: std::collections::HashSet<&str> =
             personas.iter().map(|p| p.role.as_str()).collect();
-        assert_eq!(roles.len(), 9);
+        assert_eq!(roles.len(), 10);
     }
 
     #[test]

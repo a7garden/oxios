@@ -1260,9 +1260,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                         .and_then(|v| v.as_str())
                                         .filter(|s| !s.is_empty())
                                     {
-                                        incoming
-                                            .metadata
-                                            .insert(key.to_string(), val.to_string());
+                                        incoming.metadata.insert(key.to_string(), val.to_string());
                                     }
                                 }
                                 // Activate persona if specified (Code

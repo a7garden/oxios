@@ -13,7 +13,6 @@
 
 import { Folder, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -27,11 +26,12 @@ import ReactFlow, {
   type ReactFlowProps,
   ReactFlowProvider,
 } from 'reactflow'
+import { toast } from 'sonner'
 import 'reactflow/dist/style.css'
 
 import { EmptyState } from '@/components/shared/empty-state'
 import { codeApi } from '@/lib/code-api'
-import { useCodeSessionStore, useCodeLayoutStore } from '@/stores/code/code-session'
+import { useCodeLayoutStore, useCodeSessionStore } from '@/stores/code/code-session'
 import type { CodeMessage, DirEntry, FileChange } from '@/types/code'
 
 import { CanvasFileNode, type CanvasNodeData } from './canvas-file-node'
@@ -67,7 +67,11 @@ const MAX_FILES = 40
 
 /** Expand `rootPath` into a small tree, capped by depth + file count. */
 async function loadTree(rootPath: string): Promise<LoadedEntry[]> {
-  async function walk(path: string, depth: number, fileCounter: { count: number }): Promise<LoadedEntry[]> {
+  async function walk(
+    path: string,
+    depth: number,
+    fileCounter: { count: number },
+  ): Promise<LoadedEntry[]> {
     if (fileCounter.count >= MAX_FILES) return []
     const raw = await codeApi.browse(path)
     // Sort: directories first, alphabetical. Hidden dotfiles last.
@@ -82,8 +86,7 @@ async function loadTree(rootPath: string): Promise<LoadedEntry[]> {
     for (const entry of sorted) {
       if (fileCounter.count >= MAX_FILES) break
       if (entry.is_dir) {
-        const children =
-          depth < MAX_DEPTH ? await walk(entry.path, depth + 1, fileCounter) : []
+        const children = depth < MAX_DEPTH ? await walk(entry.path, depth + 1, fileCounter) : []
         out.push({ ...entry, children })
       } else {
         out.push({ ...entry })

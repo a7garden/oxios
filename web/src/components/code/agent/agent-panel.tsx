@@ -11,11 +11,11 @@
 
 import { Bot, Power, PowerOff } from 'lucide-react'
 import { useCodeStream } from '@/hooks/code/use-code-stream'
-import { useCodeSessionStore } from '@/stores/code/code-session'
 import { cn } from '@/lib/utils'
-import { ConversationView } from './conversation-view'
-import { AgentInput } from './agent-input'
+import { useCodeSessionStore } from '@/stores/code/code-session'
 import { ReviewBar } from '../review/review-bar'
+import { AgentInput } from './agent-input'
+import { ConversationView } from './conversation-view'
 
 export interface AgentPanelProps {
   /** Optional className for the outer wrapper. */
@@ -36,22 +36,13 @@ export function AgentPanel({ className }: AgentPanelProps) {
   const { sendMessage, stop } = useCodeStream()
 
   return (
-    <div
-      className={cn(
-        'flex flex-col h-full min-h-0 bg-surface text-foreground',
-        className,
-      )}
-    >
+    <div className={cn('flex flex-col h-full min-h-0 bg-surface text-foreground', className)}>
       <header className="flex items-center gap-2 px-3 py-2 border-b border-line bg-surface">
         <Bot className="size-4 text-muted-foreground" />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">
-            {session?.title ?? 'Coding Agent'}
-          </div>
+          <div className="text-sm font-medium truncate">{session?.title ?? 'Coding Agent'}</div>
           {session ? (
-            <div className="text-[10px] text-muted-foreground truncate">
-              {session.project_path}
-            </div>
+            <div className="text-[10px] text-muted-foreground truncate">{session.project_path}</div>
           ) : null}
         </div>
         <div
@@ -63,11 +54,7 @@ export function AgentPanel({ className }: AgentPanelProps) {
           )}
           aria-live="polite"
         >
-          {isAgentRunning ? (
-            <Power className="size-3" />
-          ) : (
-            <PowerOff className="size-3" />
-          )}
+          {isAgentRunning ? <Power className="size-3" /> : <PowerOff className="size-3" />}
           <span>{isAgentRunning ? 'Running' : 'Idle'}</span>
         </div>
       </header>

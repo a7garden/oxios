@@ -7,11 +7,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path as AxumPath, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use oxios_kernel::code::{Checkpoint, CodeSession, FileChange};
 use oxios_kernel::kernel_handle::coding_api::{DirEntry, FileContent};
 use serde::{Deserialize, Serialize};
@@ -292,13 +292,26 @@ pub(crate) async fn handle_code_fs_list(
     let output = std::process::Command::new("find")
         .args([
             &query.path,
-            "-type", "f",
-            "-not", "-path", "*/.git/*",
-            "-not", "-path", "*/node_modules/*",
-            "-not", "-path", "*/target/*",
-            "-not", "-path", "*/dist/*",
-            "-not", "-path", "*/.next/*",
-            "-not", "-path", "*/__pycache__/*",
+            "-type",
+            "f",
+            "-not",
+            "-path",
+            "*/.git/*",
+            "-not",
+            "-path",
+            "*/node_modules/*",
+            "-not",
+            "-path",
+            "*/target/*",
+            "-not",
+            "-path",
+            "*/dist/*",
+            "-not",
+            "-path",
+            "*/.next/*",
+            "-not",
+            "-path",
+            "*/__pycache__/*",
         ])
         .output()
         .map_err(|e| AppError::Internal(format!("list failed: {e}")))?;
@@ -324,8 +337,14 @@ pub(crate) async fn handle_code_changes_list(
         .coding
         .get_session(&id)
         .ok_or_else(|| AppError::NotFound("session not found".into()))?;
-    let changes: Vec<FileChange> =
-        session_state.changes.read().await.list_changes().into_iter().cloned().collect();
+    let changes: Vec<FileChange> = session_state
+        .changes
+        .read()
+        .await
+        .list_changes()
+        .into_iter()
+        .cloned()
+        .collect();
     Ok(Json(changes))
 }
 
@@ -527,26 +546,21 @@ pub(crate) async fn handle_code_terminal_ws(
                         // as JSON objects.
                         let trimmed = text.trim_start();
                         if trimmed.starts_with('{')
-                            && let Ok(ctrl) =
-                                serde_json::from_str::<serde_json::Value>(&text)
+                            && let Ok(ctrl) = serde_json::from_str::<serde_json::Value>(&text)
                         {
                             match ctrl.get("type").and_then(|t| t.as_str()) {
                                 Some("resize") => {
-                                    let cols = ctrl
-                                        .get("cols")
-                                        .and_then(|c| c.as_u64())
-                                        .unwrap_or(80) as u16;
-                                    let rows = ctrl
-                                        .get("rows")
-                                        .and_then(|r| r.as_u64())
-                                        .unwrap_or(24) as u16;
+                                    let cols =
+                                        ctrl.get("cols").and_then(|c| c.as_u64()).unwrap_or(80)
+                                            as u16;
+                                    let rows =
+                                        ctrl.get("rows").and_then(|r| r.as_u64()).unwrap_or(24)
+                                            as u16;
                                     let _ = pty.resize(&tid, rows, cols).await;
                                     continue;
                                 }
                                 Some("input") => {
-                                    if let Some(data) =
-                                        ctrl.get("data").and_then(|d| d.as_str())
-                                    {
+                                    if let Some(data) = ctrl.get("data").and_then(|d| d.as_str()) {
                                         let _ = pty.write(&tid, data.as_bytes()).await;
                                     }
                                     continue;
@@ -622,19 +636,25 @@ pub(crate) async fn handle_code_message(
         .iter()
         .filter_map(|f| {
             let abs = project_path.join(&f.path);
-            std::fs::read_to_string(&abs).ok().map(|c| (f.path.clone(), c))
+            std::fs::read_to_string(&abs)
+                .ok()
+                .map(|c| (f.path.clone(), c))
         })
         .collect();
 
     // Build the incoming message with coding-specific metadata.
     let mut msg = oxios_gateway::message::IncomingMessage::new("web", "code-user", &req.content);
     msg.metadata.insert("session_id".to_owned(), id.clone());
-    msg.metadata.insert("persona_role".to_owned(), "code".to_owned());
-    msg.metadata.insert("cspace_hint".to_owned(), "coder".to_owned());
-    msg.metadata.insert("workspace_dir".to_owned(), project_path_str);
+    msg.metadata
+        .insert("persona_role".to_owned(), "code".to_owned());
+    msg.metadata
+        .insert("cspace_hint".to_owned(), "coder".to_owned());
+    msg.metadata
+        .insert("workspace_dir".to_owned(), project_path_str);
 
     if let Some(model) = &session_state.session.model {
-        msg.metadata.insert("model_override".to_owned(), model.clone());
+        msg.metadata
+            .insert("model_override".to_owned(), model.clone());
     }
     if !req.context_files.is_empty() {
         msg.metadata
@@ -723,22 +743,20 @@ fn git_changed_files(project_root: &std::path::Path) -> Vec<GitChangedFile> {
         .output();
 
     match output {
-        Ok(o) if o.status.success() => {
-            String::from_utf8_lossy(&o.stdout)
-                .lines()
-                .filter_map(|line| {
-                    if line.len() < 4 {
-                        return None;
-                    }
-                    let status = line.chars().next().unwrap_or(' ');
-                    let path = line[3..].trim().to_string();
-                    if path.is_empty() {
-                        return None;
-                    }
-                    Some(GitChangedFile { path, status })
-                })
-                .collect()
-        }
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .filter_map(|line| {
+                if line.len() < 4 {
+                    return None;
+                }
+                let status = line.chars().next().unwrap_or(' ');
+                let path = line[3..].trim().to_string();
+                if path.is_empty() {
+                    return None;
+                }
+                Some(GitChangedFile { path, status })
+            })
+            .collect(),
         _ => Vec::new(), // Not a git repo or git unavailable
     }
 }

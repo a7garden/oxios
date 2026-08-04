@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
- import { Group, Panel, Separator } from 'react-resizable-panels'
-import { useCodeLayoutStore } from '@/stores/code/code-session'
-import { FileExplorer } from '@/components/code/explorer/file-explorer'
+import { Group, Panel, Separator } from 'react-resizable-panels'
 import { AgentPanel } from '@/components/code/agent/agent-panel'
-import { CodeEditor } from '@/components/code/editor/code-editor'
-import { TerminalPanel } from '@/components/code/terminal/terminal-panel'
 import { ProjectCanvas } from '@/components/code/canvas/project-canvas'
+import { CodeEditor } from '@/components/code/editor/code-editor'
+import { FileExplorer } from '@/components/code/explorer/file-explorer'
+import { TerminalPanel } from '@/components/code/terminal/terminal-panel'
+import { useCodeLayoutStore, useCodeSessionStore } from '@/stores/code/code-session'
+import { QuickOpen } from './quick-open'
 import { WorkspaceHeader } from './workspace-header'
 import { WorkspaceStatusBar } from './workspace-status-bar'
-import { QuickOpen } from './quick-open'
-import { useCodeSessionStore } from '@/stores/code/code-session'
 
 /**
  * Horizontal resize handle (between left/right panels).
@@ -49,6 +48,10 @@ export function CodeWorkspace() {
   const toggleExplorer = useCodeLayoutStore((s) => s.toggleExplorer)
   const toggleAgent = useCodeLayoutStore((s) => s.toggleAgent)
   const toggleTerminal = useCodeLayoutStore((s) => s.toggleTerminal)
+  const showExplorer = useCodeLayoutStore((s) => s.showExplorer)
+  const showCanvas = useCodeLayoutStore((s) => s.showCanvas)
+  const showTerminal = useCodeLayoutStore((s) => s.showTerminal)
+  const showAgent = useCodeLayoutStore((s) => s.showAgent)
   const session = useCodeSessionStore((s) => s.session)
   const [showQuickOpen, setShowQuickOpen] = useState(false)
 
@@ -123,10 +126,7 @@ export function CodeWorkspace() {
       <WorkspaceStatusBar />
 
       {showQuickOpen && session && (
-        <QuickOpen
-          projectPath={session.project_path}
-          onClose={() => setShowQuickOpen(false)}
-        />
+        <QuickOpen projectPath={session.project_path} onClose={() => setShowQuickOpen(false)} />
       )}
     </div>
   )

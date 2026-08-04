@@ -1,13 +1,13 @@
 /** API helpers for Code Workspace endpoints. */
 import { apiClient } from '@/lib/api-client'
 import type {
-  CodeSession,
-  SessionResponse,
-  DirEntry,
-  FileContent,
-  FileChange,
   Checkpoint,
+  CodeSession,
+  DirEntry,
+  FileChange,
+  FileContent,
   FsSearchResult,
+  SessionResponse,
   TerminalInfo,
 } from '@/types/code'
 
@@ -21,18 +21,14 @@ export const codeApi = {
 
   listSessions: () => apiClient<CodeSession[]>('/api/code/sessions'),
 
-  getSession: (id: string) =>
-    apiClient<SessionResponse>(`/api/code/sessions/${id}`),
+  getSession: (id: string) => apiClient<SessionResponse>(`/api/code/sessions/${id}`),
 
-  deleteSession: (id: string) =>
-    apiClient<void>(`/api/code/sessions/${id}`, { method: 'DELETE' }),
+  deleteSession: (id: string) => apiClient<void>(`/api/code/sessions/${id}`, { method: 'DELETE' }),
 
   // Filesystem
-  browse: (path: string) =>
-    apiClient<DirEntry[]>('/api/code/fs/browse', { params: { path } }),
+  browse: (path: string) => apiClient<DirEntry[]>('/api/code/fs/browse', { params: { path } }),
 
-  readFile: (path: string) =>
-    apiClient<FileContent>('/api/code/fs/read', { params: { path } }),
+  readFile: (path: string) => apiClient<FileContent>('/api/code/fs/read', { params: { path } }),
 
   writeFile: (path: string, content: string) =>
     apiClient<void>('/api/code/fs/write', {
@@ -57,11 +53,10 @@ export const codeApi = {
   // Search
   searchFiles: (path: string, q: string, limit?: number) =>
     apiClient<FsSearchResult[]>('/api/code/fs/search', {
-      params: { path, q, ...(limit ? { limit } : {}) },
+      params: { path, q, ...(limit ? { limit: String(limit) } : {}) },
     }),
 
-  listFiles: (path: string) =>
-    apiClient<string[]>('/api/code/fs/list', { params: { path } }),
+  listFiles: (path: string) => apiClient<string[]>('/api/code/fs/list', { params: { path } }),
 
   // Changes
   listChanges: (sessionId: string) =>
