@@ -73,10 +73,16 @@ impl std::error::Error for QueueOverflow {}
 
 /// Listen for encrypted WebSocket sessions until `shutdown` is cancelled.
 ///
+/// The caller pre-binds `listener` (typically on `127.0.0.1:0` in tests, or
+/// the configured loopback port in production) so it can learn the bound
+/// address via `listener.local_addr()` before handing the listener off. This
+/// avoids the dual-bind race where `run_listener` would otherwise rebind to a
+/// different ephemeral port.
+///
 /// Every decrypted application request is passed to the injected asynchronous
 /// handler. Its returned bytes are encrypted and sent as an application frame.
 pub async fn run_listener<H, Fut>(
-    addr: SocketAddr,
+    listener: TcpListener,
     server_static: Vec<u8>,
     shutdown: CancellationToken,
     handler: H,
@@ -85,9 +91,9 @@ where
     H: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Vec<u8>> + Send + 'static,
 {
-    let listener = TcpListener::bind(addr)
-        .await
-        .with_context(|| format!("bind remote WebSocket listener at {addr}"))?;
+    let addr = listener
+        .local_addr()
+        .context("remote WebSocket listener must be bound")?;
     let handler = Arc::new(handler);
     let server_static = Arc::new(server_static);
 

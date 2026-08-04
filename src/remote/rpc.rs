@@ -10,12 +10,51 @@
 //! Symbols are intentionally forward-declared; `#[allow(dead_code)]` silences
 //! the warnings until the surface wiring (Task 9) lands.
 #![allow(dead_code)]
-
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use serde_json::{Value, json};
 use std::sync::Arc;
+use thiserror::Error;
 
 use crate::remote::devices::DeviceRegistry;
+
+/// JSON-RPC 2.0 error codes used by the remote companion surface.
+///
+/// Only the standard `method not found` is encoded as a structured variant
+/// here; every other failure surfaces a generic `-32603 internal error` with
+/// the underlying message attached.
+pub const RPC_METHOD_NOT_FOUND: i32 = -32601;
+pub const RPC_INVALID_REQUEST: i32 = -32600;
+pub const RPC_INTERNAL_ERROR: i32 = -32603;
+
+/// Structured RPC error that the transport can render directly on the wire.
+///
+/// `code` follows the JSON-RPC 2.0 pre-defined error code space; `message` is
+/// the human-readable explanation suitable for inclusion in the wire
+/// `error.message` field. The transport serialises this as
+/// `{"jsonrpc":"2.0","id":<id>,"error":{"code":..,"message":..}}`.
+#[derive(Debug, Clone, Error)]
+#[error("rpc error {code}: {message}")]
+pub struct RpcError {
+    pub code: i32,
+    pub message: String,
+}
+
+impl RpcError {
+    pub fn new(code: i32, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+
+    pub fn method_not_found(method: &str) -> Self {
+        Self::new(RPC_METHOD_NOT_FOUND, format!("method not found: {method}"))
+    }
+
+    pub fn invalid_request(message: impl Into<String>) -> Self {
+        Self::new(RPC_INVALID_REQUEST, message)
+    }
+}
 
 /// Wire-protocol version of the companion RPC surface. Bump together with
 /// `MIN_CLIENT_VERSION` when the contract changes.
@@ -55,11 +94,11 @@ pub struct RpcCtx {
 /// `req` is expected to be an object with `{"jsonrpc","id","method","params"}`.
 /// Only `status.get` and `echo` are implemented in Phase 1; everything else
 /// returns `-32601 method not found`.
-pub async fn dispatch(req: Value, ctx: &RpcCtx) -> Result<RpcOutcome> {
+pub async fn dispatch(req: Value, ctx: &RpcCtx) -> Result<RpcOutcome, RpcError> {
     let method = req
         .get("method")
         .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("invalid request: missing string `method`"))?;
+        .ok_or_else(|| RpcError::invalid_request("missing string `method`"))?;
 
     match method {
         "status.get" => {
@@ -75,7 +114,7 @@ pub async fn dispatch(req: Value, ctx: &RpcCtx) -> Result<RpcOutcome> {
             let params = req.get("params").cloned().unwrap_or(Value::Null);
             Ok(RpcOutcome::Resp(json!({ "echo": params })))
         }
-        other => Err(anyhow!("-32601 method not found: {other}")),
+        other => Err(RpcError::method_not_found(other)),
     }
 }
 
@@ -182,23 +221,26 @@ mod tests {
             let (_dir, ctx) = test_ctx().await;
             let req = json!({"jsonrpc": "2.0", "id": 2, "method": "nope"});
             let err = dispatch(req, &ctx).await.expect_err("must error");
-            let msg = err.to_string();
+            assert_eq!(err.code, RPC_METHOD_NOT_FOUND);
+            assert_eq!(err.code, -32601);
             assert!(
-                msg.contains("32601") || msg.contains("method"),
-                "expected -32601 method not found, got: {msg}"
+                err.message.contains("nope"),
+                "method name must surface in message, got: {}",
+                err.message
             );
         });
     }
-
     #[test]
     fn missing_method_field_is_invalid_request() {
         run(async {
             let (_dir, ctx) = test_ctx().await;
             let req = json!({"jsonrpc": "2.0", "id": 5});
             let err = dispatch(req, &ctx).await.expect_err("must error");
+            assert_eq!(err.code, RPC_INVALID_REQUEST);
             assert!(
-                err.to_string().contains("method"),
-                "expected invalid-request error mentioning method, got: {err}"
+                err.message.contains("method"),
+                "expected invalid-request error mentioning method, got: {}",
+                err.message
             );
         });
     }
