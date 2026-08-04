@@ -33,11 +33,19 @@ pub struct DeviceRegistry {
 impl DeviceRegistry {
     pub fn load_or_create(state_dir: &Path) -> Result<Self> {
         let path = state_dir.join("devices.json");
-        let devices = std::fs::read(&path)
-            .ok()
-            .and_then(|bytes| serde_json::from_slice::<RegistryFile>(&bytes).ok())
-            .map(|file| file.devices)
-            .unwrap_or_default();
+        let devices = match std::fs::read(&path) {
+            Ok(bytes) => match serde_json::from_slice::<RegistryFile>(&bytes) {
+                Ok(file) => file.devices,
+                Err(e) => {
+                    tracing::warn!("devices.json unreadable/corrupt, starting empty: {e}");
+                    Vec::new()
+                }
+            },
+            Err(e) => {
+                tracing::warn!("devices.json unreadable/corrupt, starting empty: {e}");
+                Vec::new()
+            }
+        };
         Ok(Self { path, devices })
     }
 
@@ -50,23 +58,42 @@ impl DeviceRegistry {
 
         #[cfg(unix)]
         {
-            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            use std::os::unix::fs::OpenOptionsExt;
 
-            let mut output = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&self.path)?;
-            std::io::Write::write_all(&mut output, &bytes)?;
-            output.sync_all()?;
-            std::fs::set_permissions(&self.path, std::fs::Permissions::from_mode(0o600))?;
+            let tmp = self.path.with_extension("json.tmp");
+            let result = (|| -> Result<()> {
+                let mut output = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .mode(0o600)
+                    .open(&tmp)?;
+                std::io::Write::write_all(&mut output, &bytes)?;
+                output.sync_all()?;
+                std::fs::rename(&tmp, &self.path)?;
+                Ok(())
+            })();
+            if result.is_err() {
+                let _ = std::fs::remove_file(&tmp);
+            }
+            result
         }
 
         #[cfg(not(unix))]
-        std::fs::write(&self.path, bytes)?;
-
-        Ok(())
+        {
+            let tmp = self.path.with_extension("json.tmp");
+            let result = (|| -> Result<()> {
+                let mut output = std::fs::File::create(&tmp)?;
+                std::io::Write::write_all(&mut output, &bytes)?;
+                output.sync_all()?;
+                std::fs::rename(&tmp, &self.path)?;
+                Ok(())
+            })();
+            if result.is_err() {
+                let _ = std::fs::remove_file(&tmp);
+            }
+            result
+        }
     }
 
     /// Mint a new device token. Returns `(device_id, plaintext_token)`.
@@ -109,25 +136,26 @@ impl DeviceRegistry {
         self.devices.iter().collect()
     }
 
-    pub fn revoke(&mut self, device_id: &str) -> bool {
+    pub fn revoke(&mut self, device_id: &str) -> Result<bool> {
         let before = self.devices.len();
         self.devices.retain(|device| device.device_id != device_id);
         let changed = self.devices.len() != before;
         if changed {
-            let _ = self.save();
+            self.save()?;
         }
-        changed
+        Ok(changed)
     }
 
-    pub fn touch(&mut self, device_id: &str) {
+    pub fn touch(&mut self, device_id: &str) -> Result<()> {
         if let Some(device) = self
             .devices
             .iter_mut()
             .find(|device| device.device_id == device_id)
         {
             device.last_seen = Some(chrono::Utc::now().timestamp());
-            let _ = self.save();
+            self.save()?;
         }
+        Ok(())
     }
 }
 
@@ -144,7 +172,7 @@ mod tests {
         assert!(reg.verify(&id, &token));
         assert!(!reg.verify(&id, "wrong-token"));
         assert_eq!(reg.list().len(), 1);
-        assert!(reg.revoke(&id));
+        assert!(reg.revoke(&id).unwrap());
         assert!(!reg.verify(&id, &token));
     }
 
