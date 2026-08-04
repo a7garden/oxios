@@ -15,6 +15,10 @@ mod web_dist;
 #[cfg(feature = "web")]
 mod api;
 
+// RFC-044: E2EE companion surface (opt-in).
+#[cfg(feature = "remote")]
+mod remote;
+
 // RFC-026: in-process channels (merged from channels/oxios-cli, channels/oxios-telegram)
 // Individual sub-modules are feature-gated internally.
 mod channels;

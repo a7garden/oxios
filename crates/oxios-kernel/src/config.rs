@@ -1011,6 +1011,7 @@ impl SystemAgentsConfig {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct OxiosConfig {
     /// Kernel settings.
+    #[serde(default)]
     pub kernel: KernelConfig,
     /// LLM engine settings.
     #[serde(default)]
@@ -1072,6 +1073,9 @@ pub struct OxiosConfig {
     /// Surface activation configuration (control interfaces: Web dashboard).
     #[serde(default)]
     pub surfaces: Option<SurfacesConfig>,
+    /// Remote companion surface (RFC-044). Disabled by default.
+    #[serde(default)]
+    pub remote: RemoteConfig,
     /// Headless browser configuration.
     #[serde(default)]
     pub browser: BrowserConfig,
@@ -1222,6 +1226,24 @@ pub struct GatewayConfig {
     pub reliability: GatewayReliabilityConfig,
 }
 
+/// Remote companion-surface configuration (RFC-044).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RemoteConfig {
+    /// Whether the RemoteRpcSurface is active. Default false — opt-in.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Port for the E2EE WS listener. Default 6768 (orca-compatible).
+    #[serde(default = "default_remote_port")]
+    pub port: u16,
+    /// Advertised pairing host (does NOT change the bind).
+    /// None → auto (tailscale ip -4 → hostname).
+    #[serde(default)]
+    pub pairing_address: Option<String>,
+}
+fn default_remote_port() -> u16 { 6768 }
+impl Default for RemoteConfig {
+    fn default() -> Self { Self { enabled: false, port: default_remote_port(), pairing_address: None } }
+}
 /// RFC-024 SP1: in-memory replay buffer tuning.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GatewayReliabilityConfig {
@@ -2538,5 +2560,22 @@ exec = "always"
             ..Default::default()
         };
         assert!(!cfg.should_expose_api_docs());
+    }
+
+    #[test]
+    fn test_remote_config_default_disabled() {
+        let cfg = OxiosConfig::default();
+        assert!(!cfg.remote.enabled);
+        assert_eq!(cfg.remote.port, 6768);
+        assert!(cfg.remote.pairing_address.is_none());
+    }
+
+    #[test]
+    fn test_remote_config_parse() {
+        let toml = "[remote]\nenabled = true\nport = 7000\npairing_address = \"100.64.1.20\"\n";
+        let cfg: OxiosConfig = toml::from_str(toml).unwrap();
+        assert!(cfg.remote.enabled);
+        assert_eq!(cfg.remote.port, 7000);
+        assert_eq!(cfg.remote.pairing_address.as_deref(), Some("100.64.1.20"));
     }
 }
