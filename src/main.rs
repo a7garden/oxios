@@ -3091,9 +3091,13 @@ fn acquire_instance_lock(_pid_file: &Path) -> Result<()> {
 // ─── Server mode (foreground) ────────────────────────────────────────────────
 
 /// Dispatch entry-point for `oxios start` / `oxios serve` and the bare
-/// `oxios` default. Splits the daemonized vs foreground path; the foreground
-/// path honors `--remote` / `--pairing-address` by mutating the in-memory
-/// kernel config (the daemonized path reads `config.toml` itself).
+/// `oxios` default. Splits the daemonized vs foreground path.
+///
+/// `--remote` forces the foreground path: the daemonized child re-reads
+/// `config.toml` and would never receive the in-memory override, so the
+/// readiness JSON + pairing URL would silently disappear. To run the
+/// remote surface under the long-lived daemon, set `[remote]` in
+/// `config.toml` instead of passing `--remote` on the CLI.
 async fn start_daemon(
     kernel: &mut Kernel,
     config: &OxiosConfig,
@@ -3110,9 +3114,17 @@ async fn start_daemon(
             let _ = pairing_address; // suppress unused
             tracing::warn!("--remote requested but `remote` feature is disabled; ignoring");
         }
+        if !foreground {
+            eprintln!("--remote implies --foreground: running in foreground so the readiness JSON");
+            eprintln!("  + pairing URL print here. For daemon mode, set [remote] in config.toml");
+            eprintln!("  instead of passing --remote on the CLI.");
+            tracing::info!(
+                "--remote implies --foreground; daemon child cannot receive CLI-only overrides"
+            );
+        }
     }
     let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
-    if foreground {
+    if foreground || remote {
         cmd_serve(kernel, config_path).await
     } else {
         daemon.start(config_path, config.gateway.port)
