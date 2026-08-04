@@ -6,6 +6,7 @@ pub mod endpoints;
 pub mod identity;
 pub mod noise;
 pub mod pairing;
+pub mod transport;
 
 use anyhow::Result;
 use oxios_gateway::surface::{Surface, SurfaceContext, SurfaceHandle};
