@@ -237,7 +237,7 @@ oxibrowser = "0.16"
 snow = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
-qrcode = { workspace = true, optional = true, features = ["svg"] }
+qrcode = { workspace = true, optional = true }
 local-ip-address = { workspace = true, optional = true }
 hostname = { workspace = true, optional = true }
 [dev-dependencies]

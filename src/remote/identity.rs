@@ -52,11 +52,22 @@ impl DeviceIdentity {
             secret: keypair.private.clone(),
         };
         let json = serde_json::to_vec(&f)?;
-        std::fs::write(&path, &json)?;
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).ok();
+            use std::os::unix::fs::OpenOptionsExt;
+
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&path)?;
+            std::io::Write::write_all(&mut file, &json)?;
+            file.sync_all()?;
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&path, &json)?;
         }
         Ok(Self { keypair })
     }

@@ -41,8 +41,12 @@ impl DeviceRegistry {
                     Vec::new()
                 }
             },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                tracing::debug!("devices.json not found (first run), starting empty");
+                Vec::new()
+            }
             Err(e) => {
-                tracing::warn!("devices.json unreadable/corrupt, starting empty: {e}");
+                tracing::warn!("devices.json unreadable, starting empty: {e}");
                 Vec::new()
             }
         };
