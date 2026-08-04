@@ -181,6 +181,14 @@ pub struct Transport {
 }
 
 impl Transport {
+    /// Wrap a `snow::TransportState` (typically obtained from
+    /// `HandshakeState::into_transport_mode()` on the initiator side) in
+    /// our `Transport` wrapper. Symmetric to [`Responder::into_transport`]
+    /// on the responder side.
+    pub fn from_snow_state(ts: snow::TransportState) -> Self {
+        Self { ts }
+    }
+
     /// Seal a plaintext frame. The returned ciphertext includes the 16-byte
     /// AEAD tag; the caller is responsible for framing it on the wire
     /// ([`encode_frame`] with [`FrameType::App`] / `Ping` / `Pong` / `Close`).

@@ -247,6 +247,15 @@ tokio = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 
+[[example]]
+name = "remote_probe"
+# Skip this example unless the `remote` feature is on. The example is a
+# paired-client smoke probe; it depends on `tokio-tungstenite` and `snow`
+# which are only present with `remote`. Without this, the default build
+# (`cargo test -p oxios`) tries to compile the example with no `remote`
+# feature and cargo errors E0601 because the cfg-gated `main()` is
+# stripped. `required-features` makes cargo skip the example entirely.
+required-features = ["remote"]
 [patch.crates-io]
 oxios-kernel = { path = "crates/oxios-kernel" }
 # Uncomment for local development against oxi/oxibrowser:

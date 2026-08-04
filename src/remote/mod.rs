@@ -10,6 +10,7 @@ pub mod rpc;
 pub mod serve;
 pub mod transport;
 
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -115,6 +116,30 @@ async fn handle_app_frame(frame: Vec<u8>, ctx: Arc<RpcCtx>) -> Vec<u8> {
         Err(error) => render_error(&id, error),
     }
 }
+/// Type alias for the per-frame handler the transport expects.
+///
+/// Each call returns a boxed, pinned, `Send` future so the underlying
+/// closure is dyn-compatible (`run_listener` takes `H: Fn(...) -> Fut`).
+/// `Box<dyn Fn>` is callable through deref coercion at the call site, so
+/// we wrap the closure in a `Box` rather than an `Arc` (the handler is
+/// already `Sync` because it only borrows from an `Arc<RpcCtx>`).
+pub type RpcFrameHandler =
+    Box<dyn Fn(Vec<u8>) -> Pin<Box<dyn Future<Output = Vec<u8>> + Send>> + Send + Sync>;
+
+/// Build the per-frame RPC handler used by both production (`start()`) and
+/// integration tests (the in-process E2E and the `remote_probe` example).
+///
+/// Keeping this single function as the canonical seam avoids a class of
+/// bugs where the test handler and the production handler drift apart —
+/// they MUST serialise / deserialise the exact same JSON-RPC envelope to
+/// round-trip a real request.
+pub fn build_rpc_handler(ctx: Arc<RpcCtx>) -> RpcFrameHandler {
+    Box::new(move |frame: Vec<u8>| {
+        let ctx = Arc::clone(&ctx);
+        Box::pin(async move { handle_app_frame(frame, ctx).await })
+            as Pin<Box<dyn Future<Output = Vec<u8>> + Send>>
+    })
+}
 
 #[async_trait::async_trait]
 impl Surface for RemoteRpcSurface {
@@ -163,13 +188,7 @@ impl Surface for RemoteRpcSurface {
             .context("remote WebSocket listener local_addr")?;
         tracing::info!(%local_addr, "RemoteRpcSurface listener bound");
 
-        let handler = {
-            let rpc_ctx = Arc::clone(&rpc_ctx);
-            move |frame: Vec<u8>| {
-                let rpc_ctx = Arc::clone(&rpc_ctx);
-                async move { handle_app_frame(frame, rpc_ctx).await }
-            }
-        };
+        let handler = build_rpc_handler(rpc_ctx);
 
         let shutdown: CancellationToken = ctx.shutdown.clone();
         let server_static = identity.snow_static().to_vec();
@@ -298,6 +317,207 @@ mod tests {
             .await
             .expect("listener task must exit within 5s of cancel")
             .expect("listener task joined Ok");
+
+        outcome.expect("run_listener returns Ok on clean shutdown");
+    }
+    /// End-to-end paired-client round-trip: drive a Noise_XX handshake
+    /// against the live `transport::run_listener` (with the SAME factored
+    /// handler used by `RemoteRpcSurface::start`), then encrypt and
+    /// exchange a `status.get` JSON-RPC request over the AEAD transport.
+    /// This is the RFC-044 §12 Phase-1 acceptance: a paired client can
+    /// reach the daemon over E2EE and call `status.get`.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn paired_client_round_trip_status_get() {
+        const NOISE_XX: &str = "Noise_XX_25519_ChaChaPoly_SHA256";
+
+        // 1) Server-side state: throwaway temp dir → DeviceIdentity (server
+        //    static key + device_id) + DeviceRegistry. RpcCtx is what
+        //    `build_rpc_handler` will hand to `handle_app_frame`.
+        let state = tempfile::TempDir::new().expect("tempdir");
+        let identity = DeviceIdentity::load_or_create(state.path()).expect("identity");
+        let registry = DeviceRegistry::load_or_create(state.path()).expect("registry");
+        let registry = Arc::new(tokio::sync::Mutex::new(registry));
+        let server_device_id = identity.device_id();
+        let server_static_secret = identity.snow_static().to_vec();
+        let server_static_public = identity.keypair.public.clone();
+        let rpc_ctx = Arc::new(RpcCtx {
+            registry,
+            device_id: server_device_id.clone(),
+            kernel: None,
+        });
+
+        // 2) Bind a loopback listener on an ephemeral port — the test
+        //    learns the bound address before handing the listener off, so
+        //    the listener never has to rebind.
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral listener");
+        let server_addr = listener.local_addr().expect("local_addr");
+
+        // 3) Spawn the listener with the FACTORED handler — same code
+        //    path as production.
+        let shutdown = CancellationToken::new();
+        let handler = build_rpc_handler(rpc_ctx);
+        let server_task = tokio::spawn({
+            let shutdown = shutdown.clone();
+            async move {
+                transport::run_listener(listener, server_static_secret, shutdown, handler).await
+            }
+        });
+
+        // 4) Build the paired-client side. We model the QR-pairing offer
+        //    by simply holding the server's static public key as the pin
+        //    the initiator authenticates against. Phase 2 will replace
+        //    this with a real device-token check; the wire-level Noise
+        //    pin is identical.
+        let client_kp = snow::Builder::new(NOISE_XX.parse().unwrap())
+            .generate_keypair()
+            .expect("client kp");
+        // The XX initiator learns the server's static key ON THE WIRE
+        // (in msg2) — this is the whole point of the pin: the client
+        // must NOT pre-feed `remote_public_key`, otherwise we'd be
+        // asserting a value we already knew. Compare to the existing
+        // `noise_xx_handshake_and_transport` test (noise.rs), which
+        // only sets `.local_private_key` on the initiator.
+        let mut initiator = snow::Builder::new(NOISE_XX.parse().unwrap())
+            .local_private_key(&client_kp.private)
+            .expect("set client static")
+            .build_initiator()
+            .expect("build initiator");
+
+        // 5) Open a WebSocket and drive the 3-message Noise_XX handshake
+        //    over WS Binary frames. Each handshake payload is wrapped in
+        //    a Noise frame and sent verbatim.
+        let url = format!("ws://{server_addr}");
+        let (mut client_ws, _response) = tokio_tungstenite::connect_async(&url)
+            .await
+            .expect("WS upgrade must succeed");
+
+        // msg1: -> e, es
+        let mut msg1 = vec![0u8; 1024];
+        let n = initiator
+            .write_message(&[], &mut msg1)
+            .expect("init write msg1");
+        msg1.truncate(n);
+        let frame1 = noise::encode_frame(noise::FrameType::Noise, &msg1).expect("encode msg1");
+        client_ws
+            .send(Message::Binary(frame1))
+            .await
+            .expect("send msg1");
+
+        // Recv msg2: <- e, ee, s, es
+        let msg2_msg = tokio::time::timeout(Duration::from_secs(5), client_ws.next())
+            .await
+            .expect("server must reply msg2 within 5s")
+            .expect("server closed early")
+            .expect("ws err on msg2");
+        let msg2_bytes = msg2_msg.into_data();
+        let (ft2, msg2) = noise::decode_frame(&msg2_bytes).expect("decode msg2");
+        assert_eq!(ft2, noise::FrameType::Noise, "msg2 must be Noise frame");
+        let mut buf2 = [0u8; 1024];
+        initiator
+            .read_message(msg2, &mut buf2)
+            .expect("init read msg2");
+
+        // PIN VERIFICATION: the XX initiator learns the server's static
+        // public key on the wire in msg2. We assert it byte-equals the
+        // identity's public key — without this, an AEAD round-trip
+        // would only prove "encryption works with someone", not that
+        // "we reached the *pinned* daemon". This is the whole point of
+        // the QR pairing offer's `public_key_b64` field.
+        let learned_static = initiator
+            .get_remote_static()
+            .expect("XX initiator must know the server static after msg2");
+        assert_eq!(
+            learned_static,
+            &server_static_public[..],
+            "server static learned in XX must equal the identity's public key (the pairing pin)"
+        );
+
+        // msg3: -> s, se
+        let mut msg3 = vec![0u8; 1024];
+        let n = initiator
+            .write_message(&[], &mut msg3)
+            .expect("init write msg3");
+        msg3.truncate(n);
+        let frame3 = noise::encode_frame(noise::FrameType::Noise, &msg3).expect("encode msg3");
+        client_ws
+            .send(Message::Binary(frame3))
+            .await
+            .expect("send msg3");
+
+        // XX has 3 messages; both sides now switch to transport mode.
+        assert!(
+            initiator.is_handshake_finished(),
+            "initiator must consider XX finished after msg3"
+        );
+        let mut client_transport = noise::Transport::from_snow_state(
+            initiator.into_transport_mode().expect("init -> transport"),
+        );
+
+        // 6) Encrypt a `status.get` JSON-RPC request, send as App frame.
+        let request = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "status.get",
+        });
+        let request_bytes = serde_json::to_vec(&request).expect("encode request");
+        let ciphertext = client_transport
+            .encrypt(&request_bytes)
+            .expect("encrypt req");
+        let app_frame =
+            noise::encode_frame(noise::FrameType::App, &ciphertext).expect("encode app frame");
+        client_ws
+            .send(Message::Binary(app_frame))
+            .await
+            .expect("send app");
+
+        // 7) Recv the encrypted reply, decrypt with our client transport,
+        //    parse JSON, assert protocol_version + device_id match.
+        let reply_msg = tokio::time::timeout(Duration::from_secs(5), client_ws.next())
+            .await
+            .expect("server must reply within 5s")
+            .expect("server closed")
+            .expect("ws err on reply");
+        let reply_bytes = reply_msg.into_data();
+        let (ft, payload) = noise::decode_frame(&reply_bytes).expect("decode reply");
+        assert_eq!(ft, noise::FrameType::App, "reply must be App frame");
+        let plaintext = client_transport
+            .decrypt(payload)
+            .expect("decrypt reply (proves E2EE: only the paired Noise peer can produce this)");
+        let resp: Value = serde_json::from_slice(&plaintext).expect("parse JSON-RPC reply");
+
+        assert_eq!(resp["jsonrpc"], "2.0");
+        assert_eq!(resp["id"], json!(1));
+        let result = &resp["result"];
+        assert_eq!(
+            result["protocol_version"],
+            json!(rpc::PROTOCOL_VERSION),
+            "status.get must echo PROTOCOL_VERSION=1"
+        );
+        assert_eq!(
+            result["min_client_version"],
+            json!(rpc::MIN_CLIENT_VERSION),
+            "status.get must echo MIN_CLIENT_VERSION=1"
+        );
+        assert_eq!(
+            result["device_id"],
+            json!(server_device_id),
+            "status.get device_id must match the server's identity (proves the wire reached the right daemon)"
+        );
+        assert_eq!(
+            result["paired_count"],
+            json!(0),
+            "paired_count must be 0 in a fresh registry"
+        );
+
+        // 8) Clean shutdown — drop the WS, cancel the token, join.
+        drop(client_ws);
+        shutdown.cancel();
+        let outcome = tokio::time::timeout(Duration::from_secs(5), server_task)
+            .await
+            .expect("server task must exit within 5s")
+            .expect("server task joined Ok");
         outcome.expect("run_listener returns Ok on clean shutdown");
     }
 }
