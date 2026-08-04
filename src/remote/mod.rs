@@ -4,7 +4,7 @@
 pub mod devices;
 pub mod endpoints;
 pub mod identity;
-pub mod pairing;
+pub mod noise;
 
 use anyhow::Result;
 use oxios_gateway::surface::{Surface, SurfaceContext, SurfaceHandle};
