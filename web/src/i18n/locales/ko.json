@@ -535,12 +535,6 @@
     "hintEntity": "대상",
     "hintClose": "닫기"
   },
-  "code": {
-    "openProject": "프로젝트 열기",
-    "newSession": "새 세션",
-    "sessions": "세션",
-    "noSessions": "세션이 없습니다"
-  },
   "common": {
     "save": "저장",
     "cancel": "취소",
@@ -2030,8 +2024,7 @@
   "sidebar": {
     "console": "콘솔",
     "knowledge": "지식",
-    "chat": "채팅",
-    "code": "코드"
+    "chat": "채팅"
   },
   "skills": {
     "title": "스킬",

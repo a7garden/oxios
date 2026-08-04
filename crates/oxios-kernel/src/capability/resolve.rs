@@ -26,7 +26,6 @@ use super::types::CSpace;
 const ROLE_WORKER: &str = "worker";
 const ROLE_STANDARD: &str = "standard";
 const ROLE_OPERATOR: &str = "operator";
-const ROLE_CODER: &str = "coder";
 const ROLE_SUPERVISOR: &str = "supervisor";
 
 /// Resolve an agent's initial CSpace from the available context.
@@ -84,7 +83,6 @@ fn resolve_from_template_name(name: &str, agent_id: AgentId) -> CSpace {
         ROLE_STANDARD => CapabilityTemplate::standard().build_for(agent_id),
         ROLE_OPERATOR => CapabilityTemplate::operator().build_for(agent_id),
         ROLE_SUPERVISOR => CapabilityTemplate::supervisor().build_for(agent_id),
-        ROLE_CODER => CapabilityTemplate::coder().build_for(agent_id),
         _ => {
             // If it looks like JSON, log a warning and fall back.
             // Full JSON capability parsing is a future enhancement.

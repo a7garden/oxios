@@ -72,8 +72,6 @@ libc = { workspace = true }
 inquire = { workspace = true }
 console = { workspace = true }
 indicatif = "0.17"
-portable-pty = { workspace = true }
-dashmap = { workspace = true }
 
 # SQLite-based memory storage (RFC-012)
 rusqlite = { version = "0.34", features = ["bundled"], optional = true }

@@ -28,8 +28,6 @@ import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as TokenMaxingRouteImport } from './routes/token-maxing'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
-import { Route as CodeIndexRouteImport } from './routes/code/index'
-import { Route as CodeSessionIdRouteImport } from './routes/code/$sessionId'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge/index'
 import { Route as KnowledgeGraphRouteImport } from './routes/knowledge/graph'
 import { Route as MountsIndexRouteImport } from './routes/mounts/index'
@@ -135,16 +133,6 @@ const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
   path: '/agents/$agentId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CodeIndexRoute = CodeIndexRouteImport.update({
-  id: '/code/',
-  path: '/code/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CodeSessionIdRoute = CodeSessionIdRouteImport.update({
-  id: '/code/$sessionId',
-  path: '/code/$sessionId',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const KnowledgeIndexRoute = KnowledgeIndexRouteImport.update({
   id: '/knowledge/',
   path: '/knowledge/',
@@ -210,12 +198,10 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof TasksRoute
   '/token-maxing': typeof TokenMaxingRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
-  '/code/$sessionId': typeof CodeSessionIdRoute
   '/knowledge/graph': typeof KnowledgeGraphRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/agents/': typeof AgentsIndexRoute
-  '/code/': typeof CodeIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/mounts/': typeof MountsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
@@ -242,12 +228,10 @@ export interface FileRoutesByTo {
   '/tasks': typeof TasksRoute
   '/token-maxing': typeof TokenMaxingRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
-  '/code/$sessionId': typeof CodeSessionIdRoute
   '/knowledge/graph': typeof KnowledgeGraphRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/agents': typeof AgentsIndexRoute
-  '/code': typeof CodeIndexRoute
   '/knowledge': typeof KnowledgeIndexRoute
   '/mounts': typeof MountsIndexRoute
   '/projects': typeof ProjectsIndexRoute
@@ -275,12 +259,10 @@ export interface FileRoutesById {
   '/tasks': typeof TasksRoute
   '/token-maxing': typeof TokenMaxingRoute
   '/agents/$agentId': typeof AgentsAgentIdRouteWithChildren
-  '/code/$sessionId': typeof CodeSessionIdRoute
   '/knowledge/graph': typeof KnowledgeGraphRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/agents/': typeof AgentsIndexRoute
-  '/code/': typeof CodeIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/mounts/': typeof MountsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
@@ -309,12 +291,10 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/token-maxing'
     | '/agents/$agentId'
-    | '/code/$sessionId'
     | '/knowledge/graph'
     | '/projects/$projectId'
     | '/sessions/$sessionId'
     | '/agents/'
-    | '/code/'
     | '/knowledge/'
     | '/mounts/'
     | '/projects/'
@@ -341,12 +321,10 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/token-maxing'
     | '/agents/$agentId'
-    | '/code/$sessionId'
     | '/knowledge/graph'
     | '/projects/$projectId'
     | '/sessions/$sessionId'
     | '/agents'
-    | '/code'
     | '/knowledge'
     | '/mounts'
     | '/projects'
@@ -373,12 +351,10 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/token-maxing'
     | '/agents/$agentId'
-    | '/code/$sessionId'
     | '/knowledge/graph'
     | '/projects/$projectId'
     | '/sessions/$sessionId'
     | '/agents/'
-    | '/code/'
     | '/knowledge/'
     | '/mounts/'
     | '/projects/'
@@ -406,12 +382,10 @@ export interface RootRouteChildren {
   TasksRoute: typeof TasksRoute
   TokenMaxingRoute: typeof TokenMaxingRoute
   AgentsAgentIdRoute: typeof AgentsAgentIdRouteWithChildren
-  CodeSessionIdRoute: typeof CodeSessionIdRoute
   KnowledgeGraphRoute: typeof KnowledgeGraphRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
-  CodeIndexRoute: typeof CodeIndexRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
   MountsIndexRoute: typeof MountsIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
@@ -554,20 +528,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsAgentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/code/': {
-      id: '/code/'
-      path: '/code'
-      fullPath: '/code/'
-      preLoaderRoute: typeof CodeIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/code/$sessionId': {
-      id: '/code/$sessionId'
-      path: '/code/$sessionId'
-      fullPath: '/code/$sessionId'
-      preLoaderRoute: typeof CodeSessionIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/knowledge/': {
       id: '/knowledge/'
       path: '/knowledge'
@@ -665,12 +625,10 @@ const rootRouteChildren: RootRouteChildren = {
   TasksRoute: TasksRoute,
   TokenMaxingRoute: TokenMaxingRoute,
   AgentsAgentIdRoute: AgentsAgentIdRouteWithChildren,
-  CodeSessionIdRoute: CodeSessionIdRoute,
   KnowledgeGraphRoute: KnowledgeGraphRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   AgentsIndexRoute: AgentsIndexRoute,
-  CodeIndexRoute: CodeIndexRoute,
   KnowledgeIndexRoute: KnowledgeIndexRoute,
   MountsIndexRoute: MountsIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,

@@ -3,8 +3,8 @@ import { useEffect } from 'react'
 import { SIDEBAR_MODES } from '@/components/layout/mode-tabs'
 
 /**
- * Registers global ⌃1 / ⌃2 / ⌃3 / ⌃4 shortcuts for switching between the
- * four top-level surfaces (Console / Knowledge / Chat / Code).
+ * Registers global ⌃1 / ⌃2 / ⌃3 shortcuts for switching between the three
+ * top-level surfaces (Console / Knowledge / Chat).
  *
  * Uses Control+number (not ⌘+number) because every major browser binds
  * ⌘1-⌘9 to browser-tab switching — a menu-level shortcut that fires
@@ -26,7 +26,7 @@ export function useTabShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return
-      const idx = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(e.code)
+      const idx = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code)
       if (idx === -1 || idx >= SIDEBAR_MODES.length) return
       const mode = SIDEBAR_MODES[idx]
       if (!mode) return

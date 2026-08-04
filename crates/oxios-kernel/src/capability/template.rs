@@ -58,23 +58,6 @@ impl CapabilityTemplate {
         t
     }
 
-    /// **Coder** — coding-focused execution capability.
-    ///
-    /// Shell exec only. File tools (read/write/edit/grep/find/ls) are
-    /// always-on SDK tools not gated by CSpace, so they need no entry.
-    /// Intentionally excludes browser, memory, A2A, and all other
-    /// kernel domain tools — this agent is laser-focused on code.
-    pub fn coder() -> Self {
-        let mut t = Self { caps: Vec::new() };
-        t.caps.push((
-            ResourceRef::Exec {
-                mode: "shell".into(),
-            },
-            Rights::EXECUTE | Rights::READ,
-        ));
-        t
-    }
-
     /// **Standard** — worker + memory read access.
     ///
     /// Suitable for most agents that need to recall but not modify

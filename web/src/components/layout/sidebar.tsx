@@ -5,7 +5,6 @@ import {
   Bot,
   Brain,
   CheckSquare,
-  Code2,
   FilePlus,
   Flame,
   FolderKanban,
@@ -201,11 +200,11 @@ export function Sidebar() {
       </div>
 
       <Separator />
+
       <nav className="flex-1 overflow-y-auto p-2">
         {mode === 'console' && <ConsoleNav />}
         {mode === 'knowledge' && <KnowledgeNav />}
         {mode === 'chat' && <ChatSessionNav />}
-        {mode === 'code' && <CodeNav />}
       </nav>
 
       <Separator />
@@ -622,58 +621,5 @@ function NavItemLink({
     </Tooltip>
   ) : (
     <React.Fragment key={item.href}>{link}</React.Fragment>
-  )
-}
-
-// ── Code Nav ─────────────────────────────────────────────────
-
-/**
- * Placeholder sidebar nav for the Code Workspace mode.
- *
- * Renders an "Open Project" action and an empty sessions list. The real
- * session list and project picker will be wired up in a follow-up
- * scaffold pass — keep this minimal so the route + mode toggle work
- * end-to-end today.
- */
-function CodeNav() {
-  const { t } = useTranslation()
-  const { collapsed } = useSidebarStore()
-
-  if (collapsed) {
-    return (
-      <div className="flex flex-col items-center gap-1 py-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className={cn(itemCollapsedBase, itemInactive)}
-              title={t('code.openProject')}
-            >
-              <FolderOpen className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">{t('code.openProject')}</TooltipContent>
-        </Tooltip>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <div className={sectionGap}>
-        <Button variant="outline" className="w-full justify-start" size="sm">
-          <FolderOpen className="mr-2 h-4 w-4" />
-          {t('code.openProject')}
-        </Button>
-      </div>
-
-      <div className={sectionSeparator} />
-
-      <div className="flex items-center gap-2 px-2 mb-1">
-        <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
-        <p className={sectionHeader}>{t('code.sessions')}</p>
-      </div>
-      <div className="px-2 py-1 text-xs text-sidebar-foreground/50">{t('code.noSessions')}</div>
-    </>
   )
 }

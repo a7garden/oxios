@@ -535,12 +535,6 @@
     "hintEntity": "entity",
     "hintClose": "close"
   },
-  "code": {
-    "openProject": "Open Project",
-    "newSession": "New Session",
-    "sessions": "Sessions",
-    "noSessions": "No sessions yet"
-  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -2033,8 +2027,7 @@
   "sidebar": {
     "console": "Console",
     "knowledge": "Knowledge",
-    "chat": "Chat",
-    "code": "Code"
+    "chat": "Chat"
   },
   "skills": {
     "title": "Skills",
