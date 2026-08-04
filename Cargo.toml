@@ -236,9 +236,8 @@ oxibrowser = "0.16"
 snow = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
-qrcode = { workspace = true, optional = true }
+qrcode = { workspace = true, optional = true, features = ["svg"] }
 local-ip-address = { workspace = true, optional = true }
-
 [dev-dependencies]
 oxios-ouroboros = { version = "1.36.0", path = "crates/oxios-ouroboros" }
 chrono = { workspace = true }

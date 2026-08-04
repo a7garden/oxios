@@ -3,6 +3,7 @@
 
 pub mod devices;
 pub mod identity;
+pub mod pairing;
 
 use anyhow::Result;
 use oxios_gateway::surface::{Surface, SurfaceContext, SurfaceHandle};
