@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-08-04
+
+### Added
+- **Code workspace mode (kernel/gateway/web)** — Full in-browser IDE as the
+  4th top-level mode (⌃4). New `code` persona + `coder` CSpace (shell exec only).
+  Backend: PTY manager, code session & change tracker, checkpoint system,
+  `CodeApi` facade, `/api/code/*` REST + WebSocket terminal, coder CSpace
+  resolution, file-system search/read/write/move endpoints, and agent
+  messaging endpoint. Frontend: file explorer, code editor with tabs,
+  agent conversation panel, resizable panels, project canvas visualization,
+  change review system with diff viewer and accept/reject, quick file open
+  (⌘P) with fuzzy search, and workspace layout/persistence.
+
 ## [1.35.0] - 2026-08-02
 
 ### Added
