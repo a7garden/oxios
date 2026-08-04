@@ -152,8 +152,10 @@ allow_list = []
 format = "pretty"
 # Log level override. Falls back to RUST_LOG env var, then "info".
 # level = "info"
-
-[channels]
+[surfaces]
+# Surfaces started by `oxios serve`. The default ("web") is the HTTP API /
+# dashboard. Add "remote" to enable the E2EE companion surface (RFC-044),
+# or start it ad-hoc with `oxios serve --remote`.
 enabled = ["web"]
 
 # Telegram channel settings (when enabled)
@@ -362,4 +364,24 @@ preset = "balanced"
 # enabled = true
 # provider = "fal"
 # default_model = "fal-ai/flux/schnell"
-# default_num = 1
+
+
+# ── Remote companion surface (RFC-044) ────────────────────────────────────
+# E2EE WebSocket surface for paired mobile / web clients. Disabled by
+# default — opt in via either:
+#   * Config (persistent): set `[remote] enabled = true` and add "remote"
+#     to `[surfaces].enabled` above.
+#   * CLI (per-invocation): `oxios serve --remote [--pairing-address host]`.
+#
+# Pairing flow:
+#   1. `oxios serve --remote` prints a single readiness JSON line on stdout
+#      (`pairing_url` + `device_id`) plus an SVG QR on stderr.
+#   2. A mobile client scans the QR or opens `oxios://pair?code=...`.
+#   3. Both sides complete Noise_XX; the client is then authorized.
+#
+# [remote]
+# enabled = true
+# port = 6768                                # WS bind port (default: 6768, orca-compatible)
+# pairing_address = "100.64.1.20"            # advertised host (or host:port). Wildcards rejected.
+#                                          # Leave commented for auto-detect:
+#                                          # `tailscale ip -4` → OS hostname.

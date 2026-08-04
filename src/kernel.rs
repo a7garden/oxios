@@ -480,6 +480,27 @@ impl Kernel {
         &self.config
     }
 
+    /// Apply CLI overrides for the E2EE remote companion surface (RFC-044 §6.2).
+    ///
+    /// Wired into `cmd_serve` so `oxios serve --remote [--pairing-address host]`
+    /// flips the in-memory kernel config without touching `config.toml` on
+    /// disk. The daemonized path is unaffected — that one re-reads
+    /// `config.toml` itself, so users must set `[remote]` there.
+    ///
+    /// `enabled = true` is required to start `RemoteRpcSurface`; the
+    /// surface-name `"remote"` must also be present in `[surfaces].enabled`
+    /// (defaulted to `[]`) for `activate_surfaces` to pick it up.
+    #[cfg(feature = "remote")]
+    pub fn apply_remote_overrides(&mut self, enabled: bool, pairing_address: Option<String>) {
+        self.config.remote.enabled = enabled;
+        if let Some(addr) = pairing_address {
+            self.config.remote.pairing_address = Some(addr);
+        }
+        let surfaces = self.config.surfaces.get_or_insert_with(Default::default);
+        if !surfaces.enabled.iter().any(|n| n == "remote") {
+            surfaces.enabled.push("remote".to_string());
+        }
+    }
     /// Orchestrator reference — for hot-reload config propagation.
     #[allow(dead_code)]
     pub fn orchestrator(&self) -> &Arc<Orchestrator> {

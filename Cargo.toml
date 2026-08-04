@@ -134,7 +134,7 @@ lettre = { version = "0.11", default-features = false, features = ["tokio1-rustl
 # CLI / interactive
 inquire = "0.9"
 console = "0.15"
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 libc = "0.2"
 
 # Temp files
@@ -163,7 +163,7 @@ tokio-tungstenite = "0.24"
 base64 = "0.22"
 qrcode = "0.14"
 local-ip-address = "0.6"
-
+hostname = "0.4"
 [features]
 default = ["web", "cli", "browser", "sqlite-memory"]
 # web: HTTP API server (Axum). Source: src/api/ (merged from surface/oxios-web per RFC-026)
@@ -179,7 +179,7 @@ sqlite-memory = ["oxios-kernel/sqlite-memory"]
 embedding-gguf = ["oxios-kernel/embedding-gguf"]
 
 # remote: E2EE companion surface (RFC-044). Opt-in — not in default.
-remote = ["dep:snow", "dep:tokio-tungstenite", "dep:base64", "dep:qrcode", "dep:local-ip-address"]
+remote = ["dep:snow", "dep:tokio-tungstenite", "dep:base64", "dep:qrcode", "dep:local-ip-address", "dep:hostname"]
 
 [dependencies]
 oxios-kernel = { version = "1.36.0", path = "crates/oxios-kernel", default-features = false }
@@ -239,6 +239,7 @@ tokio-tungstenite = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 qrcode = { workspace = true, optional = true, features = ["svg"] }
 local-ip-address = { workspace = true, optional = true }
+hostname = { workspace = true, optional = true }
 [dev-dependencies]
 oxios-ouroboros = { version = "1.36.0", path = "crates/oxios-ouroboros" }
 chrono = { workspace = true }

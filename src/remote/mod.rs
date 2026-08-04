@@ -7,6 +7,7 @@ pub mod identity;
 pub mod noise;
 pub mod pairing;
 pub mod rpc;
+pub mod serve;
 pub mod transport;
 
 use std::sync::Arc;

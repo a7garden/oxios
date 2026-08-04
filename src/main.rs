@@ -77,7 +77,19 @@ struct Cli {
 enum Command {
     /// Start the daemon (default when no command is given).
     #[command(visible_alias("serve"))]
-    Start,
+    Start {
+        /// Enable the E2EE remote companion surface (RFC-044).
+        ///
+        /// Equivalent to setting `[remote] enabled = true` and ensuring
+        /// `"remote"` is in `[surfaces].enabled`. Honors `OXIOS_REMOTE=1`.
+        #[arg(long, env = "OXIOS_REMOTE")]
+        remote: bool,
+        /// Advertised pairing host (`--pairing-address host` or `host:port`).
+        /// Wildcards (`0.0.0.0`, `::`, `*`) are rejected — they cannot be
+        /// advertised. Default: `tailscale ip -4` → OS hostname → none.
+        #[arg(long)]
+        pairing_address: Option<String>,
+    },
 
     /// Stop the running daemon.
     Stop,
@@ -2090,7 +2102,7 @@ async fn run(cli: Cli) -> Result<()> {
     // Commands that need the kernel assembled (and therefore credentials).
     let needs_kernel = matches!(
         cli.command.as_ref(),
-        None | Some(Command::Start)
+        None | Some(Command::Start { .. })
             | Some(Command::Run { .. })
             | Some(Command::Chat)
             | Some(Command::Status)
@@ -2123,7 +2135,7 @@ async fn run(cli: Cli) -> Result<()> {
     let _ = term.write_str(&format!("  {} Starting Oxios...\r", style("⠋").cyan()));
     let _ = term.flush();
 
-    let kernel = Kernel::builder()
+    let mut kernel = Kernel::builder()
         .config_path(config_path.clone())
         .build()
         .await?;
@@ -2133,13 +2145,30 @@ async fn run(cli: Cli) -> Result<()> {
     // ── Dispatch subcommands ──
     match cli.command.as_ref() {
         // Default / start: launch daemon
-        None | Some(Command::Start) => {
-            let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
-            if cli.foreground {
-                cmd_serve(&kernel, &config_path).await
-            } else {
-                daemon.start(&config_path, config.gateway.port)
-            }
+        None => {
+            start_daemon(
+                &mut kernel,
+                &config,
+                &config_path,
+                false,
+                None,
+                cli.foreground,
+            )
+            .await
+        }
+        Some(Command::Start {
+            remote,
+            pairing_address,
+        }) => {
+            start_daemon(
+                &mut kernel,
+                &config,
+                &config_path,
+                *remote,
+                pairing_address.clone(),
+                cli.foreground,
+            )
+            .await
         }
 
         Some(Command::Restart) => {
@@ -3061,6 +3090,35 @@ fn acquire_instance_lock(_pid_file: &Path) -> Result<()> {
 
 // ─── Server mode (foreground) ────────────────────────────────────────────────
 
+/// Dispatch entry-point for `oxios start` / `oxios serve` and the bare
+/// `oxios` default. Splits the daemonized vs foreground path; the foreground
+/// path honors `--remote` / `--pairing-address` by mutating the in-memory
+/// kernel config (the daemonized path reads `config.toml` itself).
+async fn start_daemon(
+    kernel: &mut Kernel,
+    config: &OxiosConfig,
+    config_path: &Path,
+    remote: bool,
+    pairing_address: Option<String>,
+    foreground: bool,
+) -> Result<()> {
+    if remote {
+        #[cfg(feature = "remote")]
+        kernel.apply_remote_overrides(true, pairing_address);
+        #[cfg(not(feature = "remote"))]
+        {
+            let _ = pairing_address; // suppress unused
+            tracing::warn!("--remote requested but `remote` feature is disabled; ignoring");
+        }
+    }
+    let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+    if foreground {
+        cmd_serve(kernel, config_path).await
+    } else {
+        daemon.start(config_path, config.gateway.port)
+    }
+}
+
 async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     // ── Single-instance guard ──────────────────────────────────────────
     // Acquire an exclusive advisory lock BEFORE any background task starts.
@@ -3197,6 +3255,18 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
             .await?;
     let channel_tasks = activate_channels(kernel, config_path).await?;
 
+    // ── RFC-044 §6.7: emit readiness contract when --remote is active ───────
+    // Best-effort: failures (e.g. workspace state dir unreadable) only log a
+    // warning — they MUST NOT crash the serve path. The single JSON line is
+    // scraped by automation / future `oxios pair` UX; the pairing URL is
+    // printed verbatim for manual QR workflows.
+    #[cfg(feature = "remote")]
+    {
+        let remote_cfg = &kernel.config().remote;
+        if remote_cfg.enabled && surfaces.iter().any(|s| s.name == "remote") {
+            print_remote_readiness(kernel, config_path);
+        }
+    }
     // Start guardian (RFC-024 SP3 + RFC-040 A: heartbeat watchdog for hang
     // detection) and daily health check. Both handles are tracked as
     // secondary safety nets for clean exits (audit F-14: health check was
@@ -3315,7 +3385,74 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     }
 }
 
-// ─── Channel plugin helpers ───────────────────────────────────────────────
+// ─── Remote companion surface — readiness contract (RFC-044 §6.7) ────────────
+//
+// Best-effort: any failure (unreadable state dir, identity load error,
+// QR generation failure) logs a warning and returns — the serve path
+// must NOT crash on a pairing-UX hiccup. The single JSON line is the
+// automation contract; the pairing URL is printed for manual QR workflows.
+#[cfg(feature = "remote")]
+fn print_remote_readiness(kernel: &Kernel, _config_path: &Path) {
+    use crate::remote::endpoints::{build_offer_endpoints, enumerate_direct};
+    use crate::remote::identity::DeviceIdentity;
+    use crate::remote::pairing::PairingOffer;
+    use crate::remote::serve::{ReadinessContract, resolve_advertised};
+
+    let cfg = kernel.config();
+    let port = cfg.remote.port;
+    let bound_endpoint = format!("ws://127.0.0.1:{port}");
+
+    let advertised_endpoint = resolve_advertised(cfg.remote.pairing_address.as_deref(), port);
+
+    // Load identity + endpoints from disk — same path the surface uses. Any
+    // failure here is logged but does not propagate; the readiness contract
+    // simply omits the pairing URL.
+    let workspace = std::path::PathBuf::from(&cfg.kernel.workspace);
+    let state_dir = workspace.join("state");
+    let (device_id, pairing_url) = match DeviceIdentity::load_or_create(&state_dir) {
+        Ok(identity) => {
+            let endpoints = enumerate_direct(port);
+            let offer_endpoints = build_offer_endpoints(&endpoints);
+            let primary = advertised_endpoint
+                .clone()
+                .unwrap_or_else(|| format!("ws://127.0.0.1:{port}"));
+            let device_id = identity.device_id();
+            let offer = PairingOffer {
+                v: 1,
+                endpoint: primary,
+                device_id: device_id.clone(),
+                public_key_b64: identity.public_key_b64(),
+                endpoints: offer_endpoints,
+                scope: "mobile".to_string(),
+            };
+            let url = offer.encode_url();
+            // Best-effort QR — if rendering fails (e.g. payload too long for
+            // the qrcode crate), we still print the URL.
+            if let Ok(svg) = offer.qr_svg() {
+                eprintln!();
+                eprintln!("── Remote pairing QR ────────────────────────────────");
+                for line in svg.lines().take(18) {
+                    eprintln!("{line}");
+                }
+                eprintln!("────────────────────────────────────────────────────");
+            }
+            (device_id, Some(url))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "remote identity load failed; pairing URL omitted");
+            ("0000000000000000".to_string(), None)
+        }
+    };
+
+    let contract =
+        ReadinessContract::new(bound_endpoint, advertised_endpoint, pairing_url, device_id);
+    let line = contract.to_json_line();
+    println!("{line}");
+    // Hint to humans tailing stdout: the JSON line is for tooling.
+    eprintln!(
+        "(remote) readiness contract written to stdout; scrape the single JSON line above for pairing details."
+    );
+}
 
 fn build_channel_plugins() -> Vec<Box<dyn ChannelPlugin>> {
     let plugins: Vec<Box<dyn ChannelPlugin>> = vec![];
