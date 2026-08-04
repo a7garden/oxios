@@ -6,6 +6,7 @@ pub mod endpoints;
 pub mod identity;
 pub mod noise;
 pub mod pairing;
+pub mod rpc;
 pub mod transport;
 
 use anyhow::Result;
