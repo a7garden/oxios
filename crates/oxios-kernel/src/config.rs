@@ -1240,9 +1240,17 @@ pub struct RemoteConfig {
     #[serde(default)]
     pub pairing_address: Option<String>,
 }
-fn default_remote_port() -> u16 { 6768 }
+fn default_remote_port() -> u16 {
+    6768
+}
 impl Default for RemoteConfig {
-    fn default() -> Self { Self { enabled: false, port: default_remote_port(), pairing_address: None } }
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: default_remote_port(),
+            pairing_address: None,
+        }
+    }
 }
 /// RFC-024 SP1: in-memory replay buffer tuning.
 #[derive(Debug, Clone, Serialize, Deserialize)]

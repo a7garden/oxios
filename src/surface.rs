@@ -14,6 +14,7 @@ use tokio_util::sync::CancellationToken;
 use crate::kernel::Kernel;
 
 /// Build the list of available surfaces.
+#[allow(clippy::vec_init_then_push)]
 pub fn build_surfaces() -> Vec<Box<dyn Surface>> {
     let mut surfaces: Vec<Box<dyn Surface>> = Vec::new();
     #[cfg(feature = "web")]

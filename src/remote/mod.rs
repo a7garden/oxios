@@ -9,15 +9,21 @@ pub struct RemoteRpcSurface;
 
 impl RemoteRpcSurface {
     /// Create a new remote surface instance.
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 impl Default for RemoteRpcSurface {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait::async_trait]
 impl Surface for RemoteRpcSurface {
-    fn name(&self) -> &str { "remote" }
+    fn name(&self) -> &str {
+        "remote"
+    }
     async fn start(&self, _ctx: SurfaceContext) -> Result<SurfaceHandle> {
         // Wired in Task 9.
         Err(anyhow::anyhow!("RemoteRpcSurface not yet implemented"))
