@@ -2,6 +2,7 @@
 #![cfg(feature = "remote")]
 
 pub mod devices;
+pub mod endpoints;
 pub mod identity;
 pub mod pairing;
 
