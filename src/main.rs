@@ -3093,11 +3093,14 @@ fn acquire_instance_lock(_pid_file: &Path) -> Result<()> {
 /// Dispatch entry-point for `oxios start` / `oxios serve` and the bare
 /// `oxios` default. Splits the daemonized vs foreground path.
 ///
-/// `--remote` forces the foreground path: the daemonized child re-reads
-/// `config.toml` and would never receive the in-memory override, so the
-/// readiness JSON + pairing URL would silently disappear. To run the
-/// remote surface under the long-lived daemon, set `[remote]` in
-/// `config.toml` instead of passing `--remote` on the CLI.
+/// `--remote` forces the foreground path **only when the `remote` feature is
+/// compiled in**: the daemonized child re-reads `config.toml` and would never
+/// receive the in-memory override, so the readiness JSON + pairing URL would
+/// silently disappear. To run the remote surface under the long-lived daemon,
+/// set `[remote]` in `config.toml` instead of passing `--remote` on the CLI.
+///
+/// In a default (feature-off) build, `--remote` is genuinely ignored: the
+/// "feature disabled" warning fires and the daemon is started normally.
 async fn start_daemon(
     kernel: &mut Kernel,
     config: &OxiosConfig,
@@ -3106,14 +3109,16 @@ async fn start_daemon(
     pairing_address: Option<String>,
     foreground: bool,
 ) -> Result<()> {
-    if remote {
-        #[cfg(feature = "remote")]
+    // Only honor --remote when the feature is compiled in; otherwise it is a
+    // true no-op and we keep the original daemonize-by-default behavior.
+    #[cfg(feature = "remote")]
+    let effective_remote = remote;
+    #[cfg(not(feature = "remote"))]
+    let effective_remote = false;
+
+    #[cfg(feature = "remote")]
+    if effective_remote {
         kernel.apply_remote_overrides(true, pairing_address);
-        #[cfg(not(feature = "remote"))]
-        {
-            let _ = pairing_address; // suppress unused
-            tracing::warn!("--remote requested but `remote` feature is disabled; ignoring");
-        }
         if !foreground {
             eprintln!("--remote implies --foreground: running in foreground so the readiness JSON");
             eprintln!("  + pairing URL print here. For daemon mode, set [remote] in config.toml");
@@ -3123,8 +3128,16 @@ async fn start_daemon(
             );
         }
     }
+    #[cfg(not(feature = "remote"))]
+    if remote {
+        // --remote is genuinely a no-op in feature-off builds: we cannot
+        // apply the override, so warn and fall through to the daemonized
+        // path (which reads config.toml and ignores the flag).
+        let _ = pairing_address;
+        tracing::warn!("--remote requested but `remote` feature is disabled; ignoring");
+    }
     let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
-    if foreground || remote {
+    if foreground || effective_remote {
         cmd_serve(kernel, config_path).await
     } else {
         daemon.start(config_path, config.gateway.port)
