@@ -398,6 +398,22 @@ impl OxiosEngineBuilder {
         self
     }
 
+    /// Wire lifecycle hook specs into the underlying OxicodeBuilder.
+    ///
+    /// Called from both [`build`](Self::build) and
+    /// [`build_with_routing`](Self::build_with_routing) so the legacy
+    /// `routing_enabled` path receives hooks too. No-op when no specs are
+    /// configured.
+    fn wire_hooks(mut self) -> Self {
+        if let Some(specs) = &self.hook_specs {
+            if !specs.is_empty() {
+                let runner = Arc::new(crate::hook_runner::CommandHookRunner::new(specs.clone()));
+                self.inner = self.inner.with_hooks(runner);
+            }
+        }
+        self
+    }
+
     /// Build the engine.
     ///
     /// If a router was configured via [`with_router`](Self::with_router), this
@@ -405,15 +421,9 @@ impl OxiosEngineBuilder {
     /// entries for each configured profile so `resolve_model("router/<profile>")`
     /// succeeds.
     pub fn build(mut self) -> OxiosEngine {
-        if let Some(specs) = &self.hook_specs {
-            if !specs.is_empty() {
-                let runner = Arc::new(crate::hook_runner::CommandHookRunner::new(specs.clone()));
-                self.inner = self.inner.with_hooks(runner);
-            }
-        }
+        self = self.wire_hooks();
 
         let oxi = self.inner.build();
-        let default_model_id = self.default_model_id.clone();
 
         // Register router if configured.
         if let Some(router_cfg) = &self.router_config {
@@ -441,7 +451,7 @@ impl OxiosEngineBuilder {
 
         OxiosEngine {
             oxi,
-            default_model_id,
+            default_model_id: self.default_model_id.clone(),
             routing_control: None,
             // RFC-014 Phase D: optional, off by default
             authorizer: self.authorizer,
@@ -456,20 +466,21 @@ impl OxiosEngineBuilder {
     pub fn build_with_routing(self) -> (OxiosEngine, oxicode_sdk::RoutingControl) {
         use oxicode_sdk::RoutingControl;
 
+        let this = self.wire_hooks();
+
         let routing_config = oxicode_sdk::routing::RoutingConfig::default();
         let routing_control = RoutingControl::new(routing_config);
         let engine = OxiosEngine {
-            oxi: self.inner.build(),
-            default_model_id: self.default_model_id,
+            oxi: this.inner.build(),
+            default_model_id: this.default_model_id,
             routing_control: Some(routing_control.clone()),
             // RFC-014 Phase D: optional, off by default
-            authorizer: self.authorizer,
-            tracer: self.tracer,
-            cost_tracker: self.cost_tracker,
+            authorizer: this.authorizer,
+            tracer: this.tracer,
+            cost_tracker: this.cost_tracker,
         };
         (engine, routing_control)
     }
-
     // ── RFC-014 Phase D: engine-level observability/security handles ──
     //
     // These methods let callers attach shared `Authorizer` / `Tracer` /
