@@ -4,7 +4,7 @@
 # ── Secrets (API keys, tokens, passwords) ─────────────────────────────────
 # All sensitive values in one place.
 # Environment variables serve as fallback when not set here.
-# Priority: config.toml → ~/.oxi/auth.json → env var
+# Priority: config.toml → ~/.oxicode/auth.json → env var
 #
 # [secrets]
 # # Web API authentication key (falls back to OXIOS_API_KEY env var)
@@ -36,7 +36,7 @@ max_agents = 10
 # MUST be set before first run — onboarding wizard will prompt if empty.
 # default_model = ""
 # Explicit API key (highest priority).
-# If empty, falls back to ~/.oxi/auth.json, then environment variables.
+# If empty, falls back to ~/.oxicode/auth.json, then environment variables.
 # api_key = ""
 # Enable complexity-based model routing.
 # routing_enabled = false
@@ -344,7 +344,7 @@ preset = "balanced"
 # Lets agents generate images via the `image_generation` tool. Opt-in.
 # Uses an OpenAI-compatible /v1/images/generations endpoint — the API key is
 # resolved through the SAME chain as the chat engine (env → [engine].api_key
-# → ~/.oxios/auth.json → ~/.oxi/auth.json), so no separate credential is needed.
+# → ~/.oxios/auth.json → ~/.oxicode/auth.json), so no separate credential is needed.
 # Disabled by default; uncomment and set enabled = true to opt in.
 #
 # [image-gen]

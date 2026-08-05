@@ -2,9 +2,9 @@
 # findings that are intentionally outside the default runtime surface.
 [advisories]
 ignore = [
-    # No upstream constant-time fix is available; RSA is transitive via oxi-ai.
+    # No upstream constant-time fix is available; RSA is transitive via oxicode-ai.
     "RUSTSEC-2023-0071",
-    # These remain transitive/unmaintained in the current oxi-sdk dependency graph.
+    # These remain transitive/unmaintained in the current oxicode-sdk dependency graph.
     "RUSTSEC-2024-0436",
     "RUSTSEC-2025-0046",
     "RUSTSEC-2025-0057",

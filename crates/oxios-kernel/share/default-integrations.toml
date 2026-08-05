@@ -8,7 +8,7 @@
 # Credential model: `resolver` selects the resolution path.
 #   none   — no credential (package managers)
 #   secret — CredentialStore::resolve_secret(store_key, env_var): raw env var →
-#            oxios auth store → oxi-cli store
+#            oxios auth store → oxicode-cli store
 #   oauth  — device-code flow → TokenBundle under store_key (Phase 3)
 #
 # LLM providers (anthropic/openai/google) are intentionally ABSENT — they are

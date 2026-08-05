@@ -86,7 +86,7 @@ jobs:
   # Topological order (oxios AGENTS.md §Release):
   #   ① oxios-markdown   (no oxios deps)
   #      oxios-mcp        (no oxios deps)
-  #      oxios-ouroboros  (no oxios deps, depends on oxi-sdk — external)
+  #      oxios-ouroboros  (no oxios deps, depends on oxicode-sdk — external)
   #      oxios-memory     (no oxios deps)
   #   ② oxios-calendar   → oxios-markdown
   #   ③ oxios-kernel     → {ouroboros, markdown, calendar, mcp, memory}

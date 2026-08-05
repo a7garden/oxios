@@ -10,7 +10,7 @@ unmaintained = "transitive"
 unsound = "transitive"
 yanked = "warn"
 ignore = [
-    { id = "RUSTSEC-2023-0071", reason = "No upstream constant-time fix; transitive via oxi-ai." },
+    { id = "RUSTSEC-2023-0071", reason = "No upstream constant-time fix; transitive via oxicode-ai." },
     { id = "RUSTSEC-2025-0119", reason = "Unmaintained transitive dependency owned by upstream." },
     { id = "RUSTSEC-2024-0436", reason = "Unmaintained transitive dependency owned by upstream." },
     { id = "RUSTSEC-2026-0192", reason = "Unmaintained transitive dependency owned by upstream." },
