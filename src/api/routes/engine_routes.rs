@@ -11,8 +11,8 @@ use serde::Deserialize;
 use crate::api::error::AppError;
 use crate::api::server::AppState;
 use oxios_kernel::kernel_handle::engine_api::{
-    ConnectionCheckResult, CustomProviderDef, ModelListSettings, ProviderConfigResponse,
-    ProviderInfo, ProviderSettings,
+    ConnectionCheckResult, CustomProviderDef, InputModality, ModelInfo, ModelListSettings,
+    ProviderConfigResponse, ProviderInfo, ProviderSettings,
 };
 
 // ── Request types ───────────────────────────────────────────────────────────
@@ -121,12 +121,37 @@ pub(crate) async fn handle_engine_models(
             } else {
                 connected
             };
-            let mut all_models = Vec::new();
+            let mut all_models: Vec<oxios_kernel::ModelInfo> = Vec::new();
             let mut seen = std::collections::HashSet::new();
             for p in providers {
                 for m in state.kernel.engine.models(&p.id, None) {
                     if seen.insert(m.id.clone()) {
                         all_models.push(m);
+                    }
+                }
+            }
+            // Multi-model router (SDK 0.66.0): surface router profile models
+            // so the Web UI model picker can select "router/auto" etc.
+            if let Some(router_cfg) = &state.config.read().engine.router {
+                if router_cfg.enabled {
+                    for (name, _profile) in &router_cfg.profiles {
+                        let id = format!("router/{}", name);
+                        if seen.insert(id.clone()) {
+                            all_models.push(ModelInfo {
+                                id,
+                                name: format!("Router {}", name),
+                                api: "openai-completions".to_string(),
+                                provider: "router".to_string(),
+                                reasoning: false,
+                                input: vec![InputModality::Text],
+                                context_window: 128_000,
+                                max_tokens: 32_000,
+                                cost_input: 0.0,
+                                cost_output: 0.0,
+                                cost_cache_read: 0.0,
+                                cost_cache_write: 0.0,
+                            });
+                        }
                     }
                 }
             }

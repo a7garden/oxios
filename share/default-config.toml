@@ -45,6 +45,28 @@ max_agents = 10
 # Fallback models to try when primary fails.
 # fallback_models = ["anthropic/claude-3-5-haiku-20241022"]
 
+# ── Multi-Model Router (SDK 0.66.0) ───────────────────────────────────────
+# When enabled, the engine automatically selects the best model for each
+# task based on complexity signals. The router registers as provider
+# "router" with profile models like "router/auto", "router/budget".
+[engine.router]
+enabled = false
+# default_profile = "auto"
+# classifier_model = "anthropic/claude-haiku-4-20250514"
+# max_session_budget = 5.0
+# context_upgrade_threshold = 50000
+
+# [engine.router.scoring]
+# structural = 0.25
+# behavioral = 0.20
+# context = 0.15
+# vision = 0.10
+# message = 0.30
+
+# [engine.router.profiles.auto.tiers]
+# fast = { model = "anthropic/claude-haiku-4-20250514" }
+# balanced = { model = "anthropic/claude-sonnet-4-20250514" }
+# strong = { model = "anthropic/claude-opus-4-20250514" }
 [daemon]
 # PID file for background daemon.
 # pid_file = "~/.oxios/oxios.pid"
