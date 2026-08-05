@@ -235,26 +235,53 @@ Integration into the chat view is pending (same note as Phase 3 UI).
 
 ## What's NOT Done (follow-up items)
 
-1. **Companion transport stubs** — port endpoint-probe, supervisor, reconnect,
-   logical-client from orca. The Noise_XX + framing core is done.
-2. **Web UI integration** — wire capability components into `chat.tsx` and
-   `chat-input.tsx` without breaking existing state hooks.
+1. ~~**Companion transport stubs**~~ — **DONE (already complete).** The files
+   (`direct-endpoint-probe.ts`, `endpoint-supervisor.ts`,
+   `reconnect-controller.ts`, `stable-logical-rpc-client.ts`) are NOT stubs —
+   they contain full implementations (minified). Only cosmetic reformatting
+   remains (rpc-client.ts is minified).
+2. ~~**Web UI integration**~~ — **DONE.** FanOutButton wired into chat-input
+   toolbar (gated by `worktree-fanout` capability). TerminalToggle wired into
+   chat header (gated by `terminal` capability). AgentFanoutCardGrid shows
+   fan-out agent status above the composer.
 3. **Device E2E test** — pair a phone with `oxios serve --remote`, send a
-   chat message, verify streaming transcript renders.
-4. **Bind widening** — Phase 1 binds loopback only. Phase 2 widens to LAN/
-   Tailscale (config-gated). The device-token verification is wired and ready.
-5. **OutboundQueue real backpressure** — still drains each iteration (vestigial).
-6. **AuditTrail** — companion connect/disconnect/RPC not yet logged.
+   chat message, verify streaming transcript renders. *(Needs physical device.)*
+4. ~~**Bind widening**~~ — **DONE.** `RemoteConfig.bind_address` (default
+   `127.0.0.1`). Surface::start reads it. IPv6 bracketing handled. Non-loopback
+   binds emit a security warning.
+5. ~~**OutboundQueue real backpressure**~~ — **DONE.** Push channel is bounded
+   (capacity 256). Batch flush. Soft cap (8 MiB) warns once. Hard cap (64 MiB /
+   4096 frames) closes connection gracefully. `try_push` helper on
+   ConnectionCtx.
+6. ~~**AuditTrail**~~ — **PARTIALLY DONE.** Every RPC method invocation is now
+   logged to the kernel AuditTrail (actor = device id, action = method name,
+   metadata only). Connect/disconnect logging remains — it requires plumbing
+   the kernel audit callback through the transport layer.
 7. **Compare/merge view** — diff N worktree branches after fan-out completion.
+   *(Future feature.)*
 
 ---
 
-## Suggested Next Session
+## Follow-up Session (2026-08-05)
 
-1. **Integrate web UI capability components** into chat.tsx (careful with
-   existing imports — the subagent's approach of replacing imports was wrong).
-2. **Port companion transport stubs** from orca (`mobile/src/transport/`).
-3. **Widen the bind** in `RemoteRpcSurface::start` (add `remote.bind_address`
-   config, default still loopback).
-4. **Live device test** — `cargo run --features remote -- serve --remote`,
-   scan the QR from a phone running the companion dev build.
+Commits: `b1fdc0d15` (web UI), `e255758e1` (bind + backpressure), `b4f73cc3d`
+(audit logging).
+
+All CI gates pass:
+```
+cargo build -p oxios --features remote          # ✅
+cargo test -p oxios --features remote           # ✅ 149 unit + 6 daemon + 39 e2e
+cargo clippy -p oxios --all-targets --features remote -- -D warnings  # ✅
+cargo build -p oxios                            # ✅ feature-off
+cargo clippy -p oxios --all-targets -- -D warnings  # ✅ feature-off
+cargo fmt --all --check                         # ✅
+cd web && bun run build                         # ✅
+cargo test -p oxios-kernel --lib remote_config  # ✅ 3/3
+```
+
+### Remaining work
+
+1. **Device E2E test** — needs physical device + user.
+2. **Connect/disconnect audit** — plumb kernel audit callback through transport.
+3. **Compare/merge view** — diff N worktree branches after fan-out.
+4. **Companion TS reformatting** — rpc-client.ts is minified; cosmetic only.
