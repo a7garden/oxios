@@ -1,14 +1,14 @@
 //! Image generation provider clients.
 //!
-//! `oxi-sdk` 0.58.0 has no image generation capability — the `Provider`
-//! trait offers only `stream()`/`name()`, and oxi-ai's
+//! `oxicode-sdk` 0.58.0 has no image generation capability — the `Provider`
+//! trait offers only `stream()`/`name()`, and oxicode-ai's
 //! `ImageGenerationRequest`/`ImageGenerationResponse` types are dead code
 //! (defined, never implemented, not re-exported). This module is Oxios's own
 //! image-gen backend, built directly on `reqwest`.
 //!
-//! Type shapes align with the oxi-ai dead types (`types.rs`) so a future
-//! oxi-sdk implementation can replace this module with minimal friction.
-//! Unlike oxi-ai (which returns `Vec<Vec<u8>>` bytes), Oxios always normalizes
+//! Type shapes align with the oxicode-ai dead types (`types.rs`) so a future
+//! oxicode-sdk implementation can replace this module with minimal friction.
+//! Unlike oxicode-ai (which returns `Vec<Vec<u8>>` bytes), Oxios always normalizes
 //! results to URLs — agents consume images as markdown `![](url)`.
 
 mod fal;

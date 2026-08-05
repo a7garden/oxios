@@ -241,7 +241,7 @@ impl Orchestrator {
     /// - the ordered list of active [`MountId`]s,
     /// - the rendered `## Workspace Context` body (without the header),
     /// - all resolved filesystem paths (primary first),
-    /// - a display tag like `[🔧 oxios + oxi-sdk]`.
+    /// - a display tag like `[🔧 oxios + oxicode-sdk]`.
     ///
     /// Honors the sticky-primary model: when `mount_ids` is explicitly
     /// provided they are used as-is (detection is skipped). Detection only
@@ -798,7 +798,7 @@ pub struct OrchestrationResult {
     /// Active Mount IDs for this message (RFC-025), primary first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub active_mount_ids: Vec<MountId>,
-    /// Mount decoration tag for the response (e.g. "[🔧 oxios + oxi-sdk]").
+    /// Mount decoration tag for the response (e.g. "[🔧 oxios + oxicode-sdk]").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mount_tag: Option<String>,
     /// The response to send back to the user.
@@ -998,9 +998,9 @@ mod mount_workspace_tests {
                 MountSource::Manual,
             )
             .unwrap();
-        let oxi_sdk = mm
+        let oxicode_sdk = mm
             .create_mount(
-                "oxi-sdk".to_string(),
+                "oxicode-sdk".to_string(),
                 vec![PathBuf::from("/Users/me/oxi")],
                 MountSource::Manual,
             )
@@ -1011,13 +1011,13 @@ mod mount_workspace_tests {
         // Build a minimal Orchestrator-free resolver path: replicate what
         // resolve_mount_workspace does, but against the manager directly,
         // since the full Orchestrator needs many subsystems.
-        let mounts = mm.get_mounts_ordered(&[oxios.id, oxi_sdk.id]);
+        let mounts = mm.get_mounts_ordered(&[oxios.id, oxicode_sdk.id]);
         assert_eq!(mounts.len(), 2);
 
         let body = build_workspace_context_body(&mounts).unwrap();
         assert!(body.contains("oxios"));
         assert!(body.contains("Agent OS in Rust."));
-        assert!(body.contains("oxi-sdk"));
+        assert!(body.contains("oxicode-sdk"));
 
         // Collect paths like the orchestrator does.
         let mut paths = Vec::new();

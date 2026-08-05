@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use oxi_sdk::observability::{AuditAction, AuditTrail};
+use oxicode_sdk::observability::{AuditAction, AuditTrail};
 use serde::{Deserialize, Serialize};
 
 // ─── Audit Event ────────────────────────────────────────────────────────────

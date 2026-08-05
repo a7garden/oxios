@@ -719,7 +719,7 @@ pub struct EngineConfig {
     /// Per-provider options for fine-grained control (thinking mode, etc.).
     /// Passed through to `AgentLoopConfig::provider_options`.
     #[serde(default)]
-    pub provider_options: Option<oxi_sdk::ProviderOptions>,
+    pub provider_options: Option<oxicode_sdk::ProviderOptions>,
     /// Enable complexity-based model routing.
     /// When enabled, the engine can route simple tasks to cheaper models
     /// and complex tasks to more capable ones.
@@ -2070,7 +2070,7 @@ impl Default for LoggingConfig {
 
 /// Headless browser configuration.
 ///
-/// Engine configuration. Passes through to `oxi-sdk` browser tools.
+/// Engine configuration. Passes through to `oxicode-sdk` browser tools.
 /// with an `enabled` toggle. The engine config is passed through directly
 /// to the browser — no field-by-field duplication.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -2090,9 +2090,9 @@ pub struct BrowserConfig {
     /// js_timeout_ms = 10000
     /// ```
     ///
-    /// [`BrowseConfig`]: oxi_sdk::BrowseConfig
+    /// [`BrowseConfig`]: oxicode_sdk::BrowseConfig
     #[serde(default)]
-    pub engine: oxi_sdk::BrowseConfig,
+    pub engine: oxicode_sdk::BrowseConfig,
 }
 
 fn default_browser_enabled() -> bool {
@@ -2103,7 +2103,7 @@ impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            engine: oxi_sdk::BrowseConfig::default(),
+            engine: oxicode_sdk::BrowseConfig::default(),
         }
     }
 }

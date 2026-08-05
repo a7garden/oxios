@@ -21,7 +21,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -561,7 +561,7 @@ impl AgentTool for ExecTool {
         params: Value,
         shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let mode = params.get("mode").and_then(|v| v.as_str()).ok_or_else(|| {
             "Missing required parameter: mode (expected 'shell' or 'structured')".to_string()
         })?;

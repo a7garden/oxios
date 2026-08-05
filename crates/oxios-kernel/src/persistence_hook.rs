@@ -369,7 +369,7 @@ impl PersistenceHook {
         // Build a lightweight agent via EngineHandle → Oxi → AgentBuilder
         let engine = self.engine_handle.get();
         let model_id = engine.default_model_id().to_string();
-        let agent_config = oxi_sdk::AgentConfig {
+        let agent_config = oxicode_sdk::AgentConfig {
             description: Some("Persistence reflection".into()),
             model_id: model_id.clone(),
             system_prompt: Some("You output JSON only. No explanation.".to_string()),

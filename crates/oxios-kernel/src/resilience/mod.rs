@@ -10,7 +10,7 @@
 //!
 //! # Honest limitation
 //!
-//! The typed `oxi_ai::ProviderError` is stringified at the oxi-agent
+//! The typed `oxicode_ai::ProviderError` is stringified at the oxicode-agent
 //! boundary. Downcasting across that boundary is not possible today, so
 //! `classify` uses Display-string heuristics. See [`classify`] for the
 //! pattern list and its caveats.

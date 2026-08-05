@@ -1,4 +1,4 @@
-//! Agent runtime: wraps oxi-sdk's Agent for directive execution.
+//! Agent runtime: wraps oxicode-sdk's Agent for directive execution.
 //!
 //! The AgentRuntime uses `OxiosEngine.oxi().agent()` (AgentBuilder pattern)
 //! to construct agents with full middleware, observability, and security
@@ -28,9 +28,9 @@
 //! and estimated costs.
 
 use anyhow::Result;
-use oxi_sdk::observability::AuditTrail;
-use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy};
-use oxi_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
+use oxicode_sdk::observability::AuditTrail;
+use oxicode_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy};
+use oxicode_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -50,7 +50,7 @@ use crate::session_context::SessionContext;
 use crate::types::AgentId;
 use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 
-use oxi_sdk::{BreakerState, CircuitBreaker, DefaultCircuitBreaker};
+use oxicode_sdk::{BreakerState, CircuitBreaker, DefaultCircuitBreaker};
 use std::time::Duration;
 
 /// Global LLM circuit breaker — oxi-sdk 0.64 `DefaultCircuitBreaker` (R6).
@@ -122,7 +122,7 @@ pub struct AgentRuntimeConfig {
     /// API key resolved from CredentialStore at build time.
     pub api_key: Option<String>,
     /// Per-provider options for fine-grained control.
-    pub provider_options: Option<oxi_sdk::ProviderOptions>,
+    pub provider_options: Option<oxicode_sdk::ProviderOptions>,
     /// Rate limit for tool calls (requests per minute). 0 = unlimited.
     pub rate_limit_per_minute: usize,
     /// Token budget per agent execution. 0 = unlimited.
@@ -199,7 +199,7 @@ struct ExecuteState {
     total_output_tokens: u64,
 }
 
-/// Runtime that wraps an oxi-sdk `Agent` for executing directives.
+/// Runtime that wraps an oxicode-sdk `Agent` for executing directives.
 ///
 /// Each call to [`AgentRuntime::execute_directive`] creates a fresh `Agent`,
 /// builds a ToolRegistry based on the agent's CSpace, and runs it to completion.
@@ -721,7 +721,7 @@ impl AgentRuntime {
     }
 }
 
-/// Create and run an oxi-sdk `Agent` with CSpace-based tool registration.
+/// Create and run an oxicode-sdk `Agent` with CSpace-based tool registration.
 ///
 /// Uses `engine.oxi().agent()` (AgentBuilder) for full middleware,
 /// observability, and security integration from oxi-sdk 0.23.0.
@@ -798,7 +798,7 @@ async fn run_agent(
         let mut am = kernel_handle.exec.access_manager().lock();
         let perms = am.get_or_create_permissions(&agent_name);
 
-        // 1. CWD -- critical: oxi-sdk resolves relative paths here
+        // 1. CWD -- critical: oxicode-sdk resolves relative paths here
         if let Ok(cwd) = std::env::current_dir() {
             let cwd_pattern = format!("{}/**", cwd.to_string_lossy().trim_end_matches('/'));
             if !perms.allowed_paths.iter().any(|p| p == &cwd_pattern) {
@@ -860,7 +860,7 @@ async fn run_agent(
     // Start distributed trace span for this agent execution.
     let _trace_guard = crate::observability::tracer().start(
         format!("exec-{}", &exec_id.to_string()[..8]).as_str(),
-        oxi_sdk::SpanKind::Agent,
+        oxicode_sdk::SpanKind::Agent,
     );
 
     // ── Register tools based on CSpace (with access gate) ──
@@ -1006,7 +1006,7 @@ async fn run_agent(
 
     // ── Build Agent via AgentBuilder (RFC-014 Phase D) ──
     //
-    // The legacy rate-limited `ProviderPool` path (oxi-sdk `ProviderPool` /
+    // The legacy rate-limited `ProviderPool` path (oxicode-sdk `ProviderPool` /
     // `RateLimitPolicy`) was removed in oxi-sdk 0.61 with no direct
     // replacement; oxios never set `provider_rpm > 0` in production, so the
     // single AgentBuilder path below is the only path. Engine-level
@@ -1027,7 +1027,7 @@ async fn run_agent(
     // after `build()` returns. This keeps CSpace semantics intact.
     //
     // We capture the tool names now and apply them once the agent exists.
-    let cspace_tool_arcs: Vec<Arc<dyn oxi_sdk::AgentTool>> = registry
+    let cspace_tool_arcs: Vec<Arc<dyn oxicode_sdk::AgentTool>> = registry
         .names()
         .into_iter()
         .filter_map(|name| registry.get(&name))
@@ -1228,7 +1228,7 @@ async fn run_agent(
                     stop_reason,
                     ..
                 } => {
-                    if let Some(oxi_sdk::Message::Assistant(a)) = messages.last() {
+                    if let Some(oxicode_sdk::Message::Assistant(a)) = messages.last() {
                         s.final_content = a.text_content();
                     }
                     // oxi 0.32.0: loop exits naturally when LLM produces text-only
@@ -1254,14 +1254,14 @@ async fn run_agent(
                     let agent_label = format!("agent-{agent_id_for_callback}");
                     crate::observability::cost_tracker().record(
                         &agent_label,
-                        &oxi_sdk::Model::new(
+                        &oxicode_sdk::Model::new(
                             &model_id_for_callback,
                             &model_id_for_callback,
-                            oxi_sdk::Api::OpenAiCompletions,
+                            oxicode_sdk::Api::OpenAiCompletions,
                             "unknown",
                             "https://unknown.com",
                         ),
-                        oxi_sdk::TokenUsage {
+                        oxicode_sdk::TokenUsage {
                             input: input_tokens as u64,
                             output: output_tokens as u64,
                             cache_read: 0,
@@ -1903,7 +1903,7 @@ impl std::fmt::Debug for AgentRuntime {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use oxi_sdk::{AgentTool, ToolContext, ToolError};
+    use oxicode_sdk::{AgentTool, ToolContext, ToolError};
     use serde_json::Value;
 
     /// A test tool that does nothing — used to populate the registry.
@@ -1932,8 +1932,8 @@ mod tests {
             _params: Value,
             _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
             _ctx: &ToolContext,
-        ) -> Result<oxi_sdk::AgentToolResult, ToolError> {
-            Ok(oxi_sdk::AgentToolResult::success("ok"))
+        ) -> Result<oxicode_sdk::AgentToolResult, ToolError> {
+            Ok(oxicode_sdk::AgentToolResult::success("ok"))
         }
     }
 

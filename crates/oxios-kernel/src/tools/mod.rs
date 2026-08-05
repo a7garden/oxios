@@ -1,6 +1,6 @@
 //! Oxios-specific agent tools.
 //!
-//! These tools replace oxi-agent's BashTool with purpose-specific execution tools:
+//! These tools replace oxicode-agent's BashTool with purpose-specific execution tools:
 //! - `exec_tool` — unified workspace/host command execution
 
 pub mod a2a_tools;

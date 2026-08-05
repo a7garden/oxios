@@ -1,6 +1,6 @@
 //! Observability — oxi-sdk 0.26.2 tracing, cost tracking, and audit.
 //!
-//! Provides global instances of oxi-sdk's `Tracer`, `CostTracker`, and `AuditLog`
+//! Provides global instances of oxicode-sdk's `Tracer`, `CostTracker`, and `AuditLog`
 //! for use across the kernel. These complement the existing `metrics` module
 //! (Prometheus counters/gauges) with distributed tracing, per-agent cost
 //! accounting, and structured audit logging.
@@ -33,15 +33,15 @@
 //!     ));
 //! ```
 
-use oxi_sdk::ModelRegistry;
+use oxicode_sdk::ModelRegistry;
 // Re-exports grouped by concern. All names are part of the kernel's public
 // surface (re-exported via `lib.rs`) — do not remove or rename without
 // auditing downstream consumers.
 //
 // `audit_trail::*` types (AuditTrail, AuditAction, HashDigest, ...) are
 // intentionally NOT re-exported here: they live in the dormant `audit_trail`
-// module of oxi-sdk and will be activated in Phase F (RFC-014).
-pub use oxi_sdk::{
+// module of oxicode-sdk and will be activated in Phase F (RFC-014).
+pub use oxicode_sdk::{
     // ── Audit (in-memory) ──────────────────────────────────────────────
     // Simple structured audit log. Replaced by `audit_trail` (blake3 chain)
     // in Phase F.
@@ -131,10 +131,10 @@ mod tests {
     #[test]
     fn test_cost_tracker_smoke() {
         let ct = cost_tracker();
-        let model = oxi_sdk::Model::new(
+        let model = oxicode_sdk::Model::new(
             "test/model",
             "Test",
-            oxi_sdk::Api::OpenAiCompletions,
+            oxicode_sdk::Api::OpenAiCompletions,
             "test",
             "https://test.com",
         );

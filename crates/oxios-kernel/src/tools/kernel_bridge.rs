@@ -1,20 +1,20 @@
-//! KernelToolProvider bridge — plugs oxios kernel tools into oxi-sdk agent builder.
+//! KernelToolProvider bridge — plugs oxios kernel tools into oxicode-sdk agent builder.
 //!
-//! Implements [`oxi_sdk::KernelToolProvider`] so that oxios kernel tools
+//! Implements [`oxicode_sdk::KernelToolProvider`] so that oxios kernel tools
 //! (exec, memory, project, etc.) can be registered into the SDK's
 
 use std::sync::Arc;
 
-use oxi_sdk::SearchCache;
-use oxi_sdk::ToolRegistry;
-use oxi_sdk::{
+use oxicode_sdk::SearchCache;
+use oxicode_sdk::ToolRegistry;
+use oxicode_sdk::{
     KernelToolContext as SdkKernelToolContext, KernelToolProvider as SdkKernelToolProvider,
 };
 
 use crate::KernelHandle;
 use crate::tools::registration::register_always_on;
 
-/// Bridges all oxios kernel tools into the oxi-sdk agent builder.
+/// Bridges all oxios kernel tools into the oxicode-sdk agent builder.
 pub struct OxiosKernelBridge {
     kernel_handle: Arc<KernelHandle>,
     search_cache: Arc<SearchCache>,
@@ -127,7 +127,7 @@ mod tests {
             ),
             crate::SecurityApi::new(
                 Arc::new(parking_lot::Mutex::new(crate::auth::AuthManager::new())),
-                Arc::new(oxi_sdk::observability::AuditTrail::new(100)),
+                Arc::new(oxicode_sdk::observability::AuditTrail::new(100)),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),

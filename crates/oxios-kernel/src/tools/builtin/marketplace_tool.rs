@@ -16,7 +16,7 @@
 //! ```
 
 use async_trait::async_trait;
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{Value, json};
 
 use crate::kernel_handle::KernelHandle;
@@ -130,7 +130,7 @@ impl AgentTool for MarketplaceTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

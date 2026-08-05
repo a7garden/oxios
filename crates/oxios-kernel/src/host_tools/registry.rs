@@ -50,7 +50,7 @@ pub enum CredentialResolver {
     #[default]
     None,
     /// Non-provider secret → `CredentialStore::resolve_secret(store_key, env_var)`.
-    /// 3-source: raw env var → oxios store → oxi-cli store.
+    /// 3-source: raw env var → oxios store → oxicode-cli store.
     Secret {
         /// Key passed to `load_token`/`save_token` and `resolve_secret`'s `key`.
         store_key: String,
@@ -257,7 +257,7 @@ impl CredentialStatus {
             CredentialResolver::OAuth { store_key, .. } => {
                 // Phase 3 populates TokenBundle via save_token; for now just
                 // check presence so the status is truthful today.
-                let present = oxi_sdk::load_token(store_key)
+                let present = oxicode_sdk::load_token(store_key)
                     .map(|t| t.is_some() && !t.unwrap().access_token.is_empty())
                     .unwrap_or(false);
                 Self {
@@ -276,7 +276,7 @@ impl CredentialStatus {
 fn source_label(s: &CredentialSource) -> String {
     match s {
         CredentialSource::Config => "config",
-        CredentialSource::OxiAuthStore => "auth_store",
+        CredentialSource::OxicodeAuthStore => "auth_store",
         CredentialSource::EnvVar => "env",
     }
     .into()

@@ -8,7 +8,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -100,7 +100,7 @@ impl AgentTool for A2aDelegateTool {
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let description = params["description"].as_str().unwrap_or("").to_string();
         if description.is_empty() {
             return Ok(AgentToolResult::error(
@@ -277,7 +277,7 @@ impl AgentTool for A2aSendTool {
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let target_str = params["target_agent_id"].as_str().unwrap_or("");
         let target_id: AgentId = match Uuid::parse_str(target_str) {
             Ok(id) => id,
@@ -412,7 +412,7 @@ impl AgentTool for A2aQueryTool {
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let capability = params["capability"].as_str();
         let skill = params["skill"].as_str();
         let limit = params["limit"].as_u64().unwrap_or(10) as usize;

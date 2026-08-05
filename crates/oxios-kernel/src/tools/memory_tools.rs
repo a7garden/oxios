@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 use chrono::Utc;
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{Value, json};
 
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
@@ -87,7 +87,7 @@ impl AgentTool for MemoryWriteTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let content = params["content"].as_str().unwrap_or("").to_string();
         if content.is_empty() {
             return Ok(AgentToolResult::error("content is required"));
@@ -223,7 +223,7 @@ impl AgentTool for MemoryReadTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let limit = params["limit"].as_u64().unwrap_or(10) as usize;
 
         if let Some(id) = params["id"].as_str() {
@@ -354,7 +354,7 @@ impl AgentTool for MemorySearchTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let query = params["query"].as_str().unwrap_or("");
         if query.is_empty() {
             return Ok(AgentToolResult::error("query is required"));

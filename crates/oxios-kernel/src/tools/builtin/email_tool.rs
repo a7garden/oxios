@@ -17,7 +17,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool as OxicodeAgentTool, AgentToolResult, ToolContext};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -105,7 +105,7 @@ impl std::fmt::Debug for EmailTool {
 
 #[async_trait]
 
-impl OxiAgentTool for EmailTool {
+impl OxicodeAgentTool for EmailTool {
     fn name(&self) -> &str {
         "send_email"
     }
@@ -162,7 +162,7 @@ impl OxiAgentTool for EmailTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         // Clone the EmailApi from the shared slot (cheap — Arc-based).
         // Lock is dropped before any async calls so handle_email_setup's
         // write-lock never blocks during an SMTP round-trip.

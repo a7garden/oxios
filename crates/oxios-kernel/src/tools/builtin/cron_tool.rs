@@ -15,7 +15,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{Value, json};
 
 use crate::cron::CronScheduler;
@@ -103,7 +103,7 @@ impl AgentTool for CronTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

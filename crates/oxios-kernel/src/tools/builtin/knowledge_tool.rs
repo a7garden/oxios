@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 use chrono::Datelike;
-use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool as OxicodeAgentTool, AgentToolResult, ToolContext};
 use serde_json::{Value, json};
 
 use crate::KernelHandle;
@@ -47,7 +47,7 @@ impl std::fmt::Debug for KnowledgeTool {
 
 #[async_trait]
 
-impl OxiAgentTool for KnowledgeTool {
+impl OxicodeAgentTool for KnowledgeTool {
     fn name(&self) -> &str {
         "knowledge"
     }
@@ -170,7 +170,7 @@ impl OxiAgentTool for KnowledgeTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let action = params["action"].as_str().unwrap_or("");
         if action.is_empty() {
             return Ok(AgentToolResult::error("action is required"));

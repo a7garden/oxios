@@ -1,6 +1,6 @@
-//! StateStore-backed AuditPersistence for oxi-sdk's AuditTrail.
+//! StateStore-backed AuditPersistence for oxicode-sdk's AuditTrail.
 //!
-//! Bridges the `oxi_sdk::observability::AuditPersistence` trait to oxios's
+//! Bridges the `oxicode_sdk::observability::AuditPersistence` trait to oxios's
 //! filesystem-based `StateStore`. The trail JSON is written to
 //! `<base_path>/audit/trail.json`, matching the legacy layout used before
 //! the SDK migration (RFC-014 Phase F).
@@ -8,7 +8,7 @@
 //! See: <https://github.com/a7garden/oxios/blob/main/docs/rfc-014/phase-f-audit-trail.md>
 
 use anyhow::Result;
-use oxi_sdk::observability::{AuditPersistence, TrailEntry};
+use oxicode_sdk::observability::{AuditPersistence, TrailEntry};
 
 use crate::state_store::StateStore;
 

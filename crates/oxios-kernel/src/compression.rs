@@ -190,9 +190,9 @@ impl CompressionService {
         .context("resolve compression model")?;
 
         // Build context and stream.
-        let mut ctx = oxi_sdk::Context::new();
+        let mut ctx = oxicode_sdk::Context::new();
         ctx.set_system_prompt(COMPRESSION_SYSTEM_PROMPT);
-        ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(
+        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new(
             user_prompt,
         )));
 
@@ -206,15 +206,15 @@ impl CompressionService {
         let mut pinned = std::pin::pin!(stream);
         while let Some(event) = pinned.next().await {
             match event {
-                oxi_sdk::ProviderEvent::TextDelta { delta, .. } => {
+                oxicode_sdk::ProviderEvent::TextDelta { delta, .. } => {
                     summary.push_str(&delta);
                     let _ = self.event_bus.publish(KernelEvent::CompressionDelta {
                         session_id: session_id.to_string(),
                         delta,
                     });
                 }
-                oxi_sdk::ProviderEvent::Done { .. } => break,
-                oxi_sdk::ProviderEvent::Error { error, .. } => {
+                oxicode_sdk::ProviderEvent::Done { .. } => break,
+                oxicode_sdk::ProviderEvent::Error { error, .. } => {
                     let err_msg = format!("{error:?}");
                     self.state_store
                         .update_session_with(&sid, |s| {

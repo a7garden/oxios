@@ -5,7 +5,7 @@ use crate::access_manager::{
 };
 use crate::auth::AuthManager;
 use crate::state_store::StateStore;
-use oxi_sdk::observability::{AuditAction, AuditTrail, TrailEntry};
+use oxicode_sdk::observability::{AuditAction, AuditTrail, TrailEntry};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -102,7 +102,7 @@ impl SecurityApi {
 
     /// Query audit entries whose agent/subject matches `agent_id`.
     /// Field access is serde-based so this is robust to `TrailEntry` field
-    /// renames in oxi-sdk.
+    /// renames in oxicode-sdk.
     pub fn query_audit_by_agent(&self, agent_id: &str) -> Vec<TrailEntry> {
         self.audit_trail
             .entries(0, u64::MAX)

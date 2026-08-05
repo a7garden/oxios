@@ -7,7 +7,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::Value;
 
 use crate::mcp::{McpBridge, McpContentBlock};
@@ -118,7 +118,7 @@ impl AgentTool for McpToolWrapper {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         match self
             .bridge
             .call_tool(&self.server_name, &self.tool_name, params)

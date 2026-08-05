@@ -6,11 +6,11 @@ use std::sync::Arc;
 /// Agent-to-agent communication system calls.
 ///
 /// Wraps [`A2AProtocol`] for inter-agent task delegation and messaging.
-/// Also exposes `oxi_sdk::MessageBus` for broadcast-based inter-agent communication.
+/// Also exposes `oxicode_sdk::MessageBus` for broadcast-based inter-agent communication.
 pub struct A2aApi {
     protocol: Arc<A2AProtocol>,
     /// Broadcast-based message bus for inter-agent communication.
-    message_bus: oxi_sdk::MessageBus,
+    message_bus: oxicode_sdk::MessageBus,
 }
 
 impl A2aApi {
@@ -18,7 +18,7 @@ impl A2aApi {
     pub fn new(protocol: Arc<A2AProtocol>) -> Self {
         Self {
             protocol,
-            message_bus: oxi_sdk::MessageBus::new(256),
+            message_bus: oxicode_sdk::MessageBus::new(256),
         }
     }
 
@@ -28,12 +28,12 @@ impl A2aApi {
     }
 
     /// Message bus reference for inter-agent broadcast messaging.
-    pub fn message_bus(&self) -> &oxi_sdk::MessageBus {
+    pub fn message_bus(&self) -> &oxicode_sdk::MessageBus {
         &self.message_bus
     }
 
     /// Subscribe to messages on the bus.
-    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<oxi_sdk::InterAgentMessage> {
+    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<oxicode_sdk::InterAgentMessage> {
         self.message_bus.subscribe()
     }
 

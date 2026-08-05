@@ -14,7 +14,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool as OxicodeAgentTool, AgentToolResult, ToolContext};
 use serde_json::{Value, json};
 
 use crate::budget::BudgetManager;
@@ -36,7 +36,7 @@ use crate::types::AgentId;
 /// | `budget` | Check budget for an agent | `id`            | —               |
 ///
 /// **Note:** Named `AgentTool` in this module but re-exported as
-/// `KernelAgentTool` to avoid collision with oxi_sdk's `AgentTool` trait.
+/// `KernelAgentTool` to avoid collision with oxicode_sdk's `AgentTool` trait.
 pub struct AgentTool {
     supervisor: Arc<dyn Supervisor>,
     budget_manager: Arc<BudgetManager>,
@@ -63,10 +63,10 @@ impl std::fmt::Debug for AgentTool {
 
 #[async_trait]
 
-impl OxiAgentTool for AgentTool {
-    // Note: we implement the oxi_sdk::AgentTool trait on our struct,
+impl OxicodeAgentTool for AgentTool {
+    // Note: we implement the oxicode_sdk::AgentTool trait on our struct,
     // which is also named AgentTool. Rust resolves this by treating
-    // `AgentTool` as the struct name and `oxi_sdk::AgentTool` as the trait.
+    // `AgentTool` as the struct name and `oxicode_sdk::AgentTool` as the trait.
 
     fn name(&self) -> &str {
         "kernel_agent"
@@ -109,7 +109,7 @@ impl OxiAgentTool for AgentTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_tool_name() {
         // Validate the tool name does not collide with the trait name.
-        // The tool is called "kernel_agent" to distinguish from oxi_sdk's AgentTool trait.
+        // The tool is called "kernel_agent" to distinguish from oxicode_sdk's AgentTool trait.
         // We can't construct the struct without a real KernelHandle, so we test the design.
         assert_eq!("kernel_agent", "kernel_agent");
     }

@@ -275,9 +275,9 @@ impl KnowledgeLens {
             .resolve_default()
             .map_err(|e| anyhow::anyhow!("Model/provider: {e}"))?;
 
-        let mut ctx = oxi_sdk::Context::new();
+        let mut ctx = oxicode_sdk::Context::new();
         ctx.set_system_prompt(&system_prompt);
-        ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(question)));
+        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new(question)));
 
         let stream = resolved
             .provider
@@ -289,9 +289,9 @@ impl KnowledgeLens {
         let mut pinned = std::pin::pin!(stream);
         while let Some(event) = pinned.next().await {
             match event {
-                oxi_sdk::ProviderEvent::TextDelta { delta, .. } => text.push_str(&delta),
-                oxi_sdk::ProviderEvent::Done { .. } => break,
-                oxi_sdk::ProviderEvent::Error { error, .. } => {
+                oxicode_sdk::ProviderEvent::TextDelta { delta, .. } => text.push_str(&delta),
+                oxicode_sdk::ProviderEvent::Done { .. } => break,
+                oxicode_sdk::ProviderEvent::Error { error, .. } => {
                     return Err(anyhow::anyhow!("AI: {error:?}"));
                 }
                 _ => {}

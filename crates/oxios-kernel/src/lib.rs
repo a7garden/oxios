@@ -40,9 +40,9 @@ pub mod credential;
 
 // ─── Audit Persistence ───────────────────────────────────────────────
 //
-// `audit_persistence` wires `oxi_sdk::observability::AuditPersistence`
+// `audit_persistence` wires `oxicode_sdk::observability::AuditPersistence`
 // to the kernel's filesystem-based `StateStore`. The trail itself
-// lives in `oxi_sdk::observability::AuditTrail` and is re-exported
+// lives in `oxicode_sdk::observability::AuditTrail` and is re-exported
 // below — RFC-014 Phase F.
 mod audit_persistence;
 
@@ -119,10 +119,10 @@ pub use supervisor::{BasicSupervisor, Supervisor};
 pub use budget::{
     BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager, FullBudgetInfo,
 };
-// Circuit breaker — delegates to oxi-sdk
+// Circuit breaker — delegates to oxicode-sdk
 pub use cron::{CronJob, CronJobResult, CronJobUpdate, CronScheduler, JobSource};
 pub use orchestrator::{AgentRole, OrchestrationResult, Orchestrator, SubTask};
-// CircuitBreaker removed — use oxi_sdk::ProviderCircuitBreaker directly (#11).
+// CircuitBreaker removed — use oxicode_sdk::ProviderCircuitBreaker directly (#11).
 pub use types::Priority;
 
 // ─── Security ───────────────────────────────────────────────────────
@@ -130,15 +130,15 @@ pub use access_manager::{
     AccessManager, Action, AgentPermissions, ApprovalStatus, PendingApproval, RbacAuditEntry,
     RbacManager, RbacPolicy, Role, Subject,
 };
-// AuditTrail types are re-exported from oxi-sdk (Phase F: removed
+// AuditTrail types are re-exported from oxicode-sdk (Phase F: removed
 // 1134-line duplicate). `AgentId as AuditAgentId` preserves the
 // historical kernel-level type alias.
 pub use auth::{AuthManager, KeyMeta};
 pub use capability::template::CapabilityTemplate;
 pub use capability::{CSpace, Capability, CapabilityId, Issuer, ResourceRef, Rights};
 pub use credential::CredentialStore;
-pub use oxi_sdk::observability::audit_trail::AgentId as AuditAgentId;
-pub use oxi_sdk::observability::{
+pub use oxicode_sdk::observability::audit_trail::AgentId as AuditAgentId;
+pub use oxicode_sdk::observability::{
     AuditAction, AuditError, AuditPersistence, AuditTrail, HashDigest, TrailEntry,
 };
 
@@ -295,7 +295,7 @@ pub use kernel_handle::{
 };
 pub use session_context::SessionContext;
 
-// ─── oxi-sdk re-exports ─────────────────────────────────────────────
+// ─── oxicode-sdk re-exports ─────────────────────────────────────────────
 //
-// Removed: dead re-exports (#11). Consumers should depend on oxi-sdk
-// directly and use `oxi_sdk::` instead of going through oxios-kernel.
+// Removed: dead re-exports (#11). Consumers should depend on oxicode-sdk
+// directly and use `oxicode_sdk::` instead of going through oxios-kernel.

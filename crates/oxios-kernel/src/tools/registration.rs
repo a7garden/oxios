@@ -15,18 +15,18 @@
 //!
 //! ```no_run
 //! use std::sync::Arc;
-//! use oxi_sdk::ToolRegistry;
+//! use oxicode_sdk::ToolRegistry;
 //! use oxios_kernel::capability::template::CapabilityTemplate;
 //!
 //! let registry = ToolRegistry::new();
 //! let cspace = CapabilityTemplate::standard().build();
-//! let cache = Arc::new(oxi_sdk::SearchCache::new());
+//! let cache = Arc::new(oxicode_sdk::SearchCache::new());
 //! // register_tools_from_cspace(&registry, &kernel, &cspace, cache, agent_id);
 //! ```
 
 use std::sync::Arc;
 
-use oxi_sdk::{
+use oxicode_sdk::{
     EditTool, FindTool, GetSearchResultsTool, GrepTool, LsTool, ReadTool, SearchCache,
     ToolRegistry, WebSearchTool, WriteTool,
 };
@@ -67,10 +67,10 @@ fn register_browser_tools(kernel: &KernelHandle, registry: &ToolRegistry) {
     if let Some(browser) = &kernel.browser
         && let Some(engine) = browser.try_engine()
     {
-        registry.register(oxi_sdk::BrowseTool::new(engine.clone()));
-        registry.register(oxi_sdk::BrowseExtractTool::new(engine.clone()));
-        registry.register(oxi_sdk::BrowseSessionTool::new(engine.clone()));
-        registry.register(oxi_sdk::BrowseScriptTool::new(engine));
+        registry.register(oxicode_sdk::BrowseTool::new(engine.clone()));
+        registry.register(oxicode_sdk::BrowseExtractTool::new(engine.clone()));
+        registry.register(oxicode_sdk::BrowseSessionTool::new(engine.clone()));
+        registry.register(oxicode_sdk::BrowseScriptTool::new(engine));
     }
 }
 

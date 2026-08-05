@@ -19,7 +19,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
-use oxi_sdk::Agent;
+use oxicode_sdk::Agent;
 use oxios_ouroboros::{Directive, ExecEnv};
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -699,7 +699,7 @@ mod tests {
             ),
             crate::kernel_handle::SecurityApi::new(
                 Arc::new(parking_lot::Mutex::new(crate::auth::AuthManager::new())),
-                Arc::new(oxi_sdk::observability::AuditTrail::new(100)),
+                Arc::new(oxicode_sdk::observability::AuditTrail::new(100)),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),

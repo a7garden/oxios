@@ -202,14 +202,14 @@ pub fn run_onboarding(
     print_intro(is_first_run);
 
     // ── Auto-detect ──
-    let env_providers = oxi_sdk::get_all_env_keys();
+    let env_providers = oxicode_sdk::get_all_env_keys();
     if !env_providers.is_empty() {
         let detected = env_providers
             .keys()
-            .find(|p| !oxi_sdk::get_provider_models(p).is_empty());
+            .find(|p| !oxicode_sdk::get_provider_models(p).is_empty());
 
         if let Some(provider) = detected {
-            let keys = oxi_sdk::find_env_keys(provider);
+            let keys = oxicode_sdk::find_env_keys(provider);
             let var_name = keys.and_then(|k| k.first().copied()).unwrap_or(provider);
             println!(
                 "  {} {} {}",
@@ -227,7 +227,7 @@ pub fn run_onboarding(
     }
 
     // ── Manual provider selection ──
-    let all_providers = oxi_sdk::get_providers();
+    let all_providers = oxicode_sdk::get_providers();
     let visible: Vec<&str> = all_providers
         .iter()
         .copied()
@@ -282,14 +282,14 @@ fn resolve_api_key(provider: &str) -> anyhow::Result<(Option<String>, &'static s
     }
 
     // Try auth.json
-    if let Ok(Some(token)) = oxi_sdk::load_token(provider)
+    if let Ok(Some(token)) = oxicode_sdk::load_token(provider)
         && !token.access_token.is_empty()
     {
         println!();
         println!(
             "  {} Credentials found in {}",
             theme::step("API Key"),
-            theme::dim("~/.oxi/auth.json"),
+            theme::dim("~/.oxicode/auth.json"),
         );
         let use_it = Confirm::new("  Use them?").with_default(true).prompt()?;
         if use_it {
@@ -298,7 +298,7 @@ fn resolve_api_key(provider: &str) -> anyhow::Result<(Option<String>, &'static s
     }
 
     // Try env var
-    if let Some(env_key) = oxi_sdk::get_env_api_key(provider) {
+    if let Some(env_key) = oxicode_sdk::get_env_api_key(provider) {
         println!();
         println!(
             "  {} {}",
@@ -326,8 +326,8 @@ fn prompt_provider<'a>(providers: &[&'a str]) -> anyhow::Result<&'a str> {
     let mut entries: Vec<ProviderEntry> = providers
         .iter()
         .map(|&p| {
-            let model_count = oxi_sdk::get_provider_models(p).len();
-            let has_env = oxi_sdk::has_env_key(p);
+            let model_count = oxicode_sdk::get_provider_models(p).len();
+            let has_env = oxicode_sdk::has_env_key(p);
             let mut badges = vec![format!("{} models", model_count)];
             if has_env {
                 badges.push("🔑 detected".into());
@@ -361,7 +361,7 @@ fn prompt_provider<'a>(providers: &[&'a str]) -> anyhow::Result<&'a str> {
 // ── Step: Model ──────────────────────────────────────────────────────────────
 
 fn prompt_model(provider: &str) -> anyhow::Result<String> {
-    let models = oxi_sdk::get_provider_models(provider);
+    let models = oxicode_sdk::get_provider_models(provider);
 
     println!();
     println!("  {}", theme::step("Model"));

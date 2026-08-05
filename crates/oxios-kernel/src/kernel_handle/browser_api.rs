@@ -8,7 +8,7 @@
 //! it, [`BrowserApi::try_engine`] always returns `None` and no browse tools
 //! are registered — the capability degrades gracefully to a no-op.
 //!
-//! [`BrowserEngine`]: oxi_sdk::BrowserEngine
+//! [`BrowserEngine`]: oxicode_sdk::BrowserEngine
 
 use std::sync::Arc;
 
@@ -17,16 +17,16 @@ use crate::config::OxiosConfig;
 /// Headless browser facade.
 ///
 /// Holds the SDK [`BrowseConfig`] and a lazily-initialized engine cell. The
-/// concrete `OxiBrowserEngine` (pure-Rust: boa JS + html5ever + wreq) is
+/// concrete `OxicodeBrowserEngine` (pure-Rust: boa JS + html5ever + wreq) is
 /// constructed only when [`engine`](Self::engine) is first awaited.
 ///
-/// [`BrowseConfig`]: oxi_sdk::BrowseConfig
+/// [`BrowseConfig`]: oxicode_sdk::BrowseConfig
 pub struct BrowserApi {
     /// Lazily-initialized shared engine. `None` until first `engine().await`.
     #[cfg(feature = "native-browser")]
-    engine: tokio::sync::OnceCell<Arc<dyn oxi_sdk::BrowserEngine>>,
+    engine: tokio::sync::OnceCell<Arc<dyn oxicode_sdk::BrowserEngine>>,
     /// Engine configuration (propagated to the backend on init).
-    config: oxi_sdk::BrowseConfig,
+    config: oxicode_sdk::BrowseConfig,
 }
 
 impl std::fmt::Debug for BrowserApi {
@@ -39,7 +39,7 @@ impl std::fmt::Debug for BrowserApi {
 
 impl BrowserApi {
     /// Create a new browser facade with the given configuration.
-    pub fn new(config: oxi_sdk::BrowseConfig) -> Self {
+    pub fn new(config: oxicode_sdk::BrowseConfig) -> Self {
         Self {
             #[cfg(feature = "native-browser")]
             engine: tokio::sync::OnceCell::new(),
@@ -61,19 +61,19 @@ impl BrowserApi {
 
     /// Lazily initialize and return the shared browser engine.
     ///
-    /// The underlying `OxiBrowserEngine` (pure-Rust `oxibrowser-core`) is
+    /// The underlying `OxicodeBrowserEngine` (pure-Rust `oxibrowser-core`) is
     /// created exactly once; subsequent calls return the cached handle.
     /// A failed init is retryable — the cell stays empty on error.
     ///
     /// Only available with the `native-browser` feature.
     #[cfg(feature = "native-browser")]
-    pub async fn engine(&self) -> anyhow::Result<Arc<dyn oxi_sdk::BrowserEngine>> {
+    pub async fn engine(&self) -> anyhow::Result<Arc<dyn oxicode_sdk::BrowserEngine>> {
         self.engine
             .get_or_try_init(|| async {
-                let backend = oxi_sdk::OxiBrowserEngine::with_config(self.config.clone())
+                let backend = oxicode_sdk::OxicodeBrowserEngine::with_config(self.config.clone())
                     .await
                     .map_err(|e| anyhow::anyhow!("browser engine init failed: {e}"))?;
-                Ok(Arc::new(backend) as Arc<dyn oxi_sdk::BrowserEngine>)
+                Ok(Arc::new(backend) as Arc<dyn oxicode_sdk::BrowserEngine>)
             })
             .await
             .map(Arc::clone)
@@ -85,13 +85,13 @@ impl BrowserApi {
     /// agent runtime having awaited [`engine`](Self::engine) first. Returns
     /// `None` if the engine has not been initialized (or the feature is off).
     #[cfg(feature = "native-browser")]
-    pub fn try_engine(&self) -> Option<Arc<dyn oxi_sdk::BrowserEngine>> {
+    pub fn try_engine(&self) -> Option<Arc<dyn oxicode_sdk::BrowserEngine>> {
         self.engine.get().cloned()
     }
 
     /// Without `native-browser`, no engine is ever available.
     #[cfg(not(feature = "native-browser"))]
-    pub fn try_engine(&self) -> Option<Arc<dyn oxi_sdk::BrowserEngine>> {
+    pub fn try_engine(&self) -> Option<Arc<dyn oxicode_sdk::BrowserEngine>> {
         None
     }
 }

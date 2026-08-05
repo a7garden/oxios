@@ -1,18 +1,18 @@
-//! Event bus: inter-agent communication via `oxi_sdk::EventBus<KernelEvent>`.
+//! Event bus: inter-agent communication via `oxicode_sdk::EventBus<KernelEvent>`.
 //!
 //! The event bus is the "pipe" of Oxios. All agents communicate
 //! through kernel events published on the bus.
 //!
 //! After RFC-014 Phase C, this module no longer owns the broadcast channel —
-//! it reuses `oxi_sdk::EventBus<E>`, which is a generic wrapper over
+//! it reuses `oxicode_sdk::EventBus<E>`, which is a generic wrapper over
 //! `tokio::sync::broadcast`. The only Oxios-specific bits are:
 //!
 //! - `KernelEvent` enum (oxios-internal event vocabulary)
 //! - `kernel_event_to_audit_action` mapping for the audit trail
 //! - `attach_audit_trail` helper (subscribes the bus to the trail)
 
-use oxi_sdk::EventBus as SdkEventBus;
-use oxi_sdk::observability::{AuditAction, AuditTrail};
+use oxicode_sdk::EventBus as SdkEventBus;
+use oxicode_sdk::observability::{AuditAction, AuditTrail};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -21,9 +21,9 @@ use crate::types::AgentId;
 
 /// Kernel event bus — generic SDK bus specialised for `KernelEvent`.
 ///
-/// The broadcast channel is owned by `oxi_sdk::EventBus`; this type alias
+/// The broadcast channel is owned by `oxicode_sdk::EventBus`; this type alias
 /// just makes the call sites read more naturally (`crate::event_bus::EventBus`
-/// instead of `oxi_sdk::EventBus<KernelEvent>`).
+/// instead of `oxicode_sdk::EventBus<KernelEvent>`).
 pub type EventBus = SdkEventBus<KernelEvent>;
 
 /// Events that flow through the kernel event bus.
@@ -183,7 +183,7 @@ pub enum KernelEvent {
         tool_call_id: String,
         /// Tool input arguments (JSON).
         tool_args: serde_json::Value,
-        /// Semantic context inferred by oxi-agent 0.32+ from tool name/args
+        /// Semantic context inferred by oxicode-agent 0.32+ from tool name/args
         /// (e.g. WebSearch, PageVisit). `None` for tools without context mapping.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         context: Option<serde_json::Value>,
@@ -215,12 +215,12 @@ pub enum KernelEvent {
         progress: String,
         /// Tab that emitted this progress event, if the upstream tool tracks
         /// tabs. `None` for tools that don't have a tab concept (e.g. legacy
-        /// oxi-agent versions that don't propagate `tab_id`).
+        /// oxicode-agent versions that don't propagate `tab_id`).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tab_id: Option<Uuid>,
         /// Semantic context from the tool call (e.g. PageVisit, WebSearch).
         /// Stored as `serde_json::Value` to decouple kernel events from
-        /// oxi-sdk's internal `ToolCallContext` enum. UI consumers that
+        /// oxicode-sdk's internal `ToolCallContext` enum. UI consumers that
         /// understand a context variant render it richly; older consumers
         /// simply ignore the field.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -272,7 +272,7 @@ pub enum KernelEvent {
 
     /// Compaction was triggered (RFC-035 gap 2 observability).
     ///
-    /// Emitted when `oxi_sdk::CompactionEvent::Triggered` fires (0.53.0+).
+    /// Emitted when `oxicode_sdk::CompactionEvent::Triggered` fires (0.53.0+).
     /// `source` is one of:
     /// - `"provider-reported"` — provider-reported `usage.input_tokens` drove
     ///   the trigger (ground truth; gap 2's primary signal)
@@ -872,7 +872,7 @@ mod tests {
     /// searchable detail string (used by the audit-trail UI to filter).
     /// When `tab_id` is set, the detail includes `:tab=<id>`; when absent,
     /// the original `tool_progress:<tool>` form is preserved (back-compat
-    /// for older oxi-agent versions that don't propagate tabs).
+    /// for older oxicode-agent versions that don't propagate tabs).
     #[test]
     fn test_tool_execution_progress_audit_action() {
         let with_tab = KernelEvent::ToolExecutionProgress {
@@ -910,12 +910,12 @@ mod tests {
         }
     }
 
-    /// `tab_id` is optional in serde (`#[serde(default)]`) so older oxi-agent
+    /// `tab_id` is optional in serde (`#[serde(default)]`) so older oxicode-agent
     /// versions that don't emit it still round-trip cleanly. This guards the
     /// backwards-compat contract explicitly.
     #[test]
     fn test_tool_execution_progress_tab_id_optional_in_serde() {
-        // Simulate a payload from a legacy oxi-agent (no tab_id key).
+        // Simulate a payload from a legacy oxicode-agent (no tab_id key).
         // KernelEvent is externally tagged, so the variant is the JSON key.
         let legacy_json = r#"{
             "ToolExecutionProgress": {

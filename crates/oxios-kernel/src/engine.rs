@@ -1,29 +1,29 @@
-//! Engine provider — wraps oxi-sdk's `Oxi` for the kernel.
+//! Engine provider — wraps oxicode-sdk's `Oxicode` for the kernel.
 //!
-//! All provider/model resolution goes through `oxi_sdk::OxiBuilder`.
+//! All provider/model resolution goes through `oxicode_sdk::OxicodeBuilder`.
 //! The `OxiosEngine` struct wraps the SDK instance and exposes a clean API
 //! with support for routing, credentials, provider pooling, and multi-provider fallback.
 //!
 //! # Architecture
 //!
 //! ```text
-//! OxiosEngine (OxiBuilder → Oxi)
+//! OxiosEngine (OxicodeBuilder → Oxicode)
 //!   ├── resolve_model("provider/model") → Model
 //!   ├── create_provider("anthropic")     → Arc<dyn Provider>
 //!   ├── pooled_provider("anthropic")     → Arc<dyn Provider> (rate-limited)
-//!   ├── oxi()                            → &Oxi (for AgentBuilder, etc.)
+//!   ├── oxi()                            → &Oxicode (for AgentBuilder, etc.)
 //!   └── agent(AgentConfig)               → AgentBuilder
 //! ```
 
 use anyhow::Result;
-use oxi_sdk::{CatalogConfig, FileModelCatalog, ModelCatalog, Oxi, OxiBuilder};
+use oxicode_sdk::{CatalogConfig, FileModelCatalog, ModelCatalog, Oxicode, OxicodeBuilder};
 use std::sync::Arc;
 
 use oxios_ouroboros::{ModelResolver, ResolvedModel};
 
 use crate::credential::{CredentialStore, discover_auth_store_providers};
 
-/// The kernel's engine — wraps oxi-sdk's Oxi instance.
+/// The kernel's engine — wraps oxicode-sdk's Oxicode instance.
 ///
 /// Created via [`OxiosEngine::new()`] or [`OxiosEngine::builder()`].
 /// Provides access to providers, models, routing, pooling, and agent construction.
@@ -32,32 +32,32 @@ use crate::credential::{CredentialStore, discover_auth_store_providers};
 ///
 /// `authorizer` / `tracer` / `cost_tracker` are optional, engine-level
 /// observability and security handles. When set, they are propagated to
-/// every agent built via [`OxiosEngine::oxi().agent()`][Oxi::agent] using
+/// every agent built via [`OxiosEngine::oxi().agent()`][Oxicode::agent] using
 /// the new `AgentBuilder::authorizer()` / `.tracer()` / `.cost_tracker()`
 /// API. All three are `None` by default, keeping the existing call sites
 /// fully backward compatible.
 pub struct OxiosEngine {
-    oxi: Oxi,
+    oxi: Oxicode,
     default_model_id: String,
     /// Runtime routing control for dynamic model selection.
-    routing_control: Option<oxi_sdk::RoutingControl>,
+    routing_control: Option<oxicode_sdk::RoutingControl>,
     /// ── RFC-014 Phase D: engine-level observability/security handles ──
     /// When `Some`, these are attached to every `Agent` built via the
     /// `AgentBuilder` API in `agent_runtime.rs::run_agent()`.
     /// Default: `None` (preserves pre-Phase-D behavior).
-    authorizer: Option<Arc<oxi_sdk::Authorizer>>,
-    tracer: Option<Arc<oxi_sdk::Tracer>>,
-    cost_tracker: Option<Arc<oxi_sdk::CostTracker>>,
+    authorizer: Option<Arc<oxicode_sdk::Authorizer>>,
+    tracer: Option<Arc<oxicode_sdk::Tracer>>,
+    cost_tracker: Option<Arc<oxicode_sdk::CostTracker>>,
 }
 
 impl OxiosEngine {
     /// Create a new engine with the given default model.
     ///
-    /// Internally calls `OxiBuilder::new().with_builtins()` to load all
+    /// Internally calls `OxicodeBuilder::new().with_builtins()` to load all
     /// built-in models and providers.
     pub fn new(default_model_id: impl Into<String>) -> Self {
         let model_id = default_model_id.into();
-        let oxi = OxiBuilder::new().with_builtins().build();
+        let oxi = OxicodeBuilder::new().with_builtins().build();
         Self {
             oxi,
             default_model_id: model_id,
@@ -72,10 +72,10 @@ impl OxiosEngine {
     /// Create a new engine with credentials from config.
     ///
     /// Resolves API keys from CredentialStore for each known provider
-    /// and injects them into the OxiBuilder. This enables the engine
+    /// and injects them into the OxicodeBuilder. This enables the engine
     /// to create properly authenticated providers.
     ///
-    /// Resolution order (per provider): env var → config.toml → ~/.oxi/auth.json
+    /// Resolution order (per provider): env var → config.toml → ~/.oxicode/auth.json
     ///
     /// No model catalog is wired (resolves via the static registry only).
     /// For dynamic models.dev metadata use
@@ -113,11 +113,11 @@ impl OxiosEngine {
             .map(|(p, _)| p)
             .unwrap_or("anthropic");
 
-        let mut builder = OxiBuilder::new().with_builtins();
+        let mut builder = OxicodeBuilder::new().with_builtins();
 
         // Collect all providers that need credential injection:
         // 1. Known major providers (always try to resolve)
-        // 2. Any provider found in ~/.oxi/auth.json (discovered dynamically)
+        // 2. Any provider found in ~/.oxicode/auth.json (discovered dynamically)
         // 3. The primary provider (from the default model)
         let mut providers_to_try: Vec<String> = vec![
             "anthropic".into(),
@@ -221,7 +221,7 @@ impl OxiosEngine {
     /// and security handles. All three are `None` by default.
     pub fn builder() -> OxiosEngineBuilder {
         OxiosEngineBuilder {
-            inner: OxiBuilder::new().with_builtins(),
+            inner: OxicodeBuilder::new().with_builtins(),
             default_model_id: "anthropic/claude-sonnet-4-20250514".to_string(),
             // RFC-014 Phase D: optional, off by default
             authorizer: None,
@@ -233,7 +233,7 @@ impl OxiosEngine {
     /// Build a [`CatalogConfig`] rooted at the oxios home (`~/.oxios/`).
     ///
     /// Keeps the models.dev cache/overrides self-hosted under oxios's own
-    /// directory (not oxi's `~/.oxi/`), consistent with the MCP cache/consent
+    /// directory (not oxi's `~/.oxicode/`), consistent with the MCP cache/consent
     /// path customization. Local-server discovery (`ollama`/`lmstudio`) is
     /// left empty — wire it later if oxios wants to auto-discover local
     /// models.
@@ -269,47 +269,47 @@ impl OxiosEngine {
         Ok(catalog)
     }
 
-    /// Get a reference to the underlying Oxi instance.
+    /// Get a reference to the underlying Oxicode instance.
     ///
-    /// Use this when you need to pass the engine to oxi-sdk APIs directly
+    /// Use this when you need to pass the engine to oxicode-sdk APIs directly
     /// (e.g., `AgentBuilder`, `MessageBus`, `AgentGroup`).
-    pub fn oxi(&self) -> &Oxi {
+    pub fn oxi(&self) -> &Oxicode {
         &self.oxi
     }
 
     /// RFC-014 Phase D: get the engine-level `Authorizer`, if any.
     ///
     /// When `Some`, the authorizer is attached to every `Agent` built via
-    /// `Oxi::agent().authorizer(...)` in `agent_runtime.rs::run_agent()`.
-    pub fn authorizer(&self) -> Option<&Arc<oxi_sdk::Authorizer>> {
+    /// `Oxicode::agent().authorizer(...)` in `agent_runtime.rs::run_agent()`.
+    pub fn authorizer(&self) -> Option<&Arc<oxicode_sdk::Authorizer>> {
         self.authorizer.as_ref()
     }
 
     /// RFC-014 Phase D: get the engine-level `Tracer`, if any.
     ///
     /// When `Some`, the tracer is attached to every `Agent` built via
-    /// `Oxi::agent().tracer(...)` in `agent_runtime.rs::run_agent()`.
-    pub fn tracer(&self) -> Option<&Arc<oxi_sdk::Tracer>> {
+    /// `Oxicode::agent().tracer(...)` in `agent_runtime.rs::run_agent()`.
+    pub fn tracer(&self) -> Option<&Arc<oxicode_sdk::Tracer>> {
         self.tracer.as_ref()
     }
 
     /// RFC-014 Phase D: get the engine-level `CostTracker`, if any.
     ///
     /// When `Some`, the cost tracker is attached to every `Agent` built via
-    /// `Oxi::agent().cost_tracker(...)` in `agent_runtime.rs::run_agent()`.
-    pub fn cost_tracker(&self) -> Option<&Arc<oxi_sdk::CostTracker>> {
+    /// `Oxicode::agent().cost_tracker(...)` in `agent_runtime.rs::run_agent()`.
+    pub fn cost_tracker(&self) -> Option<&Arc<oxicode_sdk::CostTracker>> {
         self.cost_tracker.as_ref()
     }
 
     /// Resolve a model ID to a Model.
-    pub fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model> {
-        // oxi-sdk 0.64 returns `Result<_, SdkError>` (R7 typed errors); convert
+    pub fn resolve_model(&self, model_id: &str) -> Result<oxicode_sdk::Model> {
+        // oxicode-sdk 0.66 returns `Result<_, SdkError>` (R7 typed errors); convert
         // into the kernel's `anyhow::Result` via `?`.
         Ok(self.oxi.resolve_model(model_id)?)
     }
 
     /// Create a provider for the given provider name.
-    pub fn create_provider(&self, name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
+    pub fn create_provider(&self, name: &str) -> Result<Arc<dyn oxicode_sdk::Provider>> {
         Ok(self.oxi.create_provider(name)?)
     }
 
@@ -319,7 +319,7 @@ impl OxiosEngine {
     }
 
     /// Get the routing control, if routing is enabled.
-    pub fn routing_control(&self) -> Option<&oxi_sdk::RoutingControl> {
+    pub fn routing_control(&self) -> Option<&oxicode_sdk::RoutingControl> {
         self.routing_control.as_ref()
     }
 }
@@ -330,13 +330,13 @@ impl OxiosEngine {
 
 /// Builder for creating an `OxiosEngine` with advanced configuration.
 pub struct OxiosEngineBuilder {
-    inner: OxiBuilder,
+    inner: OxicodeBuilder,
     default_model_id: String,
     // ── RFC-014 Phase D: optional engine-level observability/security handles ──
     // All default to `None` so existing builder chains remain unchanged.
-    authorizer: Option<Arc<oxi_sdk::Authorizer>>,
-    tracer: Option<Arc<oxi_sdk::Tracer>>,
-    cost_tracker: Option<Arc<oxi_sdk::CostTracker>>,
+    authorizer: Option<Arc<oxicode_sdk::Authorizer>>,
+    tracer: Option<Arc<oxicode_sdk::Tracer>>,
+    cost_tracker: Option<Arc<oxicode_sdk::CostTracker>>,
 }
 
 impl OxiosEngineBuilder {
@@ -374,7 +374,7 @@ impl OxiosEngineBuilder {
     }
 
     /// Register a custom provider.
-    pub fn provider(self, name: &str, p: impl oxi_sdk::Provider + 'static) -> Self {
+    pub fn provider(self, name: &str, p: impl oxicode_sdk::Provider + 'static) -> Self {
         Self {
             inner: self.inner.provider(name, p),
             default_model_id: self.default_model_id,
@@ -400,10 +400,10 @@ impl OxiosEngineBuilder {
     /// Build the engine with routing enabled.
     ///
     /// Returns `(OxiosEngine, RoutingControl)` for runtime routing control.
-    pub fn build_with_routing(self) -> (OxiosEngine, oxi_sdk::RoutingControl) {
-        use oxi_sdk::RoutingControl;
+    pub fn build_with_routing(self) -> (OxiosEngine, oxicode_sdk::RoutingControl) {
+        use oxicode_sdk::RoutingControl;
 
-        let routing_config = oxi_sdk::routing::RoutingConfig::default();
+        let routing_config = oxicode_sdk::routing::RoutingConfig::default();
         let routing_control = RoutingControl::new(routing_config);
         let engine = OxiosEngine {
             oxi: self.inner.build(),
@@ -426,38 +426,38 @@ impl OxiosEngineBuilder {
     //
     // Backward compatible: all three are `None` by default.
 
-    /// Attach an `Authorizer` to the engine. Agents built via `Oxi::agent()`
+    /// Attach an `Authorizer` to the engine. Agents built via `Oxicode::agent()`
     /// will receive this authorizer through the new `AgentBuilder::authorizer()` API.
-    pub fn with_authorizer(mut self, authorizer: Arc<oxi_sdk::Authorizer>) -> Self {
+    pub fn with_authorizer(mut self, authorizer: Arc<oxicode_sdk::Authorizer>) -> Self {
         self.authorizer = Some(authorizer);
         self
     }
 
-    /// Attach a `Tracer` to the engine. Agents built via `Oxi::agent()`
+    /// Attach a `Tracer` to the engine. Agents built via `Oxicode::agent()`
     /// will receive this tracer through the new `AgentBuilder::tracer()` API.
-    pub fn with_tracer(mut self, tracer: Arc<oxi_sdk::Tracer>) -> Self {
+    pub fn with_tracer(mut self, tracer: Arc<oxicode_sdk::Tracer>) -> Self {
         self.tracer = Some(tracer);
         self
     }
 
-    /// Attach a `CostTracker` to the engine. Agents built via `Oxi::agent()`
+    /// Attach a `CostTracker` to the engine. Agents built via `Oxicode::agent()`
     /// will receive this cost tracker through the new `AgentBuilder::cost_tracker()` API.
-    pub fn with_cost_tracker(mut self, cost_tracker: Arc<oxi_sdk::CostTracker>) -> Self {
+    pub fn with_cost_tracker(mut self, cost_tracker: Arc<oxicode_sdk::CostTracker>) -> Self {
         self.cost_tracker = Some(cost_tracker);
         self
     }
 
     /// Wire a model catalog port (e.g. [`FileModelCatalog`]) into the engine.
     ///
-    /// When set, `Oxi::resolve_model()` consults the catalog first (dynamic
+    /// When set, `Oxicode::resolve_model()` consults the catalog first (dynamic
     /// models.dev metadata: live prices/limits, user overrides, local
     /// discovery) before falling back to the static registry. Without this,
-    /// the engine uses a [`NoopModelCatalog`](oxi_sdk::NoopModelCatalog) and
+    /// the engine uses a [`NoopModelCatalog`](oxicode_sdk::NoopModelCatalog) and
     /// resolves via the static `model_db` only.
     ///
     /// Initialize the catalog once via
     /// [`OxiosEngine::init_file_catalog`] and reuse the `Arc` across rebuilds.
-    pub fn with_catalog(mut self, catalog: Arc<dyn oxi_sdk::ModelCatalog>) -> Self {
+    pub fn with_catalog(mut self, catalog: Arc<dyn oxicode_sdk::ModelCatalog>) -> Self {
         self.inner = self.inner.with_catalog(catalog);
         self
     }
@@ -472,21 +472,21 @@ impl OxiosEngineBuilder {
 /// Implemented by `OxiosEngine` directly. Use a mock for testing.
 pub trait EngineProvider: Send + Sync {
     /// Create a provider for the given provider name.
-    fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn oxi_sdk::Provider>>;
+    fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn oxicode_sdk::Provider>>;
 
     /// Resolve a "provider/model" string to a Model.
-    fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model>;
+    fn resolve_model(&self, model_id: &str) -> Result<oxicode_sdk::Model>;
 
     /// Get the default model ID.
     fn default_model_id(&self) -> &str;
 }
 
 impl EngineProvider for OxiosEngine {
-    fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
+    fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn oxicode_sdk::Provider>> {
         self.create_provider(provider_name)
     }
 
-    fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model> {
+    fn resolve_model(&self, model_id: &str) -> Result<oxicode_sdk::Model> {
         self.resolve_model(model_id)
     }
 
@@ -516,7 +516,7 @@ impl std::fmt::Debug for OxiosEngine {
 ///
 /// # Cost
 ///
-/// Rebuilding `OxiosEngine` is cheap: `OxiBuilder::new().with_builtins().build()`
+/// Rebuilding `OxiosEngine` is cheap: `OxicodeBuilder::new().with_builtins().build()`
 /// populates registries from static `model_db` data (~1μs, no I/O, no network).
 ///
 /// # Concurrency
@@ -531,7 +531,7 @@ pub struct EngineHandle {
     /// engine generation; cleared on [`swap`](Self::swap) so credential /
     /// provider changes take effect. Avoids rebuilding providers per phase call.
     provider_cache:
-        parking_lot::RwLock<std::collections::HashMap<String, Arc<dyn oxi_sdk::Provider>>>,
+        parking_lot::RwLock<std::collections::HashMap<String, Arc<dyn oxicode_sdk::Provider>>>,
 }
 impl EngineHandle {
     /// Create a new handle wrapping the given engine.
@@ -610,7 +610,7 @@ impl EngineHandle {
     }
 
     /// Get a (cached) provider for a provider name, creating it on first use.
-    fn cached_provider(&self, name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
+    fn cached_provider(&self, name: &str) -> Result<Arc<dyn oxicode_sdk::Provider>> {
         if let Some(p) = self.provider_cache.read().get(name) {
             return Ok(Arc::clone(p));
         }
@@ -824,7 +824,7 @@ mod tests {
     #[test]
     fn test_rfc014_phase_d_with_tracer() {
         // `with_tracer` attaches a `Tracer`; accessor returns `Some`.
-        let tracer = Arc::new(oxi_sdk::Tracer::new());
+        let tracer = Arc::new(oxicode_sdk::Tracer::new());
         let engine = OxiosEngine::builder()
             .default_model("openai/gpt-4o")
             .with_tracer(tracer.clone())
@@ -840,11 +840,11 @@ mod tests {
         // `CostTracker::new` needs an `Arc<ModelRegistry>`; the engine's
         // own registry (via `models_arc`) is fine for construction-only
         // assertions like this one.
-        let oxi_for_registry = oxi_sdk::OxiBuilder::new().with_builtins().build();
+        let oxi_for_registry = oxicode_sdk::OxicodeBuilder::new().with_builtins().build();
         let model_registry = oxi_for_registry.models_arc();
-        let cost_tracker = Arc::new(oxi_sdk::CostTracker::new(
+        let cost_tracker = Arc::new(oxicode_sdk::CostTracker::new(
             model_registry,
-            oxi_sdk::CostTrackerConfig::default(),
+            oxicode_sdk::CostTrackerConfig::default(),
         ));
         let engine = OxiosEngine::builder()
             .default_model("openai/gpt-4o")
@@ -858,8 +858,8 @@ mod tests {
     #[test]
     fn test_rfc014_phase_d_with_authorizer() {
         // `with_authorizer` attaches an `Authorizer`; accessor returns `Some`.
-        let audit = Arc::new(oxi_sdk::AuditLog::new(16));
-        let authorizer = Arc::new(oxi_sdk::Authorizer::new(audit));
+        let audit = Arc::new(oxicode_sdk::AuditLog::new(16));
+        let authorizer = Arc::new(oxicode_sdk::Authorizer::new(audit));
         let engine = OxiosEngine::builder()
             .default_model("openai/gpt-4o")
             .with_authorizer(authorizer)
@@ -874,14 +874,14 @@ mod tests {
         // All three handles can be set at once. The build chain must
         // preserve them through `api_key` / `credential` / `provider`
         // builder methods (they should be no-ops for the new fields).
-        let audit = Arc::new(oxi_sdk::AuditLog::new(16));
-        let authorizer = Arc::new(oxi_sdk::Authorizer::new(audit));
-        let tracer = Arc::new(oxi_sdk::Tracer::new());
-        let oxi_for_registry = oxi_sdk::OxiBuilder::new().with_builtins().build();
+        let audit = Arc::new(oxicode_sdk::AuditLog::new(16));
+        let authorizer = Arc::new(oxicode_sdk::Authorizer::new(audit));
+        let tracer = Arc::new(oxicode_sdk::Tracer::new());
+        let oxi_for_registry = oxicode_sdk::OxicodeBuilder::new().with_builtins().build();
         let model_registry = oxi_for_registry.models_arc();
-        let cost_tracker = Arc::new(oxi_sdk::CostTracker::new(
+        let cost_tracker = Arc::new(oxicode_sdk::CostTracker::new(
             model_registry,
-            oxi_sdk::CostTrackerConfig::default(),
+            oxicode_sdk::CostTrackerConfig::default(),
         ));
 
         let engine = OxiosEngine::builder()

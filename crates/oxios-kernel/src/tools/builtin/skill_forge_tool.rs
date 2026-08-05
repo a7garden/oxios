@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context as _;
 use async_trait::async_trait;
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -130,7 +130,7 @@ impl AgentTool for SkillForgeTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -195,7 +195,7 @@ impl AgentTool for SkillForgeTool {
 }
 
 impl SkillForgeTool {
-    async fn act_list(&self) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    async fn act_list(&self) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let entries = self.skill_manager.list_skills().await;
         let rows: Vec<Value> = entries
             .iter()
@@ -215,7 +215,7 @@ impl SkillForgeTool {
         ))
     }
 
-    async fn act_get(&self, name: &str) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    async fn act_get(&self, name: &str) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         match self.skill_manager.get_skill(name).await {
             Some(e) => {
                 let meta = e.metadata.as_ref();
@@ -244,7 +244,7 @@ impl SkillForgeTool {
         name: &str,
         description: &str,
         content: &str,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         // Pre-validate the proposed shape so agents get fast feedback.
         let synthetic = format!("---\nname: {name}\ndescription: {description}\n---\n\n{content}");
         let report = validate_skill_content(&synthetic, Some(name));
@@ -276,7 +276,7 @@ impl SkillForgeTool {
         &self,
         name: &str,
         content: &str,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let report = validate_skill_content(content, Some(name));
         if report.has_errors() {
             return Ok(AgentToolResult::error(format!(
@@ -303,7 +303,7 @@ impl SkillForgeTool {
         &self,
         name: Option<&str>,
         content: Option<&str>,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let report = match (name, content) {
             (Some(n), Some(c)) => {
                 // Prefer the on-disk skill if it exists; fall back to supplied content.
@@ -334,7 +334,7 @@ impl SkillForgeTool {
         ))
     }
 
-    async fn act_package(&self, name: &str) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    async fn act_package(&self, name: &str) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let entry = self
             .skill_manager
             .get_skill(name)
@@ -364,7 +364,7 @@ impl SkillForgeTool {
         &self,
         content: &str,
         name_hint: Option<&str>,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         match self
             .skill_manager
             .import_skill_text(content, name_hint)
@@ -383,7 +383,7 @@ impl SkillForgeTool {
         }
     }
 
-    async fn act_delete(&self, name: &str) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    async fn act_delete(&self, name: &str) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         match self.skill_manager.delete_skill(name).await {
             Ok(()) => Ok(AgentToolResult::success(
                 serde_json::to_string_pretty(&json!({ "ok": true, "deleted": name }))
@@ -397,7 +397,7 @@ impl SkillForgeTool {
         &self,
         name: &str,
         enabled: bool,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let op = if enabled { "enable" } else { "disable" };
         match self.skill_manager.set_enabled(name, enabled).await {
             Ok(()) => Ok(AgentToolResult::success(
@@ -421,7 +421,7 @@ impl SkillForgeTool {
         &self,
         workspace: &str,
         skill_name: Option<&str>,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let name = skill_name.unwrap_or("skill");
         match aggregate_benchmark(Path::new(workspace), name) {
             Ok(bench) => {
@@ -455,7 +455,7 @@ impl SkillForgeTool {
         workspace: &str,
         skill_name: Option<&str>,
         output: Option<&str>,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let name = skill_name.unwrap_or("skill");
         let out = output
             .map(PathBuf::from)

@@ -326,7 +326,7 @@ impl KnowledgeDream {
             self.model_id.clone()
         };
 
-        let agent_config = oxi_sdk::AgentConfig {
+        let agent_config = oxicode_sdk::AgentConfig {
             description: Some("Knowledge curation".into()),
             model_id,
             system_prompt: Some(

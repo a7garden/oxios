@@ -1,9 +1,9 @@
 //! Request/result types for image generation.
 //!
-//! Field names align with oxi-ai's dead-code types
-//! (`ImageGenerationRequest`/`ImageGenerationResponse`, `oxi-ai/src/types.rs:335-395`)
-//! so a future oxi-sdk implementation can be swapped in with minimal friction.
-//! Unlike oxi-ai (which returns `Vec<Vec<u8>>` bytes), Oxios returns URLs —
+//! Field names align with oxicode-ai's dead-code types
+//! (`ImageGenerationRequest`/`ImageGenerationResponse`, `oxicode-ai/src/types.rs:335-395`)
+//! so a future oxicode-sdk implementation can be swapped in with minimal friction.
+//! Unlike oxicode-ai (which returns `Vec<Vec<u8>>` bytes), Oxios returns URLs —
 //! agents consume images as markdown `![](url)`.
 
 use serde::{Deserialize, Serialize};

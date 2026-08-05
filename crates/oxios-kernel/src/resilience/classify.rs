@@ -2,9 +2,9 @@
 //!
 //! The strategy, in priority order:
 //!
-//! 1. **Downcast fast-path** — attempt to downcast to oxi-sdk structured
+//! 1. **Downcast fast-path** — attempt to downcast to oxicode-sdk structured
 //!    error types. Today the typed `ProviderError` is stringified at the
-//!    oxi-agent boundary, so this rarely succeeds. Kept for forward
+//!    oxicode-agent boundary, so this rarely succeeds. Kept for forward
 //!    compatibility if upstream preserves the type in a future release.
 //! 2. **Cause-chain Display walk** — collect every cause's Display
 //!    string, then pattern-match. The chain matters because the
@@ -17,7 +17,7 @@
 //!
 //! Patterns are matched case-insensitively against the lowercased
 //! concatenated cause chain. Keep them under test (this file's
-//! `#[cfg(test)]` block) and review on oxi-ai upgrades — a provider
+//! `#[cfg(test)]` block) and review on oxicode-ai upgrades — a provider
 //! changing its error wording degrades classification to Unknown, which
 //! is the safe fallback.
 
@@ -26,7 +26,7 @@ use oxios_ouroboros::FailureClass;
 /// Classify an `anyhow::Error` into a `FailureClass`.
 ///
 /// The error is expected to come from `agent.run_streaming()` after
-/// oxi-agent's internal retries are exhausted (typically as
+/// oxicode-agent's internal retries are exhausted (typically as
 /// `AgentError::RetriesExhausted { last_error }` or
 /// `AgentError::Stream(...)`). The classification is best-effort; when
 /// in doubt, returns `FailureClass::Unknown`.
@@ -45,21 +45,21 @@ pub fn classify(error: &anyhow::Error) -> FailureClass {
 /// that carries an unambiguous classification signal. Returns `Some` on
 /// the first match.
 ///
-/// Today oxi-agent stringifies `ProviderError` so this almost never
+/// Today oxicode-agent stringifies `ProviderError` so this almost never
 /// fires. Kept so that a future upstream change preserving the type
 /// automatically yields better classification.
 fn downcast_class(error: &anyhow::Error) -> Option<FailureClass> {
     for cause in error.chain() {
-        if let Some(sdk_err) = cause.downcast_ref::<oxi_sdk::SdkError>() {
+        if let Some(sdk_err) = cause.downcast_ref::<oxicode_sdk::SdkError>() {
             return Some(sdk_to_class(sdk_err));
         }
     }
     None
 }
 
-/// Map an `oxi_sdk::SdkError` to a `FailureClass` (typed fast-path).
-fn sdk_to_class(err: &oxi_sdk::SdkError) -> FailureClass {
-    use oxi_sdk::SdkError;
+/// Map an `oxicode_sdk::SdkError` to a `FailureClass` (typed fast-path).
+fn sdk_to_class(err: &oxicode_sdk::SdkError) -> FailureClass {
+    use oxicode_sdk::SdkError;
     match err {
         SdkError::ModelNotFound { .. } | SdkError::ProviderNotFound { .. } => {
             FailureClass::ModelUnavailable
@@ -179,7 +179,7 @@ fn match_pattern(lower_chain: &str) -> FailureClass {
             "network error",
             "connection",
             "timeout",
-            "timed out", // oxi-ai ProviderError::Timeout Display
+            "timed out", // oxicode-ai ProviderError::Timeout Display
             "deadline exceeded",
             "request failed",
         ],

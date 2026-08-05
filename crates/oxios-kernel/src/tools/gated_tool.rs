@@ -6,7 +6,7 @@
 //!
 //! - No changes to individual tool code
 //! - New tools are automatically protected
-//! - oxi-sdk crate tools (ReadTool, WriteTool, etc.) are covered without modification
+//! - oxicode-sdk crate tools (ReadTool, WriteTool, etc.) are covered without modification
 //!
 //! RFC-035: After the structural `AccessGate` (CSpace / RBAC / Permissions /
 //! ExecConfig) passes, `GatedTool` consults the [`ApprovalGate`] (Step 2.5).
@@ -21,7 +21,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::Value;
 
 use crate::access_manager::{
@@ -189,7 +189,7 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
         params: Value,
         signal: Option<tokio::sync::oneshot::Receiver<()>>,
         ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let tool_name = self.inner.name();
 
         // Step 1: Check tool access permission (CSpace / RBAC / Permissions / ExecConfig).
@@ -453,7 +453,7 @@ mod tests {
     use super::*;
     use crate::access_manager::{AccessManager, AgentPermissions, NoOpAuditSink, Role, Subject};
     use crate::config::ExecConfig;
-    use oxi_sdk::ReadTool;
+    use oxicode_sdk::ReadTool;
     use parking_lot::Mutex;
 
     fn make_gate_for_test() -> Arc<AccessGate> {

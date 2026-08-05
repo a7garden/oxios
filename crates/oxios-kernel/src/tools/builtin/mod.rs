@@ -48,7 +48,7 @@ pub use skill_forge_tool::SkillForgeTool;
 use crate::KernelHandle;
 use crate::tools::{AskUserTool, MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 use crate::types::AgentId;
-use oxi_sdk::ToolRegistry;
+use oxicode_sdk::ToolRegistry;
 
 /// Register all kernel domain tools into the registry.
 ///
@@ -68,11 +68,11 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     registry.register(MemoryReadTool::from_kernel(kernel));
     registry.register(MemorySearchTool::from_kernel(kernel));
 
-    // Subagent tool — oxi-agent's native `subagent` tool (RFC-035 gap 3).
+    // Subagent tool — oxicode-agent's native `subagent` tool (RFC-035 gap 3).
     // Wired via AgentConfig.subagent_runner (set in agent_runtime.rs).
     // When the runner is Some, executes in-process; when None, falls back
     // to the CLI spawn path (which is dormant in oxios — no `oxi` binary).
-    registry.register(oxi_agent::SubagentTool::new());
+    registry.register(oxicode_agent::SubagentTool::new());
 
     // Kernel domain tools (take &KernelHandle)
     registry.register(ProjectTool::from_kernel(kernel));

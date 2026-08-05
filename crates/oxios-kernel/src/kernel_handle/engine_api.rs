@@ -1,6 +1,6 @@
 //! Engine API — LLM engine introspection + config writes + routing control.
 //!
-//! Provides access to the oxi-sdk model catalog (providers, models, search)
+//! Provides access to the oxicode-sdk model catalog (providers, models, search)
 //! and write operations that persist to config.toml (model, API key, routing).
 //!
 //! Routing statistics (`RoutingStats`) are shared between this API and
@@ -223,9 +223,9 @@ impl RoutingStats {
 // ── Model cost estimation ────────────────────────────────────────────────────
 
 /// Estimate cost in USD for a model given token usage.
-/// Uses oxi-sdk's model_db for per-model pricing.
+/// Uses oxicode-sdk's model_db for per-model pricing.
 pub fn estimate_cost(model_id: &str, input_tokens: u64, output_tokens: u64) -> f64 {
-    let entries = oxi_sdk::get_provider_models(model_id.split('/').next().unwrap_or(model_id));
+    let entries = oxicode_sdk::get_provider_models(model_id.split('/').next().unwrap_or(model_id));
     let entry = entries
         .iter()
         .find(|e| format!("{}/{}", e.provider, e.id) == model_id);
@@ -262,17 +262,17 @@ pub enum ProviderCategory {
 ///
 /// This table is the **single source of truth** for provider-facing
 /// metadata in the Web UI. It enriches the dynamic list returned by
-/// `oxi_sdk::get_providers()` with human-friendly labels, UI grouping,
+/// `oxicode_sdk::get_providers()` with human-friendly labels, UI grouping,
 /// and a flag for providers that should not be exposed to the Web
 /// dashboard (e.g. those requiring non-API-key auth like AWS SigV4 or
 /// OAuth, or region-specific endpoints).
 ///
-/// New providers added to `oxi-sdk` automatically appear in the UI
+/// New providers added to `oxicode-sdk` automatically appear in the UI
 /// with sensible fallbacks (`Open` category, derived display name)
 /// even before they get an entry here.
 #[derive(Debug, Clone, Copy)]
 struct ProviderMeta {
-    /// Canonical provider id (matches `oxi_sdk::get_providers()`).
+    /// Canonical provider id (matches `oxicode_sdk::get_providers()`).
     id: &'static str,
     /// Human-readable name shown in dropdowns and badges.
     display_name: &'static str,
@@ -605,7 +605,7 @@ fn provider_category(id: &str) -> ProviderCategory {
 /// Resolve a display name for a provider id.
 ///
 /// Falls back to a Title-Cased id for unknown providers so that
-/// newly added `oxi-sdk` providers still render acceptably until a
+/// newly added `oxicode-sdk` providers still render acceptably until a
 /// real entry lands in [`PROVIDER_META`].
 fn provider_display_name(id: &str) -> String {
     provider_meta(id)
@@ -702,8 +702,8 @@ pub struct ModelInfo {
     pub cost_cache_write: f64,
 }
 
-impl From<&oxi_sdk::ModelEntry> for ModelInfo {
-    fn from(entry: &oxi_sdk::ModelEntry) -> Self {
+impl From<&oxicode_sdk::ModelEntry> for ModelInfo {
+    fn from(entry: &oxicode_sdk::ModelEntry) -> Self {
         Self {
             id: format!("{}/{}", entry.provider, entry.id),
             name: entry.name.to_string(),
@@ -714,8 +714,8 @@ impl From<&oxi_sdk::ModelEntry> for ModelInfo {
                 .input
                 .iter()
                 .map(|m| match m {
-                    oxi_sdk::InputModality::Text => InputModality::Text,
-                    oxi_sdk::InputModality::Image => InputModality::Image,
+                    oxicode_sdk::InputModality::Text => InputModality::Text,
+                    oxicode_sdk::InputModality::Image => InputModality::Image,
                     _ => InputModality::Text,
                 })
                 .collect(),
@@ -729,13 +729,13 @@ impl From<&oxi_sdk::ModelEntry> for ModelInfo {
     }
 }
 
-impl From<&oxi_sdk::CatalogModelEntry> for ModelInfo {
+impl From<&oxicode_sdk::CatalogModelEntry> for ModelInfo {
     /// Build a [`ModelInfo`] from a live catalog entry (catalog port).
     ///
-    /// Same fields as the [`ModelEntry`](oxi_sdk::ModelEntry) path; the
+    /// Same fields as the [`ModelEntry`](oxicode_sdk::ModelEntry) path; the
     /// catalog entry additionally reflects runtime models.dev refresh +
     /// user overrides when wired into the engine.
-    fn from(entry: &oxi_sdk::CatalogModelEntry) -> Self {
+    fn from(entry: &oxicode_sdk::CatalogModelEntry) -> Self {
         Self {
             id: format!("{}/{}", entry.provider, entry.model_id),
             name: entry.name.clone(),
@@ -916,7 +916,7 @@ impl EngineApi {
 
     // ── Read operations ────────────────────────────────────────────────
 
-    /// List all available providers from the oxi-sdk catalog.
+    /// List all available providers from the oxicode-sdk catalog.
     ///
     /// Reads provider/model counts from the live catalog (runtime models.dev
     /// refresh + user overrides) when wired into the engine, falling back to
@@ -927,7 +927,7 @@ impl EngineApi {
     /// with credential status, display name, and description.
     ///
     /// Providers without a [`PROVIDER_META`] entry are shown by
-    /// default — a new provider landing in `oxi-sdk` should be
+    /// default — a new provider landing in `oxicode-sdk` should be
     /// available to users even before its metadata is added here.
     pub fn providers(&self) -> Vec<ProviderInfo> {
         let catalog = self.engine_handle.get().oxi().catalog().clone();
@@ -935,7 +935,7 @@ impl EngineApi {
         let all: Vec<String> = if use_catalog {
             catalog.list_providers_sync()
         } else {
-            oxi_sdk::get_providers()
+            oxicode_sdk::get_providers()
                 .into_iter()
                 .map(|s| s.to_string())
                 .collect()
@@ -958,7 +958,7 @@ impl EngineApi {
                 let model_count = if use_catalog {
                     catalog.list_models_sync(&p).len()
                 } else {
-                    oxi_sdk::get_provider_models(&p).len()
+                    oxicode_sdk::get_provider_models(&p).len()
                 };
                 let resolved = CredentialStore::resolve(&p, api_key_override.as_deref());
                 let has_key = resolved.is_some();
@@ -966,7 +966,7 @@ impl EngineApi {
                     .map(|(_, src)| match src {
                         crate::credential::CredentialSource::EnvVar => "env",
                         crate::credential::CredentialSource::Config => "config",
-                        crate::credential::CredentialSource::OxiAuthStore => "auth_store",
+                        crate::credential::CredentialSource::OxicodeAuthStore => "auth_store",
                     })
                     .unwrap_or("none")
                     .to_string();
@@ -996,7 +996,7 @@ impl EngineApi {
         let models: Vec<ModelInfo> = if !live.is_empty() {
             live.iter().map(ModelInfo::from).collect()
         } else {
-            oxi_sdk::get_provider_models(provider)
+            oxicode_sdk::get_provider_models(provider)
                 .iter()
                 .map(ModelInfo::from)
                 .collect()
@@ -1027,7 +1027,7 @@ impl EngineApi {
         if !live.is_empty() {
             live.iter().map(ModelInfo::from).collect()
         } else {
-            oxi_sdk::search_models(query)
+            oxicode_sdk::search_models(query)
                 .into_iter()
                 .map(ModelInfo::from)
                 .collect()
@@ -1044,7 +1044,7 @@ impl EngineApi {
                 match src {
                     crate::credential::CredentialSource::EnvVar => "env",
                     crate::credential::CredentialSource::Config => "config",
-                    crate::credential::CredentialSource::OxiAuthStore => "auth_store",
+                    crate::credential::CredentialSource::OxicodeAuthStore => "auth_store",
                 }
                 .to_string()
             })
@@ -1141,7 +1141,7 @@ impl EngineApi {
 
     /// Set an API key for a provider.
     ///
-    /// Stores the key via CredentialStore (→ ~/.oxi/auth.json) and also
+    /// Stores the key via CredentialStore (→ ~/.oxicode/auth.json) and also
     /// updates config.toml's `[engine].api_key` when the provider matches
     /// the current default model. Hot-swaps the runtime engine afterward.
     pub fn set_api_key(&self, provider: &str, key: &str) -> anyhow::Result<()> {
@@ -1177,7 +1177,7 @@ impl EngineApi {
     /// Removes the key from config.toml's `[engine].api_key` (when the
     /// provider matches the current default model) and rebuilds the engine
     /// so the credential is dropped from the running process. The key in
-    /// `~/.oxi/auth.json` must be removed separately via `CredentialStore::delete`.
+    /// `~/.oxicode/auth.json` must be removed separately via `CredentialStore::delete`.
     pub fn clear_api_key(&self, provider: &str) -> anyhow::Result<()> {
         let snapshot = {
             let mut cfg = self.config.write();
@@ -1200,7 +1200,7 @@ impl EngineApi {
 
     /// Delete a provider's API key entirely.
     ///
-    /// Removes the credential from both the auth store (`~/.oxi/auth.json`)
+    /// Removes the credential from both the auth store (`~/.oxicode/auth.json`)
     /// and `config.toml` (when the provider matches the current default).
     /// Hot-swaps the runtime engine so the credential is dropped immediately.
     ///
@@ -1234,7 +1234,7 @@ impl EngineApi {
     ///
     /// Persists the options and makes them available for the next agent run.
     /// They are passed through to `AgentLoopConfig::provider_options`.
-    pub fn set_provider_options(&self, opts: &oxi_sdk::ProviderOptions) -> anyhow::Result<()> {
+    pub fn set_provider_options(&self, opts: &oxicode_sdk::ProviderOptions) -> anyhow::Result<()> {
         let snapshot = {
             let mut cfg = self.config.write();
             cfg.engine.provider_options = Some(opts.clone());
@@ -1457,12 +1457,12 @@ impl EngineApi {
             anyhow::bail!("API key is empty");
         }
 
-        let builder = oxi_sdk::OxiBuilder::new()
+        let builder = oxicode_sdk::OxicodeBuilder::new()
             .with_builtins()
             .api_key(provider, api_key);
         let oxi = builder.build();
 
-        let models = oxi_sdk::get_provider_models(provider);
+        let models = oxicode_sdk::get_provider_models(provider);
         if models.is_empty() {
             anyhow::bail!("No models found for provider '{provider}'");
         }
@@ -1475,8 +1475,8 @@ impl EngineApi {
             .create_provider(provider)
             .with_context(|| format!("Failed to create provider '{provider}'"))?;
 
-        let mut ctx = oxi_sdk::Context::new();
-        ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new("Hi")));
+        let mut ctx = oxicode_sdk::Context::new();
+        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new("Hi")));
 
         let stream_result = tokio::time::timeout(
             std::time::Duration::from_secs(15),
@@ -1575,7 +1575,7 @@ impl EngineApi {
             .map(|(_, src)| match src {
                 crate::credential::CredentialSource::EnvVar => "env",
                 crate::credential::CredentialSource::Config
-                | crate::credential::CredentialSource::OxiAuthStore => "auth_store",
+                | crate::credential::CredentialSource::OxicodeAuthStore => "auth_store",
             })
             .unwrap_or("none")
             .to_string();
@@ -1599,7 +1599,7 @@ impl EngineApi {
         if !live.is_empty() {
             live.iter().map(|m| m.model_id.clone()).collect()
         } else {
-            oxi_sdk::get_provider_models(provider_id)
+            oxicode_sdk::get_provider_models(provider_id)
                 .iter()
                 .map(|m| m.id.to_string())
                 .collect()
@@ -1639,9 +1639,9 @@ impl EngineApi {
             }
         };
 
-        let mut ctx = oxi_sdk::Context::new();
+        let mut ctx = oxicode_sdk::Context::new();
         ctx.set_system_prompt(FOLLOW_UP_SYSTEM_PROMPT);
-        ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(format!(
+        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new(format!(
             "Last assistant message:\n\"\"\"\n{text}\n\"\"\""
         ))));
 
@@ -1658,9 +1658,9 @@ impl EngineApi {
         let mut pinned = std::pin::pin!(stream);
         while let Some(event) = pinned.next().await {
             match event {
-                oxi_sdk::ProviderEvent::TextDelta { delta, .. } => raw.push_str(&delta),
-                oxi_sdk::ProviderEvent::Done { .. } => break,
-                oxi_sdk::ProviderEvent::Error { error, .. } => {
+                oxicode_sdk::ProviderEvent::TextDelta { delta, .. } => raw.push_str(&delta),
+                oxicode_sdk::ProviderEvent::Done { .. } => break,
+                oxicode_sdk::ProviderEvent::Error { error, .. } => {
                     tracing::warn!(error = ?error, "follow-up: stream error");
                     return vec![];
                 }

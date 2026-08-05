@@ -3,17 +3,17 @@
 //! Reads API keys from multiple sources with clear priority:
 //! 1. `OXIOS_<PROVIDER>_API_KEY` env var (containers/K8s)
 //! 2. `config.toml` → `[engine].api_key` (explicit override)
-//! 3. oxios auth store (`~/.oxios/auth.json`, via `OXI_HOME`) — primary
-//! 4. shared oxi-cli store (`~/.oxi/auth.json`) — backward-compat read
-//!    fallback, so keys registered via the standalone `oxi` CLI are still
+//! 3. oxios auth store (`~/.oxios/auth.json`, via `OXICODE_HOME`) — primary
+//! 4. shared oxicode-cli store (`~/.oxicode/auth.json`) — backward-compat read
+//!    fallback, so keys registered via the standalone oxicode CLI are still
 //!    detected
-//! 5. oxi-ai env var fallback (CI/CD, containers)
+//! 5. oxicode-ai env var fallback (CI/CD, containers)
 //!
 //! Writes (`store`/onboarding/`set_api_key`) always target the oxios auth store
 //! (`~/.oxios/auth.json`), keeping oxios's credentials isolated in its own
-//! product home. The shared `~/.oxi/auth.json` is treated as read-only here.
+//! product home. The shared `~/.oxicode/auth.json` is treated as read-only here.
 //!
-//! Both the modern `TokenBundle` and the legacy `oxi-cli`
+//! Both the modern `TokenBundle` and the legacy `oxicode-cli`
 //! (`{"type":"api_key","key":"..."}`) shapes are honored in either store.
 
 use anyhow::Result;
@@ -25,8 +25,8 @@ use std::path::PathBuf;
 pub enum CredentialSource {
     /// From config.toml [engine].api_key
     Config,
-    /// From an auth store (~/.oxios or ~/.oxi)
-    OxiAuthStore,
+    /// From an auth store (~/.oxios or ~/.oxicode)
+    OxicodeAuthStore,
     /// From environment variable
     EnvVar,
 }
@@ -38,7 +38,7 @@ impl CredentialStore {
     /// Resolve the best available API key for a provider.
     ///
     /// Priority: OXIOS_<PROVIDER>_API_KEY env → config.toml → oxios auth store
-    /// (~/.oxios) → shared oxi-cli store (~/.oxi) → oxi-ai env fallback.
+    /// (~/.oxios) → shared oxicode-cli store (~/.oxicode) → oxicode-ai env fallback.
     /// Environment variables take highest priority for container/K8s deployments.
     pub fn resolve(provider: &str, config_key: Option<&str>) -> Option<(String, CredentialSource)> {
         // 1. Explicit Oxios env var: OXIOS_<PROVIDER>_API_KEY (highest priority for containers)
@@ -56,20 +56,20 @@ impl CredentialStore {
             return Some((key.to_string(), CredentialSource::Config));
         }
 
-        // 3. oxios auth store (~/.oxios/auth.json via OXI_HOME) — primary
-        if let Ok(Some(token)) = oxi_sdk::load_token(provider)
+        // 3. oxios auth store (~/.oxios/auth.json via OXICODE_HOME) — primary
+        if let Ok(Some(token)) = oxicode_sdk::load_token(provider)
             && !token.access_token.is_empty()
         {
-            return Some((token.access_token, CredentialSource::OxiAuthStore));
+            return Some((token.access_token, CredentialSource::OxicodeAuthStore));
         }
 
-        // 4. Shared oxi-cli store (~/.oxi/auth.json) — backward-compat read.
+        // 4. Shared oxicode-cli store (~/.oxicode/auth.json) — backward-compat read.
         if let Some(key) = load_from_shared_store(provider) {
-            return Some((key, CredentialSource::OxiAuthStore));
+            return Some((key, CredentialSource::OxicodeAuthStore));
         }
 
-        // 5. oxi-ai env var fallback
-        if let Some(key) = oxi_sdk::get_env_api_key(provider) {
+        // 5. oxicode-ai env var fallback
+        if let Some(key) = oxicode_sdk::get_env_api_key(provider) {
             return Some((key, CredentialSource::EnvVar));
         }
 
@@ -78,13 +78,13 @@ impl CredentialStore {
         //    stores are consulted — env vars use the canonical name.
         {
             let alt = format!("{provider}-coding-plan");
-            if let Ok(Some(token)) = oxi_sdk::load_token(&alt)
+            if let Ok(Some(token)) = oxicode_sdk::load_token(&alt)
                 && !token.access_token.is_empty()
             {
-                return Some((token.access_token, CredentialSource::OxiAuthStore));
+                return Some((token.access_token, CredentialSource::OxicodeAuthStore));
             }
             if let Some(key) = load_from_shared_store(&alt) {
-                return Some((key, CredentialSource::OxiAuthStore));
+                return Some((key, CredentialSource::OxicodeAuthStore));
             }
         }
         None
@@ -97,12 +97,12 @@ impl CredentialStore {
 
     /// Store an API key to oxios's auth store (`~/.oxios/auth.json`).
     ///
-    /// Writes are isolated to the oxios product home (`OXI_HOME`); the shared
-    /// `~/.oxi/auth.json` (oxi CLI) is never written from here. If the oxios
+    /// Writes are isolated to the oxios product home (`OXICODE_HOME`); the shared
+    /// `~/.oxicode/auth.json` (oxicode CLI) is never written from here. If the oxios
     /// auth store contains legacy entries that don't deserialize as
     /// `TokenBundle`, they are auto-migrated before saving.
     pub fn store(provider: &str, api_key: &str) -> Result<()> {
-        let token = oxi_sdk::TokenBundle {
+        let token = oxicode_sdk::TokenBundle {
             access_token: api_key.to_string(),
             refresh_token: None,
             token_type: "Bearer".to_string(),
@@ -113,13 +113,13 @@ impl CredentialStore {
         Self::store_token(provider, token)
     }
 
-    /// Store an arbitrary [`oxi_sdk::TokenBundle`] (e.g. an OAuth token with a
+    /// Store an arbitrary [`oxicode_sdk::TokenBundle`] (e.g. an OAuth token with a
     /// `refresh_token`) to the oxios auth store, applying the same legacy
     /// migration as [`store`](Self::store). Used by the OAuth broker.
-    pub fn store_token(provider: &str, token: oxi_sdk::TokenBundle) -> Result<()> {
+    pub fn store_token(provider: &str, token: oxicode_sdk::TokenBundle) -> Result<()> {
         // Try the normal path first.
-        if let Err(e) = oxi_sdk::save_token(provider, &token) {
-            // If the auth store has legacy entries (e.g. `oxi-cli` wrote
+        if let Err(e) = oxicode_sdk::save_token(provider, &token) {
+            // If the auth store has legacy entries (e.g. `oxicode-cli` wrote
             // `{"type":"api_key","key":"..."}`), `save_token` fails because
             // it can't deserialize them as `TokenBundle`.  Migrate and retry.
             if is_legacy_auth_error(&e) {
@@ -137,13 +137,13 @@ impl CredentialStore {
     /// Delete a credential from both auth stores.
     ///
     /// Removes the entry from the oxios store (`~/.oxios/auth.json`) and, if
-    /// present, from the shared oxi-cli store (`~/.oxi/auth.json`). No-op if
+    /// present, from the shared oxicode-cli store (`~/.oxicode/auth.json`). No-op if
     /// neither contains the key.
     pub fn delete(key: &str) -> Result<()> {
-        // Primary: oxios store (OXI_HOME). Best-effort.
-        let _ = oxi_sdk::remove_token(key);
+        // Primary: oxios store (OXICODE_HOME). Best-effort.
+        let _ = oxicode_sdk::remove_token(key);
 
-        // Shared: oxi-cli store (~/.oxi/auth.json).
+        // Shared: oxicode-cli store (~/.oxicode/auth.json).
         if let Ok(path) = shared_auth_json_path()
             && path.exists()
             && let Ok(raw) = std::fs::read_to_string(&path)
@@ -152,7 +152,7 @@ impl CredentialStore {
             && map.remove(key).is_some()
         {
             std::fs::write(&path, serde_json::to_string_pretty(&map)?)?;
-            tracing::info!(key = %key, "Credential deleted from shared oxi-cli auth store");
+            tracing::info!(key = %key, "Credential deleted from shared oxicode-cli auth store");
         }
         Ok(())
     }
@@ -170,15 +170,15 @@ impl CredentialStore {
         {
             return Some((val, CredentialSource::EnvVar));
         }
-        // 2. oxios auth store (~/.oxios via OXI_HOME) — primary
-        if let Ok(Some(token)) = oxi_sdk::load_token(key)
+        // 2. oxios auth store (~/.oxios via OXICODE_HOME) — primary
+        if let Ok(Some(token)) = oxicode_sdk::load_token(key)
             && !token.access_token.is_empty()
         {
-            return Some((token.access_token, CredentialSource::OxiAuthStore));
+            return Some((token.access_token, CredentialSource::OxicodeAuthStore));
         }
-        // 3. Shared oxi-cli store (~/.oxi/auth.json) — backward-compat read.
+        // 3. Shared oxicode-cli store (~/.oxicode/auth.json) — backward-compat read.
         if let Some(val) = load_from_shared_store(key) {
-            return Some((val, CredentialSource::OxiAuthStore));
+            return Some((val, CredentialSource::OxicodeAuthStore));
         }
         None
     }
@@ -194,9 +194,9 @@ impl CredentialStore {
     }
 }
 
-// ── Shared oxi-cli store (read-only fallback) ──────────────────────────────
+// ── Shared oxicode-cli store (read-only fallback) ──────────────────────────────
 
-/// Legacy entry from `oxi-cli`: `{"type":"api_key","key":"..."}`.
+/// Legacy entry from `oxicode-cli`: `{"type":"api_key","key":"..."}`.
 #[derive(serde::Deserialize)]
 struct LegacyEntry {
     #[allow(dead_code)]
@@ -212,12 +212,12 @@ fn extract_credential(provider: &str, raw: &str) -> Option<String> {
     let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(raw).ok()?;
     let entry = map.get(provider)?;
     // Modern TokenBundle first.
-    if let Ok(bundle) = serde_json::from_value::<oxi_sdk::TokenBundle>(entry.clone())
+    if let Ok(bundle) = serde_json::from_value::<oxicode_sdk::TokenBundle>(entry.clone())
         && !bundle.access_token.is_empty()
     {
         return Some(bundle.access_token);
     }
-    // Legacy `oxi-cli` shape.
+    // Legacy `oxicode-cli` shape.
     if let Ok(legacy) = serde_json::from_value::<LegacyEntry>(entry.clone())
         && !legacy.key.is_empty()
     {
@@ -226,9 +226,9 @@ fn extract_credential(provider: &str, raw: &str) -> Option<String> {
     None
 }
 
-/// Load a credential from the shared oxi-cli store (`~/.oxi/auth.json`), which
+/// Load a credential from the shared oxicode-cli store (`~/.oxicode/auth.json`), which
 /// oxios treats as a read-only secondary source. Tries `TokenBundle` first,
-/// then the legacy `oxi-cli` shape. Returns `None` when the file or entry is
+/// then the legacy `oxicode-cli` shape. Returns `None` when the file or entry is
 /// absent.
 fn load_from_shared_store(provider: &str) -> Option<String> {
     let path = match shared_auth_json_path() {
@@ -252,13 +252,13 @@ fn load_from_shared_store(provider: &str) -> Option<String> {
 }
 
 /// Check if an error is caused by a legacy-format auth.json.
-fn is_legacy_auth_error(err: &oxi_sdk::OAuthError) -> bool {
-    matches!(err, oxi_sdk::OAuthError::Json(_))
+fn is_legacy_auth_error(err: &oxicode_sdk::OAuthError) -> bool {
+    matches!(err, oxicode_sdk::OAuthError::Json(_))
 }
 
 /// Migrate a legacy auth.json to `TokenBundle` format, preserving entries that
 /// can be converted and writing the new token for `provider`.
-fn migrate_legacy_auth_store(provider: &str, new_token: &oxi_sdk::TokenBundle) -> Result<()> {
+fn migrate_legacy_auth_store(provider: &str, new_token: &oxicode_sdk::TokenBundle) -> Result<()> {
     let path = shared_auth_json_path()?;
     let raw = std::fs::read_to_string(&path)?;
 
@@ -274,7 +274,7 @@ fn migrate_legacy_auth_store(provider: &str, new_token: &oxi_sdk::TokenBundle) -
         }
 
         // Try parsing as TokenBundle first.
-        if let Ok(bundle) = serde_json::from_value::<oxi_sdk::TokenBundle>(value.clone()) {
+        if let Ok(bundle) = serde_json::from_value::<oxicode_sdk::TokenBundle>(value.clone()) {
             migrated.insert(key.clone(), bundle);
             continue;
         }
@@ -283,7 +283,7 @@ fn migrate_legacy_auth_store(provider: &str, new_token: &oxi_sdk::TokenBundle) -
         if let Ok(legacy) = serde_json::from_value::<LegacyEntry>(value.clone()) {
             migrated.insert(
                 key.clone(),
-                oxi_sdk::TokenBundle {
+                oxicode_sdk::TokenBundle {
                     access_token: legacy.key,
                     refresh_token: None,
                     token_type: "Bearer".to_string(),
@@ -301,44 +301,44 @@ fn migrate_legacy_auth_store(provider: &str, new_token: &oxi_sdk::TokenBundle) -
     // Insert the new token.
     migrated.insert(provider.to_string(), new_token.clone());
 
-    // Write back as proper AuthStore (under OXI_HOME → ~/.oxios/auth.json).
-    let store = oxi_sdk::AuthStore { tokens: migrated };
-    oxi_sdk::save_auth_store(&store)?;
+    // Write back as proper AuthStore (under OXICODE_HOME → ~/.oxios/auth.json).
+    let store = oxicode_sdk::AuthStore { tokens: migrated };
+    oxicode_sdk::save_auth_store(&store)?;
     Ok(())
 }
 
-/// Resolve the shared oxi-cli auth store path (`~/.oxi/auth.json`).
+/// Resolve the shared oxicode-cli auth store path (`~/.oxicode/auth.json`).
 ///
-/// This is deliberately **independent of `OXI_HOME`**: it always points at the
-/// oxi CLI's home so oxios can read keys registered by the standalone `oxi`
+/// This is deliberately **independent of `OXICODE_HOME`**: it always points at the
+/// oxicode CLI's home so oxios can read keys registered by the standalone oxicode CLI
 /// tool as a backward-compat source, even while oxios's own writes are isolated
-/// under `OXI_HOME` (`~/.oxios/auth.json`).
+/// under `OXICODE_HOME` (`~/.oxios/auth.json`).
 fn shared_auth_json_path() -> Result<PathBuf> {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .map_err(|_| anyhow::anyhow!("Cannot determine home directory"))?;
-    Ok(PathBuf::from(home).join(".oxi").join("auth.json"))
+    Ok(PathBuf::from(home).join(".oxicode").join("auth.json"))
 }
 
 /// Discover all provider names stored in either auth store.
 ///
 /// Returns the union of provider IDs from the oxios store (`~/.oxios/auth.json`
-/// via `OXI_HOME`) and the shared oxi-cli store (`~/.oxi/auth.json`). Special
+/// via `OXICODE_HOME`) and the shared oxicode-cli store (`~/.oxicode/auth.json`). Special
 /// keys like `"version"` are filtered out. Used by `OxiosEngine::from_config`
 /// to inject credentials for providers beyond the hardcoded known list.
 pub fn discover_auth_store_providers() -> Result<Vec<String>> {
     let mut providers: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let keep = |k: &str| k != "version" && !k.starts_with('_');
 
-    // Primary: oxios store (OXI_HOME).
-    if let Ok(store) = oxi_sdk::load_auth_store() {
+    // Primary: oxios store (OXICODE_HOME).
+    if let Ok(store) = oxicode_sdk::load_auth_store() {
         for k in store.tokens.keys() {
             if keep(k) {
                 providers.insert(k.clone());
             }
         }
     }
-    // Shared: oxi-cli store (~/.oxi/auth.json) — top-level keys, any shape.
+    // Shared: oxicode-cli store (~/.oxicode/auth.json) — top-level keys, any shape.
     if let Ok(path) = shared_auth_json_path()
         && let Ok(raw) = std::fs::read_to_string(&path)
         && let Ok(map) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&raw)
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn extract_credential_roundtrips_token_bundle() {
         // Self-consistent: serialize a real TokenBundle, then read it back.
-        let bundle = oxi_sdk::TokenBundle {
+        let bundle = oxicode_sdk::TokenBundle {
             access_token: "sk-bundle".into(),
             refresh_token: None,
             token_type: "Bearer".into(),

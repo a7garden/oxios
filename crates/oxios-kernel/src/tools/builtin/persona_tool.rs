@@ -22,7 +22,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -143,7 +143,7 @@ impl AgentTool for PersonaTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxicode_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -450,7 +450,7 @@ async fn security_review(
     persona: &Persona,
 ) -> anyhow::Result<ReviewVerdict> {
     let engine = engine_handle.get();
-    let agent_config = oxi_sdk::AgentConfig {
+    let agent_config = oxicode_sdk::AgentConfig {
         description: Some("Persona security review".into()),
         model_id: engine.default_model_id().to_string(),
         system_prompt: Some(REVIEW_SYSTEM_PROMPT.to_string()),

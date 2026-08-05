@@ -60,7 +60,7 @@ pub trait OAuthProvider: Send + Sync {
     /// broker can persist the full bundle (rotated `refresh_token`,
     /// fresh `expires_in`, scope changes). Static-key providers leave
     /// this unimplemented.
-    async fn refresh(&self, refresh_token: &str) -> Result<oxi_sdk::TokenBundle>;
+    async fn refresh(&self, refresh_token: &str) -> Result<oxicode_sdk::TokenBundle>;
 
     /// Revoke a token at the provider (best-effort).
     async fn revoke(&self, token: &str) -> Result<()>;
@@ -254,7 +254,7 @@ impl OAuthProvider for GitHubProvider {
         }
     }
 
-    async fn refresh(&self, _refresh_token: &str) -> Result<oxi_sdk::TokenBundle> {
+    async fn refresh(&self, _refresh_token: &str) -> Result<oxicode_sdk::TokenBundle> {
         // GitHub device-flow tokens don't expire — nothing to refresh.
         anyhow::bail!("github device-flow tokens do not support refresh")
     }
@@ -380,7 +380,7 @@ impl OAuthBroker {
                 expires_in,
                 scope,
             } => {
-                let bundle = oxi_sdk::TokenBundle {
+                let bundle = oxicode_sdk::TokenBundle {
                     access_token,
                     refresh_token,
                     token_type: "Bearer".to_string(),
@@ -441,7 +441,7 @@ mod tests {
         async fn poll(&self, _device_code: &str) -> Result<PollOutcome> {
             Ok(PollOutcome::Pending)
         }
-        async fn refresh(&self, _: &str) -> Result<oxi_sdk::TokenBundle> {
+        async fn refresh(&self, _: &str) -> Result<oxicode_sdk::TokenBundle> {
             unreachable!()
         }
         async fn revoke(&self, _: &str) -> Result<()> {

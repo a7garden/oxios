@@ -1,7 +1,7 @@
 //! Oxios sub-agent runner — in-process delegation via oxi-sdk 0.54.0+.
 //!
-//! Wraps [`oxi_sdk::SdkSubagentRunner`] (which wraps an `Oxi` instance)
-//! and exposes it as an [`oxi_agent::SubagentRunner`] for the `subagent`
+//! Wraps [`oxicode_sdk::SdkSubagentRunner`] (which wraps an `Oxi` instance)
+//! and exposes it as an [`oxicode_agent::SubagentRunner`] for the `subagent`
 //! tool's in-process path. Each `run_isolated` call builds a fresh `Agent`
 //! with an empty context (full isolation from the parent), runs it, and
 //! returns only the final text + usage.
@@ -31,7 +31,7 @@
 
 use std::sync::Arc;
 
-use oxi_sdk::SdkSubagentRunner;
+use oxicode_sdk::SdkSubagentRunner;
 
 /// Oxios's in-process sub-agent runner.
 ///
@@ -53,11 +53,11 @@ impl std::fmt::Debug for OxiosSubagentRunner {
 }
 
 impl OxiosSubagentRunner {
-    /// Create from an [`oxi_sdk::Oxi`] engine instance.
+    /// Create from an [`oxicode_sdk::Oxicode`] engine instance.
     ///
-    /// The `Oxi` instance is `Arc`-backed, so this is clone-cheap and
+    /// The `Oxicode` instance is `Arc`-backed, so this is clone-cheap and
     /// safe to share across concurrent tasks.
-    pub fn new(oxi: oxi_sdk::Oxi) -> Self {
+    pub fn new(oxi: oxicode_sdk::Oxicode) -> Self {
         Self {
             inner: SdkSubagentRunner::new(oxi),
         }
@@ -65,13 +65,13 @@ impl OxiosSubagentRunner {
 
     /// Return an `Arc<dyn SubagentRunner>` suitable for wiring into
     /// `AgentConfig::subagent_runner`.
-    pub fn into_trait_object(self) -> Arc<dyn oxi_agent::SubagentRunner> {
+    pub fn into_trait_object(self) -> Arc<dyn oxicode_agent::SubagentRunner> {
         Arc::new(self)
     }
 }
 
 #[async_trait::async_trait]
-impl oxi_agent::SubagentRunner for OxiosSubagentRunner {
+impl oxicode_agent::SubagentRunner for OxiosSubagentRunner {
     async fn run_isolated(
         &self,
         agent_name: &str,
@@ -81,7 +81,7 @@ impl oxi_agent::SubagentRunner for OxiosSubagentRunner {
         tools: &[String],
         cwd: &std::path::Path,
         depth: u8,
-    ) -> anyhow::Result<oxi_agent::ForkResult> {
+    ) -> anyhow::Result<oxicode_agent::ForkResult> {
         // Delegate to the SDK's reference implementation. The sub-agent
         // is tool-less (see Security model above), so no sandbox escape.
         self.inner

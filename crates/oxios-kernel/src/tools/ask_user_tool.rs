@@ -24,7 +24,7 @@ use serde_json::{Value, json};
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext, ToolError};
+use oxicode_sdk::{AgentTool, AgentToolResult, ToolContext, ToolError};
 
 use crate::event_bus::{EventBus, KernelEvent};
 // ─── Pending Registry ──────────────────────────────────────────────────
