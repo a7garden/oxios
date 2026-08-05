@@ -8,13 +8,13 @@
 //!
 //! # Honest limitation
 //!
-//! The typed `oxi_ai::ProviderError` is stringified at the oxi-agent
+//! The typed `oxicode_ai::ProviderError` is stringified at the oxicode-agent
 //! boundary (`From<anyhow::Error>` → `AgentError::Stream(String)` /
 //! `RetriesExhausted { last_error: String }`). Downcasting to
 //! `ProviderError` across that boundary is **not possible** today. The
 //! kernel's `classify` function therefore uses message-pattern heuristics
 //! on the `Display` string. The variants here are the *contract*; the
-//! patterns are tested and reviewed on oxi-ai upgrades.
+//! patterns are tested and reviewed on oxicode-ai upgrades.
 //!
 //! Keep this enum, its `Serialize`/`Deserialize` shape, and its serde
 //! representation stable — it travels over the kernel ↔ gateway boundary

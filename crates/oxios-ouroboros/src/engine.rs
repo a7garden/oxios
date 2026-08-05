@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use futures::StreamExt;
-use oxi_sdk::{Context, Message, ProviderEvent, UserMessage};
+use oxicode_sdk::{Context, Message, ProviderEvent, UserMessage};
 use parking_lot::Mutex;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -447,9 +447,9 @@ mod tests {
     }
 
     fn fake_resolved(id: &str) -> ResolvedModel {
-        let model = oxi_sdk::Model::new(id, id, oxi_sdk::Api::OpenAiCompletions, "test", "");
-        let provider: std::sync::Arc<dyn oxi_sdk::Provider> =
-            std::sync::Arc::new(oxi_sdk::OpenAiProvider::with_base_url_and_key(
+        let model = oxicode_sdk::Model::new(id, id, oxicode_sdk::Api::OpenAiCompletions, "test", "");
+        let provider: std::sync::Arc<dyn oxicode_sdk::Provider> =
+            std::sync::Arc::new(oxicode_sdk::OpenAiProvider::with_base_url_and_key(
                 "https://invalid.invalid/v1",
                 Some("unused".to_string()),
             ));

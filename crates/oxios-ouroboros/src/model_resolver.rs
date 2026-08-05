@@ -20,7 +20,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use oxi_sdk::{Model, Provider};
+use oxicode_sdk::{Model, Provider};
 
 /// A model resolved against the live engine for one LLM-bound operation.
 ///
@@ -106,7 +106,7 @@ mod tests {
         let model = Model::new(
             "zai/glm-5-turbo",
             "GLM-5-Turbo",
-            oxi_sdk::Api::OpenAiCompletions,
+            oxicode_sdk::Api::OpenAiCompletions,
             "zai",
             "",
         );
@@ -118,7 +118,7 @@ mod tests {
     }
 
     fn unreachable_provider() -> Arc<dyn Provider> {
-        Arc::new(oxi_sdk::OpenAiProvider::with_base_url_and_key(
+        Arc::new(oxicode_sdk::OpenAiProvider::with_base_url_and_key(
             "https://invalid.invalid/v1",
             Some("unused".to_string()),
         ))
