@@ -9,7 +9,7 @@ repository = "https://github.com/project-oxi/oxios"
 [features]
 default = ["sqlite-memory"]
 wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
-native-browser = ["oxi-sdk/native-browser"]
+native-browser = ["oxicode-sdk/native-browser"]
 sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec", "oxios-memory/sqlite-memory"]
 
 # MLX embedding provider (Apple Silicon only)
@@ -23,9 +23,9 @@ oxios-markdown = { version = "1.36.0", path = "../oxios-markdown" }
 oxios-calendar = { version = "1.36.0", path = "../oxios-calendar" }
 oxios-mcp = { version = "1.36.0", path = "../oxios-mcp" }
 oxios-memory = { version = "1.36.0", path = "../oxios-memory" }
-oxi-sdk = { workspace = true }
-oxi-agent = "0.64.0"
-# oxi-ai no longer needed directly — all types re-exported via oxi-sdk
+oxicode-sdk = { workspace = true }
+oxicode-agent = "0.66.0"
+# oxicode-ai no longer needed directly — all types re-exported via oxicode-sdk
 tokio = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }

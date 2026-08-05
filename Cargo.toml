@@ -2,7 +2,7 @@
 name = "oxios"
 version = "1.36.0"
 edition = "2024"
-description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
+description = "Oxios Agent OS — Agent Operating System powered by oxicode-sdk"
 license = "MIT"
 include = [
     # Source — Rust
@@ -109,13 +109,13 @@ regex = "1"
 parking_lot = "0.12"
 arc-swap = "1.7"
 
-# oxi engine — single dependency for everything (oxi-ai re-exported via oxi-sdk).
-# 0.64: the unstable re-export surface moved behind opt-in cargo features (R3).
+# oxicode engine — single dependency for everything (oxicode-ai re-exported via oxicode-sdk).
+# 0.66.0: project renamed from oxi -> oxicode (CHANGELOG 0.65.0 Breaking).
 # oxios enables only the features it consumes:
 #   browser         — BrowseConfig / BrowserEngine (kernel_handle/browser_api.rs)
 #   delegation      — SdkSubagentRunner (subagent_runner.rs)
 #   circuit-breaker — CircuitBreaker trait + DefaultCircuitBreaker (agent_runtime LLM breaker)
-oxi-sdk = { version = "0.64.0", features = ["browser", "delegation", "circuit-breaker"] }
+oxicode-sdk = { version = "0.66.0", features = ["browser", "delegation", "circuit-breaker"] }
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
@@ -187,7 +187,7 @@ oxios-calendar = { version = "1.36.0", path = "crates/oxios-calendar" }
 oxios-markdown = { version = "1.36.0", path = "crates/oxios-markdown" }
 oxios-ouroboros = { version = "1.36.0", path = "crates/oxios-ouroboros" }
 oxios-gateway = { version = "1.36.0", path = "crates/oxios-gateway" }
-oxi-sdk = { workspace = true }
+oxicode-sdk = { workspace = true }
 
 # RFC-026: optional deps gated by features (were separate crates)
 axum = { workspace = true, optional = true }
@@ -232,7 +232,9 @@ webbrowser = "1.0"
  toml_edit = "0.22"
 include_dir = "0.7"
 
-oxibrowser = "0.16"
+# oxibrowser is a sister project (unchanged by the oxi->oxicode rename) but its
+# core crate was bumped to 0.17 by oxicode-sdk 0.66.0's native-browser feature.
+oxibrowser = "0.17"
 
 snow = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
@@ -258,8 +260,8 @@ name = "remote_probe"
 required-features = ["remote"]
 [patch.crates-io]
 oxios-kernel = { path = "crates/oxios-kernel" }
-# Uncomment for local development against oxi/oxibrowser:
-# oxi-ai = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-ai" }
-# oxi-agent = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-agent" }
-# oxi-sdk = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-sdk" }
+# Uncomment for local development against oxicode/oxibrowser:
+# oxicode-ai = { path = "/Volumes/MERCURY/PROJECTS/oxicode/oxicode-ai" }
+# oxicode-agent = { path = "/Volumes/MERCURY/PROJECTS/oxicode/oxicode-agent" }
+# oxicode-sdk = { path = "/Volumes/MERCURY/PROJECTS/oxicode/oxicode-sdk" }
 # oxibrowser = { path = "/Volumes/MERCURY/PROJECTS/oxibrowser/crates/oxibrowser" }

@@ -12,7 +12,7 @@ repository = "https://github.com/project-oxi/oxios"
 # Original: https://github.com/Q00/ouroboros (MIT License, Copyright (c) 2025 Q00)
 
 [dependencies]
-oxi-sdk = { workspace = true }
+oxicode-sdk = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }
@@ -26,5 +26,5 @@ chrono = { workspace = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]
-oxi-sdk = { workspace = true }
+oxicode-sdk = { workspace = true }
 proptest = { workspace = true }

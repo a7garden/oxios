@@ -171,7 +171,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -182,7 +182,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -460,7 +460,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "regex",
@@ -1990,7 +1990,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2121,7 +2121,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3537,6 +3537,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
+name = "globset"
+version = "0.4.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e47d37d2ae4464254884b60ab7071be2b876a9c35b696bd018ddcc76847309cd"
+dependencies = [
+ "aho-corasick",
+ "bstr",
+ "log",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4304,7 +4317,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5138,7 +5151,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5447,172 +5460,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
-name = "oxi-agent"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d2d87b873efef25b4393fc69fe32b2d244ba022e3a34b3c4f1959837dd62682"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64",
- "dirs",
- "futures",
- "glob",
- "libc",
- "oxi-ai",
- "oxi-api-stability",
- "oxi-hashline",
- "oxibrowser",
- "oxibrowser-core 0.16.0",
- "parking_lot",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "unicode-normalization",
- "uuid",
-]
-
-[[package]]
-name = "oxi-ai"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e1b7eeeefbcdf9fb83d52634037b0cd6e03b98b410ca578eb4a7aa360b8c555"
-dependencies = [
- "anyhow",
- "base64",
- "bytes",
- "chrono",
- "digest 0.10.7",
- "dirs",
- "filetime",
- "flate2",
- "fs2",
- "futures",
- "hmac",
- "jsonschema",
- "oxi-api-stability",
- "oxi-catalog",
- "parking_lot",
- "pkcs8",
- "raii_flock",
- "rand 0.9.4",
- "reqwest",
- "rsa",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "signature",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite 0.26.2",
- "toml 0.9.12+spec-1.1.0",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "oxi-api-stability"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f9f9510b5f9f0f002466b60b6a29d941f7920c63262c66e483daeb9dcb9b4c4"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "oxi-catalog"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93fbc9d57604569453ee0bc3f58d2424351fe926fbb3a1380026ead9cf7a99e1"
-dependencies = [
- "dirs",
- "filetime",
- "flate2",
- "futures",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "toml 0.9.12+spec-1.1.0",
- "tracing",
-]
-
-[[package]]
-name = "oxi-hashline"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b71e2b0a2caa6d2a9dad29d10d57bcf5914147d2ea11bab8cc0e5583bc1f1321"
-dependencies = [
- "async-trait",
- "lru 0.18.0",
- "parking_lot",
- "serde",
- "thiserror 2.0.18",
- "xxhash-rust",
-]
-
-[[package]]
-name = "oxi-sdk"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6c24f6a09f75bb73b3e07200b7656177c79ce50a32e7044575ea6c21be8b9fd"
-dependencies = [
- "anyhow",
- "async-trait",
- "blake3",
- "chrono",
- "dirs",
- "fastrand",
- "filetime",
- "flate2",
- "glob",
- "oxi-agent",
- "oxi-ai",
- "oxi-api-stability",
- "oxi-hashline",
- "oxi-snapcompact",
- "oxibrowser-core 0.17.0",
- "parking_lot",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "toml 0.9.12+spec-1.1.0",
- "tracing",
- "uuid",
- "walkdir",
-]
-
-[[package]]
-name = "oxi-snapcompact"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad28b4f169b475b8669c0c894d6e8ec3db60ce3ec20d894a695a7314d8e0d790"
-dependencies = [
- "fontdue",
- "png 0.17.16",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
 name = "oxibrowser"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5623,8 +5470,30 @@ dependencies = [
  "base64",
  "clap",
  "futures",
- "oxibrowser-cdp",
+ "oxibrowser-cdp 0.16.0",
  "oxibrowser-core 0.16.0",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "oxibrowser"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7f2e1e0b8abbfc1b709eab1d6e12f4f393f18abd9fbb8a256402ef1cdcff9e2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64",
+ "clap",
+ "futures",
+ "oxibrowser-cdp 0.17.0",
+ "oxibrowser-core 0.17.0",
  "reqwest",
  "serde",
  "serde_json",
@@ -5648,6 +5517,31 @@ dependencies = [
  "hyper-util",
  "oxibrowser-core 0.16.0",
  "oxibrowser-webapi 0.16.0",
+ "serde",
+ "serde_json",
+ "sha1",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite 0.26.2",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "oxibrowser-cdp"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85d90b401fd20c5fd09ca204a6895b179e63b123862ff56250a8d6df8a59ee0d"
+dependencies = [
+ "anyhow",
+ "base64",
+ "futures",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "oxibrowser-core 0.17.0",
+ "oxibrowser-webapi 0.17.0",
  "serde",
  "serde_json",
  "sha1",
@@ -5764,6 +5658,173 @@ dependencies = [
 ]
 
 [[package]]
+name = "oxicode-agent"
+version = "0.66.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b79edd37b30d0b2361e7d8d6384cb87e2ffb46514d7385a306b7696ca1670c41"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64",
+ "dirs",
+ "futures",
+ "glob",
+ "libc",
+ "oxibrowser 0.16.0",
+ "oxibrowser-core 0.16.0",
+ "oxicode-ai",
+ "oxicode-api-stability",
+ "oxicode-hashline",
+ "parking_lot",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "unicode-normalization",
+ "uuid",
+]
+
+[[package]]
+name = "oxicode-ai"
+version = "0.66.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c8ce5eab741f3384e02a42f445b1e62561ee13da180170b5482ef194ce54de1"
+dependencies = [
+ "anyhow",
+ "base64",
+ "bytes",
+ "chrono",
+ "digest 0.10.7",
+ "dirs",
+ "filetime",
+ "flate2",
+ "fs2",
+ "futures",
+ "hmac",
+ "jsonschema",
+ "oxicode-api-stability",
+ "oxicode-catalog",
+ "parking_lot",
+ "pkcs8",
+ "raii_flock",
+ "rand 0.9.4",
+ "reqwest",
+ "rsa",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "signature",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite 0.26.2",
+ "toml 0.9.12+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "oxicode-api-stability"
+version = "0.66.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ca98b18863de5c766154662e4a066760f886385d26edd74cf0706bd88a2f518"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "oxicode-catalog"
+version = "0.66.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1dad20b1ce40fbbbe4413e583c5d99b46c9e357a5b62040345eda6699cec1c2"
+dependencies = [
+ "dirs",
+ "filetime",
+ "flate2",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml 0.9.12+spec-1.1.0",
+ "tracing",
+]
+
+[[package]]
+name = "oxicode-hashline"
+version = "0.66.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e287dd9fd9cb0fbcc9cc0914f8c8a805c75faa449a7346b1cb10f0feda88ba8"
+dependencies = [
+ "async-trait",
+ "lru 0.18.0",
+ "parking_lot",
+ "serde",
+ "thiserror 2.0.18",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "oxicode-sdk"
+version = "0.66.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17f1da1faba6f2d5f2a3e0d994cdc93fe1b5091845b7e6aa7c49c130d1bdc63b"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "blake3",
+ "chrono",
+ "dirs",
+ "fastrand",
+ "filetime",
+ "flate2",
+ "glob",
+ "globset",
+ "oxibrowser-core 0.17.0",
+ "oxicode-agent",
+ "oxicode-ai",
+ "oxicode-api-stability",
+ "oxicode-hashline",
+ "oxicode-snapcompact",
+ "parking_lot",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "toml 0.9.12+spec-1.1.0",
+ "tracing",
+ "uuid",
+ "walkdir",
+]
+
+[[package]]
+name = "oxicode-snapcompact"
+version = "0.66.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c938805cff71e6a0642caf06c4b43beaf258f492def11f6ce604008ba47c8535"
+dependencies = [
+ "fontdue",
+ "png 0.17.16",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "oxios"
 version = "1.36.0"
 dependencies = [
@@ -5787,8 +5848,8 @@ dependencies = [
  "libc",
  "local-ip-address",
  "mime_guess",
- "oxi-sdk",
- "oxibrowser",
+ "oxibrowser 0.17.0",
+ "oxicode-sdk",
  "oxios-calendar",
  "oxios-gateway",
  "oxios-kernel",
@@ -5889,8 +5950,8 @@ dependencies = [
  "libc",
  "llama-gguf",
  "once_cell",
- "oxi-agent",
- "oxi-sdk",
+ "oxicode-agent",
+ "oxicode-sdk",
  "oxios-calendar",
  "oxios-markdown",
  "oxios-mcp",
@@ -5993,7 +6054,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
- "oxi-sdk",
+ "oxicode-sdk",
  "parking_lot",
  "proptest",
  "serde",
@@ -6420,7 +6481,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -6440,7 +6501,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn",
@@ -6590,7 +6651,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7160,7 +7221,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7615,7 +7676,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7858,7 +7919,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9423,7 +9484,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
