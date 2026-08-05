@@ -132,26 +132,26 @@ pub(crate) async fn handle_engine_models(
             }
             // Multi-model router (SDK 0.66.0): surface router profile models
             // so the Web UI model picker can select "router/auto" etc.
-            if let Some(router_cfg) = &state.config.read().engine.router {
-                if router_cfg.enabled {
-                    for (name, _profile) in &router_cfg.profiles {
-                        let id = format!("router/{}", name);
-                        if seen.insert(id.clone()) {
-                            all_models.push(ModelInfo {
-                                id,
-                                name: format!("Router {}", name),
-                                api: "openai-completions".to_string(),
-                                provider: "router".to_string(),
-                                reasoning: false,
-                                input: vec![InputModality::Text],
-                                context_window: 128_000,
-                                max_tokens: 32_000,
-                                cost_input: 0.0,
-                                cost_output: 0.0,
-                                cost_cache_read: 0.0,
-                                cost_cache_write: 0.0,
-                            });
-                        }
+            if let Some(router_cfg) = &state.config.read().engine.router
+                && router_cfg.enabled
+            {
+                for name in router_cfg.profiles.keys() {
+                    let id = format!("router/{}", name);
+                    if seen.insert(id.clone()) {
+                        all_models.push(ModelInfo {
+                            id,
+                            name: format!("Router {}", name),
+                            api: "openai-completions".to_string(),
+                            provider: "router".to_string(),
+                            reasoning: false,
+                            input: vec![InputModality::Text],
+                            context_window: 128_000,
+                            max_tokens: 32_000,
+                            cost_input: 0.0,
+                            cost_output: 0.0,
+                            cost_cache_read: 0.0,
+                            cost_cache_write: 0.0,
+                        });
                     }
                 }
             }

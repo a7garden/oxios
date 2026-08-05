@@ -405,11 +405,11 @@ impl OxiosEngineBuilder {
     /// `routing_enabled` path receives hooks too. No-op when no specs are
     /// configured.
     fn wire_hooks(mut self) -> Self {
-        if let Some(specs) = &self.hook_specs {
-            if !specs.is_empty() {
-                let runner = Arc::new(crate::hook_runner::CommandHookRunner::new(specs.clone()));
-                self.inner = self.inner.with_hooks(runner);
-            }
+        if let Some(specs) = &self.hook_specs
+            && !specs.is_empty()
+        {
+            let runner = Arc::new(crate::hook_runner::CommandHookRunner::new(specs.clone()));
+            self.inner = self.inner.with_hooks(runner);
         }
         self
     }
@@ -426,26 +426,25 @@ impl OxiosEngineBuilder {
         let oxi = self.inner.build();
 
         // Register router if configured.
-        if let Some(router_cfg) = &self.router_config {
-            if router_cfg.enabled {
-                let sdk_router_config = router_config_to_sdk(router_cfg);
-                let registry = oxi.providers_arc();
-                let router =
-                    oxicode_sdk::router::RouterProvider::new(&sdk_router_config, registry);
-                oxi.providers().register_arc("router", Arc::new(router));
+        if let Some(router_cfg) = &self.router_config
+            && router_cfg.enabled
+        {
+            let sdk_router_config = router_config_to_sdk(router_cfg);
+            let registry = oxi.providers_arc();
+            let router = oxicode_sdk::router::RouterProvider::new(&sdk_router_config, registry);
+            oxi.providers().register_arc("router", Arc::new(router));
 
-                // Register synthetic models for each profile so
-                // resolve_model("router/<profile>") succeeds.
-                for profile_name in sdk_router_config.profiles.keys() {
-                    let model = oxicode_sdk::Model::new(
-                        profile_name.clone(),
-                        format!("Router {}", profile_name),
-                        oxicode_sdk::Api::OpenAiCompletions, // router delegates; dialect irrelevant
-                        "router",
-                        "", // no direct base URL; delegate providers handle it
-                    );
-                    oxi.models().register(model);
-                }
+            // Register synthetic models for each profile so
+            // resolve_model("router/<profile>") succeeds.
+            for profile_name in sdk_router_config.profiles.keys() {
+                let model = oxicode_sdk::Model::new(
+                    profile_name.clone(),
+                    format!("Router {}", profile_name),
+                    oxicode_sdk::Api::OpenAiCompletions, // router delegates; dialect irrelevant
+                    "router",
+                    "", // no direct base URL; delegate providers handle it
+                );
+                oxi.models().register(model);
             }
         }
 
@@ -718,11 +717,9 @@ impl std::fmt::Debug for EngineHandle {
 ///
 /// Tier mapping: oxios `fast` → SDK `Low`, `balanced` → `Medium`, `strong` → `High`.
 /// Scoring weight: oxios `context` → SDK `context_budget`.
-fn router_config_to_sdk(
-    cfg: &crate::config::RouterConfig,
-) -> oxicode_sdk::router::RouterConfig {
+fn router_config_to_sdk(cfg: &crate::config::RouterConfig) -> oxicode_sdk::router::RouterConfig {
     use oxicode_sdk::router::{
-        RouterConfig as SdkRouterConfig, RouterProfile, RoutedTierConfig, ScoringWeights,
+        RoutedTierConfig, RouterConfig as SdkRouterConfig, RouterProfile, ScoringWeights,
     };
 
     let mut profiles = std::collections::HashMap::new();
@@ -1043,7 +1040,6 @@ mod tests {
         assert!(engine.tracer().is_some());
         assert!(engine.cost_tracker().is_some());
         assert_eq!(engine.default_model_id(), "openai/gpt-4o");
-
     }
 
     // ── Router registration (oxi-sdk 0.66.0+) ──
