@@ -227,6 +227,7 @@ impl OxiosEngine {
             authorizer: None,
             tracer: None,
             cost_tracker: None,
+            router_config: None,
         }
     }
 
@@ -337,6 +338,7 @@ pub struct OxiosEngineBuilder {
     authorizer: Option<Arc<oxicode_sdk::Authorizer>>,
     tracer: Option<Arc<oxicode_sdk::Tracer>>,
     cost_tracker: Option<Arc<oxicode_sdk::CostTracker>>,
+    router_config: Option<crate::config::RouterConfig>,
 }
 
 impl OxiosEngineBuilder {
@@ -354,6 +356,7 @@ impl OxiosEngineBuilder {
             authorizer: self.authorizer,
             tracer: self.tracer,
             cost_tracker: self.cost_tracker,
+            router_config: self.router_config,
         }
     }
 
@@ -370,6 +373,7 @@ impl OxiosEngineBuilder {
             authorizer: self.authorizer,
             tracer: self.tracer,
             cost_tracker: self.cost_tracker,
+            router_config: self.router_config,
         }
     }
 
@@ -381,14 +385,47 @@ impl OxiosEngineBuilder {
             authorizer: self.authorizer,
             tracer: self.tracer,
             cost_tracker: self.cost_tracker,
+            router_config: self.router_config,
         }
     }
 
     /// Build the engine.
+    ///
+    /// If a router was configured via [`with_router`](Self::with_router), this
+    /// registers a `RouterProvider` as provider `"router"` and synthetic model
+    /// entries for each configured profile so `resolve_model("router/<profile>")`
+    /// succeeds.
     pub fn build(self) -> OxiosEngine {
+        let oxi = self.inner.build();
+        let default_model_id = self.default_model_id.clone();
+
+        // Register router if configured.
+        if let Some(router_cfg) = &self.router_config {
+            if router_cfg.enabled {
+                let sdk_router_config = router_config_to_sdk(router_cfg);
+                let registry = oxi.providers_arc();
+                let router =
+                    oxicode_sdk::router::RouterProvider::new(&sdk_router_config, registry);
+                oxi.providers().register_arc("router", Arc::new(router));
+
+                // Register synthetic models for each profile so
+                // resolve_model("router/<profile>") succeeds.
+                for profile_name in sdk_router_config.profiles.keys() {
+                    let model = oxicode_sdk::Model::new(
+                        profile_name.clone(),
+                        format!("Router {}", profile_name),
+                        oxicode_sdk::Api::OpenAiCompletions, // router delegates; dialect irrelevant
+                        "router",
+                        "", // no direct base URL; delegate providers handle it
+                    );
+                    oxi.models().register(model);
+                }
+            }
+        }
+
         OxiosEngine {
-            oxi: self.inner.build(),
-            default_model_id: self.default_model_id,
+            oxi,
+            default_model_id,
             routing_control: None,
             // RFC-014 Phase D: optional, off by default
             authorizer: self.authorizer,
@@ -459,6 +496,15 @@ impl OxiosEngineBuilder {
     /// [`OxiosEngine::init_file_catalog`] and reuse the `Arc` across rebuilds.
     pub fn with_catalog(mut self, catalog: Arc<dyn oxicode_sdk::ModelCatalog>) -> Self {
         self.inner = self.inner.with_catalog(catalog);
+        self
+    }
+
+    /// Enable multi-model routing with the given configuration.
+    ///
+    /// Registers a `RouterProvider` as provider `"router"` and synthetic
+    /// model entries for each profile so `resolve_model("router/<profile>")` works.
+    pub fn with_router(mut self, router_config: crate::config::RouterConfig) -> Self {
+        self.router_config = Some(router_config);
         self
     }
 }
@@ -639,6 +685,80 @@ impl std::fmt::Debug for EngineHandle {
             .field("current_model", &engine.default_model_id())
             .finish()
     }
+}
+
+/// Convert oxios [`RouterConfig`] to SDK [`oxicode_sdk::router::RouterConfig`].
+///
+/// Tier mapping: oxios `fast` → SDK `Low`, `balanced` → `Medium`, `strong` → `High`.
+/// Scoring weight: oxios `context` → SDK `context_budget`.
+fn router_config_to_sdk(
+    cfg: &crate::config::RouterConfig,
+) -> oxicode_sdk::router::RouterConfig {
+    use oxicode_sdk::router::{
+        RouterConfig as SdkRouterConfig, RouterProfile, RoutedTierConfig, ScoringWeights,
+    };
+
+    let mut profiles = std::collections::HashMap::new();
+    for (name, profile) in &cfg.profiles {
+        let empty = RoutedTierConfig {
+            model: String::new(),
+            thinking: None,
+            fallbacks: vec![],
+        };
+        let fast = profile
+            .tiers
+            .fast
+            .as_ref()
+            .map(|t| RoutedTierConfig {
+                model: t.model.clone(),
+                thinking: None,
+                fallbacks: t.fallbacks.clone(),
+            })
+            .unwrap_or_else(|| empty.clone());
+        let balanced = profile
+            .tiers
+            .balanced
+            .as_ref()
+            .map(|t| RoutedTierConfig {
+                model: t.model.clone(),
+                thinking: None,
+                fallbacks: t.fallbacks.clone(),
+            })
+            .unwrap_or_else(|| empty.clone());
+        let strong = profile
+            .tiers
+            .strong
+            .as_ref()
+            .map(|t| RoutedTierConfig {
+                model: t.model.clone(),
+                thinking: None,
+                fallbacks: t.fallbacks.clone(),
+            })
+            .unwrap_or(empty);
+        profiles.insert(
+            name.clone(),
+            RouterProfile {
+                high: strong,
+                medium: balanced,
+                low: fast,
+            },
+        );
+    }
+
+    SdkRouterConfig::new(
+        cfg.default_profile.clone(),
+        cfg.classifier_model.clone(),
+        cfg.context_upgrade_threshold,
+        cfg.max_session_budget,
+        profiles,
+        ScoringWeights {
+            structural: cfg.scoring.structural,
+            behavioral: cfg.scoring.behavioral,
+            context_budget: cfg.scoring.context,
+            vision: cfg.scoring.vision,
+            message: cfg.scoring.message,
+        },
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -896,6 +1016,57 @@ mod tests {
         assert!(engine.tracer().is_some());
         assert!(engine.cost_tracker().is_some());
         assert_eq!(engine.default_model_id(), "openai/gpt-4o");
+
+    }
+
+    // ── Router registration (oxi-sdk 0.66.0+) ──
+    //
+    // Wires a `RouterProvider` into the engine via `with_router` and verifies:
+    // 1. The provider is reachable under the name `"router"`.
+    // 2. Synthetic model entries for each profile are resolvable.
+    // 3. The configured default model id flows through unchanged.
+    #[test]
+    fn test_router_registration() {
+        let router_cfg = crate::config::RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles: {
+                let mut m = std::collections::HashMap::new();
+                let mut tiers = crate::config::RouterTiersConfig::default();
+                tiers.fast = Some(crate::config::RouterTierConfig {
+                    model: "anthropic/claude-haiku-4-20250514".into(),
+                    fallbacks: vec![],
+                    thinking: None,
+                });
+                tiers.balanced = Some(crate::config::RouterTierConfig {
+                    model: "anthropic/claude-sonnet-4-20250514".into(),
+                    fallbacks: vec![],
+                    thinking: None,
+                });
+                tiers.strong = Some(crate::config::RouterTierConfig {
+                    model: "anthropic/claude-opus-4-20250514".into(),
+                    fallbacks: vec![],
+                    thinking: None,
+                });
+                m.insert("auto".into(), crate::config::RouterProfileConfig { tiers });
+                m
+            },
+            ..Default::default()
+        };
+
+        let engine = OxiosEngine::builder()
+            .default_model("router/auto")
+            .with_router(router_cfg)
+            .build();
+
+        // Router provider should be registered.
+        assert!(engine.create_provider("router").is_ok());
+
+        // Router profile models should be resolvable.
+        assert!(engine.resolve_model("router/auto").is_ok());
+
+        // Default model should match.
+        assert_eq!(engine.default_model_id(), "router/auto");
     }
 
     // ── Catalog port integration (oxi-sdk 0.37.0+) ──
