@@ -2725,4 +2725,35 @@ exec = "always"
         assert!(!cfg.remote.enabled);
         assert_eq!(cfg.remote.port, 6768);
     }
+    #[test]
+    fn test_router_config_deserialization() {
+        let toml_str = r#"
+[engine.router]
+enabled = true
+default_profile = "auto"
+
+[engine.router.scoring]
+structural = 0.25
+behavioral = 0.20
+context = 0.15
+vision = 0.10
+message = 0.30
+
+[engine.router.profiles.auto.tiers]
+fast = { model = "anthropic/claude-haiku-4-20250514" }
+balanced = { model = "anthropic/claude-sonnet-4-20250514" }
+strong = { model = "anthropic/claude-opus-4-20250514" }
+"#;
+
+        let config: OxiosConfig = toml::from_str(toml_str).unwrap();
+        let router = config.engine.router.expect("router config should be present");
+        assert!(router.enabled);
+        assert_eq!(router.default_profile, "auto");
+
+        let auto = router.profiles.get("auto").expect("auto profile should exist");
+        let fast = auto.tiers.fast.as_ref().expect("fast tier should exist");
+        assert_eq!(fast.model, "anthropic/claude-haiku-4-20250514");
+        let strong = auto.tiers.strong.as_ref().expect("strong tier should exist");
+        assert_eq!(strong.model, "anthropic/claude-opus-4-20250514");
+    }
 }

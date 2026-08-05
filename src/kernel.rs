@@ -16,6 +16,7 @@ use oxios_kernel::{
 };
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
+use oxicode_sdk::ModelCatalog;
 
 #[cfg(feature = "embedding-gguf")]
 use std::path::Path;
@@ -1098,7 +1099,21 @@ impl KernelBuilder {
                 None
             }
         };
-        let engine = if config.engine.routing_enabled {
+        let engine = if let Some(ref router_cfg) = config.engine.router {
+            if router_cfg.enabled {
+                let effective_model = format!("router/{}", router_cfg.default_profile);
+                let mut engine_builder = OxiosEngine::builder()
+                    .default_model(&effective_model)
+                    .with_router(router_cfg.clone());
+                if let Some(ref c) = catalog {
+                    engine_builder = engine_builder.with_catalog(c.clone());
+                }
+                Arc::new(engine_builder.build())
+            } else {
+                build_default_engine(&config, model_id, &catalog)
+            }
+        } else if config.engine.routing_enabled {
+            // Legacy routing_enabled path (backward compat)
             let mut engine_builder = OxiosEngine::builder().default_model(model_id);
             if let Some(ref c) = catalog {
                 engine_builder = engine_builder.with_catalog(c.clone());
@@ -1106,7 +1121,15 @@ impl KernelBuilder {
             let (engine, _routing_control) = engine_builder.build_with_routing();
             Arc::new(engine)
         } else {
-            match &catalog {
+            build_default_engine(&config, model_id, &catalog)
+        };
+
+        fn build_default_engine(
+            config: &OxiosConfig,
+            model_id: &str,
+            catalog: &Option<Arc<dyn ModelCatalog>>,
+        ) -> Arc<OxiosEngine> {
+            match catalog {
                 Some(c) => Arc::new(OxiosEngine::from_config_with_catalog(
                     model_id,
                     config.engine.api_key.as_deref(),
@@ -1117,7 +1140,7 @@ impl KernelBuilder {
                     config.engine.api_key.as_deref(),
                 )),
             }
-        };
+        }
         // Boot-time validation: resolve the configured model so a broken
         // config fails fast (daemon refuses to start). `model.provider` is
         // reused below to seed the agent API key.
