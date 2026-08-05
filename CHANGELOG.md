@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **oxicode-sdk 0.64 → 0.66 (kernel)** — Followed the upstream `oxi → oxicode`
+  rename (CHANGELOG §0.65.0 Breaking). Crate deps: `oxi-sdk`/`oxi-ai`/`oxi-agent`
+  → `oxicode-sdk`/`oxicode-ai`/`oxicode-agent` (0.66.0). Identifiers:
+  `Oxi`/`OxiBuilder`/`OxiBrowserEngine` → `Oxicode`/`OxicodeBuilder`/
+  `OxicodeBrowserEngine`; the `OxiosEngine.oxi` field name is preserved
+  (oxios-internal). Env vars: `OXI_*` → `OXICODE_*`. Config paths:
+  `~/.oxi/auth.json` → `~/.oxicode/auth.json` (no backward-compat read — the
+  shared `oxicode-cli` home is now the only fallback store). Bumped
+  `oxibrowser` 0.16 → 0.17 (its core crate moved with the SDK).
+  Workspace check / clippy / test build all green; oxicode-sdk 0.66.0 brings
+  the hooks system (Claude Code-compatible `HookRunner` port), shake
+  compaction, typed `StreamDelta`, and an LSP `reload`/`capabilities`/
+  `request` action set — not yet wired in oxios.
+
 ## [1.36.0] - 2026-08-04
 
 ### Added
@@ -127,7 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   endpoints; `SearchPanel` store with manual search and browse cache;
   `BrowseRender` component for markdown rendering; auto-open panel on
   `web_search`/`browse` tool calls; i18n keys.
-- **BrowseTool (kernel)** — wired oxi-sdk `BrowseTool` for headless page
+- **BrowseTool (kernel)** — wired oxicode-sdk `BrowseTool` for headless page
   content reading.
 - **Virtualized chat list (web)** — migrated chat message list to `virtua`
   for smooth rendering of large histories.
@@ -617,7 +632,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.10.0] - 2026-06-25
 
 ### Added
-- **RFC-029: execution resilience** — OTP-style recovery layered on the existing Unix supervisor: snapshot/restore, `SupervisorPolicy` + `RestartBackoff`, and `ModelSwitched` lifecycle events (adopted from oxi-sdk). A bounded recovery ladder runs on provider failure: L0 execute → L1 restart (same model) → L2 snapshot+restore-with-new-model → L3 compact-or-larger → L4 A2A delegate → L5 terminal `ResilientFailure`. Backed by error classification (`FailureClass`), a shared `AttemptBudget`, and a per-provider circuit breaker (`ProviderHealthRegistry`) that replaces the global `LLM_CIRCUIT_BREAKER`.
+- **RFC-029: execution resilience** — OTP-style recovery layered on the existing Unix supervisor: snapshot/restore, `SupervisorPolicy` + `RestartBackoff`, and `ModelSwitched` lifecycle events (adopted from oxicode-sdk). A bounded recovery ladder runs on provider failure: L0 execute → L1 restart (same model) → L2 snapshot+restore-with-new-model → L3 compact-or-larger → L4 A2A delegate → L5 terminal `ResilientFailure`. Backed by error classification (`FailureClass`), a shared `AttemptBudget`, and a per-provider circuit breaker (`ProviderHealthRegistry`) that replaces the global `LLM_CIRCUIT_BREAKER`.
 
 ### Fixed
 - **P0: provider errors now propagate as `Err`** — `run_agent` previously swallowed provider failures as `Ok(success:false)`, burying them in `ExecutionResult.output`. It now returns `Err`, so the lifecycle boundary and the recovery ladder can react. `ExecutionResult` carries `failure_class` + `restore_state` so the class/state survive even when a caller returns `Ok(success:false)`.
@@ -662,7 +677,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Desktop notifications + sound (SP-1d)** — New `desktop-notify.ts` (Notification API, background-tab only) and `sound.ts` (Web Audio oscillator, severity-distinct tones). Integrated into `use-global-events`.
 - **Notification preferences (SP-1e)** — Client-side toggles for desktop notifications, sound, completion sound, and error sound in a new Settings → Notifications section. Stored in `localStorage`.
 - **Declarative config sections (SP-2a)** — Six config sections now editable in Settings: `calendar`, `otel`, `agent_log`, `resource_monitor`, `browser`, `budget`. All use the existing declarative field-defs framework; no backend changes needed.
-- **Secrets API (SP-2b)** — `GET/PUT/DELETE /api/secrets[/{key}]` and `GET /api/secrets/{key}/source`. Stores credentials in `~/.oxi/auth.json` via `CredentialStore`, never in `config.toml` plaintext. Responses are masked (`has_value`, `source`, `preview`).
+- **Secrets API (SP-2b)** — `GET/PUT/DELETE /api/secrets[/{key}]` and `GET /api/secrets/{key}/source`. Stores credentials in `~/.oxicode/auth.json` via `CredentialStore`, never in `config.toml` plaintext. Responses are masked (`has_value`, `source`, `preview`).
 - **Secrets UI (SP-2c)** — Settings → Secrets section with per-key password inputs, source badges, and masked previews.
 - **Trace trajectory join (SP-3a)** — `GET /api/agents/{id}/trace` now merges session trajectory steps with `agent.tool_calls` (deduped by `tool_call_id`). Trace steps carry a `kind` field (`tool` | `memory` | `reasoning`) for future expansion.
 - **UI polish (SP-4)** — Shadow tokens added (`--shadow-sm/md/lg`) with dark-mode alpha 0.2–0.4 vs light 0.04–0.08. Background raised to `oklch(0.99 0 0)` for card elevation. `focus-visible` added to header/sidebar buttons. Global `<kbd>` styling.
@@ -880,7 +895,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`reasoning_bank.rs`** — Unused module (RFC-017)
 - **`rvf_store.rs`** — Unused module (RFC-017)
 - **`lateral.rs` / `regression.rs`** in ouroboros — Superseded by integrated evolution loop
-- **`oxi-ai` direct dependency** — All provider construction via `oxi-sdk`
+- **`oxicode-ai` direct dependency** — All provider construction via `oxicode-sdk`
 - **280+ missing_docs warnings** — Resolved across kernel crate
 
 ## [0.4.0] - 2026-05-25
