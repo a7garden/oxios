@@ -25,7 +25,12 @@ use super::noise::{self, FrameType, Responder};
 /// Sender for server-pushed plaintext frames. The transport loop encrypts
 /// anything sent here and writes it to the socket as an `App` frame.
 /// Cloned into subscription tasks spawned by the RPC dispatch layer.
-pub type PushSender = mpsc::UnboundedSender<Vec<u8>>;
+///
+/// The channel is bounded (capacity 256) so a stuck client cannot accumulate
+/// an unbounded queue of pending subscription frames in memory. Producers
+/// should use [`ConnectionCtx::try_push`] so backpressure surfaces
+/// immediately rather than blocking the subscription task.
+pub type PushSender = mpsc::Sender<Vec<u8>>;
 
 /// Per-connection context created fresh for each companion session.
 ///
@@ -51,6 +56,20 @@ impl ConnectionCtx {
         }
     }
 
+    /// Non-blocking push of a subscription frame into the per-connection
+    /// outbound channel.
+    ///
+    /// Callers (subscription tasks spawned from the RPC dispatch layer)
+    /// should prefer this over `push_tx.send(...)` because the channel is
+    /// bounded: `send` would await a free slot, blocking the producer until
+    /// the transport loop drains, which can deadlock when the producer and
+    /// consumer share the same task budget. `try_push` returns immediately
+    /// with `Full` if the channel is saturated so the producer can drop the
+    /// frame or break out of its loop.
+    pub fn try_push(&self, data: Vec<u8>) -> Result<(), mpsc::error::TrySendError<Vec<u8>>> {
+        self.push_tx.try_send(data)
+    }
+
     /// Returns the authenticated device ID, or `None` if not yet verified.
     pub fn authenticated_device(&self) -> Option<String> {
         self.device_id.lock().ok()?.clone()
@@ -71,6 +90,10 @@ impl ConnectionCtx {
 
 const MAX_QUEUED_FRAMES: usize = 4096;
 const MAX_QUEUED_BYTES: usize = 64 * 1024 * 1024;
+/// Soft cap that warns when the outbound queue is parking frames above
+/// this byte total. Exceeding the soft cap does not close the connection;
+/// only the hard cap (`MAX_QUEUED_BYTES`) does. Set per RFC-044 §6.4.
+const SOFT_CAP_BYTES: usize = 8 * 1024 * 1024;
 
 /// A hard-bounded FIFO of encoded outbound WebSocket frames.
 #[derive(Debug, Default)]
@@ -99,6 +122,11 @@ impl OutboundQueue {
         self.bytes = next_bytes;
         self.frames.push_back(frame);
         Ok(())
+    }
+
+    /// Current byte total across all queued frames.
+    pub fn bytes(&self) -> usize {
+        self.bytes
     }
 
     /// Move all queued frames into `out` in FIFO order.
@@ -239,9 +267,15 @@ where
     let mut transport = responder.into_transport()?;
     let mut outbound = OutboundQueue::new();
     let mut drained = Vec::new();
+    // Latch to log the soft-cap warning only once per connection so a
+    // sustained backlog doesn't spam the log.
+    let mut soft_cap_warned = false;
 
     // Per-connection push channel for server-initiated frames (subscriptions).
-    let (push_tx, mut push_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+    // Bounded so backpressure actually applies: when the client stalls, the
+    // push channel fills, then the OutboundQueue fills, then the hard cap
+    // closes the connection (the client reconnects).
+    let (push_tx, mut push_rx) = mpsc::channel::<Vec<u8>>(256);
     let conn_ctx = Arc::new(ConnectionCtx::new(push_tx));
 
     loop {
@@ -252,11 +286,42 @@ where
                 return Ok(());
             }
             // Server-pushed subscription frames: encrypt + send.
+            //
+            // Batch every immediately-available push into the outbound
+            // queue before flushing, so a burst of subscription events
+            // produces one round-trip of WebSocket writes rather than one
+            // per event.
             Some(plaintext) = push_rx.recv() => {
-                let ciphertext = transport.encrypt(&plaintext)?;
-                let encoded = noise::encode_frame(FrameType::App, &ciphertext)
-                    .ok_or_else(|| anyhow!("pushed frame exceeds frame limit"))?;
-                outbound.push(encoded)?;
+                let mut pending: Vec<Vec<u8>> = vec![plaintext];
+                while let Ok(more) = push_rx.try_recv() {
+                    pending.push(more);
+                }
+                for frame in pending {
+                    let ciphertext = transport
+                        .encrypt(&frame)
+                        .context("encrypt pushed subscription frame")?;
+                    let encoded = noise::encode_frame(FrameType::App, &ciphertext)
+                        .ok_or_else(|| anyhow!("pushed frame exceeds frame limit"))?;
+                    if outbound.push(encoded).is_err() {
+                        tracing::warn!(
+                            %peer,
+                            bytes = outbound.bytes(),
+                            frames = MAX_QUEUED_FRAMES,
+                            "outbound queue hard cap reached; closing connection"
+                        );
+                        close_going_away(&mut socket).await;
+                        return Ok(());
+                    }
+                }
+                if !soft_cap_warned && outbound.bytes() > SOFT_CAP_BYTES {
+                    tracing::warn!(
+                        %peer,
+                        bytes = outbound.bytes(),
+                        soft_cap = SOFT_CAP_BYTES,
+                        "outbound queue parked above soft cap"
+                    );
+                    soft_cap_warned = true;
+                }
                 outbound.drain_into_vec(&mut drained);
                 for frame in drained.drain(..) {
                     socket.send(Message::Binary(frame)).await?;
@@ -282,7 +347,24 @@ where
                                 let ciphertext = transport.encrypt(&reply)?;
                                 let encoded = noise::encode_frame(FrameType::App, &ciphertext)
                                     .ok_or_else(|| anyhow!("encrypted reply exceeds frame limit"))?;
-                                outbound.push(encoded)?;
+                                if outbound.push(encoded).is_err() {
+                                    tracing::warn!(
+                                        %peer,
+                                        bytes = outbound.bytes(),
+                                        "outbound queue hard cap reached on reply; closing connection"
+                                    );
+                                    close_going_away(&mut socket).await;
+                                    return Ok(());
+                                }
+                                if !soft_cap_warned && outbound.bytes() > SOFT_CAP_BYTES {
+                                    tracing::warn!(
+                                        %peer,
+                                        bytes = outbound.bytes(),
+                                        soft_cap = SOFT_CAP_BYTES,
+                                        "outbound queue parked above soft cap"
+                                    );
+                                    soft_cap_warned = true;
+                                }
                                 outbound.drain_into_vec(&mut drained);
                                 for frame in drained.drain(..) {
                                     socket.send(Message::Binary(frame)).await?;
@@ -293,7 +375,24 @@ where
                                 let ciphertext = transport.encrypt(&plaintext)?;
                                 let encoded = noise::encode_frame(FrameType::Pong, &ciphertext)
                                     .ok_or_else(|| anyhow!("encrypted pong exceeds frame limit"))?;
-                                outbound.push(encoded)?;
+                                if outbound.push(encoded).is_err() {
+                                    tracing::warn!(
+                                        %peer,
+                                        bytes = outbound.bytes(),
+                                        "outbound queue hard cap reached on pong; closing connection"
+                                    );
+                                    close_going_away(&mut socket).await;
+                                    return Ok(());
+                                }
+                                if !soft_cap_warned && outbound.bytes() > SOFT_CAP_BYTES {
+                                    tracing::warn!(
+                                        %peer,
+                                        bytes = outbound.bytes(),
+                                        soft_cap = SOFT_CAP_BYTES,
+                                        "outbound queue parked above soft cap"
+                                    );
+                                    soft_cap_warned = true;
+                                }
                                 outbound.drain_into_vec(&mut drained);
                                 for frame in drained.drain(..) {
                                     socket.send(Message::Binary(frame)).await?;
@@ -370,6 +469,7 @@ mod tests {
         queue.drain_into_vec(&mut out);
 
         assert_eq!(out, vec![b"a".to_vec(), b"b".to_vec(), b"c".to_vec()]);
+        assert_eq!(queue.bytes(), 0, "drain resets byte counter");
     }
 
     #[test]
@@ -382,6 +482,46 @@ mod tests {
         assert!(
             queue.push(b"y".to_vec()).is_err(),
             "4097th frame must overflow"
+        );
+    }
+
+    #[test]
+    fn queue_bytes_tracks_total() {
+        let mut queue = OutboundQueue::new();
+        assert_eq!(queue.bytes(), 0, "fresh queue is empty");
+        queue.push(b"hello".to_vec()).expect("fits");
+        assert_eq!(queue.bytes(), 5);
+        queue.push(b"world!".to_vec()).expect("fits");
+        assert_eq!(queue.bytes(), 11);
+        let mut out = Vec::new();
+        queue.drain_into_vec(&mut out);
+        assert_eq!(queue.bytes(), 0, "drain resets total");
+    }
+
+    #[test]
+    fn push_sender_is_bounded() {
+        // The push channel is bounded at 256 entries; verify the type
+        // alias actually points at mpsc::Sender (not UnboundedSender) and
+        // that producing past the limit surfaces TrySendError::Full.
+        let (tx, _rx) = mpsc::channel::<Vec<u8>>(256);
+        fn assert_bounded(_: &mpsc::Sender<Vec<u8>>) {}
+        assert_bounded(&tx);
+
+        let mut sent = 0;
+        for i in 0..256 {
+            match tx.try_send(vec![i as u8]) {
+                Ok(()) => sent += 1,
+                Err(mpsc::error::TrySendError::Full(_)) => break,
+                Err(mpsc::error::TrySendError::Closed(_)) => panic!("channel closed unexpectedly"),
+            }
+        }
+        assert_eq!(sent, 256, "channel must accept exactly its capacity");
+        assert!(
+            matches!(
+                tx.try_send(vec![0xff]),
+                Err(mpsc::error::TrySendError::Full(_))
+            ),
+            "one more send must report Full"
         );
     }
 }

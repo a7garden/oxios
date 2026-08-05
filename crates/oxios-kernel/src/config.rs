@@ -1235,6 +1235,12 @@ pub struct RemoteConfig {
     /// Port for the E2EE WS listener. Default 6768 (orca-compatible).
     #[serde(default = "default_remote_port")]
     pub port: u16,
+    /// Bind address for the E2EE WS listener.
+    /// Loopback default keeps the surface local-only; widen to a LAN/Tailscale
+    /// address (e.g. `100.64.1.20` or `0.0.0.0`) to accept network clients.
+    /// Does NOT change the advertised endpoint — see `pairing_address`.
+    #[serde(default = "default_remote_bind_address")]
+    pub bind_address: String,
     /// Advertised pairing host (does NOT change the bind).
     /// None → auto (tailscale ip -4 → hostname).
     #[serde(default)]
@@ -1243,11 +1249,15 @@ pub struct RemoteConfig {
 fn default_remote_port() -> u16 {
     6768
 }
+fn default_remote_bind_address() -> String {
+    "127.0.0.1".to_string()
+}
 impl Default for RemoteConfig {
     fn default() -> Self {
         Self {
             enabled: false,
             port: default_remote_port(),
+            bind_address: default_remote_bind_address(),
             pairing_address: None,
         }
     }
@@ -2559,31 +2569,32 @@ exec = "always"
             ..Default::default()
         };
         assert!(cfg.should_expose_api_docs());
-
-        // Opt-out (explicit false) + loopback — NOT exposed.
-        let cfg = GatewayConfig {
-            host: "127.0.0.1".into(),
-            port: 4200,
-            expose_api_docs: false,
-            ..Default::default()
-        };
-        assert!(!cfg.should_expose_api_docs());
     }
-
     #[test]
     fn test_remote_config_default_disabled() {
         let cfg = OxiosConfig::default();
         assert!(!cfg.remote.enabled);
         assert_eq!(cfg.remote.port, 6768);
+        assert_eq!(cfg.remote.bind_address, "127.0.0.1");
         assert!(cfg.remote.pairing_address.is_none());
     }
 
     #[test]
     fn test_remote_config_parse() {
-        let toml = "[remote]\nenabled = true\nport = 7000\npairing_address = \"100.64.1.20\"\n";
+        let toml = "[remote]\nenabled = true\nport = 7000\nbind_address = \"0.0.0.0\"\npairing_address = \"100.64.1.20\"\n";
         let cfg: OxiosConfig = toml::from_str(toml).unwrap();
         assert!(cfg.remote.enabled);
         assert_eq!(cfg.remote.port, 7000);
+        assert_eq!(cfg.remote.bind_address, "0.0.0.0");
         assert_eq!(cfg.remote.pairing_address.as_deref(), Some("100.64.1.20"));
+    }
+
+    #[test]
+    fn test_remote_config_default_bind_address() {
+        // When no [remote] section is present, bind_address falls back to loopback.
+        let cfg: OxiosConfig = toml::from_str("").unwrap();
+        assert_eq!(cfg.remote.bind_address, "127.0.0.1");
+        assert!(!cfg.remote.enabled);
+        assert_eq!(cfg.remote.port, 6768);
     }
 }

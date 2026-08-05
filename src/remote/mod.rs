@@ -282,7 +282,7 @@ fn spawn_subscription(
     let Some(kernel) = ctx.kernel.clone() else {
         return;
     };
-    let push_tx = conn.push_tx.clone();
+    let conn_for_task = Arc::clone(&conn);
 
     match kind {
         SubscriptionKind::Chat { session_id } => {
@@ -305,8 +305,8 @@ fn spawn_subscription(
                                 }
                             });
                             let bytes = serde_json::to_vec(&notification).unwrap_or_default();
-                            if push_tx.send(bytes).is_err() {
-                                break; // Connection closed
+                            if conn_for_task.try_push(bytes).is_err() {
+                                break; // Connection closed or queue full
                             }
                         }
                         else => break,
@@ -335,7 +335,7 @@ fn spawn_subscription(
                                 }
                             });
                             let bytes = serde_json::to_vec(&notification).unwrap_or_default();
-                            if push_tx.send(bytes).is_err() {
+                            if conn_for_task.try_push(bytes).is_err() {
                                 break;
                             }
                         }
@@ -399,6 +399,12 @@ pub fn build_rpc_handler(ctx: Arc<RpcCtx>) -> RpcFrameHandler {
     })
 }
 
+/// True iff the bind host is a loopback address (`127.0.0.1`, `::1`, or `localhost`).
+/// Used to decide whether to emit a security warning when widening the bind.
+fn is_loopback_bind(host: &str) -> bool {
+    matches!(host, "127.0.0.1" | "::1" | "localhost")
+}
+
 #[async_trait::async_trait]
 impl Surface for RemoteRpcSurface {
     fn name(&self) -> &str {
@@ -415,9 +421,24 @@ impl Surface for RemoteRpcSurface {
         }
 
         let port = ctx.config.read().remote.port;
-        let bind_addr: std::net::SocketAddr = format!("127.0.0.1:{port}")
+        let bind_host = ctx.config.read().remote.bind_address.clone();
+        // IPv6 hosts must be bracketed (`[::1]:6768`); IPv4/hostname don't need it.
+        let bind_str = if bind_host.contains(':') {
+            format!("[{bind_host}]:{port}")
+        } else {
+            format!("{bind_host}:{port}")
+        };
+        let bind_addr: std::net::SocketAddr = bind_str
             .parse()
-            .with_context(|| format!("invalid remote port {port}"))?;
+            .with_context(|| format!("invalid remote bind {bind_str}"))?;
+        if !is_loopback_bind(&bind_host) {
+            tracing::warn!(
+                bind = %bind_addr,
+                "RemoteRpcSurface binding to a non-loopback address; the E2EE WS \
+                 listener is reachable from the network. Companion auth is enforced \
+                 (Noise_XX + device token) but you must trust the network path."
+            );
+        }
 
         let workspace = ctx.config.read().kernel.workspace.clone();
         let state_dir = std::path::PathBuf::from(&workspace).join("state");

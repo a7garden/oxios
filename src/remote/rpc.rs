@@ -523,8 +523,8 @@ fn create_git_worktree(
 mod tests {
     use super::*;
 
-    fn make_conn() -> (tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>, ConnectionCtx) {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    fn make_conn() -> (tokio::sync::mpsc::Receiver<Vec<u8>>, ConnectionCtx) {
+        let (tx, rx) = tokio::sync::mpsc::channel(256);
         (rx, ConnectionCtx::new(tx))
     }
 

@@ -382,6 +382,9 @@ preset = "balanced"
 # [remote]
 # enabled = true
 # port = 6768                                # WS bind port (default: 6768, orca-compatible)
+# bind_address = "127.0.0.1"                 # WS bind host (default: 127.0.0.1, loopback only).
+#                                            # Widen to a LAN/Tailscale IP (e.g. "100.64.1.20")
+#                                            # or "0.0.0.0" to accept network clients. The listener
+#                                            # is then reachable from the network; companion auth
+#                                            # (Noise_XX + device token) is still enforced.
 # pairing_address = "100.64.1.20"            # advertised host (or host:port). Wildcards rejected.
-#                                          # Leave commented for auto-detect:
-#                                          # `tailscale ip -4` → OS hostname.
