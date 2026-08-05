@@ -251,6 +251,26 @@ async fn handle_app_frame(frame: Vec<u8>, ctx: Arc<RpcCtx>, conn: Arc<Connection
 
     let id = request.get("id").cloned().unwrap_or(Value::Null);
 
+    // RFC-044 §6.7: audit every RPC method invocation. Metadata only — the
+    // payload is already inside the Noise session, so the trail never sees
+    // plaintext content, just the method name and the authenticated actor.
+    if let Some(kernel) = ctx.kernel.as_ref() {
+        let actor = conn
+            .authenticated_device()
+            .unwrap_or_else(|| "anonymous".to_string());
+        let method = request
+            .get("method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        kernel.security.audit(
+            &actor,
+            oxios_kernel::AuditAction::Other {
+                detail: format!("remote_rpc:{method}"),
+            },
+            "remote",
+        );
+    }
     match dispatch(request, &ctx, &conn).await {
         Ok(rpc::RpcOutcome::Resp(value)) => render_success(&id, value),
         Ok(rpc::RpcOutcome::Stream {
