@@ -13,6 +13,8 @@ import { MessageBubble } from '@/components/chat/message-bubble'
 import { PathAccessCard } from '@/components/chat/path-access-card'
 import { TextSelectionBar } from '@/components/chat/text-selection-bar'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
+import { AgentFanoutCardGrid } from '@/components/chat/AgentFanoutCard'
+import { TerminalToggle } from '@/components/chat/TerminalToggle'
 import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { PortalPanel } from '@/components/portal/portal-panel'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
@@ -20,10 +22,12 @@ import { Button } from '@/components/ui/button'
 import { useDraftPersistence } from '@/hooks/use-draft-persistence'
 import { useRoles } from '@/hooks/use-engine'
 import { useMounts } from '@/hooks/use-mounts'
+import { usePersonaCapabilities } from '@/hooks/usePersonaCapabilities'
 import { buildChatRows } from '@/lib/chat-rows'
 import { addInputHistory } from '@/lib/input-history-storage'
 import { getToken, useChatStore } from '@/stores/chat'
 import { usePortalStore } from '@/stores/portal'
+import { useFanoutStore } from '@/stores/fanout'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
 
@@ -63,6 +67,9 @@ function ChatPage() {
   } = useChatStore()
   const queuedCount = useChatStore((s) => s._pendingQueue.length)
   const stackOpen = usePortalStore((s) => s.stack.length > 0)
+  // RFC-044 Phase 3/4: persona capabilities + fan-out agent tracking.
+  const { capabilities } = usePersonaCapabilities()
+  const fanoutGroups = useFanoutStore((s) => s.groups)
   const { data: rolesData } = useRoles()
   const roles = Object.entries(rolesData?.roles ?? {}).map(([name, model]) => ({ name, model }))
   const { data: mountsData } = useMounts()
@@ -298,14 +305,19 @@ function ChatPage() {
         <MountDetectionBadge />
 
         {/* Search Panel toggle */}
-        <button
-          type="button"
-          className="fixed top-4 right-4 z-50 flex items-center gap-1 rounded-lg border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors shadow-sm"
-          onClick={() => usePortalStore.getState().pushView({ type: 'search' })}
-        >
-          <Search className="w-3.5 h-3.5" />
-          Search
-        </button>
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+          {capabilities.has('terminal') && (
+            <TerminalToggle className="h-8 gap-1 rounded-lg border bg-background px-3 py-1.5 text-xs font-normal shadow-sm" />
+          )}
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded-lg border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors shadow-sm"
+            onClick={() => usePortalStore.getState().pushView({ type: 'search' })}
+          >
+            <Search className="w-3.5 h-3.5" />
+            Search
+          </button>
+        </div>
 
         {/* ── Messages area ── */}
         <div ref={messagesContainerRef} className="relative flex-1 min-h-0">
@@ -420,6 +432,14 @@ function ChatPage() {
           <ChatMiniMap messages={messages} onJump={handleMiniMapJump} />
           <TextSelectionBar containerRef={messagesContainerRef} />
         </div>
+        {/* RFC-044 Phase 4: fan-out agent status grid */}
+        {fanoutGroups.length > 0 && (
+          <div className="shrink-0 border-t bg-background/95 px-4 py-2">
+            {fanoutGroups.map((group) => (
+              <AgentFanoutCardGrid key={group.groupId} agents={group.agents} />
+            ))}
+          </div>
+        )}
         {!activeInterview && (
           <div className="bg-background/95 backdrop-blur-sm shrink-0">
             <ChatInput

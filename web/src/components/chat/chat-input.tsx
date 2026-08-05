@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { useIsTouch } from '@/hooks/use-is-touch'
 import { useKnowledgeSearch } from '@/hooks/use-knowledge'
 import { useMemorySemanticSearch } from '@/hooks/use-memory'
+import { usePersonaCapabilities } from '@/hooks/usePersonaCapabilities'
 import { useMounts } from '@/hooks/use-mounts'
 import { api } from '@/lib/api-client'
 import { getInputHistory } from '@/lib/input-history-storage'
@@ -28,6 +29,7 @@ import { ApprovalModeSelector } from './approval-mode-selector'
 import { LiveActivityBar } from './live-activity-bar'
 import { ModelParamsPopover } from './model-params-popover'
 import { ModelPickerContainer } from './model-picker'
+import { FanOutButton } from './FanOutButton'
 
 // ── Types ──
 
@@ -209,6 +211,8 @@ export function ChatInput({
   const knowledgeSearch = useKnowledgeSearch()
   const memorySearch = useMemorySemanticSearch()
   const { data: mountsData } = useMounts()
+  // RFC-044 Phase 3: persona capabilities drive composer affordances.
+  const { capabilities } = usePersonaCapabilities()
 
   // Mention search
   // searchMentions must stay referentially stable: it is a dependency of the
@@ -811,6 +815,7 @@ export function ChatInput({
               <Paperclip className="h-3.5 w-3.5" />
             </button>
             <ModelParamsPopover />
+            {capabilities.has('worktree-fanout') && <FanOutButton />}
           </div>
           {/* Right: queue + send */}
           <div className="flex items-center shrink-0 gap-1.5">
