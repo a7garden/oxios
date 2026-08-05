@@ -277,7 +277,9 @@ impl KnowledgeLens {
 
         let mut ctx = oxicode_sdk::Context::new();
         ctx.set_system_prompt(&system_prompt);
-        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new(question)));
+        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new(
+            question,
+        )));
 
         let stream = resolved
             .provider

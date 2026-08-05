@@ -1090,7 +1090,6 @@ impl KernelBuilder {
             anyhow::bail!("Invalid [engine.router] configuration: {err}");
         }
 
-
         fn attach_hooks(
             engine_builder: oxios_kernel::OxiosEngineBuilder,
             hooks: &[oxios_kernel::HookSpec],

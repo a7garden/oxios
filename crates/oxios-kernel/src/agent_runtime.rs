@@ -1383,11 +1383,12 @@ async fn run_agent(
                                             .text
                                             .push_str(&chunk);
                                     } else {
-                                        s.reasoning_segments
-                                            .push(oxios_ouroboros::ReasoningSegment {
+                                        s.reasoning_segments.push(
+                                            oxios_ouroboros::ReasoningSegment {
                                                 before_step: pos,
                                                 text: chunk,
-                                            });
+                                            },
+                                        );
                                     }
                                 }
                             }

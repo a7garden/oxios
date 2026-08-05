@@ -287,10 +287,7 @@ mod tests {
 
         // Command: ensure the marker is touched ONLY if the sleep completes
         // (i.e. NOT if we kill it). `&&` makes the touch conditional on sleep.
-        let cmd = format!(
-            "sleep 30 && touch {}",
-            marker.to_string_lossy()
-        );
+        let cmd = format!("sleep 30 && touch {}", marker.to_string_lossy());
         let spec = HookSpec {
             event: HookEvent::PreToolUse,
             matcher: None,
@@ -325,7 +322,8 @@ mod tests {
             command: "sleep 5".to_string(),
             timeout_secs: None, // <-- omit; default_timeout applies
         };
-        let runner = CommandHookRunner::new(vec![spec]).with_default_timeout(Duration::from_millis(500));
+        let runner =
+            CommandHookRunner::new(vec![spec]).with_default_timeout(Duration::from_millis(500));
         let ctx = HookContext::default();
         let start = std::time::Instant::now();
         let outcome = runner.run(HookEvent::PreToolUse, &ctx).await;

@@ -2825,7 +2825,9 @@ strong = { model = "anthropic/claude-opus-4-20250514" }
             profiles: std::collections::HashMap::new(),
             ..Default::default()
         };
-        let err = cfg.validate().expect_err("must fail when default_profile missing");
+        let err = cfg
+            .validate()
+            .expect_err("must fail when default_profile missing");
         assert!(
             err.contains("default_profile 'auto' is not defined"),
             "got: {err}"
@@ -2849,10 +2851,7 @@ strong = { model = "anthropic/claude-opus-4-20250514" }
             ..Default::default()
         };
         let err = cfg.validate().expect_err("must fail on empty profile");
-        assert!(
-            err.contains("no configured tiers"),
-            "got: {err}"
-        );
+        assert!(err.contains("no configured tiers"), "got: {err}");
     }
     #[test]
     fn test_router_validate_with_one_tier_is_ok() {
@@ -2867,10 +2866,7 @@ strong = { model = "anthropic/claude-opus-4-20250514" }
             }),
             ..Default::default()
         };
-        profiles.insert(
-            "auto".into(),
-            RouterProfileConfig { tiers },
-        );
+        profiles.insert("auto".into(), RouterProfileConfig { tiers });
         let cfg = RouterConfig {
             enabled: true,
             default_profile: "auto".into(),

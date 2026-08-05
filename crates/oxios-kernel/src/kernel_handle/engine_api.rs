@@ -1476,7 +1476,9 @@ impl EngineApi {
             .with_context(|| format!("Failed to create provider '{provider}'"))?;
 
         let mut ctx = oxicode_sdk::Context::new();
-        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new("Hi")));
+        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new(
+            "Hi",
+        )));
 
         let stream_result = tokio::time::timeout(
             std::time::Duration::from_secs(15),
@@ -1641,9 +1643,9 @@ impl EngineApi {
 
         let mut ctx = oxicode_sdk::Context::new();
         ctx.set_system_prompt(FOLLOW_UP_SYSTEM_PROMPT);
-        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new(format!(
-            "Last assistant message:\n\"\"\"\n{text}\n\"\"\""
-        ))));
+        ctx.add_message(oxicode_sdk::Message::User(oxicode_sdk::UserMessage::new(
+            format!("Last assistant message:\n\"\"\"\n{text}\n\"\"\""),
+        )));
 
         let stream = match resolved.provider.stream(&resolved.model, &ctx, None).await {
             Ok(s) => s,

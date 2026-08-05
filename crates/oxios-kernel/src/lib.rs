@@ -67,6 +67,7 @@ pub mod onboarding;
 pub mod persona;
 
 // ─── Tools & Skills ───────────────────────────────────────────────
+pub mod hook_runner;
 pub mod host_tools;
 pub mod skill;
 pub mod token_maxing;
@@ -74,7 +75,6 @@ pub mod tools;
 #[cfg(feature = "wasm-sandbox")]
 pub mod wasm_sandbox;
 pub mod workers;
-pub mod hook_runner;
 
 // ─── State & Config ─────────────────────────────────────────────────
 // 영속 상태, 설정, 백업, 리소스 모니터링.
@@ -208,6 +208,8 @@ pub use oxios_memory::memory::sqlite::{MemoryDatabase, bytes_to_f32_slice, f32_s
 pub use persona::{Persona, PersonaManager, PersonaStore, default_personas};
 
 // ─── Tools & Skills ────────────────────────────────────────────────
+pub use hook_runner::CommandHookRunner;
+pub use oxicode_sdk::ports::hooks::HookSpec;
 pub use skill::clawhub::{
     ClawHubClient, ClawHubInstaller, ClawHubLockEntry, ClawHubLockfile, ClawHubOrigin,
     ClawHubSearchResult, ClawHubSkillDetail, ClawHubSkillMeta, ClawHubVersion, DownloadedArchive,
@@ -225,8 +227,6 @@ pub use skill::{
 pub use tools::ToolMeta;
 pub use tools::tool_types::{ArgumentDef, ToolDef};
 pub use tools::{ExecTool, KnowledgeTool};
-pub use hook_runner::CommandHookRunner;
-pub use oxicode_sdk::ports::hooks::HookSpec;
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 // Token-maxing (RFC-031): self-tracker + QuotaTracker + maxer/planner/session.
@@ -273,8 +273,8 @@ pub use state_store::{
 };
 
 // ─── Infrastructure ─────────────────────────────────────────────────
-pub use engine::{EngineHandle, EngineProvider, OxiosEngine, OxiosEngineBuilder};
 pub use asset_store::{Asset, AssetFilter, AssetSource, AssetStore, AssetStoreError, asset_type};
+pub use engine::{EngineHandle, EngineProvider, OxiosEngine, OxiosEngineBuilder};
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};
 pub use observability::{

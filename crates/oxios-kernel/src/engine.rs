@@ -892,8 +892,6 @@ fn router_config_to_sdk(cfg: &crate::config::RouterConfig) -> oxicode_sdk::route
             strong_model.expect("at least one tier is configured"),
         );
 
-
-
         profiles.insert(
             name.clone(),
             RouterProfile {
@@ -1218,7 +1216,6 @@ mod tests {
             .with_router(router_cfg)
             .build();
 
-
         // Router provider should be registered.
         assert!(engine.create_provider("router").is_ok());
 
@@ -1231,7 +1228,6 @@ mod tests {
 
     #[test]
     fn test_router_registration_with_routing_path() {
-
         // The legacy `build_with_routing()` path must also register the router.
         // Regression guard for: "build_with_routing() silently drops router_config".
         let router_cfg = crate::config::RouterConfig {
@@ -1320,11 +1316,23 @@ mod tests {
         let sdk_cfg = router_config_to_sdk(&cfg);
         let profile = sdk_cfg.profiles.get("auto").expect("profile present");
         // All three SDK tiers must have non-empty model ids.
-        assert!(!profile.high.model.is_empty(), "SDK High tier must not be empty");
-        assert!(!profile.medium.model.is_empty(), "SDK Medium tier must not be empty");
-        assert!(!profile.low.model.is_empty(), "SDK Low tier must not be empty");
+        assert!(
+            !profile.high.model.is_empty(),
+            "SDK High tier must not be empty"
+        );
+        assert!(
+            !profile.medium.model.is_empty(),
+            "SDK Medium tier must not be empty"
+        );
+        assert!(
+            !profile.low.model.is_empty(),
+            "SDK Low tier must not be empty"
+        );
         // Thinking budget → ThinkingLevel.
-        assert_eq!(profile.medium.thinking, Some(oxicode_sdk::ThinkingLevel::Medium));
+        assert_eq!(
+            profile.medium.thinking,
+            Some(oxicode_sdk::ThinkingLevel::Medium)
+        );
     }
 
     #[test]
