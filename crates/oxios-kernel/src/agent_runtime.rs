@@ -1335,24 +1335,79 @@ async fn run_agent(
                                 });
                     }
                 }
-                AgentEvent::TextChunk { text } => {
-                    // P1 chat transparency: push live text delta through the
-                    // streaming-sink registry. The gateway has already
-                    // registered a strong sender under `session_id`; the
-                    // collector there converts each delta into a partial
-                    // `OutgoingMessage` with `partial = Some(true)` and
-                    // `target_conn_id = Some(conn_id)` so the WS handler
-                    // forwards it as a bare `token` chunk (no `done`).
-                    //
-                    // Lookup uses `transparency_session` (the same session_id
-                    // already plumbed for RFC-015 event publishing). A miss
-                    // here means no gateway has registered for this session —
-                    // silent skip; non-streaming callers see no behavior
-                    // change.
-                    if let Some(ref sid) = transparency_session
-                        && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
-                    {
-                        let _ = tx.try_send(StreamDelta::Text(text.clone()));
+                AgentEvent::MessageUpdate { delta, .. } => {
+                    // SDK 0.66.0: unified streaming delta. Text deltas arrive
+                    // ONLY here (the legacy TextChunk variant is never emitted
+                    // in 0.66.0), so this arm is the live text path.
+                    match delta {
+                        oxicode_agent::StreamDelta::Text(text) => {
+                            if let Some(ref sid) = transparency_session
+                                && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                            {
+                                let _ = tx.try_send(StreamDelta::Text(text));
+                            }
+                        }
+                        oxicode_agent::StreamDelta::Thinking(text) if !text.is_empty() => {
+                            // SDK emits thinking deltas BOTH as legacy
+                            // ThinkingDelta and as MessageUpdate::Thinking.
+                            // We handle them here and drop the legacy arm to
+                            // avoid double-emission to the UI.
+                            const REASONING_CAP: usize = 4096;
+                            if s.reasoning_text.len() < REASONING_CAP {
+                                s.reasoning_text.push_str(&text);
+                                if s.reasoning_text.len() > REASONING_CAP {
+                                    s.reasoning_text.truncate(REASONING_CAP);
+                                }
+                            }
+                            // Block-stream transparency: capture into a
+                            // positioned segment keyed by tools started so far.
+                            if s.reasoning_bytes < REASONING_CAP {
+                                let budget = REASONING_CAP - s.reasoning_bytes;
+                                let mut chunk = String::new();
+                                for ch in text.chars() {
+                                    if chunk.len() + ch.len_utf8() > budget {
+                                        break;
+                                    }
+                                    chunk.push(ch);
+                                }
+                                if !chunk.is_empty() {
+                                    s.reasoning_bytes += chunk.len();
+                                    let pos = s.trajectory_steps.len();
+                                    if s.reasoning_segments
+                                        .last()
+                                        .is_some_and(|l| l.before_step == pos)
+                                    {
+                                        s.reasoning_segments
+                                            .last_mut()
+                                            .unwrap()
+                                            .text
+                                            .push_str(&chunk);
+                                    } else {
+                                        s.reasoning_segments
+                                            .push(oxios_ouroboros::ReasoningSegment {
+                                                before_step: pos,
+                                                text: chunk,
+                                            });
+                                    }
+                                }
+                            }
+                            if let Some(ref sid) = transparency_session
+                                && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
+                            {
+                                let _ = tx.try_send(StreamDelta::Thinking);
+                                let _ = tx.try_send(StreamDelta::ThinkingDelta(text));
+                            }
+                        }
+                        oxicode_agent::StreamDelta::Sync => {
+                            // Tool-call end marker — not a reasoning span end.
+                            // The authoritative reasoning.end marker comes from
+                            // the legacy ThinkingEnd event (handled below).
+                        }
+                        // Empty Thinking delta — the guarded
+                        // `Thinking(text) if !text.is_empty()` arm above
+                        // doesn't count for exhaustiveness, so handle the
+                        // empty case here as a no-op.
+                        _ => {}
                     }
                 }
                 AgentEvent::Thinking => {
@@ -1364,68 +1419,6 @@ async fn run_agent(
                         && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
                     {
                         let _ = tx.try_send(StreamDelta::Thinking);
-                    }
-                }
-                AgentEvent::ThinkingDelta { text } => {
-                    // P4: each thinking delta goes through the same
-                    // connection-scoped sink as Text deltas. The collector
-                    // converts each into a `reasoning` WS chunk (partial,
-                    // no assign_seq). Frontend appends them to the
-                    // ThinkingPanel. No batching here — the sink is a
-                    // per-session mpsc, fan-out is bounded by active turns,
-                    // and the per-token load is well below 100 Hz in
-                    // practice (verified empirically with reasoning models).
-                    // P4 (§7 persistence): append to the accumulator too so
-                    // the full reasoning text surfaces via ExecutionResult
-                    // metadata at turn end. Capped at ~4 KB to bound
-                    // storage — matches the design doc §7 truncation
-                    // rationale (matches `tool_calls.output_summary`).
-                    const REASONING_CAP: usize = 4096;
-                    if s.reasoning_text.len() < REASONING_CAP {
-                        s.reasoning_text.push_str(&text);
-                        if s.reasoning_text.len() > REASONING_CAP {
-                            s.reasoning_text.truncate(REASONING_CAP);
-                        }
-                    }
-                    // Block-stream transparency (2026-07-27): capture this
-                    // delta into a positioned segment keyed by the number of
-                    // tools started so far (`trajectory_steps.len()`), so a
-                    // reopened session can interleave reasoning with tools.
-                    // Char-safe cap shared with `reasoning_text`.
-                    if s.reasoning_bytes < REASONING_CAP {
-                        let budget = REASONING_CAP - s.reasoning_bytes;
-                        let mut chunk = String::new();
-                        for ch in text.chars() {
-                            if chunk.len() + ch.len_utf8() > budget {
-                                break;
-                            }
-                            chunk.push(ch);
-                        }
-                        if !chunk.is_empty() {
-                            s.reasoning_bytes += chunk.len();
-                            let pos = s.trajectory_steps.len();
-                            if s.reasoning_segments
-                                .last()
-                                .is_some_and(|l| l.before_step == pos)
-                            {
-                                s.reasoning_segments
-                                    .last_mut()
-                                    .unwrap()
-                                    .text
-                                    .push_str(&chunk);
-                            } else {
-                                s.reasoning_segments
-                                    .push(oxios_ouroboros::ReasoningSegment {
-                                        before_step: pos,
-                                        text: chunk,
-                                    });
-                            }
-                        }
-                    }
-                    if let Some(ref sid) = transparency_session
-                        && let Some(tx) = streaming_sinks_for_cb.lookup(sid)
-                    {
-                        let _ = tx.try_send(StreamDelta::ThinkingDelta(text.clone()));
                     }
                 }
                 AgentEvent::ThinkingEnd => {
