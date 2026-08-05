@@ -744,6 +744,9 @@ pub struct EngineConfig {
     /// user point throwaway questions at a cheaper/faster model.
     #[serde(default)]
     pub quick_ask_model: Option<String>,
+    /// Multi-model router configuration (SDK 0.66.0 router feature).
+    #[serde(default)]
+    pub router: Option<RouterConfig>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -759,9 +762,111 @@ impl Default for EngineConfig {
             excluded_models: Vec::new(),
             role_routing: RoleRoutingConfig::default(),
             quick_ask_model: None,
+            router: None,
         }
     }
 }
+/// Router profile configuration loaded from config.toml.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct RouterConfig {
+    /// Enable router. When true, `default_model` becomes `"router/<default_profile>"`.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Default profile name.
+    #[serde(default = "default_router_profile")]
+    pub default_profile: String,
+    /// Optional classifier model for LLM-based classification in ambiguous cases.
+    #[serde(default)]
+    pub classifier_model: Option<String>,
+    /// Maximum session budget in USD.
+    #[serde(default)]
+    pub max_session_budget: Option<f64>,
+    /// Upgrade to strong tier when context tokens exceed this.
+    #[serde(default)]
+    pub context_upgrade_threshold: Option<usize>,
+    /// Tier configurations per profile.
+    #[serde(default)]
+    pub profiles: std::collections::HashMap<String, RouterProfileConfig>,
+    /// Scoring weights.
+    #[serde(default)]
+    pub scoring: RouterScoringConfig,
+}
+
+fn default_router_profile() -> String {
+    "auto".to_string()
+}
+
+/// A named routing profile mapping tiers to model configs.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct RouterProfileConfig {
+    /// Tier configurations.
+    #[serde(default)]
+    pub tiers: RouterTiersConfig,
+}
+
+/// Tier-to-model mapping.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct RouterTiersConfig {
+    #[serde(default)]
+    pub fast: Option<RouterTierConfig>,
+    #[serde(default)]
+    pub balanced: Option<RouterTierConfig>,
+    #[serde(default)]
+    pub strong: Option<RouterTierConfig>,
+}
+
+/// Configuration for a single routing tier.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RouterTierConfig {
+    /// Model ID in "provider/model" format.
+    pub model: String,
+    /// Fallback models.
+    #[serde(default)]
+    pub fallbacks: Vec<String>,
+    /// Thinking budget for reasoning models.
+    #[serde(default)]
+    pub thinking: Option<RouterThinkingConfig>,
+}
+
+/// Thinking budget for a tier model.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RouterThinkingConfig {
+    pub budget: u32,
+}
+
+/// Scoring weights for router signal aggregation.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RouterScoringConfig {
+    #[serde(default = "default_weight_structural")]
+    pub structural: f64,
+    #[serde(default = "default_weight_behavioral")]
+    pub behavioral: f64,
+    #[serde(default = "default_weight_context")]
+    pub context: f64,
+    #[serde(default = "default_weight_vision")]
+    pub vision: f64,
+    #[serde(default = "default_weight_message")]
+    pub message: f64,
+}
+
+impl Default for RouterScoringConfig {
+    fn default() -> Self {
+        Self {
+            structural: 0.25,
+            behavioral: 0.20,
+            context: 0.15,
+            vision: 0.10,
+            message: 0.30,
+        }
+    }
+}
+
+fn default_weight_structural() -> f64 { 0.25 }
+fn default_weight_behavioral() -> f64 { 0.20 }
+fn default_weight_context() -> f64 { 0.15 }
+fn default_weight_vision() -> f64 { 0.10 }
+fn default_weight_message() -> f64 { 0.30 }
+
 
 /// Daemon mode configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
