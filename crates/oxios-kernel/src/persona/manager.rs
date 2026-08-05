@@ -282,6 +282,7 @@ mod tests {
             enabled: true,
             model: None,
             personality_traits: vec![],
+            capabilities: vec![],
         };
         pm.store().register(custom);
         pm.set_active("custom-1").await.unwrap();

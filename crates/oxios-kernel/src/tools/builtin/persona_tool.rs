@@ -248,6 +248,7 @@ impl AgentTool for PersonaTool {
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string()),
                     personality_traits: str_array(&params, "personality_traits"),
+                    capabilities: str_array(&params, "capabilities"),
                 };
 
                 // Security review (fail-closed): blocks prompt-injection in the
@@ -325,6 +326,11 @@ impl AgentTool for PersonaTool {
                         str_array(&params, "personality_traits")
                     } else {
                         existing.personality_traits
+                    },
+                    capabilities: if params.get("capabilities").is_some() {
+                        str_array(&params, "capabilities")
+                    } else {
+                        existing.capabilities
                     },
                 };
 

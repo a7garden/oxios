@@ -3,17 +3,20 @@
 //!
 //! File path: `~/.oxios/state/personas/index.json`
 //!
-//! Schema (schema_version = 1):
+//! Schema (schema_version = 2):
 //! ```json
 //! {
-//!   "schema_version": 1,
+//!   "schema_version": 2,
 //!   "active_persona_id": "dev",
 //!   "personas": [ { "id": "...", "name": "...", "role": "...",
 //!                   "description": "...", "system_prompt": "...",
 //!                   "enabled": true, "model": null,
-//!                   "personality_traits": [] }, ... ]
+//!                   "personality_traits": [],
+//!                   "capabilities": [] }, ... ]
 //! }
 //! ```
+//! Backward compat: v1 files (no `capabilities` field) load with empty
+//! capabilities via `#[serde(default)]` on the `Persona.capabilities` field.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -21,7 +24,9 @@ use serde::{Deserialize, Serialize};
 use super::Persona;
 use crate::state_store::StateStore;
 
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
+/// Oldest schema version still accepted on load (for backward compat).
+const MIN_SCHEMA_VERSION: u32 = 1;
 
 /// Serializable snapshot of the persona registry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,13 +46,16 @@ pub async fn load_from_state_store(store: &StateStore) -> Result<Option<PersonaS
         .await
         .context("persona: failed to load index.json")?;
     let Some(snap) = raw else { return Ok(None) };
-    if snap.schema_version != SCHEMA_VERSION {
+    if snap.schema_version < MIN_SCHEMA_VERSION || snap.schema_version > SCHEMA_VERSION {
         anyhow::bail!(
-            "persona: schema_version {} not supported (expected {})",
+            "persona: schema_version {} not supported (expected {}-{})",
             snap.schema_version,
+            MIN_SCHEMA_VERSION,
             SCHEMA_VERSION
         );
     }
+    // v1 → v2: capabilities field defaults to empty via serde(default).
+    // No explicit migration needed — old personas load with [] capabilities.
     Ok(Some(snap))
 }
 
@@ -74,6 +82,7 @@ mod tests {
             enabled,
             model: None,
             personality_traits: vec!["curious".to_string()],
+            capabilities: vec![],
         }
     }
 
@@ -86,7 +95,7 @@ mod tests {
     async fn test_round_trip() {
         let store = make_store();
         let snap = PersonaSnapshot {
-            schema_version: 1,
+            schema_version: SCHEMA_VERSION,
             active_persona_id: Some("dev".to_string()),
             personas: vec![
                 make_persona("dev", "Dev", "developer", true),
@@ -95,11 +104,27 @@ mod tests {
         };
         save_to_state_store(&store, &snap).await.unwrap();
         let loaded = load_from_state_store(&store).await.unwrap().unwrap();
-        assert_eq!(loaded.schema_version, 1);
+        assert_eq!(loaded.schema_version, SCHEMA_VERSION);
         assert_eq!(loaded.active_persona_id, Some("dev".to_string()));
         assert_eq!(loaded.personas.len(), 2);
         assert_eq!(loaded.personas[0].id, "dev");
         assert_eq!(loaded.personas[1].role, "qa");
+    }
+
+    #[tokio::test]
+    async fn test_v1_backward_compat_loads() {
+        // A v1 snapshot (no capabilities field) should load successfully
+        // with empty capabilities via #[serde(default)].
+        let store = make_store();
+        let snap = PersonaSnapshot {
+            schema_version: 1,
+            active_persona_id: Some("dev".to_string()),
+            personas: vec![make_persona("dev", "Dev", "developer", true)],
+        };
+        save_to_state_store(&store, &snap).await.unwrap();
+        let loaded = load_from_state_store(&store).await.unwrap().unwrap();
+        assert_eq!(loaded.schema_version, 1);
+        assert_eq!(loaded.personas[0].capabilities, Vec::<String>::new());
     }
 
     #[tokio::test]
@@ -128,7 +153,7 @@ mod tests {
     async fn test_empty_personas_round_trip() {
         let store = make_store();
         let snap = PersonaSnapshot {
-            schema_version: 1,
+            schema_version: SCHEMA_VERSION,
             active_persona_id: None,
             personas: vec![],
         };
@@ -142,13 +167,13 @@ mod tests {
     async fn test_overwrite_on_save() {
         let store = make_store();
         let snap1 = PersonaSnapshot {
-            schema_version: 1,
+            schema_version: SCHEMA_VERSION,
             active_persona_id: Some("dev".to_string()),
             personas: vec![make_persona("dev", "Dev", "developer", true)],
         };
         save_to_state_store(&store, &snap1).await.unwrap();
         let snap2 = PersonaSnapshot {
-            schema_version: 1,
+            schema_version: SCHEMA_VERSION,
             active_persona_id: Some("qa".to_string()),
             personas: vec![
                 make_persona("dev", "Dev", "developer", true),

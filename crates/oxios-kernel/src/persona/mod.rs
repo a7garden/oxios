@@ -32,6 +32,12 @@ pub struct Persona {
     pub model: Option<String>,
     /// Personality traits (curious, skeptical, creative...).
     pub personality_traits: Vec<String>,
+    /// RFC-044 §8.2: UI capability flags this persona enables on the chat
+    /// substrate. Drives role-specific affordances (terminal, diff-viewer,
+    /// approval-cards, worktree-fanout, longform-editor, outline, web-search).
+    /// Backward-compatible: old files load with an empty vec (`#[serde(default)]`).
+    #[serde(default)]
+    pub capabilities: Vec<String>,
 }
 
 impl Default for Persona {
@@ -45,6 +51,7 @@ impl Default for Persona {
             enabled: true,
             model: None,
             personality_traits: vec![],
+            capabilities: vec![],
         }
     }
 }
@@ -61,6 +68,7 @@ impl Persona {
             enabled: true,
             model: None,
             personality_traits: vec![],
+            capabilities: vec![],
         }
     }
 
@@ -81,6 +89,7 @@ impl Persona {
             enabled: true,
             model: None,
             personality_traits: vec![],
+            capabilities: vec![],
         }
     }
 }
@@ -130,6 +139,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "action-oriented".to_string(),
                 "practical".to_string(),
             ],
+            capabilities: vec!["terminal".to_string(), "diff-viewer".to_string(), "approval-cards".to_string(), "worktree-fanout".to_string(), "exec".to_string()],
         },
         Persona {
             id: "review".to_string(),
@@ -161,6 +171,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "thorough".to_string(),
                 "quality-focused".to_string(),
             ],
+            capabilities: vec!["diff-viewer".to_string(), "approval-cards".to_string()],
         },
         Persona {
             id: "research".to_string(),
@@ -192,6 +203,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "analytical".to_string(),
                 "evidence-focused".to_string(),
             ],
+            capabilities: vec!["web-search".to_string()],
         },
         Persona {
             id: "architect".to_string(),
@@ -227,6 +239,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "deliberate".to_string(),
                 "tradeoff-aware".to_string(),
             ],
+            capabilities: vec![],
         },
         Persona {
             id: "mentor".to_string(),
@@ -262,6 +275,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "encouraging".to_string(),
                 "clarity-focused".to_string(),
             ],
+            capabilities: vec![],
         },
         Persona {
             id: "ops".to_string(),
@@ -295,6 +309,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "reliability-focused".to_string(),
                 "failure-aware".to_string(),
             ],
+            capabilities: vec!["exec".to_string()],
         },
         Persona {
             id: "security".to_string(),
@@ -329,6 +344,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "precise".to_string(),
                 "risk-focused".to_string(),
             ],
+            capabilities: vec!["diff-viewer".to_string()],
         },
         Persona {
             id: "writer".to_string(),
@@ -364,6 +380,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "reader-focused".to_string(),
                 "concise".to_string(),
             ],
+            capabilities: vec!["longform-editor".to_string(), "outline".to_string()],
         },
         Persona {
             id: "planner".to_string(),
@@ -398,6 +415,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "outcome-oriented".to_string(),
                 "adaptive".to_string(),
             ],
+            capabilities: vec![],
         },
     ]
 }
