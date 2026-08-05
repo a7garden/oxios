@@ -949,7 +949,9 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
             Some((key, source)) => {
                 let source_str = match source {
                     oxios_kernel::credential::CredentialSource::Config => "config.toml",
-                    oxios_kernel::credential::CredentialSource::OxicodeAuthStore => "~/.oxicode/auth.json",
+                    oxios_kernel::credential::CredentialSource::OxicodeAuthStore => {
+                        "~/.oxicode/auth.json"
+                    }
                     oxios_kernel::credential::CredentialSource::EnvVar => "env var",
                 };
                 let preview = if key.len() > 8 {
@@ -1272,7 +1274,9 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
             Some((key, source)) => {
                 let source_str = match source {
                     oxios_kernel::credential::CredentialSource::Config => "config.toml",
-                    oxios_kernel::credential::CredentialSource::OxicodeAuthStore => "~/.oxicode/auth.json",
+                    oxios_kernel::credential::CredentialSource::OxicodeAuthStore => {
+                        "~/.oxicode/auth.json"
+                    }
                     oxios_kernel::credential::CredentialSource::EnvVar => "env var",
                 };
                 let preview = if key.len() > 8 {
@@ -1386,7 +1390,8 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
     } else {
         println!("  {} oxicode CLI not detected", style("⚠").yellow().bold());
         issues.push(
-            "Install oxicode CLI for shared credential management: `cargo install oxicode-cli`".to_string(),
+            "Install oxicode CLI for shared credential management: `cargo install oxicode-cli`"
+                .to_string(),
         );
     }
 

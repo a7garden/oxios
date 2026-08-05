@@ -5,6 +5,7 @@
 //! The kernel library provides parts; the binary puts them together.
 
 use anyhow::{Context, Result};
+use oxicode_sdk::ModelCatalog;
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     A2AProtocol, AgentRuntime, AuditPersistence, AuditTrail, BasicSupervisor, BudgetManager,
@@ -1082,9 +1083,24 @@ impl KernelBuilder {
 
         // Model comes from config, not hardcoded default
         let model_id = &config.engine.default_model;
-        // Initialize the shared model catalog once. This pulls in dynamic
-        // models.dev metadata (live prices/limits, user overrides). Failure
-        // is non-fatal: engines fall back to the static registry.
+
+        if let Some(router_cfg) = &config.engine.router
+            && let Err(err) = router_cfg.validate()
+        {
+            anyhow::bail!("Invalid [engine.router] configuration: {err}");
+        }
+
+        fn attach_hooks(
+            engine_builder: oxios_kernel::OxiosEngineBuilder,
+            hooks: &[oxios_kernel::HookSpec],
+        ) -> oxios_kernel::OxiosEngineBuilder {
+            if hooks.is_empty() {
+                engine_builder
+            } else {
+                engine_builder.with_hook_specs(hooks.to_vec())
+            }
+        }
+
         let catalog = match OxiosEngine::init_file_catalog().await {
             Ok(c) => {
                 tracing::info!("Model catalog initialized (dynamic models.dev data)");
@@ -1098,32 +1114,63 @@ impl KernelBuilder {
                 None
             }
         };
-        let engine = if config.engine.routing_enabled {
+        let engine = if let Some(ref router_cfg) = config.engine.router {
+            if router_cfg.enabled {
+                let effective_model = format!("router/{}", router_cfg.default_profile);
+                let mut engine_builder = OxiosEngine::builder()
+                    .default_model(&effective_model)
+                    .with_router(router_cfg.clone());
+                if let Some(ref c) = catalog {
+                    engine_builder = engine_builder.with_catalog(c.clone());
+                }
+                Arc::new(attach_hooks(engine_builder, &config.engine.hooks).build())
+            } else {
+                build_default_engine(&config, model_id, &catalog)
+            }
+        } else if config.engine.routing_enabled {
+            // Legacy routing_enabled path (backward compat)
             let mut engine_builder = OxiosEngine::builder().default_model(model_id);
             if let Some(ref c) = catalog {
                 engine_builder = engine_builder.with_catalog(c.clone());
             }
-            let (engine, _routing_control) = engine_builder.build_with_routing();
+            let (engine, _routing_control) =
+                attach_hooks(engine_builder, &config.engine.hooks).build_with_routing();
             Arc::new(engine)
         } else {
-            match &catalog {
-                Some(c) => Arc::new(OxiosEngine::from_config_with_catalog(
-                    model_id,
-                    config.engine.api_key.as_deref(),
-                    c.clone(),
-                )),
-                None => Arc::new(OxiosEngine::from_config(
-                    model_id,
-                    config.engine.api_key.as_deref(),
-                )),
-            }
+            build_default_engine(&config, model_id, &catalog)
         };
-        // Boot-time validation: resolve the configured model so a broken
-        // config fails fast (daemon refuses to start). `model.provider` is
-        // reused below to seed the agent API key.
+
+        fn build_default_engine(
+            config: &OxiosConfig,
+            model_id: &str,
+            catalog: &Option<Arc<dyn ModelCatalog>>,
+        ) -> Arc<OxiosEngine> {
+            let primary_provider = model_id
+                .split_once('/')
+                .map(|(p, _)| p)
+                .unwrap_or("anthropic");
+            let mut engine_builder = oxios_kernel::OxiosEngine::builder().default_model(model_id);
+            if let Some(key) = config.engine.api_key.as_deref() {
+                engine_builder = engine_builder.api_key(primary_provider, key);
+            }
+            if let Some(c) = catalog {
+                engine_builder = engine_builder.with_catalog(c.clone());
+            }
+            Arc::new(attach_hooks(engine_builder, &config.engine.hooks).build())
+        }
+        // Boot-time validation: resolve the engine's effective default model
+        // so a broken config fails fast (daemon refuses to start). When the
+        // router is enabled, the effective id is `router/<default_profile>`
+        // and a synthetic model was registered for that profile by Task 2;
+        // otherwise it matches `config.engine.default_model`. Using the raw
+        // config field here would diverge from the router path (and fail on
+        // an empty config default). `model.provider` is reused below to seed
+        // the agent API key — for the router it yields "router" and the
+        // CredentialStore gracefully falls back to `config.engine.api_key`.
+        let effective_model_id = engine.default_model_id();
         let model = engine
-            .resolve_model(model_id)
-            .context(format!("Failed to resolve model: {model_id}"))?;
+            .resolve_model(effective_model_id)
+            .context(format!("Failed to resolve model: {effective_model_id}"))?;
 
         // EngineHandle — hot-swappable engine reference. Created here so both
         // the OuroborosEngine (interview/crystallize/review) and the AgentRuntime

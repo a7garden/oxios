@@ -115,7 +115,7 @@ arc-swap = "1.7"
 #   browser         — BrowseConfig / BrowserEngine (kernel_handle/browser_api.rs)
 #   delegation      — SdkSubagentRunner (subagent_runner.rs)
 #   circuit-breaker — CircuitBreaker trait + DefaultCircuitBreaker (agent_runtime LLM breaker)
-oxicode-sdk = { version = "0.66.0", features = ["browser", "delegation", "circuit-breaker"] }
+oxicode-sdk = { version = "0.66.0", features = ["browser", "delegation", "circuit-breaker", "router"] }
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }

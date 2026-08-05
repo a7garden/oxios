@@ -67,6 +67,7 @@ pub mod onboarding;
 pub mod persona;
 
 // ─── Tools & Skills ───────────────────────────────────────────────
+pub mod hook_runner;
 pub mod host_tools;
 pub mod skill;
 pub mod token_maxing;
@@ -207,6 +208,8 @@ pub use oxios_memory::memory::sqlite::{MemoryDatabase, bytes_to_f32_slice, f32_s
 pub use persona::{Persona, PersonaManager, PersonaStore, default_personas};
 
 // ─── Tools & Skills ────────────────────────────────────────────────
+pub use hook_runner::CommandHookRunner;
+pub use oxicode_sdk::ports::hooks::HookSpec;
 pub use skill::clawhub::{
     ClawHubClient, ClawHubInstaller, ClawHubLockEntry, ClawHubLockfile, ClawHubOrigin,
     ClawHubSearchResult, ClawHubSkillDetail, ClawHubSkillMeta, ClawHubVersion, DownloadedArchive,
@@ -270,9 +273,8 @@ pub use state_store::{
 };
 
 // ─── Infrastructure ─────────────────────────────────────────────────
-pub use engine::{EngineHandle, EngineProvider, OxiosEngine};
-// ─── Unified Asset Store ────────────────────────────────────────────
 pub use asset_store::{Asset, AssetFilter, AssetSource, AssetStore, AssetStoreError, asset_type};
+pub use engine::{EngineHandle, EngineProvider, OxiosEngine, OxiosEngineBuilder};
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};
 pub use observability::{

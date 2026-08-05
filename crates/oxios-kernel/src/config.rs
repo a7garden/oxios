@@ -744,6 +744,12 @@ pub struct EngineConfig {
     /// user point throwaway questions at a cheaper/faster model.
     #[serde(default)]
     pub quick_ask_model: Option<String>,
+    /// SDK lifecycle hooks (Claude Code compatible schema).
+    #[serde(default)]
+    pub hooks: Vec<oxicode_sdk::ports::hooks::HookSpec>,
+    /// Multi-model router configuration (SDK 0.66.0 router feature).
+    #[serde(default)]
+    pub router: Option<RouterConfig>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -759,8 +765,171 @@ impl Default for EngineConfig {
             excluded_models: Vec::new(),
             role_routing: RoleRoutingConfig::default(),
             quick_ask_model: None,
+            hooks: Vec::new(),
+            router: None,
         }
     }
+}
+/// Router profile configuration loaded from config.toml.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RouterConfig {
+    /// Enable router. When true, `default_model` becomes `"router/<default_profile>"`.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Default profile name.
+    #[serde(default = "default_router_profile")]
+    pub default_profile: String,
+    /// Optional classifier model for LLM-based classification in ambiguous cases.
+    #[serde(default)]
+    pub classifier_model: Option<String>,
+    /// Maximum session budget in USD.
+    #[serde(default)]
+    pub max_session_budget: Option<f64>,
+    /// Upgrade to strong tier when context tokens exceed this.
+    #[serde(default)]
+    pub context_upgrade_threshold: Option<usize>,
+    /// Tier configurations per profile.
+    #[serde(default)]
+    pub profiles: std::collections::HashMap<String, RouterProfileConfig>,
+    /// Scoring weights.
+    #[serde(default)]
+    pub scoring: RouterScoringConfig,
+}
+
+impl Default for RouterConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            default_profile: default_router_profile(),
+            classifier_model: None,
+            max_session_budget: None,
+            context_upgrade_threshold: None,
+            profiles: std::collections::HashMap::new(),
+            scoring: RouterScoringConfig::default(),
+        }
+    }
+}
+impl RouterConfig {
+    /// Validate the router configuration.
+    ///
+    /// Returns `Ok(())` when:
+    /// - the router is disabled (it is a no-op), or
+    /// - when enabled, `default_profile` resolves to a profile AND that
+    ///   profile has at least one tier configured.
+    ///
+    /// On failure, returns an actionable message suitable for a startup
+    /// failure ("router enabled but ..."). Callers should surface this as a
+    /// hard boot error rather than letting the kernel proceed to a
+    /// `router/<missing>` model-resolution failure.
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        let Some(profile) = self.profiles.get(&self.default_profile) else {
+            return Err(format!(
+                "router enabled but default_profile '{}' is not defined under [engine.router.profiles]",
+                self.default_profile
+            ));
+        };
+
+        let has_tier = profile.tiers.fast.is_some()
+            || profile.tiers.balanced.is_some()
+            || profile.tiers.strong.is_some();
+        if !has_tier {
+            return Err(format!(
+                "router enabled but default_profile '{}' has no configured tiers — add [engine.router.profiles.{}.tiers] or disable router",
+                self.default_profile, self.default_profile
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+fn default_router_profile() -> String {
+    "auto".to_string()
+}
+
+/// A named routing profile mapping tiers to model configs.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct RouterProfileConfig {
+    /// Tier configurations.
+    #[serde(default)]
+    pub tiers: RouterTiersConfig,
+}
+
+/// Tier-to-model mapping.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct RouterTiersConfig {
+    #[serde(default)]
+    pub fast: Option<RouterTierConfig>,
+    #[serde(default)]
+    pub balanced: Option<RouterTierConfig>,
+    #[serde(default)]
+    pub strong: Option<RouterTierConfig>,
+}
+
+/// Configuration for a single routing tier.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RouterTierConfig {
+    /// Model ID in "provider/model" format.
+    pub model: String,
+    /// Fallback models.
+    #[serde(default)]
+    pub fallbacks: Vec<String>,
+    /// Thinking budget for reasoning models.
+    #[serde(default)]
+    pub thinking: Option<RouterThinkingConfig>,
+}
+
+/// Thinking budget for a tier model.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RouterThinkingConfig {
+    pub budget: u32,
+}
+
+/// Scoring weights for router signal aggregation.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RouterScoringConfig {
+    #[serde(default = "default_weight_structural")]
+    pub structural: f64,
+    #[serde(default = "default_weight_behavioral")]
+    pub behavioral: f64,
+    #[serde(default = "default_weight_context")]
+    pub context: f64,
+    #[serde(default = "default_weight_vision")]
+    pub vision: f64,
+    #[serde(default = "default_weight_message")]
+    pub message: f64,
+}
+
+impl Default for RouterScoringConfig {
+    fn default() -> Self {
+        Self {
+            structural: 0.25,
+            behavioral: 0.20,
+            context: 0.15,
+            vision: 0.10,
+            message: 0.30,
+        }
+    }
+}
+
+fn default_weight_structural() -> f64 {
+    0.25
+}
+fn default_weight_behavioral() -> f64 {
+    0.20
+}
+fn default_weight_context() -> f64 {
+    0.15
+}
+fn default_weight_vision() -> f64 {
+    0.10
+}
+fn default_weight_message() -> f64 {
+    0.30
 }
 
 /// Daemon mode configuration.
@@ -2596,5 +2765,114 @@ exec = "always"
         assert_eq!(cfg.remote.bind_address, "127.0.0.1");
         assert!(!cfg.remote.enabled);
         assert_eq!(cfg.remote.port, 6768);
+    }
+    #[test]
+    fn test_router_config_deserialization() {
+        let toml_str = r#"
+[engine.router]
+enabled = true
+default_profile = "auto"
+
+[engine.router.scoring]
+structural = 0.25
+behavioral = 0.20
+context = 0.15
+vision = 0.10
+message = 0.30
+
+[engine.router.profiles.auto.tiers]
+fast = { model = "anthropic/claude-haiku-4-20250514" }
+balanced = { model = "anthropic/claude-sonnet-4-20250514" }
+strong = { model = "anthropic/claude-opus-4-20250514" }
+"#;
+
+        let config: OxiosConfig = toml::from_str(toml_str).unwrap();
+        let router = config
+            .engine
+            .router
+            .expect("router config should be present");
+        assert!(router.enabled);
+        assert_eq!(router.default_profile, "auto");
+
+        let auto = router
+            .profiles
+            .get("auto")
+            .expect("auto profile should exist");
+        let fast = auto.tiers.fast.as_ref().expect("fast tier should exist");
+        assert_eq!(fast.model, "anthropic/claude-haiku-4-20250514");
+        let strong = auto
+            .tiers
+            .strong
+            .as_ref()
+            .expect("strong tier should exist");
+        assert_eq!(strong.model, "anthropic/claude-opus-4-20250514");
+    }
+
+    #[test]
+    fn test_router_validate_disabled_is_ok() {
+        // The router being off is always valid.
+        let cfg = RouterConfig::default();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_router_validate_missing_default_profile() {
+        // Enabled router, but `default_profile = "auto"` doesn't resolve to
+        // any defined profile.
+        let cfg = RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles: std::collections::HashMap::new(),
+            ..Default::default()
+        };
+        let err = cfg
+            .validate()
+            .expect_err("must fail when default_profile missing");
+        assert!(
+            err.contains("default_profile 'auto' is not defined"),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_router_validate_empty_profile() {
+        // Enabled router with a profile that has no tiers configured.
+        let mut profiles = std::collections::HashMap::new();
+        profiles.insert(
+            "auto".into(),
+            RouterProfileConfig {
+                tiers: RouterTiersConfig::default(),
+            },
+        );
+        let cfg = RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles,
+            ..Default::default()
+        };
+        let err = cfg.validate().expect_err("must fail on empty profile");
+        assert!(err.contains("no configured tiers"), "got: {err}");
+    }
+    #[test]
+    fn test_router_validate_with_one_tier_is_ok() {
+        // The minimum to be valid: the default profile exists and has at
+        // least one tier.
+        let mut profiles = std::collections::HashMap::new();
+        let tiers = RouterTiersConfig {
+            balanced: Some(RouterTierConfig {
+                model: "anthropic/claude-sonnet-4-20250514".into(),
+                fallbacks: vec![],
+                thinking: None,
+            }),
+            ..Default::default()
+        };
+        profiles.insert("auto".into(), RouterProfileConfig { tiers });
+        let cfg = RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok());
     }
 }
