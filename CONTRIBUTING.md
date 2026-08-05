@@ -34,7 +34,7 @@ Oxios is an **Agent Operating System** in Rust. Key components:
 | `oxios-cli` | CLI channel |
 | `oxios-telegram` | Telegram channel |
 
-**Dependency graph:** `oxios → oxios-kernel → oxi-sdk (crates.io)`
+**Dependency graph:** `oxios → oxios-kernel → oxicode-sdk (crates.io)`
 
 ## Code Conventions
 

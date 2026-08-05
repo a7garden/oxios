@@ -7,7 +7,7 @@
 
 Oxios is an **Agent Operating System** in Rust. AI agents fork, exec, wait, kill — just like Unix processes.
 
-**Stack:** Rust 2024 (edition 2024, MSRV 1.96), tokio async, serde, oxi-sdk (crates.io).
+**Stack:** Rust 2024 (edition 2024, MSRV 1.96), tokio async, serde, oxicode-sdk (crates.io).
 
 ```
 User → Channel (Web/CLI/Telegram) → Gateway → Kernel
@@ -31,7 +31,7 @@ oxios/
 └── docs/                  # Architecture, RFCs, design documents
 ```
 
-**Dependencies:** `oxios → oxios-kernel → {oxios-memory, oxios-ouroboros, oxios-markdown, oxios-calendar, oxios-mcp, oxi-sdk}`. `oxi-sdk` is a crates.io dependency — never reimplement what it provides.
+**Dependencies:** `oxios → oxios-kernel → {oxios-memory, oxios-ouroboros, oxios-markdown, oxios-calendar, oxios-mcp, oxicode-sdk}`. `oxicode-sdk` is a crates.io dependency — never reimplement what it provides.
 
 ## Quick Facts
 
@@ -48,7 +48,7 @@ oxios/
 
 - **Unix philosophy** — fork/exec/wait/kill for agents. Compose small pieces.
 - **Intent-first** — assess every message; depth adapts to the task. assess → crystallize → execute → review.
-- **No reimplementation** — reuse oxi-sdk from crates.io.
+- **No reimplementation** — reuse oxicode-sdk from crates.io.
 - **Channel agnostic** — gateway doesn't care where messages come from.
 - **No containers** — direct host execution. Security via AccessManager (RBAC + path sandboxing).
 
@@ -83,7 +83,7 @@ oxios/
 | `~/.oxios/config.toml` | Configuration |
 | `~/.oxios/workspace/` | Agent working directory (sessions, skills) |
 | `~/.oxios/knowledge/` | User markdown knowledge base |
-| `~/.oxi/auth.json` | oxi-cli credentials (separate from Oxios) |
+| `~/.oxicode/auth.json` | oxicode-cli credentials (separate from Oxios) |
 
 ## Architecture (summary)
 
@@ -93,15 +93,15 @@ See `docs/ARCHITECTURE.md` for the full reference (subsystems, data flow, depend
 - **KernelHandle** — Facade with 13 typed APIs (Agent, Space, Security, Persona, Exec, Browser, MCP, Extension, Infra, A2A, State, KnowledgeBase, KnowledgeLens).
 - **Supervisor** — Agent lifecycle: fork/exec/wait/kill.
 - **Orchestrator** — Ouroboros protocol end-to-end. The "brain".
-- **AgentRuntime** — Wraps oxi-sdk tool-calling loop.
-- **OxiosEngine** — Wraps oxi-sdk's `Oxi`. Provider/model resolution goes through `OxiBuilder`. The **catalog port** (`oxi-sdk` `ModelCatalog`) is initialized once at boot (`OxiosEngine::init_file_catalog`, self-hosted under `~/.oxios/cache/`) and attached to every engine — including across hot-swaps — so `resolve_model` and Web UI introspection (`EngineApi`) consult dynamic models.dev metadata (live price/limit refresh, user overrides) before falling back to the static registry. Static free-fns (`get_provider_models`, etc.) remain as fallbacks (the static `model_db` is itself backed by the embedded models.dev snapshot, so it carries real prices).
+- **AgentRuntime** — Wraps oxicode-sdk tool-calling loop.
+- **OxiosEngine** — Wraps oxicode-sdk's `Oxicode`. Provider/model resolution goes through `OxicodeBuilder`. The **catalog port** (`oxicode-sdk` `ModelCatalog`) is initialized once at boot (`OxiosEngine::init_file_catalog`, self-hosted under `~/.oxios/cache/`) and attached to every engine — including across hot-swaps — so `resolve_model` and Web UI introspection (`EngineApi`) consult dynamic models.dev metadata (live price/limit refresh, user overrides) before falling back to the static registry. Static free-fns (`get_provider_models`, etc.) remain as fallbacks (the static `model_db` is itself backed by the embedded models.dev snapshot, so it carries real prices).
 - **Memory** — Tiered (Hot/Warm/Cold), Dream consolidation, HNSW, hyperbolic embeddings.
 - **AccessManager** — OWASP RBAC + path sandboxing + Merkle audit trail.
 - **Skill** — Unified system (RFC-009). Each skill = `SKILL.md` with YAML frontmatter.
 
 ## Adding a New Tool
 
-1. Define in `crates/oxios-kernel/src/tools/<name>_tool.rs` — implement `AgentTool` from `oxi_sdk`
+1. Define in `crates/oxios-kernel/src/tools/<name>_tool.rs` — implement `AgentTool` from `oxicode_sdk`
 2. Register in `tools/kernel_bridge.rs::register_all_kernel_tools()`
 3. If it wraps a KernelHandle API, add `*_api.rs` in `kernel_handle/`
 4. Test: `oxios run --json "<command that triggers tool>"`
@@ -154,14 +154,14 @@ Topological order:
 `oxios-web`/`oxios-cli`/`oxios-telegram` were merged into the binary as
 in-process modules per RFC-026 — no separate crates to publish.
 - **Kernel is intentionally monolithic.** See ARCHITECTURE.md §10. Do not propose splitting.
-- **oxi-sdk is crates.io only.** Never add as path dep. Never reimplement what it provides.
+- **oxicode-sdk is crates.io only.** Never add as path dep. Never reimplement what it provides.
 - **Kernel binary vs library.** `src/kernel.rs` (assembler) is in the binary crate, not `oxios-kernel`.
 - **Agent lifecycle split.** `Supervisor` = low-level process. `AgentLifecycleManager` = full lifecycle (A2A, scheduling, permissions). Don't add lifecycle logic to Orchestrator.
 - **Tool registration.** All kernel tools → `tools/kernel_bridge.rs::register_all_kernel_tools()`. Not `registration.rs`.
 - **Two knowledge systems.** Agent memory = MemoryManager (JSON per Space). User notes = KnowledgeBase (`.md` files, `~/.oxios/knowledge/`). See `docs/rfc-003-knowledge-separation.md`.
 - **Unified skill model.** No separate `program/` module or `program.toml`. `SkillManager` handles everything. Each skill = `SKILL.md` + YAML frontmatter.
 - **Feature gates.** Web, CLI, Telegram, browser, telemetry are feature-gated. Check `cargo build -p oxios --features <feature>`.
-- **`--all-features` works.** oxi-sdk 0.45.1 + wasmtime 24 migration — `cargo build/clippy --workspace --all-features` compiles. As of oxi-sdk 0.45.x, `AgentConfig` gained `ttsr_engine`/`memory`/`todo`/`agent_pool` fields (all `#[serde(skip, default)]`); fill with `..Default::default()` to keep sites working. CI still uses per-crate features (`.github/workflows/ci.yml`) for precision. The prior wasm-sandbox `ResourceLimiter` regression (missing `table_growing` on wasmtime 24) is fixed in `crates/oxios-kernel/src/wasm_sandbox.rs`.
-- **Workspace deps.** `oxi-sdk` must be in both `[workspace.dependencies]` (root `Cargo.toml`) AND `[dependencies]` in the crate using it.
+- **`--all-features` works.** oxicode-sdk 0.66.0 + wasmtime 24 migration — `cargo build/clippy --workspace --all-features` compiles. As of oxicode-sdk 0.45.x, `AgentConfig` gained `ttsr_engine`/`memory`/`todo`/`agent_pool` fields (all `#[serde(skip, default)]`); fill with `..Default::default()` to keep sites working. CI still uses per-crate features (`.github/workflows/ci.yml`) for precision. The prior wasm-sandbox `ResourceLimiter` regression (missing `table_growing` on wasmtime 24) is fixed in `crates/oxios-kernel/src/wasm_sandbox.rs`. As of oxicode-sdk 0.66.0, the project was renamed from `oxi` to `oxicode` (CHANGELOG §0.65.0 Breaking) — `oxi-sdk`/`oxi-ai`/`oxi-agent` → `oxicode-sdk`/`oxicode-ai`/`oxicode-agent`; `Oxi`/`OxiBuilder`/`OxiBrowserEngine` → `Oxicode`/`OxicodeBuilder`/`OxicodeBrowserEngine`; `OXI_*` → `OXICODE_*`; `~/.oxi/` → `~/.oxicode/`. oxibrowser-core bumped to 0.17. CI pulls oxicode-sdk from crates.io (no path dep, no separate `a7garden/oxicode` checkout — `Cargo.toml` `[patch.crates-io]` is intentionally uncommented).
+- **Workspace deps.** `oxicode-sdk` must be in both `[workspace.dependencies]` (root `Cargo.toml`) AND `[dependencies]` in the crate using it.
 - **Stdin blocking.** `oxios run --context-file -` reads stdin to EOF. Don't use with interactive input.
-- **CI oxi checkout.** CI checks out `a7garden/oxi` alongside oxios. Check ref if oxi-related tests fail.
+

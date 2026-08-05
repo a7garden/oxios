@@ -794,7 +794,7 @@ credential.
 ```
 1. config.toml [engine].api_key     (explicit override — highest priority)
          ↓ not set or empty
-2. ~/.oxi/auth.json                  (shared with oxi CLI)
+2. ~/.oxicode/auth.json                  (shared with oxicode CLI)
          ↓ not found
 3. Environment variables             (CI/CD, containers)
          ↓ not found
@@ -808,7 +808,7 @@ credential.
 # Option 1: Explicit API key (highest priority)
 api_key = "sk-ant-api03-..."
 
-# Option 2: Leave empty to fall through to oxi CLI or env vars
+# Option 2: Leave empty to fall through to oxicode CLI or env vars
 # api_key = ""
 
 # Model in "provider/model" format
@@ -828,7 +828,7 @@ OPENAI_API_KEY=sk-...
 
 ### Credential Storage (Onboarding)
 
-The onboarding wizard stores credentials to `~/.oxi/auth.json`, which is
+The onboarding wizard stores credentials to `~/.oxicode/auth.json`, which is
 shared with the `oxi` CLI if installed:
 
 ```rust
@@ -1149,9 +1149,9 @@ Never include destructive commands (`rm`, `dd`, `mkfs`) in the allowlist.
 # Restrict permissions on sensitive files
 chmod 600 ~/.oxios/config.toml
 chmod 600 ~/.oxios/keys.json
-chmod 600 ~/.oxi/auth.json
+chmod 600 ~/.oxicode/auth.json
 chmod 700 ~/.oxios/
-chmod 700 ~/.oxi/
+chmod 700 ~/.oxicode/
 ```
 
 #### 7. Regular Audit Trail Verification
@@ -1362,7 +1362,7 @@ If an agent accesses files outside its workspace:
 |------|---------|
 | `~/.oxios/config.toml` | Main configuration (permissions, auth, exec) |
 | `~/.oxios/keys.json` | API key hashes (SHA-256) |
-| `~/.oxi/auth.json` | LLM provider credentials (shared with oxi CLI) |
+| `~/.oxicode/auth.json` | LLM provider credentials (shared with oxicode CLI) |
 | `~/.oxios/workspace/audit/trail.json` | Cryptographic audit trail |
 
 ### Emergency Commands

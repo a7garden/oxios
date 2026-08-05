@@ -14,7 +14,7 @@
 
 **Built with**
 
-[![oxi](https://img.shields.io/badge/oxi-agent_runtime-6E40C9?logo=rust&logoColor=white)](https://github.com/a7garden/oxi)
+[![oxicode](https://img.shields.io/badge/oxicode-agent_runtime-6E40C9?logo=rust&logoColor=white)](https://github.com/a7garden/oxicode)
 &nbsp;
 [![oxibrowser](https://img.shields.io/badge/oxibrowser-headless_browser-00A86B?logo=rust&logoColor=white)](https://github.com/a7garden/oxibrowser)
 &nbsp;
@@ -164,13 +164,13 @@ That's it. The OS handles the rest.
 │                                                      │
 │  ┌────────────────────────────────────────────────┐  │
 │  │              Agent Runtime                      │  │
-│  │  oxi-agent + oxi-ai (multi-provider)            │  │
+│  │  oxicode-agent + oxicode-ai (multi-provider)            │  │
 │  │  read · write · edit · bash · grep · browser   │  │
 │  │  skills · MCP · memory · A2A · git             │  │
 │  └────────────────────────────────────────────────┘  │
 │                                                      │
 │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐  │
-│  │OxiBrowser   │ │  GitLayer    │ │ CircuitBreaker│  │
+│  │OxicodeBrowser│ │  GitLayer    │ │ CircuitBreaker│  │
 │  │In-process   │ │  (gix)       │ │ 3-state LLM  │  │
 │  │~10MB        │ │  version ctrl│ │  protection  │  │
 │  └─────────────┘ └──────────────┘ └──────────────┘  │
@@ -229,7 +229,7 @@ Priority-based task queue inspired by [AIOS](https://arxiv.org/abs/2403.16971) a
 
 ### 🌐 Built-in Browser
 
-[OxiBrowser](https://github.com/a7garden/oxibrowser) — a **pure Rust headless browser** running in-process. ~10MB memory footprint. No Chromium. No CDP overhead.
+[OxicodeBrowser](https://github.com/a7garden/oxibrowser) — a **pure Rust headless browser** running in-process. ~10MB memory footprint. No Chromium. No CDP overhead.
 
 ```
 "Read this URL"    →  browse(url)              →  Markdown (one-shot)
@@ -617,7 +617,7 @@ oxios ──► oxios-kernel ──► oxios-memory
                        ──► oxios-markdown
                        ──► oxios-calendar
                        ──► oxios-mcp
-                       ──► oxi-sdk (crates.io)
+                       ──► oxicode-sdk (crates.io)
       ──► oxios-gateway ──► oxios-kernel
 ```
 
@@ -642,7 +642,7 @@ Oxios is part of the **a7garden** Rust AI stack — a collection of focused crat
 
 | Project | Purpose |
 |---------|---------|
-| [**oxi**](https://github.com/a7garden/oxi) | LLM engine + agent runtime (multi-provider, tool-calling loop) |
+| [**oxicode**](https://github.com/a7garden/oxicode) | LLM engine + agent runtime (multi-provider, tool-calling loop) |
 | [**oxibrowser**](https://github.com/a7garden/oxibrowser) | Pure Rust headless browser (~10MB, no Chromium) |
 | [**ouroboros**](https://github.com/Q00/ouroboros) | Specification-first agent framework |
 | **oxios** | Agent Operating System *(you are here)* |
@@ -650,8 +650,8 @@ Oxios is part of the **a7garden** Rust AI stack — a collection of focused crat
 **Layered architecture:**
 
 ```
-oxi-ai ──── LLM abstraction (multi-provider: Anthropic, OpenAI, ...)
-oxi-agent ── Tool-calling agent loop
+oxicode-ai ──── LLM abstraction (multi-provider: Anthropic, OpenAI, ...)
+oxicode-agent ── Tool-calling agent loop
   │
 ouroboros ── Specification-first protocol
   │

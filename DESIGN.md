@@ -63,9 +63,9 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 │  └────────────────────────────────────────────────────────┘   │
 │                                                                │
 │  ┌────────────────────────────────────────────────────────┐   │
-│  │          Agent Runtime (oxi-agent)                      │   │
+│  │          Agent Runtime (oxicode-agent)                      │   │
 │  │  tools: read, write, edit, bash, grep, find, ls         │   │
-│  │  LLM: oxi-ai (multi-provider)                           │   │
+│  │  LLM: oxicode-ai (multi-provider)                           │   │
 │  └────────────────────────────────────────────────────────┘   │
 │                                                                │
 │  ┌────────────────────────────────────────────────────────┐   │
@@ -98,7 +98,7 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 
 | Unix | Oxios | Role |
 |------|-------|------|
-| Kernel (syscalls) | oxi-agent (tool calls) | Minimal execution unit: read, write, edit, bash |
+| Kernel (syscalls) | oxicode-agent (tool calls) | Minimal execution unit: read, write, edit, bash |
 | Process | Agent instance | Running AI instance |
 | Shell | Gateway | Human↔OS interface |
 | Pipe (|) | Event Bus | Inter-process communication |
@@ -130,7 +130,7 @@ oxios/
 │   │       ├── event_bus.rs    KernelEvent, EventBus (broadcast)
 │   │       ├── state_store.rs  Markdown-based state persistence
 │   │       ├── supervisor.rs   Supervisor trait, BasicSupervisor
-│   │       ├── agent_runtime.rs oxi-agent wrapper (AgentRuntime)
+│   │       ├── agent_runtime.rs oxicode-agent wrapper (AgentRuntime)
 │   │       ├── orchestrator.rs  Ouroboros lifecycle coordinator
 │   │       ├── exec_tool.rs    ExecTool (secure host command execution)
 │   │       ├── program.rs     ProgramManager (OS-level programs)
@@ -179,8 +179,8 @@ oxios/
 ### Dependencies (no reimplementation)
 
 ```
-oxi/oxi-ai        → LLM provider layer for oxios-kernel and ouroboros
-oxi/oxi-agent     → Tool runtime for oxios-kernel (AgentRuntime)
+oxi/oxicode-ai        → LLM provider layer for oxios-kernel and ouroboros
+oxi/oxicode-agent     → Tool runtime for oxios-kernel (AgentRuntime)
 ```
 
 Oxios is a layer on top of oxi. oxi is consumed as a path dependency, never reimplemented.
@@ -197,7 +197,7 @@ The OS kernel. Everything passes through here.
 - **Supervisor** — Agent instance creation (fork), execution, monitoring, termination (reap)
 - **Event Bus** — Inter-agent communication (evolved Unix pipe, broadcast)
 - **State Store** — Markdown-based persistent state (sessions, memory, workspace)
-- **Agent Runtime** — Wraps oxi-agent for tool-calling loop execution
+- **Agent Runtime** — Wraps oxicode-agent for tool-calling loop execution
 - **Orchestrator** — Coordinates full Ouroboros lifecycle per message
 - **Program Manager** — OS-level installable applications
 - **MCP Bridge** — Model Context Protocol awareness
@@ -589,7 +589,7 @@ oxios -v                       Verbose logging
 ```
 Phase 1: Kernel skeleton ✓
   ├── oxios-kernel (supervisor, event bus, state store) ✓
-  ├── oxi-agent dependency wiring ✓
+  ├── oxicode-agent dependency wiring ✓
   └── Basic agent execution test ✓
 
 Phase 2: Ouroboros Protocol ✓
@@ -632,6 +632,6 @@ Phase 7: Channel expansion
 |------|-------|
 | Language | Rust (edition 2021) |
 | Target | macOS Silicon |
-| Engine | oxi-ai + oxi-agent (oxi path dependency) |
+| Engine | oxicode-ai + oxicode-agent (oxi path dependency) |
 | License | MIT |
 | Default port | 4200 |

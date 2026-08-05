@@ -1,6 +1,6 @@
 # Oxios Architecture Reference
 
-> **Version:** 1.21.0 · **Stack:** Rust 2024, tokio, serde (JSON+TOML), oxi-sdk · **License:** MIT
+> **Version:** 1.21.0 · **Stack:** Rust 2024, tokio, serde (JSON+TOML), oxicode-sdk · **License:** MIT
 
 This document is a standalone reference for every subsystem in the Oxios Agent OS.
 Read it before modifying kernel structure, adding modules, or onboarding onto the project.
@@ -42,7 +42,7 @@ Oxios is built on two foundational metaphors:
 | Principle | Meaning |
 |-----------|---------|
 | **Ouroboros-first** | Every task goes through the full spec-generate-execute-evaluate-evolve lifecycle |
-| **No reimplementation** | Reuse `oxi-sdk` (crates.io). Never reimplement what oxi already provides |
+| **No reimplementation** | Reuse `oxicode-sdk` (crates.io). Never reimplement what oxi already provides |
 | **Channel agnostic** | Gateway doesn't care where messages come from (Web, CLI, Telegram) |
 | **User invisible** | Users don't know how many agents are running |
 | **Least privilege** | Agents start with minimal permissions, must be explicitly granted more |
@@ -109,9 +109,9 @@ Oxios is built on two foundational metaphors:
 └────────────────────────────────────────────────────────────────────────┘
        │
 ├──────┴─────────────────────────────────────────────────────────────────┤
-│                         ENGINE (oxi-sdk / oxi-ai)                       │
-│  Thin wrapper around oxi_sdk::Oxi. Provider/model resolution via       │
-│  OxiBuilder. Uses oxi-ai for provider construction (Anthropic,         │
+│                         ENGINE (oxicode-sdk / oxicode-ai)                       │
+│  Thin wrapper around oxicode_sdk::Oxicode. Provider/model resolution via       │
+│  OxicodeBuilder. Uses oxicode-ai for provider construction (Anthropic,         │
 │  OpenAI, etc.). AgentLoop provides multi-turn tool-calling loop.       │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -129,11 +129,11 @@ Oxios is built on two foundational metaphors:
         │
         ├── KernelHandle ─── typed facade (13 APIs)
         │       │
-        │       └── AgentRuntime ─── wraps oxi-sdk AgentLoop
+        │       └── AgentRuntime ─── wraps oxicode-sdk AgentLoop
         │
         ├── Ouroboros ─── spec-first protocol engine
         │
-        └── Engine (oxi-sdk) ─── LLM provider abstraction
+        └── Engine (oxicode-sdk) ─── LLM provider abstraction
 ```
 
 ---
@@ -291,7 +291,7 @@ Extracted from the Orchestrator to reduce scope. Handles the complete lifecycle 
 
 ### 3.4 AgentRuntime — Tool-Calling Loop
 
-Wraps `oxi_sdk::AgentLoop` for executing Seeds through the multi-turn LLM tool-calling loop.
+Wraps `oxicode_sdk::AgentLoop` for executing Seeds through the multi-turn LLM tool-calling loop.
 
 ```
   ┌──────────────────────────────────────────────────────┐
@@ -329,7 +329,7 @@ Wraps `oxi_sdk::AgentLoop` for executing Seeds through the multi-turn LLM tool-c
   │  └──────────────────────┬───────────────────────────┘│
   │                         │                             │
   │  ┌──────────────────────┴───────────────────────────┐│
-  │  │         oxi_sdk::AgentLoop::run()                ││
+  │  │         oxicode_sdk::AgentLoop::run()                ││
   │  │  Multi-turn LLM tool-calling loop                ││
   │  │  Callbacks: ToolEnd, AgentEnd, Error, Compaction ││
   │  │  Runs inside spawn_blocking (AgentLoop !Send)    ││
@@ -975,7 +975,7 @@ Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (ve
   │  Authentication for kernel operations.       │
   │  API keys resolved via:                      │
   │  1. engine.api_key (config)                  │
-  │  2. ~/.oxi/auth.json (oxi credentials)       │
+  │  2. ~/.oxicode/auth.json (oxi credentials)       │
   │  3. Environment variables                    │
   │                                              │
   │  Used by KernelHandle's SecurityApi          │
@@ -1031,7 +1031,7 @@ Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (ve
   └──────────────────────────────────────────────┘
 ```
 
-**Source:** Integrated into `AgentRuntime` via `oxi_sdk::AgentLoop` compaction callbacks.
+**Source:** Integrated into `AgentRuntime` via `oxicode_sdk::AgentLoop` compaction callbacks.
 
 ---
 
@@ -1169,7 +1169,7 @@ Complete path of a user message through the system:
   ║         ├── Register tools (always-on + CSpace)      ║
   ║         ├── Recall memories → blend into prompt      ║
   ║         ├── Semantic capability retrieval             ║
-  ║         └── oxi_sdk::AgentLoop::run()                ║
+  ║         └── oxicode_sdk::AgentLoop::run()                ║
   ║             └── Multi-turn LLM tool-calling loop     ║
   ║                 ├── Tool calls: exec, read, write... ║
   ║                 ├── Circuit breaker on LLM errors    ║
@@ -1243,12 +1243,12 @@ Complete path of a user message through the system:
   │ AccessMgr    │ │ Evolve        │ │ oxios-kernel │
   │ AuditTrail   │ │               │ │ (Orchestrator│
   │ Memory       │ │ Depends on:   │ │  reference)  │
-  │ Space        │ │ oxi-sdk       │ └──────────────┘
+  │ Space        │ │ oxicode-sdk       │ └──────────────┘
   │ MCP Bridge   │ │ (Provider)    │
   │ A2A          │ └───────────────┘
   │ PersonaMgr   │
   │ SkillMgr     │   ┌──────────────────────┐
-  │ GitLayer     │   │  oxi-sdk (crates.io) │
+  │ GitLayer     │   │  oxicode-sdk (crates.io) │
   │ CronSched    │   │  NOT a path dep!     │
   │ BudgetMgr    │   │  AgentLoop, Provider,│
   │ ResourceMon  │   │  ToolRegistry, etc.  │
@@ -1256,8 +1256,8 @@ Complete path of a user message through the system:
   │ KernelHandle │          ▲
   │              │          │
   │ Depends on:  │──────────┘
-  │ oxi-sdk      │   + oxi-ai (provider construction)
-  │ oxi-ai       │   + oxios-ouroboros
+  │ oxicode-sdk      │   + oxicode-ai (provider construction)
+  │ oxicode-ai       │   + oxios-ouroboros
   │ oxios-ourobo │
   └──────────────┘
 ```
@@ -1476,7 +1476,7 @@ Complete path of a user message through the system:
 
 | Rule | Description |
 |------|-------------|
-| **oxi-sdk is crates.io only** | `oxi-sdk` is a published crate, NOT a path dependency. Never reimplement what oxi provides. |
+| **oxicode-sdk is crates.io only** | `oxicode-sdk` is a published crate, NOT a path dependency. Never reimplement what oxi provides. |
 | **Kernel binary assembles, library provides** | `src/kernel.rs` (binary) assembles components. `oxios-kernel` (library) provides them. |
 | **KernelHandle is the syscall table** | All tool access goes through `KernelHandle`. Never bypass it with direct subsystem references in tools. |
 | **Supervisor ≠ AgentLifecycleManager** | `Supervisor` = low-level process management. `AgentLifecycleManager` = full orchestrated lifecycle (A2A, scheduling, permissions). Never add lifecycle logic to Orchestrator directly. |
@@ -1504,10 +1504,10 @@ The construction order solves the `KernelHandle → AgentRuntime → Supervisor 
 |------------|-------------|
 | Unit tests | `#[cfg(test)] mod tests` in each file |
 | Integration tests | `tests/` per crate |
-| Mock providers | `MockProvider` implements `oxi_sdk::Provider` with empty streams |
+| Mock providers | `MockProvider` implements `oxicode_sdk::Provider` with empty streams |
 | Temp directories | Use `tempfile::tempdir()` for state store tests |
 | Must pass | `cargo test --workspace` at every commit |
-| CI check | `a7garden/oxi` at `v0.4.4` checked out alongside for oxi-related tests |
+| CI check | `a7garden/oxicode` at `v0.4.4` checked out alongside for oxi-related tests |
 
 ---
 
@@ -1528,7 +1528,7 @@ Real-world code review shows that kernel subsystems depend on each other in a cl
           │          │          │
      Supervisor ── Scheduler ── BudgetManager
           │
-     AgentRuntime ── Engine (→ oxi-sdk)
+     AgentRuntime ── Engine (→ oxicode-sdk)
           │
      KernelHandle (facade: references all subsystems)
 ```
@@ -1610,7 +1610,7 @@ Instead of crate splitting, the kernel manages complexity through:
 | `~/.oxios/workspace/skills/` | Unified skill definitions (Programs + Skills) |
 | `~/.oxios/workspace/sessions/` | Session data (ephemeral) |
 | `~/.oxios/spaces/` | Space data (index + per-space dirs) |
-| `~/.oxi/auth.json` | oxi-cli credentials |
+| `~/.oxicode/auth.json` | oxi-cli credentials |
 
 ### CLI Quick Reference
 

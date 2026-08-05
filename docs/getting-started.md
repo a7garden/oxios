@@ -58,7 +58,7 @@ Set your key before running Oxios:
 export ANTHROPIC_API_KEY=sk-ant-api03-...
 ```
 
-> **Tip:** You can also store credentials via `oxi login` (shared with the oxi CLI) or through the onboarding wizard. See [Credential Resolution](#credential-resolution-order) for the full priority chain.
+> **Tip:** You can also store credentials via `oxi login` (shared with the oxicode CLI) or through the onboarding wizard. See [Credential Resolution](#credential-resolution-order) for the full priority chain.
 
 ---
 
@@ -130,7 +130,7 @@ $ oxios
 
 ### What happens:
 
-**Step 0 — Auto-detection.** Oxios scans for existing API keys in environment variables and `~/.oxi/auth.json` (from the oxi CLI). If it finds one, it asks whether to use it.
+**Step 0 — Auto-detection.** Oxios scans for existing API keys in environment variables and `~/.oxicode/auth.json` (from the oxicode CLI). If it finds one, it asks whether to use it.
 
 ```
   Detected ANTHROPIC_API_KEY in environment for 'anthropic'.
@@ -520,7 +520,7 @@ enabled = true
 When connecting to an LLM provider, Oxios resolves credentials in this priority:
 
 1. **`engine.api_key`** in `config.toml` (explicit, highest priority)
-2. **`~/.oxi/auth.json`** (shared with the [oxi CLI](https://github.com/a7garden/oxi))
+2. **`~/.oxicode/auth.json`** (shared with the [oxicode CLI](https://github.com/a7garden/oxi))
 3. **Environment variable** (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`)
 
 ---
@@ -975,7 +975,7 @@ $ oxios doctor
   ✓ Daemon is running
   ⚠ No MCP servers configured
   ✓ Default model: anthropic/claude-sonnet-4-20250514
-  ✓ oxi CLI available (shared auth store)
+  ✓ oxicode CLI available (shared auth store)
   ✓ Port 4200 listening (daemon active)
   ────────────────────────────────────────────────
   7 checks passed, no issues found. All good!
@@ -991,7 +991,7 @@ $ oxios doctor
 | 4 | Daemon | Daemon process is running |
 | 5 | MCP servers | Whether MCP servers are connected |
 | 6 | Model | A default model is configured |
-| 7 | oxi CLI | Whether the shared oxi CLI is installed |
+| 7 | oxicode CLI | Whether the shared oxicode CLI is installed |
 | 8 | Port | Gateway port is available (or listening if daemon is up) |
 
 ### When things go wrong:
@@ -1007,14 +1007,14 @@ $ oxios doctor
   ⚠ Daemon is not running (Stopped)
   ⚠ No MCP servers configured
   ✓ Default model: anthropic/claude-sonnet-4-20250514
-  ⚠ oxi CLI not detected
+  ⚠ oxicode CLI not detected
   ✓ Port 4200 available
   ────────────────────────────────────────────────
   8 checks, 3 issue(s):
 
     1. No API key for 'anthropic'. Run `oxios onboard` to configure.
     2. Daemon not running. Start with `oxios start`.
-    3. Install oxi CLI for shared credential management: `cargo install oxi-cli`
+    3. Install oxicode CLI for shared credential management: `cargo install oxicode-cli`
 ```
 
 ### Common fixes:
@@ -1097,7 +1097,7 @@ $ cargo uninstall oxios
 | `~/.oxios/` | Config, workspace, logs, PID file, all agent data |
 | `~/.cargo/bin/oxios` | The binary itself |
 
-> **Note:** `~/.oxi/auth.json` (shared oxi CLI credentials) is **not** deleted by `oxios reset`. Remove it manually if desired: `rm ~/.oxi/auth.json`.
+> **Note:** `~/.oxicode/auth.json` (shared oxicode CLI credentials) is **not** deleted by `oxios reset`. Remove it manually if desired: `rm ~/.oxicode/auth.json`.
 
 ---
 
