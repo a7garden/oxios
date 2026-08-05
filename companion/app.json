@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Oxios Companion",
+    "slug": "oxios-companion",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "oxios",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.oxios.companion",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Oxios connects to your paired desktop on the local network and Tailscale.",
+        "NSCameraUsageDescription": "Used to scan QR codes presented by your paired host.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "usesCleartextTraffic": true,
+      "allowBackup": false,
+      "permissions": ["android.permission.CAMERA", "android.permission.INTERNET"],
+      "package": "com.oxios.companion",
+      "versionCode": 1
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
