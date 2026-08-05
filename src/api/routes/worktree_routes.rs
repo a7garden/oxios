@@ -318,22 +318,19 @@ pub(crate) async fn handle_worktree_merge(
         ));
     }
 
-    // The merge must happen inside the main worktree (the one whose branch
-    // is `target_branch`). `git rev-parse --show-toplevel` returns the
-    // repository root which, in single-worktree repos, is the main
-    // worktree; in multi-worktree repos it returns the path of whichever
-    // worktree the command runs in, which is the right one for us.
-    let repo_root = run_git_capture(&worktree, &["rev-parse", "--show-toplevel"])
-        .map_err(|e| AppError::Internal(format!("git rev-parse --show-toplevel failed: {e}")))?;
-    let repo_root = PathBuf::from(repo_root.trim());
+    // The merge must happen inside the MAIN worktree (the first entry in
+    // `git worktree list --porcelain`). `git rev-parse --show-toplevel`
+    // returns the fanout worktree's own path — using it here would make
+    // `git checkout main` fail with "already checked out".
+    let main_wt = find_main_worktree(&worktree)
+        .map_err(|e| AppError::Internal(format!("find main worktree: {e}")))?;
 
-    // Switch to the target branch. We do not abort the existing work if
-    // this fails — that is a normal client-visible failure mode (e.g. dirty
-    // working tree) and the error message is the most useful response.
-    run_git(&repo_root, &["checkout", &target_branch])
+    // Switch to the target branch in the main worktree. This is a no-op when
+    // the main worktree is already on `target_branch` (the common case).
+    run_git(&main_wt, &["checkout", &target_branch])
         .map_err(|e| AppError::Conflict(format!("checkout {target_branch} failed: {e}")))?;
 
-    let merge_result = run_git(&repo_root, &["merge", "--no-edit", &source_branch]);
+    let merge_result = run_git(&main_wt, &["merge", "--no-edit", &source_branch]);
 
     match merge_result {
         Ok(()) => Ok(Json(MergeResponse {
@@ -346,15 +343,14 @@ pub(crate) async fn handle_worktree_merge(
             // keep going past this point — listing conflicts is independent
             // of whether the merge can still succeed (e.g. the caller can
             // resolve them and retry).
-            let conflicts =
-                run_git_capture(&repo_root, &["diff", "--name-only", "--diff-filter=U"])
-                    .map(|text| {
-                        text.lines()
-                            .map(str::to_owned)
-                            .filter(|s| !s.is_empty())
-                            .collect()
-                    })
-                    .unwrap_or_default();
+            let conflicts = run_git_capture(&main_wt, &["diff", "--name-only", "--diff-filter=U"])
+                .map(|text| {
+                    text.lines()
+                        .map(str::to_owned)
+                        .filter(|s| !s.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default();
 
             tracing::warn!(
                 error = %merge_err,
@@ -406,6 +402,25 @@ fn run_git_capture(dir: &Path, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+/// Find the main worktree path by parsing `git worktree list --porcelain`.
+///
+/// The first `worktree` line is always the main (primary) worktree — this is
+/// where `main` is checked out and where merges must happen. We cannot use
+/// `git rev-parse --show-toplevel` because that returns the path of whichever
+/// worktree the command runs in, not the main one.
+fn find_main_worktree(any_worktree: &Path) -> Result<PathBuf, String> {
+    let output = run_git_capture(any_worktree, &["worktree", "list", "--porcelain"])?;
+    for line in output.lines() {
+        if let Some(path) = line.strip_prefix("worktree ") {
+            let path = PathBuf::from(path.trim());
+            if path.is_dir() {
+                return Ok(path);
+            }
+        }
+    }
+    Err("no worktree entries found in `git worktree list --porcelain`".into())
+}
+
 /// Create a fresh git worktree at `<repo>/.oxios-worktrees/<name>` on a new
 /// branch `oxios/<name>` based off `base_ref` (e.g. `"HEAD"`).
 fn create_worktree(
@@ -448,4 +463,111 @@ fn unix_timestamp_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn init_repo(dir: &Path) -> String {
+        Command::new("git")
+            .args(["init"])
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "user.email", "t@t.com"])
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "user.name", "T"])
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        std::fs::write(dir.join("README.md"), "init\n").unwrap();
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        let out = Command::new("git")
+            .args(["branch", "--show-current"])
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_owned()
+    }
+
+    /// Create a worktree on branch `oxios/{name}` from HEAD.
+    fn make_worktree(repo: &Path, name: &str) -> PathBuf {
+        let wt_dir = repo.join(".oxios-worktrees");
+        std::fs::create_dir_all(&wt_dir).unwrap();
+        let wt_path = wt_dir.join(name);
+        let branch = format!("oxios/{name}");
+        let out = Command::new("git")
+            .args(["worktree", "add", "-b", &branch])
+            .arg(&wt_path)
+            .arg("HEAD")
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "worktree add: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        wt_path
+    }
+
+    #[test]
+    fn find_main_worktree_returns_main_not_fanout() {
+        let tmp = tempfile::tempdir().unwrap();
+        init_repo(tmp.path());
+        let wt = make_worktree(tmp.path(), "fmwt");
+
+        let found = find_main_worktree(&wt).unwrap();
+        assert_eq!(
+            found.canonicalize().unwrap(),
+            tmp.path().canonicalize().unwrap(),
+            "find_main_worktree must return the main repo, not the fanout worktree"
+        );
+    }
+
+    #[test]
+    fn merge_worktree_branch_into_main_succeeds() {
+        let tmp = tempfile::tempdir().unwrap();
+        let branch = init_repo(tmp.path());
+        let wt = make_worktree(tmp.path(), "mrg");
+
+        // Commit a new file in the worktree.
+        std::fs::write(wt.join("feature.txt"), "new\n").unwrap();
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(&wt)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["commit", "-m", "feature"])
+            .current_dir(&wt)
+            .output()
+            .unwrap();
+
+        // The fix: find the MAIN worktree, not rev-parse --show-toplevel.
+        let main_wt = find_main_worktree(&wt).unwrap();
+        run_git(&main_wt, &["checkout", &branch]).unwrap();
+        let result = run_git(&main_wt, &["merge", "--no-edit", "oxios/mrg"]);
+        assert!(result.is_ok(), "merge failed: {result:?}");
+
+        // The file from the worktree branch must now exist in the main worktree.
+        assert!(
+            main_wt.join("feature.txt").exists(),
+            "merged file missing from main worktree"
+        );
+    }
 }
