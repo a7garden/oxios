@@ -416,52 +416,33 @@ impl OxiosEngineBuilder {
 
     /// Build the engine.
     ///
-    /// If a router was configured via [`with_router`](Self::with_router), this
-    /// registers a `RouterProvider` as provider `"router"` and synthetic model
-    /// entries for each configured profile so `resolve_model("router/<profile>")`
-    /// succeeds.
-    pub fn build(mut self) -> OxiosEngine {
-        self = self.wire_hooks();
+    /// If a router was configured via [`with_router`](Self::with_router) AND it
+    /// is `enabled`, this also registers a `RouterProvider` as provider
+    /// `"router"` plus synthetic model entries for each configured profile so
+    /// `resolve_model("router/<profile>")` succeeds.
+    pub fn build(self) -> OxiosEngine {
+        let this = self.wire_hooks();
 
-        let oxi = self.inner.build();
-
-        // Register router if configured.
-        if let Some(router_cfg) = &self.router_config
-            && router_cfg.enabled
-        {
-            let sdk_router_config = router_config_to_sdk(router_cfg);
-            let registry = oxi.providers_arc();
-            let router = oxicode_sdk::router::RouterProvider::new(&sdk_router_config, registry);
-            oxi.providers().register_arc("router", Arc::new(router));
-
-            // Register synthetic models for each profile so
-            // resolve_model("router/<profile>") succeeds.
-            for profile_name in sdk_router_config.profiles.keys() {
-                let model = oxicode_sdk::Model::new(
-                    profile_name.clone(),
-                    format!("Router {}", profile_name),
-                    oxicode_sdk::Api::OpenAiCompletions, // router delegates; dialect irrelevant
-                    "router",
-                    "", // no direct base URL; delegate providers handle it
-                );
-                oxi.models().register(model);
-            }
-        }
+        let oxi = this.inner.build();
+        register_router(&oxi, this.router_config.as_ref());
 
         OxiosEngine {
             oxi,
-            default_model_id: self.default_model_id.clone(),
+            default_model_id: this.default_model_id.clone(),
             routing_control: None,
             // RFC-014 Phase D: optional, off by default
-            authorizer: self.authorizer,
-            tracer: self.tracer,
-            cost_tracker: self.cost_tracker,
+            authorizer: this.authorizer,
+            tracer: this.tracer,
+            cost_tracker: this.cost_tracker,
         }
     }
 
     /// Build the engine with routing enabled.
     ///
     /// Returns `(OxiosEngine, RoutingControl)` for runtime routing control.
+    /// If a router was configured via [`with_router`](Self::with_router) AND
+    /// it is `enabled`, the router is registered post-build so the legacy
+    /// routing path still resolves `router/<profile>` model ids.
     pub fn build_with_routing(self) -> (OxiosEngine, oxicode_sdk::RoutingControl) {
         use oxicode_sdk::RoutingControl;
 
@@ -469,8 +450,10 @@ impl OxiosEngineBuilder {
 
         let routing_config = oxicode_sdk::routing::RoutingConfig::default();
         let routing_control = RoutingControl::new(routing_config);
+        let oxi = this.inner.build();
+        register_router(&oxi, this.router_config.as_ref());
         let engine = OxiosEngine {
-            oxi: this.inner.build(),
+            oxi,
             default_model_id: this.default_model_id,
             routing_control: Some(routing_control.clone()),
             // RFC-014 Phase D: optional, off by default
@@ -713,52 +696,204 @@ impl std::fmt::Debug for EngineHandle {
     }
 }
 
+/// Register a `RouterProvider` on the given [`Oxicode`] if `cfg` is `Some` AND
+/// `cfg.enabled` is true.
+///
+/// Shared between [`OxiosEngineBuilder::build`] and
+/// [`OxiosEngineBuilder::build_with_routing`] so the legacy routing path
+/// no longer silently drops router configuration. Logs a warning and skips
+/// registration when the router is misconfigured (e.g. all profiles have no
+/// tiers); a fully-valid config always emits at least one synthetic model
+/// so `resolve_model("router/<default_profile>")` succeeds.
+fn register_router(oxi: &Oxicode, cfg: Option<&crate::config::RouterConfig>) {
+    let Some(cfg) = cfg else { return };
+    if !cfg.enabled {
+        return;
+    }
+
+    let sdk_router_config = router_config_to_sdk(cfg);
+    if sdk_router_config.profiles.is_empty() {
+        tracing::warn!(
+            "Router enabled but no profiles produced valid tiers — router not registered"
+        );
+        return;
+    }
+
+    let registry = oxi.providers_arc();
+    let router = oxicode_sdk::router::RouterProvider::new(&sdk_router_config, registry);
+    oxi.providers().register_arc("router", Arc::new(router));
+
+    // Register synthetic models for each profile so
+    // resolve_model("router/<profile>") succeeds. The synthetic model points
+    // at provider "router"; the RouterProvider selects the concrete delegate
+    // at runtime.
+    for profile_name in sdk_router_config.profiles.keys() {
+        let model = oxicode_sdk::Model::new(
+            profile_name.clone(),
+            format!("Router {}", profile_name),
+            oxicode_sdk::Api::OpenAiCompletions, // router delegates; dialect irrelevant
+            "router",
+            "", // no direct base URL; delegate providers handle it
+        );
+        oxi.models().register(model);
+    }
+}
+
+/// Map an oxios thinking-budget value to an SDK [`ThinkingLevel`].
+///
+/// Documented monotonic mapping:
+/// - `0`                → `Off`
+/// - `1..=2048`         → `Low`
+/// - `2049..=8192`      → `Medium`   (matches the design-doc example `balanced` = 4000)
+/// - `8193..=32768`     → `High`     (matches the design-doc example `strong` = 16000)
+/// - `> 32768`          → `XHigh`
+fn thinking_level_from_budget(budget: u32) -> oxicode_sdk::ThinkingLevel {
+    use oxicode_sdk::ThinkingLevel;
+    match budget {
+        0 => ThinkingLevel::Off,
+        1..=2048 => ThinkingLevel::Low,
+        2049..=8192 => ThinkingLevel::Medium,
+        8193..=32768 => ThinkingLevel::High,
+        _ => ThinkingLevel::XHigh,
+    }
+}
+
+/// Build a [`RoutedTierConfig`] from an oxios [`RouterTierConfig`], using the
+/// provided fallback `model` string if the tier itself is absent. Emits the
+/// tier's `thinking` budget when present.
+fn routed_tier_from(
+    tier: Option<&crate::config::RouterTierConfig>,
+    fallback_model: &str,
+) -> oxicode_sdk::router::RoutedTierConfig {
+    let Some(t) = tier else {
+        return oxicode_sdk::router::RoutedTierConfig {
+            model: fallback_model.to_string(),
+            thinking: None,
+            fallbacks: vec![],
+        };
+    };
+    oxicode_sdk::router::RoutedTierConfig {
+        model: t.model.clone(),
+        thinking: t
+            .thinking
+            .as_ref()
+            .map(|c| thinking_level_from_budget(c.budget)),
+        fallbacks: t.fallbacks.clone(),
+    }
+}
+
 /// Convert oxios [`RouterConfig`] to SDK [`oxicode_sdk::router::RouterConfig`].
 ///
 /// Tier mapping: oxios `fast` → SDK `Low`, `balanced` → `Medium`, `strong` → `High`.
 /// Scoring weight: oxios `context` → SDK `context_budget`.
+///
+/// Tier fallback policy (ensures no SDK tier ends up with an empty model id):
+/// - `fast`     missing → use `fast` of the next-higher configured tier
+/// - `balanced` missing → use `fast`'s model, then `strong`'s
+/// - `strong`   missing → use `balanced`'s model, then `fast`'s
+///
+/// Profiles with no tiers configured at all are skipped (with a warning).
 fn router_config_to_sdk(cfg: &crate::config::RouterConfig) -> oxicode_sdk::router::RouterConfig {
-    use oxicode_sdk::router::{
-        RoutedTierConfig, RouterConfig as SdkRouterConfig, RouterProfile, ScoringWeights,
-    };
-
+    use oxicode_sdk::router::{RouterConfig as SdkRouterConfig, RouterProfile, ScoringWeights};
     let mut profiles = std::collections::HashMap::new();
     for (name, profile) in &cfg.profiles {
-        let empty = RoutedTierConfig {
-            model: String::new(),
-            thinking: None,
-            fallbacks: vec![],
-        };
-        let fast = profile
-            .tiers
-            .fast
-            .as_ref()
-            .map(|t| RoutedTierConfig {
-                model: t.model.clone(),
-                thinking: None,
-                fallbacks: t.fallbacks.clone(),
-            })
-            .unwrap_or_else(|| empty.clone());
-        let balanced = profile
-            .tiers
-            .balanced
-            .as_ref()
-            .map(|t| RoutedTierConfig {
-                model: t.model.clone(),
-                thinking: None,
-                fallbacks: t.fallbacks.clone(),
-            })
-            .unwrap_or_else(|| empty.clone());
-        let strong = profile
+        // Pick a non-empty fallback model for each missing tier by walking
+        // through configured tiers in priority order.
+        let configured: Vec<&str> = [
+            profile.tiers.fast.as_ref().map(|t| t.model.as_str()),
+            profile.tiers.balanced.as_ref().map(|t| t.model.as_str()),
+            profile.tiers.strong.as_ref().map(|t| t.model.as_str()),
+        ]
+        .into_iter()
+        .flatten()
+        .filter(|m| !m.is_empty())
+        .collect();
+
+        if configured.is_empty() {
+            tracing::warn!(
+                profile = %name,
+                "Router profile has no configured tiers — skipping"
+            );
+            continue;
+        }
+
+        // Per-tier fallback model chosen by walking configured tiers in the
+        // documented priority order (strong → balanced → fast for SDK High,
+        // balanced → strong → fast for SDK Medium, fast → balanced → strong
+        // for SDK Low).
+        let strong_model = profile
             .tiers
             .strong
             .as_ref()
-            .map(|t| RoutedTierConfig {
-                model: t.model.clone(),
-                thinking: None,
-                fallbacks: t.fallbacks.clone(),
+            .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
+            .or_else(|| {
+                profile
+                    .tiers
+                    .balanced
+                    .as_ref()
+                    .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
             })
-            .unwrap_or(empty);
+            .or_else(|| {
+                profile
+                    .tiers
+                    .fast
+                    .as_ref()
+                    .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
+            });
+        let balanced_model = profile
+            .tiers
+            .balanced
+            .as_ref()
+            .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
+            .or_else(|| {
+                profile
+                    .tiers
+                    .fast
+                    .as_ref()
+                    .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
+            })
+            .or_else(|| {
+                profile
+                    .tiers
+                    .strong
+                    .as_ref()
+                    .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
+            });
+        let fast_model = profile
+            .tiers
+            .fast
+            .as_ref()
+            .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
+            .or_else(|| {
+                profile
+                    .tiers
+                    .balanced
+                    .as_ref()
+                    .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
+            })
+            .or_else(|| {
+                profile
+                    .tiers
+                    .strong
+                    .as_ref()
+                    .and_then(|t| (!t.model.is_empty()).then_some(t.model.as_str()))
+            });
+
+        let fast = routed_tier_from(
+            profile.tiers.fast.as_ref(),
+            fast_model.expect("at least one tier is configured"),
+        );
+        let balanced = routed_tier_from(
+            profile.tiers.balanced.as_ref(),
+            balanced_model.expect("at least one tier is configured"),
+        );
+        let strong = routed_tier_from(
+            profile.tiers.strong.as_ref(),
+            strong_model.expect("at least one tier is configured"),
+        );
+
+
+
         profiles.insert(
             name.clone(),
             RouterProfile {
@@ -1055,22 +1190,23 @@ mod tests {
             default_profile: "auto".into(),
             profiles: {
                 let mut m = std::collections::HashMap::new();
-                let mut tiers = crate::config::RouterTiersConfig::default();
-                tiers.fast = Some(crate::config::RouterTierConfig {
-                    model: "anthropic/claude-haiku-4-20250514".into(),
-                    fallbacks: vec![],
-                    thinking: None,
-                });
-                tiers.balanced = Some(crate::config::RouterTierConfig {
-                    model: "anthropic/claude-sonnet-4-20250514".into(),
-                    fallbacks: vec![],
-                    thinking: None,
-                });
-                tiers.strong = Some(crate::config::RouterTierConfig {
-                    model: "anthropic/claude-opus-4-20250514".into(),
-                    fallbacks: vec![],
-                    thinking: None,
-                });
+                let tiers = crate::config::RouterTiersConfig {
+                    fast: Some(crate::config::RouterTierConfig {
+                        model: "anthropic/claude-haiku-4-20250514".into(),
+                        fallbacks: vec![],
+                        thinking: None,
+                    }),
+                    balanced: Some(crate::config::RouterTierConfig {
+                        model: "anthropic/claude-sonnet-4-20250514".into(),
+                        fallbacks: vec![],
+                        thinking: None,
+                    }),
+                    strong: Some(crate::config::RouterTierConfig {
+                        model: "anthropic/claude-opus-4-20250514".into(),
+                        fallbacks: vec![],
+                        thinking: None,
+                    }),
+                };
                 m.insert("auto".into(), crate::config::RouterProfileConfig { tiers });
                 m
             },
@@ -1082,6 +1218,7 @@ mod tests {
             .with_router(router_cfg)
             .build();
 
+
         // Router provider should be registered.
         assert!(engine.create_provider("router").is_ok());
 
@@ -1092,7 +1229,131 @@ mod tests {
         assert_eq!(engine.default_model_id(), "router/auto");
     }
 
-    // ── Catalog port integration (oxi-sdk 0.37.0+) ──
+    #[test]
+    fn test_router_registration_with_routing_path() {
+
+        // The legacy `build_with_routing()` path must also register the router.
+        // Regression guard for: "build_with_routing() silently drops router_config".
+        let router_cfg = crate::config::RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles: {
+                let mut m = std::collections::HashMap::new();
+                let tiers = crate::config::RouterTiersConfig {
+                    fast: Some(crate::config::RouterTierConfig {
+                        model: "anthropic/claude-haiku-4-20250514".into(),
+                        fallbacks: vec![],
+                        thinking: None,
+                    }),
+                    balanced: Some(crate::config::RouterTierConfig {
+                        model: "anthropic/claude-sonnet-4-20250514".into(),
+                        fallbacks: vec![],
+                        thinking: None,
+                    }),
+                    strong: Some(crate::config::RouterTierConfig {
+                        model: "anthropic/claude-opus-4-20250514".into(),
+                        fallbacks: vec![],
+                        thinking: None,
+                    }),
+                };
+                m.insert("auto".into(), crate::config::RouterProfileConfig { tiers });
+                m
+            },
+            ..Default::default()
+        };
+
+        let (engine, _rc) = OxiosEngine::builder()
+            .default_model("router/auto")
+            .with_router(router_cfg)
+            .build_with_routing();
+
+        // Provider must be registered even on the routing path.
+        assert!(engine.create_provider("router").is_ok());
+        // Synthetic model must resolve.
+        assert!(engine.resolve_model("router/auto").is_ok());
+        // RoutingControl is still surfaced.
+        assert!(engine.routing_control().is_some());
+    }
+
+    #[test]
+    fn test_thinking_budget_maps_to_level() {
+        // Documented monotonic mapping for the router thinking-budget field.
+        use oxicode_sdk::ThinkingLevel;
+        assert_eq!(thinking_level_from_budget(0), ThinkingLevel::Off);
+        assert_eq!(thinking_level_from_budget(1), ThinkingLevel::Low);
+        assert_eq!(thinking_level_from_budget(2048), ThinkingLevel::Low);
+        assert_eq!(thinking_level_from_budget(2049), ThinkingLevel::Medium);
+        // Design-doc example: balanced budget 4000 → Medium.
+        assert_eq!(thinking_level_from_budget(4000), ThinkingLevel::Medium);
+        assert_eq!(thinking_level_from_budget(8192), ThinkingLevel::Medium);
+        assert_eq!(thinking_level_from_budget(8193), ThinkingLevel::High);
+        // Design-doc example: strong budget 16000 → High.
+        assert_eq!(thinking_level_from_budget(16000), ThinkingLevel::High);
+        assert_eq!(thinking_level_from_budget(32768), ThinkingLevel::High);
+        assert_eq!(thinking_level_from_budget(32769), ThinkingLevel::XHigh);
+        assert_eq!(thinking_level_from_budget(100_000), ThinkingLevel::XHigh);
+    }
+
+    #[test]
+    fn test_router_tier_fallback_fills_empty_models() {
+        // A profile with only the `balanced` tier must still produce
+        // non-empty `model` strings for SDK High/Medium/Low tiers.
+        let tiers = crate::config::RouterTiersConfig {
+            balanced: Some(crate::config::RouterTierConfig {
+                model: "anthropic/claude-sonnet-4-20250514".into(),
+                fallbacks: vec![],
+                thinking: Some(crate::config::RouterThinkingConfig { budget: 4000 }),
+            }),
+            ..Default::default()
+        };
+        let cfg = crate::config::RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles: {
+                let mut m = std::collections::HashMap::new();
+                m.insert("auto".into(), crate::config::RouterProfileConfig { tiers });
+                m
+            },
+            ..Default::default()
+        };
+
+        let sdk_cfg = router_config_to_sdk(&cfg);
+        let profile = sdk_cfg.profiles.get("auto").expect("profile present");
+        // All three SDK tiers must have non-empty model ids.
+        assert!(!profile.high.model.is_empty(), "SDK High tier must not be empty");
+        assert!(!profile.medium.model.is_empty(), "SDK Medium tier must not be empty");
+        assert!(!profile.low.model.is_empty(), "SDK Low tier must not be empty");
+        // Thinking budget → ThinkingLevel.
+        assert_eq!(profile.medium.thinking, Some(oxicode_sdk::ThinkingLevel::Medium));
+    }
+
+    #[test]
+    fn test_router_empty_profile_skipped() {
+        // A profile with no tiers at all must be skipped, not emitted with empty
+        // model strings.
+        let cfg = crate::config::RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles: {
+                let mut m = std::collections::HashMap::new();
+                m.insert(
+                    "broken".into(),
+                    crate::config::RouterProfileConfig {
+                        tiers: crate::config::RouterTiersConfig::default(),
+                    },
+                );
+                m
+            },
+            ..Default::default()
+        };
+
+        let sdk_cfg = router_config_to_sdk(&cfg);
+        assert!(
+            !sdk_cfg.profiles.contains_key("broken"),
+            "empty profile must be skipped"
+        );
+    }
+
     //
     // `#[ignore]` because `init_file_catalog` may touch the network for a
     // one-shot models.dev refresh and writes to `~/.oxios/cache/`. Run with

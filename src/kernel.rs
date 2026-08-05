@@ -5,6 +5,7 @@
 //! The kernel library provides parts; the binary puts them together.
 
 use anyhow::{Context, Result};
+use oxicode_sdk::ModelCatalog;
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     A2AProtocol, AgentRuntime, AuditPersistence, AuditTrail, BasicSupervisor, BudgetManager,
@@ -16,7 +17,6 @@ use oxios_kernel::{
 };
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
-use oxicode_sdk::ModelCatalog;
 
 #[cfg(feature = "embedding-gguf")]
 use std::path::Path;
@@ -1083,7 +1083,14 @@ impl KernelBuilder {
 
         // Model comes from config, not hardcoded default
         let model_id = &config.engine.default_model;
-        // Attach lifecycle hooks to a builder if configured.
+
+        if let Some(router_cfg) = &config.engine.router
+            && let Err(err) = router_cfg.validate()
+        {
+            anyhow::bail!("Invalid [engine.router] configuration: {err}");
+        }
+
+
         fn attach_hooks(
             engine_builder: oxios_kernel::OxiosEngineBuilder,
             hooks: &[oxios_kernel::HookSpec],
@@ -1143,8 +1150,7 @@ impl KernelBuilder {
                 .split_once('/')
                 .map(|(p, _)| p)
                 .unwrap_or("anthropic");
-            let mut engine_builder = oxios_kernel::OxiosEngine::builder()
-                .default_model(model_id);
+            let mut engine_builder = oxios_kernel::OxiosEngine::builder().default_model(model_id);
             if let Some(key) = config.engine.api_key.as_deref() {
                 engine_builder = engine_builder.api_key(primary_provider, key);
             }

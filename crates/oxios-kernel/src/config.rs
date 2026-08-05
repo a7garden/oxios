@@ -809,6 +809,43 @@ impl Default for RouterConfig {
         }
     }
 }
+impl RouterConfig {
+    /// Validate the router configuration.
+    ///
+    /// Returns `Ok(())` when:
+    /// - the router is disabled (it is a no-op), or
+    /// - when enabled, `default_profile` resolves to a profile AND that
+    ///   profile has at least one tier configured.
+    ///
+    /// On failure, returns an actionable message suitable for a startup
+    /// failure ("router enabled but ..."). Callers should surface this as a
+    /// hard boot error rather than letting the kernel proceed to a
+    /// `router/<missing>` model-resolution failure.
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        let Some(profile) = self.profiles.get(&self.default_profile) else {
+            return Err(format!(
+                "router enabled but default_profile '{}' is not defined under [engine.router.profiles]",
+                self.default_profile
+            ));
+        };
+
+        let has_tier = profile.tiers.fast.is_some()
+            || profile.tiers.balanced.is_some()
+            || profile.tiers.strong.is_some();
+        if !has_tier {
+            return Err(format!(
+                "router enabled but default_profile '{}' has no configured tiers — add [engine.router.profiles.{}.tiers] or disable router",
+                self.default_profile, self.default_profile
+            ));
+        }
+
+        Ok(())
+    }
+}
 
 fn default_router_profile() -> String {
     "auto".to_string()
@@ -2750,14 +2787,96 @@ strong = { model = "anthropic/claude-opus-4-20250514" }
 "#;
 
         let config: OxiosConfig = toml::from_str(toml_str).unwrap();
-        let router = config.engine.router.expect("router config should be present");
+        let router = config
+            .engine
+            .router
+            .expect("router config should be present");
         assert!(router.enabled);
         assert_eq!(router.default_profile, "auto");
 
-        let auto = router.profiles.get("auto").expect("auto profile should exist");
+        let auto = router
+            .profiles
+            .get("auto")
+            .expect("auto profile should exist");
         let fast = auto.tiers.fast.as_ref().expect("fast tier should exist");
         assert_eq!(fast.model, "anthropic/claude-haiku-4-20250514");
-        let strong = auto.tiers.strong.as_ref().expect("strong tier should exist");
+        let strong = auto
+            .tiers
+            .strong
+            .as_ref()
+            .expect("strong tier should exist");
         assert_eq!(strong.model, "anthropic/claude-opus-4-20250514");
+    }
+
+    #[test]
+    fn test_router_validate_disabled_is_ok() {
+        // The router being off is always valid.
+        let cfg = RouterConfig::default();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_router_validate_missing_default_profile() {
+        // Enabled router, but `default_profile = "auto"` doesn't resolve to
+        // any defined profile.
+        let cfg = RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles: std::collections::HashMap::new(),
+            ..Default::default()
+        };
+        let err = cfg.validate().expect_err("must fail when default_profile missing");
+        assert!(
+            err.contains("default_profile 'auto' is not defined"),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_router_validate_empty_profile() {
+        // Enabled router with a profile that has no tiers configured.
+        let mut profiles = std::collections::HashMap::new();
+        profiles.insert(
+            "auto".into(),
+            RouterProfileConfig {
+                tiers: RouterTiersConfig::default(),
+            },
+        );
+        let cfg = RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles,
+            ..Default::default()
+        };
+        let err = cfg.validate().expect_err("must fail on empty profile");
+        assert!(
+            err.contains("no configured tiers"),
+            "got: {err}"
+        );
+    }
+    #[test]
+    fn test_router_validate_with_one_tier_is_ok() {
+        // The minimum to be valid: the default profile exists and has at
+        // least one tier.
+        let mut profiles = std::collections::HashMap::new();
+        let tiers = RouterTiersConfig {
+            balanced: Some(RouterTierConfig {
+                model: "anthropic/claude-sonnet-4-20250514".into(),
+                fallbacks: vec![],
+                thinking: None,
+            }),
+            ..Default::default()
+        };
+        profiles.insert(
+            "auto".into(),
+            RouterProfileConfig { tiers },
+        );
+        let cfg = RouterConfig {
+            enabled: true,
+            default_profile: "auto".into(),
+            profiles,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_ok());
     }
 }
