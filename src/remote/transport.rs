@@ -1,6 +1,8 @@
 //! WebSocket transport for the encrypted remote companion surface.
 //!
-//! The public listener is wired into `RemoteRpcSurface` in Task 9.
+//! Phase 2: each connection owns a [`ConnectionCtx`] carrying a push sender
+//! (for server-initiated subscription frames) and per-connection auth state.
+//! The handler signature is `Fn(Vec<u8>, Arc<ConnectionCtx>) -> Fut<Vec<u8>>`.
 #![allow(dead_code)]
 
 use std::{borrow::Cow, collections::VecDeque, future::Future, net::SocketAddr, sync::Arc};
@@ -8,6 +10,7 @@ use std::{borrow::Cow, collections::VecDeque, future::Future, net::SocketAddr, s
 use anyhow::{Context, Result, anyhow};
 use futures::{SinkExt, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc;
 use tokio_tungstenite::{
     WebSocketStream, accept_async,
     tungstenite::{
@@ -18,6 +21,53 @@ use tokio_tungstenite::{
 use tokio_util::sync::CancellationToken;
 
 use super::noise::{self, FrameType, Responder};
+
+/// Sender for server-pushed plaintext frames. The transport loop encrypts
+/// anything sent here and writes it to the socket as an `App` frame.
+/// Cloned into subscription tasks spawned by the RPC dispatch layer.
+pub type PushSender = mpsc::UnboundedSender<Vec<u8>>;
+
+/// Per-connection context created fresh for each companion session.
+///
+/// Passed to every frame-handler invocation so the handler can:
+/// - Read/update auth state (set by `auth.verify`, checked before sensitive methods)
+/// - Spawn subscription tasks that push events back to the client
+pub struct ConnectionCtx {
+    /// Sender for server-pushed plaintext frames. Subscription tasks clone
+    /// this and push serialized JSON-RPC notification bytes; the transport
+    /// loop encrypts and frames them.
+    pub push_tx: PushSender,
+    /// Authenticated device ID. `None` until `auth.verify` succeeds.
+    /// Checked by `dispatch` before any sensitive RPC method.
+    pub device_id: Arc<std::sync::Mutex<Option<String>>>,
+}
+
+impl ConnectionCtx {
+    /// Create a new connection context with the given push sender.
+    pub fn new(push_tx: PushSender) -> Self {
+        Self {
+            push_tx,
+            device_id: Arc::new(std::sync::Mutex::new(None)),
+        }
+    }
+
+    /// Returns the authenticated device ID, or `None` if not yet verified.
+    pub fn authenticated_device(&self) -> Option<String> {
+        self.device_id.lock().ok()?.clone()
+    }
+
+    /// Set the authenticated device ID (called by `auth.verify` dispatch).
+    pub fn set_authenticated(&self, device_id: String) {
+        if let Ok(mut guard) = self.device_id.lock() {
+            *guard = Some(device_id);
+        }
+    }
+
+    /// Whether this connection has completed `auth.verify`.
+    pub fn is_authenticated(&self) -> bool {
+        self.device_id.lock().map(|g| g.is_some()).unwrap_or(false)
+    }
+}
 
 const MAX_QUEUED_FRAMES: usize = 4096;
 const MAX_QUEUED_BYTES: usize = 64 * 1024 * 1024;
@@ -73,14 +123,13 @@ impl std::error::Error for QueueOverflow {}
 
 /// Listen for encrypted WebSocket sessions until `shutdown` is cancelled.
 ///
-/// The caller pre-binds `listener` (typically on `127.0.0.1:0` in tests, or
-/// the configured loopback port in production) so it can learn the bound
-/// address via `listener.local_addr()` before handing the listener off. This
-/// avoids the dual-bind race where `run_listener` would otherwise rebind to a
-/// different ephemeral port.
+/// The caller pre-binds `listener` so it can learn the bound address before
+/// handing the listener off. Each accepted connection gets its own
+/// [`ConnectionCtx`] (push sender + auth state) created fresh.
 ///
-/// Every decrypted application request is passed to the injected asynchronous
-/// handler. Its returned bytes are encrypted and sent as an application frame.
+/// The handler receives `(decrypted_request_bytes, Arc<ConnectionCtx>)` and
+/// returns reply bytes. Server-pushed subscription frames are delivered via
+/// `ConnectionCtx::push_tx` — the transport loop encrypts and sends them.
 pub async fn run_listener<H, Fut>(
     listener: TcpListener,
     server_static: Vec<u8>,
@@ -88,7 +137,7 @@ pub async fn run_listener<H, Fut>(
     handler: H,
 ) -> Result<()>
 where
-    H: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+    H: Fn(Vec<u8>, Arc<ConnectionCtx>) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Vec<u8>> + Send + 'static,
 {
     let addr = listener
@@ -107,9 +156,6 @@ where
                 let (stream, peer) = match accepted {
                     Ok(accepted) => accepted,
                     Err(error) => {
-                        // Per-connection accept failures are transient (e.g. EMFILE/ENFILE
-                        // under FD pressure, ECONNABORTED, resets before accept). A single
-                        // bad connection must not tear down the long-running listener.
                         tracing::warn!(%addr, %error, "remote WebSocket accept failed; continuing");
                         continue;
                     }
@@ -141,7 +187,7 @@ async fn handle_connection<H, Fut>(
     handler: Arc<H>,
 ) -> Result<()>
 where
-    H: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+    H: Fn(Vec<u8>, Arc<ConnectionCtx>) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Vec<u8>> + Send + 'static,
 {
     let mut socket = accept_async(stream)
@@ -194,57 +240,78 @@ where
     let mut outbound = OutboundQueue::new();
     let mut drained = Vec::new();
 
+    // Per-connection push channel for server-initiated frames (subscriptions).
+    let (push_tx, mut push_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+    let conn_ctx = Arc::new(ConnectionCtx::new(push_tx));
+
     loop {
-        let message = tokio::select! {
+        tokio::select! {
+            biased;
             _ = shutdown.cancelled() => {
                 close_going_away(&mut socket).await;
                 return Ok(());
             }
-            message = socket.next() => message.transpose().context("read encrypted app frame")?,
-        };
-        let Some(message) = message else {
-            return Ok(());
-        };
-
-        match message {
-            Message::Binary(frame) => {
-                let (frame_type, payload) = noise::decode_frame(&frame)
-                    .ok_or_else(|| anyhow!("malformed encrypted frame"))?;
-                match frame_type {
-                    FrameType::App => {
-                        let request = transport.decrypt(payload)?;
-                        let reply = handler(request).await;
-                        let ciphertext = transport.encrypt(&reply)?;
-                        let encoded = noise::encode_frame(FrameType::App, &ciphertext)
-                            .ok_or_else(|| anyhow!("encrypted reply exceeds frame limit"))?;
-                        outbound.push(encoded)?;
-                        outbound.drain_into_vec(&mut drained);
-                        for frame in drained.drain(..) {
-                            socket.send(Message::Binary(frame)).await?;
-                        }
-                    }
-                    FrameType::Ping => {
-                        let plaintext = transport.decrypt(payload)?;
-                        let ciphertext = transport.encrypt(&plaintext)?;
-                        let encoded = noise::encode_frame(FrameType::Pong, &ciphertext)
-                            .ok_or_else(|| anyhow!("encrypted pong exceeds frame limit"))?;
-                        outbound.push(encoded)?;
-                        outbound.drain_into_vec(&mut drained);
-                        for frame in drained.drain(..) {
-                            socket.send(Message::Binary(frame)).await?;
-                        }
-                    }
-                    FrameType::Close => {
-                        let _ = transport.decrypt(payload)?;
-                        close_normal(&mut socket).await;
-                        return Ok(());
-                    }
-                    FrameType::Noise | FrameType::Pong => {}
+            // Server-pushed subscription frames: encrypt + send.
+            Some(plaintext) = push_rx.recv() => {
+                let ciphertext = transport.encrypt(&plaintext)?;
+                let encoded = noise::encode_frame(FrameType::App, &ciphertext)
+                    .ok_or_else(|| anyhow!("pushed frame exceeds frame limit"))?;
+                outbound.push(encoded)?;
+                outbound.drain_into_vec(&mut drained);
+                for frame in drained.drain(..) {
+                    socket.send(Message::Binary(frame)).await?;
                 }
             }
-            Message::Ping(payload) => socket.send(Message::Pong(payload)).await?,
-            Message::Close(_) => return Ok(()),
-            Message::Text(_) | Message::Pong(_) | Message::Frame(_) => {}
+            message = socket.next() => {
+                let message = match message.transpose() {
+                    Ok(m) => m,
+                    Err(e) => return Err(anyhow!("read encrypted app frame: {e}")),
+                };
+                let Some(message) = message else {
+                    return Ok(());
+                };
+
+                match message {
+                    Message::Binary(frame) => {
+                        let (frame_type, payload) = noise::decode_frame(&frame)
+                            .ok_or_else(|| anyhow!("malformed encrypted frame"))?;
+                        match frame_type {
+                            FrameType::App => {
+                                let request = transport.decrypt(payload)?;
+                                let reply = handler(request, Arc::clone(&conn_ctx)).await;
+                                let ciphertext = transport.encrypt(&reply)?;
+                                let encoded = noise::encode_frame(FrameType::App, &ciphertext)
+                                    .ok_or_else(|| anyhow!("encrypted reply exceeds frame limit"))?;
+                                outbound.push(encoded)?;
+                                outbound.drain_into_vec(&mut drained);
+                                for frame in drained.drain(..) {
+                                    socket.send(Message::Binary(frame)).await?;
+                                }
+                            }
+                            FrameType::Ping => {
+                                let plaintext = transport.decrypt(payload)?;
+                                let ciphertext = transport.encrypt(&plaintext)?;
+                                let encoded = noise::encode_frame(FrameType::Pong, &ciphertext)
+                                    .ok_or_else(|| anyhow!("encrypted pong exceeds frame limit"))?;
+                                outbound.push(encoded)?;
+                                outbound.drain_into_vec(&mut drained);
+                                for frame in drained.drain(..) {
+                                    socket.send(Message::Binary(frame)).await?;
+                                }
+                            }
+                            FrameType::Close => {
+                                let _ = transport.decrypt(payload)?;
+                                close_normal(&mut socket).await;
+                                return Ok(());
+                            }
+                            FrameType::Noise | FrameType::Pong => {}
+                        }
+                    }
+                    Message::Ping(payload) => socket.send(Message::Pong(payload)).await?,
+                    Message::Close(_) => return Ok(()),
+                    Message::Text(_) | Message::Pong(_) | Message::Frame(_) => {}
+                }
+            }
         }
     }
 }

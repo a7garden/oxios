@@ -81,6 +81,8 @@ pub struct PersonaCreateRequest {
     model: Option<String>,
     #[serde(default)]
     personality_traits: Vec<String>,
+    #[serde(default)]
+    capabilities: Option<Vec<String>>,
 }
 
 fn default_true() -> bool {
@@ -102,6 +104,7 @@ pub async fn handle_persona_create(
         enabled: body.enabled,
         model: body.model,
         personality_traits: body.personality_traits,
+        capabilities: body.capabilities.unwrap_or_default(),
     };
     let created_id = persona.id.clone();
     let created_name = persona.name.clone();
@@ -131,6 +134,7 @@ pub struct PersonaUpdateRequest {
     enabled: Option<bool>,
     model: Option<String>,
     personality_traits: Option<Vec<String>>,
+    capabilities: Option<Vec<String>>,
 }
 
 /// PUT /api/personas/:id — Update a persona.
@@ -157,6 +161,7 @@ pub async fn handle_persona_update(
         personality_traits: body
             .personality_traits
             .unwrap_or(existing.personality_traits),
+        capabilities: body.capabilities.unwrap_or(existing.capabilities),
     };
 
     state
