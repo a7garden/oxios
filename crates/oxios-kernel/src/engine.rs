@@ -228,6 +228,7 @@ impl OxiosEngine {
             tracer: None,
             cost_tracker: None,
             router_config: None,
+            hook_specs: None,
         }
     }
 
@@ -339,6 +340,7 @@ pub struct OxiosEngineBuilder {
     tracer: Option<Arc<oxicode_sdk::Tracer>>,
     cost_tracker: Option<Arc<oxicode_sdk::CostTracker>>,
     router_config: Option<crate::config::RouterConfig>,
+    hook_specs: Option<Vec<oxicode_sdk::ports::hooks::HookSpec>>,
 }
 
 impl OxiosEngineBuilder {
@@ -348,7 +350,6 @@ impl OxiosEngineBuilder {
         self
     }
 
-    /// Register an API key for a specific provider.
     pub fn api_key(self, provider: &str, key: impl Into<String>) -> Self {
         Self {
             inner: self.inner.api_key(provider, key),
@@ -357,6 +358,7 @@ impl OxiosEngineBuilder {
             tracer: self.tracer,
             cost_tracker: self.cost_tracker,
             router_config: self.router_config,
+            hook_specs: self.hook_specs,
         }
     }
 
@@ -374,10 +376,10 @@ impl OxiosEngineBuilder {
             tracer: self.tracer,
             cost_tracker: self.cost_tracker,
             router_config: self.router_config,
+            hook_specs: self.hook_specs,
         }
     }
 
-    /// Register a custom provider.
     pub fn provider(self, name: &str, p: impl oxicode_sdk::Provider + 'static) -> Self {
         Self {
             inner: self.inner.provider(name, p),
@@ -386,7 +388,14 @@ impl OxiosEngineBuilder {
             tracer: self.tracer,
             cost_tracker: self.cost_tracker,
             router_config: self.router_config,
+            hook_specs: self.hook_specs,
         }
+    }
+
+    /// Register lifecycle hook specifications.
+    pub fn with_hook_specs(mut self, specs: Vec<oxicode_sdk::ports::hooks::HookSpec>) -> Self {
+        self.hook_specs = Some(specs);
+        self
     }
 
     /// Build the engine.
@@ -395,7 +404,14 @@ impl OxiosEngineBuilder {
     /// registers a `RouterProvider` as provider `"router"` and synthetic model
     /// entries for each configured profile so `resolve_model("router/<profile>")`
     /// succeeds.
-    pub fn build(self) -> OxiosEngine {
+    pub fn build(mut self) -> OxiosEngine {
+        if let Some(specs) = &self.hook_specs {
+            if !specs.is_empty() {
+                let runner = Arc::new(crate::hook_runner::CommandHookRunner::new(specs.clone()));
+                self.inner = self.inner.with_hooks(runner);
+            }
+        }
+
         let oxi = self.inner.build();
         let default_model_id = self.default_model_id.clone();
 

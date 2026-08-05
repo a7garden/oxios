@@ -67,9 +67,23 @@ enabled = false
 # fast = { model = "anthropic/claude-haiku-4-20250514" }
 # balanced = { model = "anthropic/claude-sonnet-4-20250514" }
 # strong = { model = "anthropic/claude-opus-4-20250514" }
+
+# ── Lifecycle Hooks (SDK 0.66.0) ───────────────────────────────────────
+# Shell commands executed on agent lifecycle events.
+# Claude Code compatible schema.
+# [[hooks]]
+# event = "PreToolUse"
+# matcher = "Bash|Write"
+# command = "echo 'Tool starting' >> ~/.oxios/logs/hooks.log"
+# timeout_secs = 10
+#
+# [[hooks]]
+# event = "PostToolUse"
+# matcher = ""
+# command = "echo 'Tool done' >> ~/.oxios/logs/hooks.log"
+
 [daemon]
 # PID file for background daemon.
-# pid_file = "~/.oxios/oxios.pid"
 # Log directory.
 # log_dir = "~/.oxios/logs"
 

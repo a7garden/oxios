@@ -744,6 +744,9 @@ pub struct EngineConfig {
     /// user point throwaway questions at a cheaper/faster model.
     #[serde(default)]
     pub quick_ask_model: Option<String>,
+    /// SDK lifecycle hooks (Claude Code compatible schema).
+    #[serde(default)]
+    pub hooks: Vec<oxicode_sdk::ports::hooks::HookSpec>,
     /// Multi-model router configuration (SDK 0.66.0 router feature).
     #[serde(default)]
     pub router: Option<RouterConfig>,
@@ -762,6 +765,7 @@ impl Default for EngineConfig {
             excluded_models: Vec::new(),
             role_routing: RoleRoutingConfig::default(),
             quick_ask_model: None,
+            hooks: Vec::new(),
             router: None,
         }
     }

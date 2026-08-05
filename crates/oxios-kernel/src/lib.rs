@@ -226,6 +226,7 @@ pub use tools::ToolMeta;
 pub use tools::tool_types::{ArgumentDef, ToolDef};
 pub use tools::{ExecTool, KnowledgeTool};
 pub use hook_runner::CommandHookRunner;
+pub use oxicode_sdk::ports::hooks::HookSpec;
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 // Token-maxing (RFC-031): self-tracker + QuotaTracker + maxer/planner/session.
@@ -272,8 +273,7 @@ pub use state_store::{
 };
 
 // ─── Infrastructure ─────────────────────────────────────────────────
-pub use engine::{EngineHandle, EngineProvider, OxiosEngine};
-// ─── Unified Asset Store ────────────────────────────────────────────
+pub use engine::{EngineHandle, EngineProvider, OxiosEngine, OxiosEngineBuilder};
 pub use asset_store::{Asset, AssetFilter, AssetSource, AssetStore, AssetStoreError, asset_type};
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};

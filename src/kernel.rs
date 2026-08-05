@@ -1083,9 +1083,18 @@ impl KernelBuilder {
 
         // Model comes from config, not hardcoded default
         let model_id = &config.engine.default_model;
-        // Initialize the shared model catalog once. This pulls in dynamic
-        // models.dev metadata (live prices/limits, user overrides). Failure
-        // is non-fatal: engines fall back to the static registry.
+        // Attach lifecycle hooks to a builder if configured.
+        fn attach_hooks(
+            engine_builder: oxios_kernel::OxiosEngineBuilder,
+            hooks: &[oxios_kernel::HookSpec],
+        ) -> oxios_kernel::OxiosEngineBuilder {
+            if hooks.is_empty() {
+                engine_builder
+            } else {
+                engine_builder.with_hook_specs(hooks.to_vec())
+            }
+        }
+
         let catalog = match OxiosEngine::init_file_catalog().await {
             Ok(c) => {
                 tracing::info!("Model catalog initialized (dynamic models.dev data)");
@@ -1108,7 +1117,7 @@ impl KernelBuilder {
                 if let Some(ref c) = catalog {
                     engine_builder = engine_builder.with_catalog(c.clone());
                 }
-                Arc::new(engine_builder.build())
+                Arc::new(attach_hooks(engine_builder, &config.engine.hooks).build())
             } else {
                 build_default_engine(&config, model_id, &catalog)
             }
@@ -1118,7 +1127,8 @@ impl KernelBuilder {
             if let Some(ref c) = catalog {
                 engine_builder = engine_builder.with_catalog(c.clone());
             }
-            let (engine, _routing_control) = engine_builder.build_with_routing();
+            let (engine, _routing_control) =
+                attach_hooks(engine_builder, &config.engine.hooks).build_with_routing();
             Arc::new(engine)
         } else {
             build_default_engine(&config, model_id, &catalog)
@@ -1129,17 +1139,19 @@ impl KernelBuilder {
             model_id: &str,
             catalog: &Option<Arc<dyn ModelCatalog>>,
         ) -> Arc<OxiosEngine> {
-            match catalog {
-                Some(c) => Arc::new(OxiosEngine::from_config_with_catalog(
-                    model_id,
-                    config.engine.api_key.as_deref(),
-                    c.clone(),
-                )),
-                None => Arc::new(OxiosEngine::from_config(
-                    model_id,
-                    config.engine.api_key.as_deref(),
-                )),
+            let primary_provider = model_id
+                .split_once('/')
+                .map(|(p, _)| p)
+                .unwrap_or("anthropic");
+            let mut engine_builder = oxios_kernel::OxiosEngine::builder()
+                .default_model(model_id);
+            if let Some(key) = config.engine.api_key.as_deref() {
+                engine_builder = engine_builder.api_key(primary_provider, key);
             }
+            if let Some(c) = catalog {
+                engine_builder = engine_builder.with_catalog(c.clone());
+            }
+            Arc::new(attach_hooks(engine_builder, &config.engine.hooks).build())
         }
         // Boot-time validation: resolve the engine's effective default model
         // so a broken config fails fast (daemon refuses to start). When the
