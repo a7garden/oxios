@@ -74,6 +74,7 @@ pub mod tools;
 #[cfg(feature = "wasm-sandbox")]
 pub mod wasm_sandbox;
 pub mod workers;
+pub mod hook_runner;
 
 // ─── State & Config ─────────────────────────────────────────────────
 // 영속 상태, 설정, 백업, 리소스 모니터링.
@@ -224,6 +225,7 @@ pub use skill::{
 pub use tools::ToolMeta;
 pub use tools::tool_types::{ArgumentDef, ToolDef};
 pub use tools::{ExecTool, KnowledgeTool};
+pub use hook_runner::CommandHookRunner;
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 // Token-maxing (RFC-031): self-tracker + QuotaTracker + maxer/planner/session.
