@@ -253,10 +253,11 @@ Integration into the chat view is pending (same note as Phase 3 UI).
    (capacity 256). Batch flush. Soft cap (8 MiB) warns once. Hard cap (64 MiB /
    4096 frames) closes connection gracefully. `try_push` helper on
    ConnectionCtx.
-6. ~~**AuditTrail**~~ — **PARTIALLY DONE.** Every RPC method invocation is now
-   logged to the kernel AuditTrail (actor = device id, action = method name,
-   metadata only). Connect/disconnect logging remains — it requires plumbing
-   the kernel audit callback through the transport layer.
+6. ~~**AuditTrail**~~ — **DONE.** Every companion connect, disconnect, and RPC
+   method is now logged to the kernel AuditTrail. Connect/disconnect fire via
+   a `CompanionAudit` trait + RAII `DisconnectGuard` in the transport layer;
+   RPC methods log in `handle_app_frame`. Actor = device id (or "anonymous"
+   pre-auth), action = method name / connect / disconnect, metadata only.
 7. **Compare/merge view** — diff N worktree branches after fan-out completion.
    *(Future feature.)*
 
@@ -264,8 +265,13 @@ Integration into the chat view is pending (same note as Phase 3 UI).
 
 ## Follow-up Session (2026-08-05)
 
-Commits: `b1fdc0d15` (web UI), `e255758e1` (bind + backpressure), `b4f73cc3d`
-(audit logging).
+Commits:
+- `b1fdc0d15` — feat(web): wire persona capability components into chat
+- `e255758e1` — feat(remote): config-gated bind address + bounded backpressure
+- `b4f73cc3d` — feat(remote): audit companion RPC method invocations
+- `41fa8aed4` — feat(remote): audit companion connect/disconnect lifecycle
+- `a9a630e7a` — style(companion): reformat minified transport TS
+- `7e330668d` — docs: update handoff
 
 All CI gates pass:
 ```
@@ -282,6 +288,4 @@ cargo test -p oxios-kernel --lib remote_config  # ✅ 3/3
 ### Remaining work
 
 1. **Device E2E test** — needs physical device + user.
-2. **Connect/disconnect audit** — plumb kernel audit callback through transport.
-3. **Compare/merge view** — diff N worktree branches after fan-out.
-4. **Companion TS reformatting** — rpc-client.ts is minified; cosmetic only.
+2. **Compare/merge view** — diff N worktree branches after fan-out. Needs UX design.
