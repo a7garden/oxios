@@ -767,7 +767,7 @@ impl Default for EngineConfig {
     }
 }
 /// Router profile configuration loaded from config.toml.
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RouterConfig {
     /// Enable router. When true, `default_model` becomes `"router/<default_profile>"`.
     #[serde(default)]
@@ -790,6 +790,20 @@ pub struct RouterConfig {
     /// Scoring weights.
     #[serde(default)]
     pub scoring: RouterScoringConfig,
+}
+
+impl Default for RouterConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            default_profile: default_router_profile(),
+            classifier_model: None,
+            max_session_budget: None,
+            context_upgrade_threshold: None,
+            profiles: std::collections::HashMap::new(),
+            scoring: RouterScoringConfig::default(),
+        }
+    }
 }
 
 fn default_router_profile() -> String {
@@ -861,12 +875,21 @@ impl Default for RouterScoringConfig {
     }
 }
 
-fn default_weight_structural() -> f64 { 0.25 }
-fn default_weight_behavioral() -> f64 { 0.20 }
-fn default_weight_context() -> f64 { 0.15 }
-fn default_weight_vision() -> f64 { 0.10 }
-fn default_weight_message() -> f64 { 0.30 }
-
+fn default_weight_structural() -> f64 {
+    0.25
+}
+fn default_weight_behavioral() -> f64 {
+    0.20
+}
+fn default_weight_context() -> f64 {
+    0.15
+}
+fn default_weight_vision() -> f64 {
+    0.10
+}
+fn default_weight_message() -> f64 {
+    0.30
+}
 
 /// Daemon mode configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
