@@ -16,6 +16,7 @@ pub mod transport;
 
 use std::collections::HashMap;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -425,6 +426,35 @@ fn is_loopback_bind(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "::1" | "localhost")
 }
 
+/// Companion session audit hook backed by the kernel's AuditTrail
+/// (RFC-044 §6.7). Logs connect/disconnect events with metadata only — the
+/// payload is inside the Noise session.
+struct KernelCompanionAudit {
+    kernel: Arc<oxios_kernel::KernelHandle>,
+}
+
+impl transport::CompanionAudit for KernelCompanionAudit {
+    fn on_connect(&self, peer: SocketAddr) {
+        self.kernel.security.audit(
+            "companion",
+            oxios_kernel::AuditAction::Other {
+                detail: format!("connect:{peer}"),
+            },
+            "remote",
+        );
+    }
+
+    fn on_disconnect(&self, peer: SocketAddr, device_id: Option<String>) {
+        let actor = device_id.as_deref().unwrap_or("anonymous");
+        self.kernel.security.audit(
+            actor,
+            oxios_kernel::AuditAction::Other {
+                detail: format!("disconnect:{peer}"),
+            },
+            "remote",
+        );
+    }
+}
 #[async_trait::async_trait]
 impl Surface for RemoteRpcSurface {
     fn name(&self) -> &str {
@@ -500,10 +530,14 @@ impl Surface for RemoteRpcSurface {
 
         let shutdown: CancellationToken = ctx.shutdown.clone();
         let server_static = identity.snow_static().to_vec();
+        let audit: Option<Arc<dyn transport::CompanionAudit>> =
+            Some(Arc::new(KernelCompanionAudit {
+                kernel: Arc::clone(&ctx.kernel),
+            }));
 
         let handle = tokio::spawn(async move {
             if let Err(error) =
-                transport::run_listener(listener, server_static, shutdown, handler).await
+                transport::run_listener(listener, server_static, shutdown, handler, audit).await
             {
                 tracing::error!(%error, "RemoteRpcSurface listener terminated");
             }
@@ -531,6 +565,7 @@ pub(crate) async fn run_for_test(
         server_static,
         shutdown,
         |_frame, _conn| async move { Vec::new() },
+        None,
     )
     .await
 }
@@ -644,7 +679,7 @@ mod tests {
         let shutdown_clone = shutdown.clone();
 
         let handle = tokio::spawn(async move {
-            transport::run_listener(listener, server_static, shutdown_clone, handler)
+            transport::run_listener(listener, server_static, shutdown_clone, handler, None)
                 .await
                 .unwrap();
         });

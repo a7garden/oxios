@@ -149,6 +149,36 @@ impl std::fmt::Display for QueueOverflow {
 
 impl std::error::Error for QueueOverflow {}
 
+/// Audit hook for companion session lifecycle events (RFC-044 §6.7).
+///
+/// The transport calls `on_connect` after the Noise handshake completes and
+/// `on_disconnect` when the connection ends (clean close, error, or shutdown).
+/// Both are synchronous — the kernel's AuditTrail append is in-memory.
+pub trait CompanionAudit: Send + Sync {
+    /// Called once after the Noise_XX handshake establishes the E2EE channel.
+    fn on_connect(&self, peer: SocketAddr);
+    /// Called once when the connection ends. `device_id` is the authenticated
+    /// device (set by `auth.verify`), or `None` if the client disconnected
+    /// before authenticating.
+    fn on_disconnect(&self, peer: SocketAddr, device_id: Option<String>);
+}
+
+/// RAII guard that fires `on_disconnect` exactly once when dropped,
+/// regardless of how [`handle_connection`] exits (Ok, Err, or panic).
+struct DisconnectGuard {
+    audit: Option<Arc<dyn CompanionAudit>>,
+    peer: SocketAddr,
+    conn_ctx: Arc<ConnectionCtx>,
+}
+
+impl Drop for DisconnectGuard {
+    fn drop(&mut self) {
+        if let Some(audit) = self.audit.as_ref() {
+            audit.on_disconnect(self.peer, self.conn_ctx.authenticated_device());
+        }
+    }
+}
+
 /// Listen for encrypted WebSocket sessions until `shutdown` is cancelled.
 ///
 /// The caller pre-binds `listener` so it can learn the bound address before
@@ -163,6 +193,7 @@ pub async fn run_listener<H, Fut>(
     server_static: Vec<u8>,
     shutdown: CancellationToken,
     handler: H,
+    audit: Option<Arc<dyn CompanionAudit>>,
 ) -> Result<()>
 where
     H: Fn(Vec<u8>, Arc<ConnectionCtx>) -> Fut + Send + Sync + 'static,
@@ -191,6 +222,7 @@ where
                 let handler = Arc::clone(&handler);
                 let server_static = Arc::clone(&server_static);
                 let connection_shutdown = shutdown.clone();
+                let connection_audit = audit.clone();
                 tokio::spawn(async move {
                     if let Err(error) = handle_connection(
                         stream,
@@ -198,6 +230,7 @@ where
                         server_static,
                         connection_shutdown,
                         handler,
+                        connection_audit,
                     ).await {
                         tracing::warn!(%peer, %error, "remote WebSocket connection ended");
                     }
@@ -213,6 +246,7 @@ async fn handle_connection<H, Fut>(
     server_static: Arc<Vec<u8>>,
     shutdown: CancellationToken,
     handler: Arc<H>,
+    audit: Option<Arc<dyn CompanionAudit>>,
 ) -> Result<()>
 where
     H: Fn(Vec<u8>, Arc<ConnectionCtx>) -> Fut + Send + Sync + 'static,
@@ -277,6 +311,18 @@ where
     // closes the connection (the client reconnects).
     let (push_tx, mut push_rx) = mpsc::channel::<Vec<u8>>(256);
     let conn_ctx = Arc::new(ConnectionCtx::new(push_tx));
+
+    // RFC-044 §6.7: audit companion session lifecycle. `on_connect` fires
+    // once the E2EE channel is established; the guard fires `on_disconnect`
+    // when this function returns on any path.
+    if let Some(audit) = audit.as_ref() {
+        audit.on_connect(peer);
+    }
+    let _disconnect_guard = DisconnectGuard {
+        audit: audit.clone(),
+        peer,
+        conn_ctx: Arc::clone(&conn_ctx),
+    };
 
     loop {
         tokio::select! {
