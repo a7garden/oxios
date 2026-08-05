@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowDown, RefreshCw, Search } from 'lucide-react'
+import { ArrowDown, GitPullRequest, RefreshCw, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { VList, type VListHandle } from 'virtua'
@@ -15,6 +15,7 @@ import { TextSelectionBar } from '@/components/chat/text-selection-bar'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
 import { AgentFanoutCardGrid } from '@/components/chat/AgentFanoutCard'
 import { TerminalToggle } from '@/components/chat/TerminalToggle'
+import { WorktreeComparePanel } from '@/components/chat/WorktreeComparePanel'
 import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { PortalPanel } from '@/components/portal/portal-panel'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
@@ -70,6 +71,7 @@ function ChatPage() {
   // RFC-044 Phase 3/4: persona capabilities + fan-out agent tracking.
   const { capabilities } = usePersonaCapabilities()
   const fanoutGroups = useFanoutStore((s) => s.groups)
+  const [compareGroupId, setCompareGroupId] = useState<string | null>(null)
   const { data: rolesData } = useRoles()
   const roles = Object.entries(rolesData?.roles ?? {}).map(([name, model]) => ({ name, model }))
   const { data: mountsData } = useMounts()
@@ -432,12 +434,36 @@ function ChatPage() {
           <ChatMiniMap messages={messages} onJump={handleMiniMapJump} />
           <TextSelectionBar containerRef={messagesContainerRef} />
         </div>
-        {/* RFC-044 Phase 4: fan-out agent status grid */}
+        {/* RFC-044 Phase 4: fan-out agent status grid + compare/merge */}
         {fanoutGroups.length > 0 && (
           <div className="shrink-0 border-t bg-background/95 px-4 py-2">
-            {fanoutGroups.map((group) => (
-              <AgentFanoutCardGrid key={group.groupId} agents={group.agents} />
-            ))}
+            {fanoutGroups.map((group) => {
+              const allSettled =
+                group.agents.length > 0 &&
+                group.agents.every((a) => a.status !== 'working')
+              return (
+                <div key={group.groupId} className="space-y-1.5">
+                  {allSettled && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-2xs text-muted-foreground">
+                        {group.prompt}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 shrink-0 gap-1 px-2 text-2xs"
+                        onClick={() => setCompareGroupId(group.groupId)}
+                      >
+                        <GitPullRequest className="h-3 w-3" />
+                        {t('chat.fanout.compare', { defaultValue: 'Compare' })}
+                      </Button>
+                    </div>
+                  )}
+                  <AgentFanoutCardGrid agents={group.agents} />
+                </div>
+              )
+            })}
           </div>
         )}
         {!activeInterview && (
@@ -463,6 +489,19 @@ function ChatPage() {
         )}
       </div>
       {stackOpen && <PortalPanel className="shrink-0" />}
+      {/* RFC-044 Phase 4: compare/merge panel */}
+      {compareGroupId &&
+        (() => {
+          const group = fanoutGroups.find((g) => g.groupId === compareGroupId)
+          if (!group) return null
+          return (
+            <WorktreeComparePanel
+              group={group}
+              open={!!compareGroupId}
+              onOpenChange={(v) => !v && setCompareGroupId(null)}
+            />
+          )
+        })()}
     </div>
   )
 }
