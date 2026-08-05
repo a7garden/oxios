@@ -9,11 +9,17 @@
 // so the flow reads as one rhythm, while the terminal text answer gets extra
 // air above it so the conclusion stands apart from the process that produced
 // it.
+//
+// RFC-044 Phase 3: when the active persona exposes the `diff-viewer`
+// capability, edit/write/patch tool calls also render an InlineDiffViewer
+// below their card so the agent's edits are scannable without leaving chat.
 
 import { memo, type ReactNode } from 'react'
+import { InlineDiffViewer, isFileEditCall } from '@/components/chat/InlineDiffViewer'
 import { MarkdownMessage } from '@/components/chat/markdown-message'
+import { usePersonaCapabilities } from '@/hooks/usePersonaCapabilities'
 import { Thinking } from '@/components/chat/thinking'
-import type { ChatBlock } from '@/types'
+import type { ChatBlock, ChatToolPayload } from '@/types'
 import { ToolCallCard } from './ToolCallList'
 
 interface BlockStreamProps {
@@ -21,7 +27,39 @@ interface BlockStreamProps {
   messageId: string
 }
 
+/** Build a small wrapper that renders the tool card + the optional diff. */
+function renderToolBlock(
+  b: ChatBlock & { type: 'tool' },
+  showDiffViewer: boolean,
+): ReactNode {
+  const card = <ToolCallCard call={b} defaultExpanded={false} />
+  if (!showDiffViewer) return card
+  const args = (b as ChatToolPayload).arguments
+  if (!args || typeof args !== 'object') return card
+  if (!isFileEditCall((b as ChatToolPayload).apiName, args as Record<string, unknown>)) {
+    return card
+  }
+  const argRec = args as Record<string, unknown>
+  const path =
+    (typeof argRec.path === 'string' && argRec.path) ||
+    (typeof argRec.file_path === 'string' && argRec.file_path) ||
+    undefined
+  return (
+    <div className="space-y-1.5">
+      {card}
+      <InlineDiffViewer
+        toolName={(b as ChatToolPayload).apiName}
+        path={path}
+        args={argRec}
+      />
+    </div>
+  )
+}
+
 export const BlockStream = memo(function BlockStream({ blocks, messageId }: BlockStreamProps) {
+  const { capabilities } = usePersonaCapabilities()
+  const showDiffViewer = capabilities.has('diff-viewer')
+
   return (
     <div className="flex flex-col">
       {blocks.map((b, i) => {
@@ -42,9 +80,7 @@ export const BlockStream = memo(function BlockStream({ blocks, messageId }: Bloc
             />
           )
         } else if (b.type === 'tool') {
-          // ToolBlock = { type: 'tool' } & ChatToolPayload; assignable to the
-          // ChatToolPayload prop (the discriminator is structurally compatible).
-          node = <ToolCallCard call={b} defaultExpanded={false} />
+          node = renderToolBlock(b, showDiffViewer)
         } else if (b.type === 'text') {
           node = (
             <MarkdownMessage key={b.id} messageId={messageId} isStreaming={!!b.streaming}>
@@ -79,3 +115,4 @@ export const BlockStream = memo(function BlockStream({ blocks, messageId }: Bloc
     </div>
   )
 })
+

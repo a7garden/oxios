@@ -575,6 +575,11 @@ export interface Persona {
   description?: string
   enabled: boolean
   personality_traits?: string[]
+  /// RFC-044 Phase 3: capability tags that enable UI affordances.
+  /// Examples: 'terminal', 'diff-viewer', 'approval-cards',
+  /// 'worktree-fanout', 'exec', 'web-search', 'longform-editor', 'outline'.
+  /// Empty / undefined = no capabilities (all affordances disabled).
+  capabilities?: string[]
 }
 
 // Workspace — matches backend TreeEntry from /api/workspace/tree

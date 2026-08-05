@@ -23,6 +23,8 @@ export interface PersonaItem {
   description: string
   enabled: boolean
   personality_traits?: string[]
+  /// RFC-044 Phase 3: capability tags surfaced by the list endpoint.
+  capabilities?: string[]
 }
 
 export interface PersonaPatch {
