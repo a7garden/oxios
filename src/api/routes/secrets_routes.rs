@@ -1,7 +1,7 @@
 //! Secrets management API — `/api/secrets`.
 //!
 //! Stores non-config secrets (telegram token, email password, API keys) in
-//! `~/.oxi/auth.json` via `CredentialStore`, never in `config.toml` plaintext.
+//! `~/.oxicode/auth.json` via `CredentialStore`, never in `config.toml` plaintext.
 //! Provider keys (anthropic, openai, google) share the same auth-store path
 //! as the Engine API but are exposed here for unified management.
 
@@ -110,7 +110,7 @@ fn mask(value: &str) -> String {
 fn source_label(s: &CredentialSource) -> &'static str {
     match s {
         CredentialSource::Config => "config",
-        CredentialSource::OxiAuthStore => "auth_store",
+        CredentialSource::OxicodeAuthStore => "auth_store",
         CredentialSource::EnvVar => "env",
     }
 }

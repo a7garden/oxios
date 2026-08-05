@@ -2,7 +2,7 @@
 //!
 //! Replaces the dead token-based BudgetManager endpoints with real spend
 //! data aggregated from the SQLite agent log (the actual source of truth for
-//! per-agent `cost_usd` recorded by oxi-sdk's CostTracker at execution time).
+//! per-agent `cost_usd` recorded by oxicode-sdk's CostTracker at execution time).
 
 use std::sync::Arc;
 

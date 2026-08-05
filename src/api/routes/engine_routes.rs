@@ -55,7 +55,7 @@ pub struct SetApiKeyRequest {
 #[derive(Debug, Deserialize)]
 pub struct SetProviderOptionsRequest {
     /// Provider-specific options.
-    pub options: oxi_sdk::ProviderOptions,
+    pub options: oxicode_sdk::ProviderOptions,
 }
 
 /// Request body for POST /api/engine/validate-key
@@ -231,7 +231,7 @@ pub(crate) async fn handle_engine_set_api_key(
 
 /// DELETE /api/engine/api-key — Delete a provider's API key entirely.
 ///
-/// Removes the key from the credential store (`~/.oxi/auth.json`) and
+/// Removes the key from the credential store (`~/.oxicode/auth.json`) and
 /// config.toml. Keys sourced from environment variables cannot be
 /// removed this way — the caller should check the credential source first.
 pub(crate) async fn handle_engine_delete_api_key(

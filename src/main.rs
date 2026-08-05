@@ -949,7 +949,7 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
             Some((key, source)) => {
                 let source_str = match source {
                     oxios_kernel::credential::CredentialSource::Config => "config.toml",
-                    oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
+                    oxios_kernel::credential::CredentialSource::OxicodeAuthStore => "~/.oxicode/auth.json",
                     oxios_kernel::credential::CredentialSource::EnvVar => "env var",
                 };
                 let preview = if key.len() > 8 {
@@ -1272,7 +1272,7 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
             Some((key, source)) => {
                 let source_str = match source {
                     oxios_kernel::credential::CredentialSource::Config => "config.toml",
-                    oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
+                    oxios_kernel::credential::CredentialSource::OxicodeAuthStore => "~/.oxicode/auth.json",
                     oxios_kernel::credential::CredentialSource::EnvVar => "env var",
                 };
                 let preview = if key.len() > 8 {
@@ -1368,11 +1368,11 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
         issues.push("No default model configured.".to_string());
     }
 
-    // 7. oxi CLI installed
+    // 7. oxicode CLI installed
     checks += 1;
     let oxi_auth_exists = {
         let home = std::env::var("HOME").unwrap_or_default();
-        std::path::PathBuf::from(format!("{home}/.oxi/auth.json")).exists()
+        std::path::PathBuf::from(format!("{home}/.oxicode/auth.json")).exists()
     };
     let oxi_bin_exists = std::path::PathBuf::from("/usr/local/bin/oxi").exists()
         || std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default() + "/.cargo/bin/oxi")
@@ -1380,13 +1380,13 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
     let oxi_installed = oxi_auth_exists || oxi_bin_exists;
     if oxi_installed {
         println!(
-            "  {} oxi CLI available (shared auth store)",
+            "  {} oxicode CLI available (shared auth store)",
             style("✓").green()
         );
     } else {
-        println!("  {} oxi CLI not detected", style("⚠").yellow().bold());
+        println!("  {} oxicode CLI not detected", style("⚠").yellow().bold());
         issues.push(
-            "Install oxi CLI for shared credential management: `cargo install oxi-cli`".to_string(),
+            "Install oxicode CLI for shared credential management: `cargo install oxicode-cli`".to_string(),
         );
     }
 
@@ -1489,7 +1489,7 @@ fn cmd_models(provider: Option<&str>) -> Result<()> {
         anyhow::bail!("Could not determine provider. Use `--provider <name>`.");
     }
 
-    let models = oxi_sdk::get_provider_models(&provider_id);
+    let models = oxicode_sdk::get_provider_models(&provider_id);
     if models.is_empty() {
         println!("  No models found for '{provider_id}'. Check the provider name.");
         return Ok(());
@@ -1705,7 +1705,7 @@ async fn cmd_email_setup(kernel: &Kernel) {
         Ok(smtp) => match smtp.test_connection().await {
             Ok(()) => {
                 // Save credentials
-                let token = oxi_sdk::TokenBundle {
+                let token = oxicode_sdk::TokenBundle {
                     access_token: password,
                     refresh_token: None,
                     token_type: "Bearer".to_string(),
@@ -1713,7 +1713,7 @@ async fn cmd_email_setup(kernel: &Kernel) {
                     expires_in: 0,
                     scope: None,
                 };
-                if let Err(e) = oxi_sdk::save_token("email_smtp", &token) {
+                if let Err(e) = oxicode_sdk::save_token("email_smtp", &token) {
                     eprintln!(
                         "{} Failed to save credentials: {}",
                         style("✗").red().bold(),
@@ -1888,17 +1888,17 @@ fn install_panic_hook() {
 fn main() {
     install_panic_hook();
 
-    // Parse CLI and set OXI_HOME BEFORE starting the tokio runtime.
+    // Parse CLI and set OXICODE_HOME BEFORE starting the tokio runtime.
     // Rust 2024: env::set_var is UB when other threads may access the
     // environment concurrently. The multi-threaded tokio runtime (created
     // below) spawns worker threads, so we set this env var first.
     let cli = Cli::parse();
     let config_path = oxios_kernel::config::expand_home(&cli.config);
     let oxios_home = oxios_home_from_config(&config_path);
-    if std::env::var("OXI_HOME").is_err() {
+    if std::env::var("OXICODE_HOME").is_err() {
         // SAFETY: single-threaded — tokio runtime hasn't been created yet.
         unsafe {
-            std::env::set_var("OXI_HOME", &oxios_home);
+            std::env::set_var("OXICODE_HOME", &oxios_home);
         }
     }
 
@@ -1921,7 +1921,7 @@ fn main() {
 async fn run(cli: Cli) -> Result<()> {
     let config_path = oxios_kernel::config::expand_home(&cli.config);
     let oxios_home = oxios_home_from_config(&config_path);
-    // OXI_HOME was set in main() before the tokio runtime started — Rust 2024
+    // OXICODE_HOME was set in main() before the tokio runtime started — Rust 2024
     // requires single-threaded env mutation.
 
     // Detect first run (before ensure_workspace creates the dir).

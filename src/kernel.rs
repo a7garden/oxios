@@ -434,7 +434,7 @@ impl Kernel {
             .or_else(|| std::env::var("RESEND_API_KEY").ok())
             .or_else(|| {
                 // Try credential store
-                oxi_sdk::load_token(&self.config.email.secret_ref)
+                oxicode_sdk::load_token(&self.config.email.secret_ref)
                     .ok()
                     .flatten()
                     .map(|t| t.access_token)
@@ -868,7 +868,7 @@ impl Kernel {
 /// are synchronous blocking calls. Extracted from the old inline loop body
 /// so they can be offloaded from the async worker thread (RFC-040 A2).
 fn guardian_tick_sync(handle: &oxios_kernel::KernelHandle) {
-    use oxi_sdk::AuditAction;
+    use oxicode_sdk::AuditAction;
 
     if let Ok(valid) = handle.security.verify_chain()
         && !valid
@@ -1444,7 +1444,7 @@ impl KernelBuilder {
         }
 
         let auth_manager = AuthManager::new();
-        // API key auth is now via engine.api_key or ~/.oxi/auth.json
+        // API key auth is now via engine.api_key or ~/.oxicode/auth.json
         // No more security.api_keys_path
         let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
 

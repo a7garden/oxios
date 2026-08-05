@@ -46,7 +46,7 @@ pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32
     // ── Audit ──
     kernel.handle().security.audit(
         "cli",
-        oxi_sdk::AuditAction::Other {
+        oxicode_sdk::AuditAction::Other {
             detail: format!(
                 "run: {}",
                 effective_prompt.chars().take(100).collect::<String>()

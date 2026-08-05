@@ -82,7 +82,7 @@ pub(crate) struct ChatResponse {
     /// RFC-025: active Mount IDs (comma-separated), primary first.
     #[serde(skip_serializing_if = "Option::is_none")]
     mount_ids: Option<String>,
-    /// RFC-025: Mount decoration tag (e.g. "[🔧 oxios + oxi-sdk]").
+    /// RFC-025: Mount decoration tag (e.g. "[🔧 oxios + oxicode-sdk]").
     #[serde(skip_serializing_if = "Option::is_none")]
     mount_tag: Option<String>,
     /// RFC-014: Evaluation passed.
@@ -2161,7 +2161,7 @@ mod rfc015_tests {
         assert!(chunk.is_none(), "foreign progress should be filtered");
     }
 
-    /// When `tab_id` is `None` (legacy oxi-agent versions), the chunk must
+    /// When `tab_id` is `None` (legacy oxicode-agent versions), the chunk must
     /// omit the `tab_id` key entirely so the frontend treats it as
     /// "no badge" rather than rendering `null`.
     #[test]

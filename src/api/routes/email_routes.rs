@@ -425,7 +425,7 @@ pub(crate) async fn handle_email_setup(
         .map_err(|e| AppError::BadRequest(format!("SMTP test failed: {e}")))?;
 
     // Save password to the credential store
-    let token = oxi_sdk::TokenBundle {
+    let token = oxicode_sdk::TokenBundle {
         access_token: body.password,
         refresh_token: None,
         token_type: "Bearer".to_string(),
@@ -433,7 +433,7 @@ pub(crate) async fn handle_email_setup(
         expires_in: 0,
         scope: None,
     };
-    oxi_sdk::save_token("email_smtp", &token)
+    oxicode_sdk::save_token("email_smtp", &token)
         .map_err(|e| AppError::Internal(format!("Failed to save credentials: {e}")))?;
 
     // Persist to config.toml (upsert — replaces existing [email] section)
