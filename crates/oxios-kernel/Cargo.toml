@@ -17,6 +17,18 @@ sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec", "oxios-memory/sqlite-memory"]
 # When disabled, falls back to TF-IDF sparse embeddings.
 embedding-gguf = ["dep:llama-gguf", "dep:hf-hub"]
 
+# First-party app modules (opt-in). Embed a sibling app's core library so oxios
+# agents manipulate its data via typed Rust APIs (no CLI shell-out). Activated at
+# runtime via the `[memo]` config section. The core crate is a sibling (not yet
+# on crates.io); path is used locally, version recorded for a future crates.io
+# publish. See docs/designs/2026-08-05-app-module-integration-design.md
+#
+# NOTE: a `timeline` (oxiline-core) module is designed but not yet wired:
+# oxiline-core's rusqlite stack (0.32 + rusqlite_migration) conflicts with
+# oxios's rusqlite 0.34 at the native `sqlite3` link. Enabling it requires
+# aligning SQLite versions across oxios (memory system + sqlite-vec) and oxiline.
+memo = ["dep:oximemo-core"]
+
 [dependencies]
 oxios-ouroboros = { version = "1.36.0", path = "../oxios-ouroboros" }
 oxios-markdown = { version = "1.36.0", path = "../oxios-markdown" }
@@ -25,6 +37,10 @@ oxios-mcp = { version = "1.36.0", path = "../oxios-mcp" }
 oxios-memory = { version = "1.36.0", path = "../oxios-memory" }
 oxicode-sdk = { workspace = true }
 oxicode-agent = "0.66.0"
+# First-party app module core (optional, opt-in via the `memo` feature).
+# Sibling crate, not yet on crates.io; path for local dev, version recorded for
+# a future crates.io publish. (oxiline-core deferred — see feature note above.)
+oximemo-core = { version = "0.6.0", path = "../../../oximemo/crates/oximemo-core", optional = true }
 # oxicode-ai no longer needed directly — all types re-exported via oxicode-sdk
 tokio = { workspace = true }
 futures = { workspace = true }

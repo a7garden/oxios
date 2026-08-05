@@ -13,6 +13,7 @@ pub mod infra_api;
 pub mod knowledge_lens;
 pub mod marketplace_api;
 pub mod mcp_api;
+pub mod memo_api;
 pub mod memory_api;
 pub mod mount_api;
 pub mod persona_api;
@@ -42,6 +43,7 @@ pub use knowledge_lens::{
 };
 pub use marketplace_api::MarketplaceApi;
 pub use mcp_api::McpApi;
+pub use memo_api::MemoApi;
 pub use memory_api::MemoryApi;
 pub use mount_api::{MountApi, MountInfo};
 pub use persona_api::PersonaApi;
@@ -108,6 +110,11 @@ pub struct KernelHandle {
     pub marketplace_api: MarketplaceApi,
     /// Calendar events — create, update, delete, list, search, freebusy.
     pub calendar: Option<CalendarApi>,
+    /// oximemo integration (opt-in first-party app module; `memo` feature).
+    /// `None` unless `[memo].enabled` and the vault opens. oxios is a
+    /// co-client of the vault — never its owner. Shared via `Arc` so the agent
+    /// tool can delegate to the facade (which publishes mutation events).
+    pub memo: Option<Arc<MemoApi>>,
     /// Email — send HTML emails via SMTP, template management.
     pub email: Arc<RwLock<Option<EmailApi>>>,
     /// Token-maxing (RFC-031): the shared QuotaTracker facade. `None` only on
@@ -181,6 +188,7 @@ impl KernelHandle {
             marketplace_api,
             calendar,
             email,
+            memo: None,
             token_maxing: None,
             compression: None,
             host_tools: HostToolsApi::new(),
@@ -199,6 +207,13 @@ impl KernelHandle {
     /// RFC-011 Projects continue to work during the migration.
     pub fn with_mounts(mut self, mounts: MountApi) -> Self {
         self.mounts = Some(mounts);
+        self
+    }
+
+    /// Attach the oximemo facade (first-party app module). Called by the kernel
+    /// assembler when `[memo].enabled` and the vault opens.
+    pub fn with_memo(mut self, memo: Arc<MemoApi>) -> Self {
+        self.memo = Some(memo);
         self
     }
     /// Attach the unified AssetStore. Called by the kernel assembler.

@@ -311,6 +311,16 @@ pub enum KernelEvent {
         /// Event title.
         title: String,
     },
+    /// A memo was created in the oximemo vault (first-party app module).
+    MemoCreated {
+        /// Memo id (UUIDv7, hyphenated).
+        id: String,
+    },
+    /// A memo was soft-deleted from the oximemo vault.
+    MemoDeleted {
+        /// Memo id (UUIDv7, hyphenated).
+        id: String,
+    },
     /// An email has been sent.
     EmailSent {
         /// Email subject.
@@ -564,6 +574,12 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         },
         KernelEvent::CalendarEventDeleted { uid, title } => AuditAction::Other {
             detail: format!("calendar:deleted:{uid}:{title}"),
+        },
+        KernelEvent::MemoCreated { id } => AuditAction::Other {
+            detail: format!("memo:created:{id}"),
+        },
+        KernelEvent::MemoDeleted { id } => AuditAction::Other {
+            detail: format!("memo:deleted:{id}"),
         },
         KernelEvent::EmailSent {
             subject,

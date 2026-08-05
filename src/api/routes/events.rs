@@ -561,6 +561,14 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "uid": uid,
             "title": title,
         }),
+        KernelEvent::MemoCreated { id } => serde_json::json!({
+            "type": "memo_created",
+            "id": id,
+        }),
+        KernelEvent::MemoDeleted { id } => serde_json::json!({
+            "type": "memo_deleted",
+            "id": id,
+        }),
         KernelEvent::EmailSent {
             subject,
             message_id,

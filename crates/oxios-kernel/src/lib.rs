@@ -291,7 +291,7 @@ pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CalendarApi, CopilotResponse, EmailApi, EngineApi,
     EngineConfigResponse, ExecApi, ExtensionApi, FallbackEvent, HostToolsApi, InfraApi,
     InputModality as EngineInputModality, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi,
-    MemoryNote, ModelInfo, MountApi, MountInfo, PersonaApi, ProjectApi, ProjectInfo,
+    MemoApi, MemoryNote, ModelInfo, MountApi, MountInfo, PersonaApi, ProjectApi, ProjectInfo,
     ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot,
     RoutingUpdate, SecurityApi, SharedExecConfig, StateApi, ValidateKeyResult,
 };

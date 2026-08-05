@@ -295,6 +295,12 @@ impl Kernel {
                     self.token_maxer.clone(),
                 ));
                 let kh = kh.with_browser(oxios_kernel::BrowserApi::from_config(&self.config));
+                // oximemo (optional first-party app module; `memo` feature + [memo].enabled).
+                #[cfg(feature = "memo")]
+                let kh = match self.build_memo_api() {
+                    Some(api) => kh.with_memo(api),
+                    None => kh,
+                };
                 let compression_service = Arc::new(oxios_kernel::CompressionService::new(
                     self.state_store.clone(),
                     self.engine_handle.clone(),
@@ -412,6 +418,32 @@ impl Kernel {
             }
             None => {
                 tracing::warn!("Failed to initialize calendar system");
+                None
+            }
+        }
+    }
+
+    /// Build the oximemo facade (optional first-party app module — `memo`
+    /// feature + `[memo].enabled`). oxios opens the user's oximemo vault as a
+    /// co-client; the vault's advisory locks keep concurrent app/oxios access
+    /// safe. Only compiled when the binary's `memo` feature is on.
+    #[cfg(feature = "memo")]
+    fn build_memo_api(&self) -> Option<std::sync::Arc<oxios_kernel::MemoApi>> {
+        if !self.config.memo.enabled {
+            return None;
+        }
+        let vault_path = if self.config.memo.vault_path.is_empty() {
+            None
+        } else {
+            Some(std::path::PathBuf::from(&self.config.memo.vault_path))
+        };
+        match oxios_kernel::MemoApi::open(vault_path.as_deref(), Some(self.event_bus.clone())) {
+            Ok(api) => {
+                tracing::info!("oximemo module initialized (vault co-client)");
+                Some(api)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to open oximemo vault; memo module disabled");
                 None
             }
         }

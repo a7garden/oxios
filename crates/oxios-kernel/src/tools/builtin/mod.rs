@@ -23,6 +23,9 @@ pub mod email_tool;
 pub mod image_generation_tool;
 pub mod knowledge_tool;
 pub mod marketplace_tool;
+// First-party app module tools (opt-in, feature-gated).
+#[cfg(feature = "memo")]
+pub mod memo_tool;
 pub mod mount_tool;
 pub mod persona_tool;
 pub mod project_tool;
@@ -38,6 +41,8 @@ pub use email_tool::EmailTool;
 pub use image_generation_tool::ImageGenerationTool;
 pub use knowledge_tool::KnowledgeTool;
 pub use marketplace_tool::MarketplaceTool;
+#[cfg(feature = "memo")]
+pub use memo_tool::MemoTool;
 pub use mount_tool::MountTool;
 pub use persona_tool::PersonaTool;
 pub use project_tool::ProjectTool;
@@ -118,6 +123,12 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     // Calendar (optional — only if [calendar] is enabled)
     if let Some(calendar_tool) = CalendarTool::try_from_kernel(kernel) {
         registry.register(calendar_tool);
+    }
+
+    // oximemo (optional first-party app module — `memo` feature + [memo].enabled)
+    #[cfg(feature = "memo")]
+    if let Some(memo_tool) = MemoTool::try_from_kernel(kernel) {
+        registry.register(memo_tool);
     }
 
     // Email — always registered; returns a helpful setup error when unconfigured.

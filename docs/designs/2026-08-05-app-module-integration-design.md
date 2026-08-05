@@ -1,7 +1,6 @@
 # App Module Integration — oximemo & oxiline
 
-**Date:** 2026-08-05
-**Status:** Design (awaiting implementation)
+**Status:** oximemo module **implemented + verified** (compiles + clippy + tests in both feature configs). oxiline module **deferred** — blocked on a cross-repo SQLite version alignment (oxiline-core's rusqlite 0.32 + rusqlite_migration 1.x vs oxios's rusqlite 0.34 conflict at the native `sqlite3` link); see §10.1.
 **Scope:** opt-in first-party integration of [oximemo](https://github.com/a7garden/oximemo) and [oxiline](https://github.com/a7garden/oxiline) into oxios
 
 ---
@@ -268,19 +267,28 @@ portal panel:
 **Prerequisite (blocking publish):** publish `oximemo-core` and `oxiline-core`
 to crates.io at their current workspace versions (0.6.0 / 0.2.0).
 
+**Prerequisite (blocks oxiline only):** SQLite version alignment. oxiline-core
+depends on `rusqlite 0.32` + `rusqlite_migration 1.x`; oxios-kernel uses
+`rusqlite 0.34` (constrained by `sqlite-vec` + the memory system). Both pull
+`libsqlite3-sys` with the native `links = "sqlite3"` — Cargo allows only one —
+so they cannot coexist. Unblocking oxiline requires either bumping oxios's
+rusqlite (re-validating the memory system + `sqlite-vec`) or reworking oxiline's
+migration story onto rusqlite 0.34. (oximemo uses redb+tantivy, no SQLite —
+unaffected, hence shipped.)
+
 **Implementation phases:**
 
-1. **Framework skeleton** — features, config sections, `Option<>` fields on
-   `KernelHandle`, `try_from_kernel` stubs, assembly in `kernel.rs`, settings
-   API + toggle. Build green with and without features.
-2. **oximemo module** — `MemoApi` + `MemoTool` over `Vault`; events; context-in
-   `search`; settings card. Smoke: agent `search_memos` against a real vault.
-3. **oxiline module** — `TimelineApi` + `TimelineTool` over the pool; events;
-   context-in `now`; `update_hook` bridge; settings card. Smoke: agent `now`.
-4. **Write-back hooks** — opt-in `PersistenceHook` analogs (memo summary, time
-   log), off by default.
-5. **Verify** — `cargo build/clippy --workspace` with and without features;
-   `cargo test`; manual smoke of connect/disconnect and a tool call per module.
+1. ✅ **Framework skeleton** — features (`memo`), `MemoConfig`, `Option<Arc<MemoApi>>`
+   field + `with_memo` builder, `try_from_kernel`, assembly (`build_memo_api`) in
+   `kernel.rs`, `KernelEvent::MemoCreated/Deleted`. Build green with and without.
+2. ✅ **oximemo module** — `MemoApi` (create/get/list/search/delete over `Vault`,
+   `spawn_blocking` + event publish) + `MemoTool` (AgentTool). Verified: round-trip
+   test passes, 826 lib tests pass, clippy `-D warnings` clean both configs.
+3. ⏸ **oxiline module** — *deferred* on the SQLite-alignment prerequisite above.
+4. ⏸ **Write-back hooks** — opt-in `PersistenceHook` analogs (deferred; v1 ships
+   context-in only, per the chosen D scope).
+5. ✅ **Verify** — `cargo check/clippy` (default + `--features memo`), `cargo test`,
+   `cargo fmt --check` — all green.
 
 ## 11. Out of scope (v1)
 

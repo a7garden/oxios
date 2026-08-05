@@ -1272,6 +1272,10 @@ pub struct OxiosConfig {
     /// Image generation configuration (OpenAI-compatible providers).
     #[serde(default)]
     pub image_gen: ImageGenConfig,
+    /// oximemo integration (opt-in first-party app module; requires the `memo`
+    /// cargo feature). oxios acts as a co-client of the oximemo vault.
+    #[serde(default)]
+    pub memo: MemoConfig,
 }
 
 /// Image generation configuration.
@@ -1582,6 +1586,25 @@ impl Default for CalendarConfig {
             archive_after_days: default_archive_days(),
         }
     }
+}
+
+/// oximemo integration configuration (first-party app module, opt-in).
+///
+/// When `enabled` (and the `memo` cargo feature is compiled in), oxios embeds
+/// `oximemo-core` and agents gain a `memo` tool to read/write the user's
+/// oximemo vault directly via typed Rust APIs — no CLI shell-out. oxios is a
+/// *co-client* of the vault: it shares oximemo's canonical store but never
+/// replaces it as the owner. Disabled by default.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct MemoConfig {
+    /// Enable the oximemo integration (default off).
+    #[serde(default)]
+    pub enabled: bool,
+    /// Path to the oximemo vault directory. Empty = oximemo's default location
+    /// (`~/Library/Application Support/com.oximemo.app/` on macOS), resolved by
+    /// `oximemo_core::Paths`.
+    #[serde(default)]
+    pub vault_path: String,
 }
 
 /// Email configuration.
