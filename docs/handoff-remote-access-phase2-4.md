@@ -258,8 +258,12 @@ Integration into the chat view is pending (same note as Phase 3 UI).
    a `CompanionAudit` trait + RAII `DisconnectGuard` in the transport layer;
    RPC methods log in `handle_app_frame`. Actor = device id (or "anonymous"
    pre-auth), action = method name / connect / disconnect, metadata only.
-7. **Compare/merge view** — diff N worktree branches after fan-out completion.
-   *(Future feature.)*
+7. ~~**Compare/merge view**~~ — **DONE.** `POST /api/worktree/diff` +
+   `POST /api/worktree/merge` endpoints + `WorktreeComparePanel` dialog.
+   When all fan-out agents settle, a "Compare" button opens the panel:
+   each agent shows diff stats (files, +/- lines), full diff viewer with
+   syntax highlighting, and a merge button per agent. Also added
+   `POST /api/worktree/fanout` (was missing from the HTTP API).
 
 ---
 
@@ -288,4 +292,3 @@ cargo test -p oxios-kernel --lib remote_config  # ✅ 3/3
 ### Remaining work
 
 1. **Device E2E test** — needs physical device + user.
-2. **Compare/merge view** — diff N worktree branches after fan-out. Needs UX design.
