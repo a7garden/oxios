@@ -26,8 +26,8 @@ import { Label } from '@/components/ui/label'
 import { Select as SimpleSelect } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api-client'
-import { useFanoutStore } from '@/stores/fanout'
 import { useChatStore } from '@/stores/chat'
+import { useFanoutStore } from '@/stores/fanout'
 
 /** Allowed fan-out sizes. Backend supports 2-8 parallel agents. */
 const COUNT_OPTIONS = [2, 3, 4, 5, 6, 7, 8] as const
@@ -131,9 +131,7 @@ export function FanOutButton({ projectPath, showLabel, className }: FanOutButton
         ) : (
           <GitFork className="size-3.5" />
         )}
-        {showLabel && (
-          <span>{t('chat.fanout.label', { defaultValue: 'Fan Out' })}</span>
-        )}
+        {showLabel && <span>{t('chat.fanout.label', { defaultValue: 'Fan Out' })}</span>}
       </Button>
       <Dialog open={open} onOpenChange={(o) => !submitting && setOpen(o)}>
         <DialogContent className="max-w-md">

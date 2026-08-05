@@ -20,15 +20,10 @@ import {
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { api } from '@/lib/api-client'
+import { cn } from '@/lib/utils'
 import type { FanoutGroup } from '@/stores/fanout'
 
 // ── API types ──
@@ -139,11 +134,7 @@ function DiffStatCard({
         selected ? 'border-primary ring-1 ring-primary/30' : 'border-border/70',
       )}
     >
-      <button
-        type="button"
-        onClick={onSelect}
-        className="flex w-full items-center gap-2 text-left"
-      >
+      <button type="button" onClick={onSelect} className="flex w-full items-center gap-2 text-left">
         <span
           className={cn(
             'inline-block h-2 w-2 shrink-0 rounded-full',
@@ -169,10 +160,7 @@ function DiffStatCard({
             >
               {selected ? 'Hide' : 'View'}
               <ChevronRight
-                className={cn(
-                  'h-3 w-3 transition-transform',
-                  selected && 'rotate-90',
-                )}
+                className={cn('h-3 w-3 transition-transform', selected && 'rotate-90')}
               />
             </button>
           </div>
@@ -192,15 +180,11 @@ function DiffStatCard({
               <span className="ml-auto shrink-0 font-mono text-status-success">
                 +{f.insertions}
               </span>
-              <span className="shrink-0 font-mono text-status-error">
-                -{f.deletions}
-              </span>
+              <span className="shrink-0 font-mono text-status-error">-{f.deletions}</span>
             </div>
           ))}
           {diff.files.length > 5 && (
-            <p className="text-2xs text-muted-foreground italic">
-              +{diff.files.length - 5} more
-            </p>
+            <p className="text-2xs text-muted-foreground italic">+{diff.files.length - 5} more</p>
           )}
         </div>
       )}
@@ -247,27 +231,19 @@ interface WorktreeComparePanelProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function WorktreeComparePanel({
-  group,
-  open,
-  onOpenChange,
-}: WorktreeComparePanelProps) {
+export function WorktreeComparePanel({ group, open, onOpenChange }: WorktreeComparePanelProps) {
   const { t } = useTranslation()
   const [diffs, setDiffs] = useState<Record<string, DiffStat>>({})
   const [loading, setLoading] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
   const [merging, setMerging] = useState<string | null>(null)
-  const [mergeResults, setMergeResults] = useState<
-    Record<string, MergeResult>
-  >({})
+  const [mergeResults, setMergeResults] = useState<Record<string, MergeResult>>({})
 
   // Fetch diffs for completed agents on open.
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    const completed = group.agents.filter(
-      (a) => a.status === 'done' && a.worktreePath,
-    )
+    const completed = group.agents.filter((a) => a.status === 'done' && a.worktreePath)
     if (completed.length === 0) {
       setLoading(false)
       return
@@ -322,9 +298,7 @@ export function WorktreeComparePanel({
         )
       }
     } catch {
-      toast.error(
-        t('chat.fanout.mergeFailed', { defaultValue: 'Merge failed' }),
-      )
+      toast.error(t('chat.fanout.mergeFailed', { defaultValue: 'Merge failed' }))
     } finally {
       setMerging(null)
     }
@@ -344,9 +318,7 @@ export function WorktreeComparePanel({
         </DialogHeader>
 
         {/* Prompt preview */}
-        <p className="truncate text-sm text-muted-foreground">
-          {group.prompt}
-        </p>
+        <p className="truncate text-sm text-muted-foreground">{group.prompt}</p>
 
         {/* Loading state */}
         {loading ? (
@@ -374,11 +346,7 @@ export function WorktreeComparePanel({
                   mergeResult={mergeResults[agent.agentId] ?? null}
                   merging={merging === agent.agentId}
                   onSelect={() =>
-                    setSelectedAgent(
-                      selectedAgent === agent.agentId
-                        ? null
-                        : agent.agentId,
-                    )
+                    setSelectedAgent(selectedAgent === agent.agentId ? null : agent.agentId)
                   }
                   onMerge={() => handleMerge(agent.agentId)}
                 />
@@ -394,8 +362,8 @@ export function WorktreeComparePanel({
                       selectedAgent.slice(0, 8)}
                   </span>
                   <span className="text-2xs text-muted-foreground">
-                    {selectedDiff.files_changed} files · +
-                    {selectedDiff.insertions} −{selectedDiff.deletions}
+                    {selectedDiff.files_changed} files · +{selectedDiff.insertions} −
+                    {selectedDiff.deletions}
                   </span>
                 </div>
                 <DiffTextRenderer text={selectedDiff.diff_text} />

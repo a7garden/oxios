@@ -20,16 +20,16 @@ import { Button } from '@/components/ui/button'
 import { useIsTouch } from '@/hooks/use-is-touch'
 import { useKnowledgeSearch } from '@/hooks/use-knowledge'
 import { useMemorySemanticSearch } from '@/hooks/use-memory'
-import { usePersonaCapabilities } from '@/hooks/usePersonaCapabilities'
 import { useMounts } from '@/hooks/use-mounts'
+import { usePersonaCapabilities } from '@/hooks/usePersonaCapabilities'
 import { api } from '@/lib/api-client'
 import { getInputHistory } from '@/lib/input-history-storage'
 import { cn } from '@/lib/utils'
 import { ApprovalModeSelector } from './approval-mode-selector'
+import { FanOutButton } from './FanOutButton'
 import { LiveActivityBar } from './live-activity-bar'
 import { ModelParamsPopover } from './model-params-popover'
 import { ModelPickerContainer } from './model-picker'
-import { FanOutButton } from './FanOutButton'
 
 // ── Types ──
 

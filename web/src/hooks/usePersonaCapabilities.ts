@@ -79,9 +79,7 @@ export function usePersonaCapabilities(): UsePersonaCapabilitiesResult {
   const sessionQuery = useQuery({
     queryKey: ['session', activeSessionId],
     queryFn: () =>
-      api.get<SessionDetail>(
-        `/api/sessions/${encodeURIComponent(activeSessionId ?? '')}`,
-      ),
+      api.get<SessionDetail>(`/api/sessions/${encodeURIComponent(activeSessionId ?? '')}`),
     enabled: !!activeSessionId,
     staleTime: 30_000,
   })
@@ -115,8 +113,7 @@ export function usePersonaCapabilities(): UsePersonaCapabilitiesResult {
     // Capabilities come from the persona record first; if the persona isn't
     // in the list cache yet, fall back to whatever the active-persona
     // endpoint returned.
-    const capsList =
-      persona?.capabilities ?? activePersonaQuery.data?.capabilities ?? []
+    const capsList = persona?.capabilities ?? activePersonaQuery.data?.capabilities ?? []
 
     return {
       capabilities: new Set(capsList),
@@ -128,9 +125,5 @@ export function usePersonaCapabilities(): UsePersonaCapabilitiesResult {
     // we only care about their `data`. Tanstack query keeps `data` stable
     // across re-renders that don't change the resolved value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    personasQuery.data,
-    sessionQuery.data?.active_persona_id,
-    activePersonaQuery.data,
-  ])
+  }, [personasQuery.data, sessionQuery.data?.active_persona_id, activePersonaQuery.data])
 }

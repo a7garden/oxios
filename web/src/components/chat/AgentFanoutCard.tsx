@@ -111,9 +111,7 @@ export function AgentFanoutCard({
               pres.text,
             )}
           />
-          <span className="truncate text-sm font-medium text-foreground">
-            {displayName}
-          </span>
+          <span className="truncate text-sm font-medium text-foreground">{displayName}</span>
           {ago && (
             <span className="ml-auto shrink-0 text-2xs text-muted-foreground tabular-nums">
               {ago}
@@ -121,13 +119,9 @@ export function AgentFanoutCard({
           )}
         </div>
         {worktreePath && (
-          <p className="mt-0.5 truncate font-mono text-2xs text-muted-foreground">
-            {worktreePath}
-          </p>
+          <p className="mt-0.5 truncate font-mono text-2xs text-muted-foreground">{worktreePath}</p>
         )}
-        {detail && (
-          <p className={cn('mt-1 truncate text-xs', pres.text)}>{detail}</p>
-        )}
+        {detail && <p className={cn('mt-1 truncate text-xs', pres.text)}>{detail}</p>}
       </div>
     </button>
   )

@@ -17,8 +17,8 @@
 import { memo, type ReactNode } from 'react'
 import { InlineDiffViewer, isFileEditCall } from '@/components/chat/InlineDiffViewer'
 import { MarkdownMessage } from '@/components/chat/markdown-message'
-import { usePersonaCapabilities } from '@/hooks/usePersonaCapabilities'
 import { Thinking } from '@/components/chat/thinking'
+import { usePersonaCapabilities } from '@/hooks/usePersonaCapabilities'
 import type { ChatBlock, ChatToolPayload } from '@/types'
 import { ToolCallCard } from './ToolCallList'
 
@@ -28,10 +28,7 @@ interface BlockStreamProps {
 }
 
 /** Build a small wrapper that renders the tool card + the optional diff. */
-function renderToolBlock(
-  b: ChatBlock & { type: 'tool' },
-  showDiffViewer: boolean,
-): ReactNode {
+function renderToolBlock(b: ChatBlock & { type: 'tool' }, showDiffViewer: boolean): ReactNode {
   const card = <ToolCallCard call={b} defaultExpanded={false} />
   if (!showDiffViewer) return card
   const args = (b as ChatToolPayload).arguments
@@ -47,11 +44,7 @@ function renderToolBlock(
   return (
     <div className="space-y-1.5">
       {card}
-      <InlineDiffViewer
-        toolName={(b as ChatToolPayload).apiName}
-        path={path}
-        args={argRec}
-      />
+      <InlineDiffViewer toolName={(b as ChatToolPayload).apiName} path={path} args={argRec} />
     </div>
   )
 }
@@ -115,4 +108,3 @@ export const BlockStream = memo(function BlockStream({ blocks, messageId }: Bloc
     </div>
   )
 })
-

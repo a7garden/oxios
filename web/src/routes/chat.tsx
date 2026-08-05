@@ -3,6 +3,7 @@ import { ArrowDown, GitPullRequest, RefreshCw, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { VList, type VListHandle } from 'virtua'
+import { AgentFanoutCardGrid } from '@/components/chat/AgentFanoutCard'
 import type { AttachedFile, ContextAttachment } from '@/components/chat/chat-input'
 import { ChatInput } from '@/components/chat/chat-input'
 import { ChatMiniMap } from '@/components/chat/chat-minimap'
@@ -11,10 +12,9 @@ import { EmptyChatState } from '@/components/chat/empty-chat-state'
 import { InterviewWizard } from '@/components/chat/interview-wizard'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { PathAccessCard } from '@/components/chat/path-access-card'
+import { TerminalToggle } from '@/components/chat/TerminalToggle'
 import { TextSelectionBar } from '@/components/chat/text-selection-bar'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
-import { AgentFanoutCardGrid } from '@/components/chat/AgentFanoutCard'
-import { TerminalToggle } from '@/components/chat/TerminalToggle'
 import { WorktreeComparePanel } from '@/components/chat/WorktreeComparePanel'
 import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { PortalPanel } from '@/components/portal/portal-panel'
@@ -27,8 +27,8 @@ import { usePersonaCapabilities } from '@/hooks/usePersonaCapabilities'
 import { buildChatRows } from '@/lib/chat-rows'
 import { addInputHistory } from '@/lib/input-history-storage'
 import { getToken, useChatStore } from '@/stores/chat'
-import { usePortalStore } from '@/stores/portal'
 import { useFanoutStore } from '@/stores/fanout'
+import { usePortalStore } from '@/stores/portal'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
 
@@ -439,8 +439,7 @@ function ChatPage() {
           <div className="shrink-0 border-t bg-background/95 px-4 py-2">
             {fanoutGroups.map((group) => {
               const allSettled =
-                group.agents.length > 0 &&
-                group.agents.every((a) => a.status !== 'working')
+                group.agents.length > 0 && group.agents.every((a) => a.status !== 'working')
               return (
                 <div key={group.groupId} className="space-y-1.5">
                   {allSettled && (

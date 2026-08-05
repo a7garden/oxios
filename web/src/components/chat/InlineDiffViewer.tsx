@@ -172,10 +172,7 @@ function DiffLineRow({ line, idx }: { line: DiffLine; idx: number }) {
         {line.newLine ?? ''}
       </span>
       <span
-        className={cn(
-          'w-4 shrink-0 select-none text-center font-bold',
-          KIND_GUTTER[line.kind],
-        )}
+        className={cn('w-4 shrink-0 select-none text-center font-bold', KIND_GUTTER[line.kind])}
       >
         {KIND_PREFIX[line.kind]}
       </span>
@@ -205,10 +202,7 @@ export function InlineDiffViewer({
 
   return (
     <div
-      className={cn(
-        'overflow-hidden rounded-md border border-border/70 bg-muted/20',
-        className,
-      )}
+      className={cn('overflow-hidden rounded-md border border-border/70 bg-muted/20', className)}
     >
       {(path || toolName) && (
         <div className="flex items-center gap-1.5 border-b border-border/60 bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
@@ -266,7 +260,6 @@ export function isFileEditCall(
   if (!looksLikeEdit) return false
   // Need both before/after (or only after — write-style replacement).
   const hasOld = 'old_text' in args || 'old_str' in args || 'oldString' in args
-  const hasNew =
-    'new_text' in args || 'new_str' in args || 'newString' in args || 'content' in args
+  const hasNew = 'new_text' in args || 'new_str' in args || 'newString' in args || 'content' in args
   return hasOld || hasNew
 }
