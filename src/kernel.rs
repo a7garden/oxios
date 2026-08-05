@@ -1141,12 +1141,19 @@ impl KernelBuilder {
                 )),
             }
         }
-        // Boot-time validation: resolve the configured model so a broken
-        // config fails fast (daemon refuses to start). `model.provider` is
-        // reused below to seed the agent API key.
+        // Boot-time validation: resolve the engine's effective default model
+        // so a broken config fails fast (daemon refuses to start). When the
+        // router is enabled, the effective id is `router/<default_profile>`
+        // and a synthetic model was registered for that profile by Task 2;
+        // otherwise it matches `config.engine.default_model`. Using the raw
+        // config field here would diverge from the router path (and fail on
+        // an empty config default). `model.provider` is reused below to seed
+        // the agent API key — for the router it yields "router" and the
+        // CredentialStore gracefully falls back to `config.engine.api_key`.
+        let effective_model_id = engine.default_model_id();
         let model = engine
-            .resolve_model(model_id)
-            .context(format!("Failed to resolve model: {model_id}"))?;
+            .resolve_model(effective_model_id)
+            .context(format!("Failed to resolve model: {effective_model_id}"))?;
 
         // EngineHandle — hot-swappable engine reference. Created here so both
         // the OuroborosEngine (interview/crystallize/review) and the AgentRuntime
