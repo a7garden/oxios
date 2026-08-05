@@ -44,6 +44,7 @@ mod task_routes;
 mod token_maxing_routes;
 mod tools;
 mod workspace;
+mod worktree_routes;
 
 use std::sync::Arc;
 
@@ -790,6 +791,19 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             get(handle_asset_meta_get).put(handle_asset_meta_update),
         )
         .route("/api/assets/{name}", delete(handle_asset_delete))
+        // Worktree fan-out (RFC-044 Phase 4) — protected
+        .route(
+            "/api/worktree/fanout",
+            post(worktree_routes::handle_worktree_fanout),
+        )
+        .route(
+            "/api/worktree/diff",
+            post(worktree_routes::handle_worktree_diff),
+        )
+        .route(
+            "/api/worktree/merge",
+            post(worktree_routes::handle_worktree_merge),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,
