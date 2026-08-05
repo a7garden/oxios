@@ -164,7 +164,7 @@
     "regional": "지역",
     "localSelfHosted": "로컬 / 셀프호스팅",
     "apiKeyEnv": "환경 변수",
-    "apiKeyAuthStore": "인증 저장소 (~/.oxi/auth.json)",
+    "apiKeyAuthStore": "인증 저장소 (~/.oxicode/auth.json)",
     "apiKeyConfig": "설정 오버라이드",
     "apiKeyNone": "키 미설정",
     "apiKeySetNew": "키 설정",

@@ -164,7 +164,7 @@
     "regional": "Regional",
     "localSelfHosted": "Local / Self-hosted",
     "apiKeyEnv": "Environment Variable",
-    "apiKeyAuthStore": "Auth Store (~/.oxi/auth.json)",
+    "apiKeyAuthStore": "Auth Store (~/.oxicode/auth.json)",
     "apiKeyConfig": "Config Override",
     "apiKeyNone": "No key set",
     "apiKeySetNew": "Set Key",

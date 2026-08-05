@@ -9,7 +9,7 @@ import type {
 import type { FallbackHistoryResponse, RoutingConfig, RoutingStats } from '@/types/routing'
 
 // ── Static provider catalog ──────────────────────────────────
-// Mirrors the oxi-ai provider registry so the frontend can
+// Mirrors the oxicode-ai provider registry so the frontend can
 // display provider/model information without a dedicated API.
 
 /** Known providers with display metadata. */

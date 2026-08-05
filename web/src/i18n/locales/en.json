@@ -1007,7 +1007,7 @@
     "regional": "Regional",
     "localSelfHosted": "Local / Self-hosted",
     "apiKeyEnv": "Environment Variable",
-    "apiKeyAuthStore": "Auth Store (~/.oxi/auth.json)",
+    "apiKeyAuthStore": "Auth Store (~/.oxicode/auth.json)",
     "apiKeyConfig": "Config Override",
     "apiKeyNone": "No key set",
     "apiKeySetNew": "Set Key",
@@ -2346,7 +2346,7 @@
     "submit": "Connect",
     "tokenLabel": "API Token",
     "tokenPlaceholder": "Paste your token here…",
-    "tokenHint": "Find your token in ~/.oxi/auth.json on the server machine.",
+    "tokenHint": "Find your token in ~/.oxicode/auth.json on the server machine.",
     "invalidToken": "Token rejected by server. Check and try again.",
     "networkError": "Could not reach the server. Check your connection.",
     "serverError": "Server error ({{status}}). Try again later."

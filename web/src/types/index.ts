@@ -423,7 +423,7 @@ export interface StreamChunk {
   /// Human-readable progress text (RFC-015 v0.12).
   progress?: string
   /// Browser tab id (when the upstream tool is tab-aware, e.g. browser).
-  /// Absent on legacy oxi-agent versions; the frontend treats absence
+  /// Absent on legacy oxicode-agent versions; the frontend treats absence
   /// as "no badge".
   tab_id?: string
   action?: 'recall' | 'store'
@@ -432,7 +432,7 @@ export interface StreamChunk {
   source?: string
   input_tokens?: number
   output_tokens?: number
-  /// Semantic context from the tool call (oxi-agent 0.29+ BrowseProgress).
+  /// Semantic context from the tool call (oxicode-agent 0.29+ BrowseProgress).
   /// Carries structured info about what a browsing tool is doing.
   /// UI consumers that understand a context kind render it richly;
   /// older consumers simply ignore the field.
@@ -452,15 +452,15 @@ export interface StreamChunk {
   citations?: Array<{ url: string; title?: string; favicon?: string }>
 }
 
-// ── Browser observability (RFC-015 Phase G, oxi-agent 0.29.1+) ─────────
+// ── Browser observability (RFC-015 Phase G, oxicode-agent 0.29.1+) ─────────
 
-/** Reason for visiting a page. Mirrors oxi-agent's `VisitReason` enum. */
+/** Reason for visiting a page. Mirrors oxicode-agent's `VisitReason` enum. */
 export type VisitReason =
   | 'direct_navigation'
   | { search_result: { position: number } }
   | { link_followed: { from_url: string } }
 
-/** Screenshot metadata. Mirrors oxi-agent's `ScreenshotMeta` struct. */
+/** Screenshot metadata. Mirrors oxicode-agent's `ScreenshotMeta` struct. */
 export interface ScreenshotMeta {
   /** PNG payload size in bytes. */
   bytes: number
@@ -481,9 +481,9 @@ export type ToolCallContext =
       page_status?: number
       page_bytes?: number
       page_duration_ms?: number
-      /** Navigation error (from BrowseProgress::NavigationFailed, oxi-agent 0.29.1+). */
+      /** Navigation error (from BrowseProgress::NavigationFailed, oxicode-agent 0.29.1+). */
       navigation_error?: string
-      /** Screenshot metadata (from BrowseProgress::ScreenshotCaptured, oxi-agent 0.29.1+). */
+      /** Screenshot metadata (from BrowseProgress::ScreenshotCaptured, oxicode-agent 0.29.1+). */
       screenshot?: ScreenshotMeta
     }
   | {

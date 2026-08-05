@@ -3,7 +3,7 @@
  *
  * Lists all known secrets with masked status, allows setting and deleting
  * values via the `/api/secrets` backend. Secrets are stored in
- * `~/.oxi/auth.json`, never in `config.toml` plaintext.
+ * `~/.oxicode/auth.json`, never in `config.toml` plaintext.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Eye, EyeOff, KeyRound, ShieldCheck, Trash2 } from 'lucide-react'

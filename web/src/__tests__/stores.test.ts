@@ -180,7 +180,7 @@ describe('useChatStore handleChunk (RFC-015)', () => {
   })
 
   it('tool_progress chunk without tab_id omits tabId on the tool block', () => {
-    // Legacy oxi-agent versions don't emit tab_id; the resulting tool block
+    // Legacy oxicode-agent versions don't emit tab_id; the resulting tool block
     // must not have tabId at all (not tabId: undefined), so the frontend
     // doesn't render a badge.
     useChatStore.getState().handleChunk({

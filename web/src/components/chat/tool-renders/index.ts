@@ -1,7 +1,7 @@
 // tool-renders/index.ts — registers all builtin tool renders + inspectors.
 //
 // Aliases: a single render often covers multiple tool names. We register
-// under both Oxios kernel names and oxi-sdk builtins so lookups hit
+// under both Oxios kernel names and oxicode-sdk builtins so lookups hit
 // regardless of which layer emitted the call.
 
 import { A2aDelegateRender, A2aQueryRender, A2aSendRender } from './A2a'
