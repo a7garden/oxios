@@ -447,7 +447,8 @@ impl Surface for WebSurface {
         // SPA routes (defined first so we can merge them into `app`).
         let spa_routes: Router<Arc<AppState>> = Router::new()
             .route("/assets/{*path}", get(static_handler))
-            .route("/favicon.svg", get(static_handler))
+            .route("/favicon.png", get(static_handler))
+            .route("/apple-touch-icon.png", get(static_handler))
             .route("/icons.svg", get(static_handler))
             .route("/{*path}", get(spa_handler))
             .route("/", get(spa_handler));

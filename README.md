@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="logo-readme.png" alt="Oxios" width="110" height="110" />
+
 # ⬡ Oxios
 
 **Agent Operating System**

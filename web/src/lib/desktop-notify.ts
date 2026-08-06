@@ -37,7 +37,7 @@ export function showDesktopNotification(title: string, body: string, link?: stri
     body,
     tag: 'oxios-agent',
     // Reuse favicon as the notification icon.
-    icon: '/favicon.svg',
+    icon: '/favicon.png',
   })
 
   n.onclick = () => {

@@ -181,7 +181,7 @@ export function Sidebar() {
       >
         {!(collapsed && !mobileOpen) && (
           <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
+            <img src="/favicon.png" alt="" className="h-6 w-6 rounded-md shrink-0" />
             <span className="font-bold text-lg">Oxios</span>
           </div>
         )}

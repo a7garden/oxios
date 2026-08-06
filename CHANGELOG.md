@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **New app icon** — replaced the legacy purple mark with the oxiOS
+  terminal-window icon: web favicon (`/favicon.png`) + apple-touch-icon,
+  sidebar brand mark, README header logo, repo-root `icon.png`, and the
+  mobile companion app icons (Expo `assets/`). Also fixed fixed-path static
+  asset serving — root files like `/favicon.svg` previously 500'd because
+  `static_handler` required a `{*path}` capture; it now falls back to the
+  request URI.
+
 ## [1.37.0] - 2026-08-06
 
 ### Added
