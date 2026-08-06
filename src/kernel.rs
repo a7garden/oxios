@@ -301,6 +301,12 @@ impl Kernel {
                     Some(api) => kh.with_memo(api),
                     None => kh,
                 };
+                // oxiline (optional first-party app module; `timeline` feature + [timeline].enabled).
+                #[cfg(feature = "timeline")]
+                let kh = match self.build_timeline_api() {
+                    Some(api) => kh.with_timeline(api),
+                    None => kh,
+                };
                 let compression_service = Arc::new(oxios_kernel::CompressionService::new(
                     self.state_store.clone(),
                     self.engine_handle.clone(),
@@ -444,6 +450,32 @@ impl Kernel {
             }
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to open oximemo vault; memo module disabled");
+                None
+            }
+        }
+    }
+
+    /// Build the oxiline facade (optional first-party app module — `timeline`
+    /// feature + `[timeline].enabled`). oxios opens the user's oxiline SQLite
+    /// store as a co-client (read-only context-in). Only compiled when the
+    /// binary's `timeline` feature is on.
+    #[cfg(feature = "timeline")]
+    fn build_timeline_api(&self) -> Option<std::sync::Arc<oxios_kernel::TimelineApi>> {
+        if !self.config.timeline.enabled {
+            return None;
+        }
+        let db_path = if self.config.timeline.db_path.is_empty() {
+            None
+        } else {
+            Some(std::path::PathBuf::from(&self.config.timeline.db_path))
+        };
+        match oxios_kernel::TimelineApi::open(db_path.as_deref()) {
+            Ok(api) => {
+                tracing::info!("oxiline module initialized (timeline co-client, read-only)");
+                Some(api)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to open oxiline db; timeline module disabled");
                 None
             }
         }

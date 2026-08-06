@@ -20,6 +20,7 @@ pub mod persona_api;
 pub mod project_api;
 pub mod security_api;
 pub mod state_api;
+pub mod timeline_api;
 pub mod token_maxing_api;
 
 pub use crate::host_tools::HostToolsApi;
@@ -48,6 +49,7 @@ pub use memory_api::MemoryApi;
 pub use mount_api::{MountApi, MountInfo};
 pub use persona_api::PersonaApi;
 pub use project_api::{ProjectApi, ProjectInfo};
+pub use timeline_api::TimelineApi;
 
 pub use security_api::SecurityApi;
 pub use state_api::StateApi;
@@ -116,6 +118,11 @@ pub struct KernelHandle {
     /// oxios is a co-client of the vault — never its owner. Shared via `Arc`
     /// so the agent tool can delegate to the facade (which publishes events).
     pub memo: Arc<RwLock<Option<Arc<MemoApi>>>>,
+    /// oxiline integration (opt-in first-party app module; `timeline` feature).
+    /// Live runtime slot (mirrors `memo`/`email`): read-only context-in for
+    /// agents (current activity, today's plan compliance, recent records). oxios
+    /// is a co-client of the store — never its owner.
+    pub timeline: Arc<RwLock<Option<Arc<TimelineApi>>>>,
     /// Email — send HTML emails via SMTP, template management.
     pub email: Arc<RwLock<Option<EmailApi>>>,
     /// Token-maxing (RFC-031): the shared QuotaTracker facade. `None` only on
@@ -190,6 +197,7 @@ impl KernelHandle {
             calendar,
             email,
             memo: Arc::new(RwLock::new(None)),
+            timeline: Arc::new(RwLock::new(None)),
             token_maxing: None,
             compression: None,
             host_tools: HostToolsApi::new(),
@@ -216,6 +224,13 @@ impl KernelHandle {
     /// for a live swap (no restart). Replaces any prior facade in the slot.
     pub fn with_memo(self, memo: Arc<MemoApi>) -> Self {
         *self.memo.write() = Some(memo);
+        self
+    }
+    /// Attach the oxiline facade (first-party app module). Called by the kernel
+    /// assembler at boot when `[timeline].enabled`, and by
+    /// `POST /api/timeline/enable` for a live swap (no restart).
+    pub fn with_timeline(self, timeline: Arc<TimelineApi>) -> Self {
+        *self.timeline.write() = Some(timeline);
         self
     }
     /// Attach the unified AssetStore. Called by the kernel assembler.

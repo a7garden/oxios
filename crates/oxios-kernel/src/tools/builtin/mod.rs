@@ -32,6 +32,8 @@ pub mod project_tool;
 pub mod resource_tool;
 pub mod security_tool;
 pub mod skill_forge_tool;
+#[cfg(feature = "timeline")]
+pub mod timeline_tool;
 
 pub use agent_tool::AgentTool as KernelAgentTool;
 pub use budget_tool::BudgetTool;
@@ -49,6 +51,8 @@ pub use project_tool::ProjectTool;
 pub use resource_tool::ResourceTool;
 pub use security_tool::SecurityTool;
 pub use skill_forge_tool::SkillForgeTool;
+#[cfg(feature = "timeline")]
+pub use timeline_tool::TimelineTool;
 
 use crate::KernelHandle;
 use crate::tools::{AskUserTool, MemoryReadTool, MemorySearchTool, MemoryWriteTool};
@@ -129,6 +133,12 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     #[cfg(feature = "memo")]
     if let Some(memo_tool) = MemoTool::try_from_kernel(kernel) {
         registry.register(memo_tool);
+    }
+
+    // oxiline (optional first-party app module — `timeline` feature + [timeline].enabled)
+    #[cfg(feature = "timeline")]
+    if let Some(timeline_tool) = TimelineTool::try_from_kernel(kernel) {
+        registry.register(timeline_tool);
     }
 
     // Email — always registered; returns a helpful setup error when unconfigured.

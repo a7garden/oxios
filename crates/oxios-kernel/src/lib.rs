@@ -293,7 +293,7 @@ pub use kernel_handle::{
     InputModality as EngineInputModality, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi,
     MemoApi, MemoryNote, ModelInfo, MountApi, MountInfo, PersonaApi, ProjectApi, ProjectInfo,
     ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot,
-    RoutingUpdate, SecurityApi, SharedExecConfig, StateApi, ValidateKeyResult,
+    RoutingUpdate, SecurityApi, SharedExecConfig, StateApi, TimelineApi, ValidateKeyResult,
 };
 pub use session_context::SessionContext;
 

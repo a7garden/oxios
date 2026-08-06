@@ -35,6 +35,7 @@ import { SectionCard } from '@/components/settings/section-card'
 import { SectionIcon } from '@/components/settings/section-icons'
 import { SettingsHeader } from '@/components/settings/settings-header'
 import { SettingsShell } from '@/components/settings/settings-shell'
+import { TimelineSectionCard } from '@/components/settings/timeline-section'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { SystemToolsPanel } from '@/components/system/system-tools'
@@ -916,6 +917,10 @@ function renderActiveSection(
   // Memo: oximemo integration card (first-party app module; `memo` feature).
   if (sectionId === 'memo') {
     return <MemoSectionCard />
+  }
+  // Timeline: oxiline integration card (first-party app module; `timeline` feature).
+  if (sectionId === 'timeline') {
+    return <TimelineSectionCard />
   }
 
   if (!meta) return null

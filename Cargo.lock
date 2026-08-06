@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "Inflector"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
+
+[[package]]
 name = "addr2line"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1980,6 +1986,15 @@ dependencies = [
 
 [[package]]
 name = "dirs"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
+dependencies = [
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
+name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
@@ -3721,7 +3736,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "629d8f3bbeda9d148036d6b0de0a3ab947abd08ce90626327fc3547a49d59d97"
 dependencies = [
- "dirs",
+ "dirs 6.0.0",
  "futures",
  "http",
  "indicatif",
@@ -5853,7 +5868,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
- "dirs",
+ "dirs 6.0.0",
  "futures",
  "glob",
  "libc",
@@ -5886,7 +5901,7 @@ dependencies = [
  "bytes",
  "chrono",
  "digest 0.10.7",
- "dirs",
+ "dirs 6.0.0",
  "filetime",
  "flate2",
  "fs2",
@@ -5933,7 +5948,7 @@ version = "0.66.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1dad20b1ce40fbbbe4413e583c5d99b46c9e357a5b62040345eda6699cec1c2"
 dependencies = [
- "dirs",
+ "dirs 6.0.0",
  "filetime",
  "flate2",
  "futures",
@@ -5970,7 +5985,7 @@ dependencies = [
  "async-trait",
  "blake3",
  "chrono",
- "dirs",
+ "dirs 6.0.0",
  "fastrand",
  "filetime",
  "flate2",
@@ -6012,6 +6027,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "oxiline-core"
+version = "0.3.0"
+dependencies = [
+ "chrono",
+ "dirs 5.0.1",
+ "rusqlite",
+ "rusqlite_migration",
+ "serde",
+ "serde_json",
+ "specta",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "oximemo-core"
 version = "0.7.0"
 dependencies = [
@@ -6043,7 +6073,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "console",
- "dirs",
+ "dirs 6.0.0",
  "futures",
  "futures-util",
  "getrandom 0.2.17",
@@ -6143,7 +6173,7 @@ dependencies = [
  "console",
  "criterion",
  "cron",
- "dirs",
+ "dirs 6.0.0",
  "flate2",
  "futures",
  "getrandom 0.2.17",
@@ -6159,6 +6189,7 @@ dependencies = [
  "once_cell",
  "oxicode-agent",
  "oxicode-sdk",
+ "oxiline-core",
  "oximemo-core",
  "oxios-calendar",
  "oxios-markdown",
@@ -7371,6 +7402,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusqlite_migration"
+version = "2.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03451d4dc523c0a96d9e412c574670b3f5f184c3988b77a435876be25477bbd3"
+dependencies = [
+ "log",
+ "rusqlite",
+]
+
+[[package]]
 name = "rust-embed"
 version = "8.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7941,6 +7982,28 @@ dependencies = [
  "byteorder",
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "specta"
+version = "2.0.0-rc.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38f9a30cbcbb7011f1da7d73483983bf838af123883e45f2b36ed76328df9c50"
+dependencies = [
+ "rustc_version",
+ "specta-macros",
+]
+
+[[package]]
+name = "specta-macros"
+version = "2.0.0-rc.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ce14957ecc2897f1f848b8255b6531d13ddf49cbcf506b7c2c9fb1d005593bb"
+dependencies = [
+ "Inflector",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -25,6 +25,8 @@ mod image_routes;
 mod infra;
 #[cfg(feature = "memo")]
 mod memo_routes;
+#[cfg(feature = "timeline")]
+mod timeline_routes;
 pub(crate) use host_tools_routes::{handle_host_tools, handle_host_tools_detect};
 mod integrations_routes;
 pub(crate) use integrations_routes::{
@@ -169,6 +171,10 @@ pub(crate) use task_routes::{
     execute_task_run, handle_task_create, handle_task_delete, handle_task_get, handle_task_run,
     handle_task_runs, handle_task_set_schedule, handle_task_set_verify, handle_task_update_status,
     handle_tasks_list,
+};
+#[cfg(feature = "timeline")]
+pub(crate) use timeline_routes::{
+    handle_timeline_disable, handle_timeline_enable, handle_timeline_status,
 };
 pub(crate) use token_maxing_routes::{
     handle_token_maxing_providers, handle_token_maxing_session, handle_token_maxing_sessions,
@@ -817,6 +823,11 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/memo/status", get(handle_memo_status))
         .route("/api/memo/enable", post(handle_memo_enable))
         .route("/api/memo/disable", post(handle_memo_disable));
+    #[cfg(feature = "timeline")]
+    let api = api
+        .route("/api/timeline/status", get(handle_timeline_status))
+        .route("/api/timeline/enable", post(handle_timeline_enable))
+        .route("/api/timeline/disable", post(handle_timeline_disable));
 
     let api = api
         .layer(axum::middleware::from_fn_with_state(

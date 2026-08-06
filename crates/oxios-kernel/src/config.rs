@@ -1276,6 +1276,9 @@ pub struct OxiosConfig {
     /// cargo feature). oxios acts as a co-client of the oximemo vault.
     #[serde(default)]
     pub memo: MemoConfig,
+    /// oxiline (timeline) integration config.
+    #[serde(default)]
+    pub timeline: TimelineConfig,
 }
 
 /// Image generation configuration.
@@ -1605,6 +1608,25 @@ pub struct MemoConfig {
     /// `oximemo_core::Paths`.
     #[serde(default)]
     pub vault_path: String,
+}
+
+/// oxiline integration configuration (first-party app module, opt-in).
+///
+/// When `enabled` (and the `timeline` cargo feature is compiled in), oxios
+/// embeds `oxiline-core` and agents gain a `timeline` tool to read the user's
+/// time-tracking data (current activity, today's plan, recent records) via
+/// typed Rust APIs — no CLI shell-out. oxios is a *co-client* of the store: it
+/// shares oxiline's canonical SQLite database but never replaces it as the
+/// owner. v1 is read-only (context-in). Disabled by default.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct TimelineConfig {
+    /// Enable the oxiline integration (default off).
+    #[serde(default)]
+    pub enabled: bool,
+    /// Path to the oxiline SQLite database. Empty = oxiline's default location
+    /// (resolved by `oxiline_core::paths::db_path`, honoring `OXILINE_DB_PATH`).
+    #[serde(default)]
+    pub db_path: String,
 }
 
 /// Email configuration.

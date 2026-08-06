@@ -30,6 +30,7 @@ const RENDERABLE_SECTION_IDS = new Set<string>([
   'host-tools',
   'memory',
   'memo',
+  'timeline',
   'channels.telegram',
   'system-agents',
   'image',
