@@ -1,6 +1,6 @@
 //! Coordination primitives — multi-agent work distribution and consensus.
 //!
-//! Re-exports oxi-sdk 0.23.0's coordination primitives for use by the
+//! Re-exports oxicode-sdk 0.23.0's coordination primitives for use by the
 //! orchestrator and other kernel components.
 //!
 //! # Available Primitives

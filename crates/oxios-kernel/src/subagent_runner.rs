@@ -1,6 +1,6 @@
-//! Oxios sub-agent runner — in-process delegation via oxi-sdk 0.54.0+.
+//! Oxios sub-agent runner — in-process delegation via oxicode-sdk 0.54.0+.
 //!
-//! Wraps [`oxicode_sdk::SdkSubagentRunner`] (which wraps an `Oxi` instance)
+//! Wraps [`oxicode_sdk::SdkSubagentRunner`] (which wraps an `Oxicode` instance)
 //! and exposes it as an [`oxicode_agent::SubagentRunner`] for the `subagent`
 //! tool's in-process path. Each `run_isolated` call builds a fresh `Agent`
 //! with an empty context (full isolation from the parent), runs it, and
@@ -35,7 +35,7 @@ use oxicode_sdk::SdkSubagentRunner;
 
 /// Oxios's in-process sub-agent runner.
 ///
-/// Constructed once at boot from the [`OxiosEngine`]'s `Oxi` instance
+/// Constructed once at boot from the [`OxiosEngine`]'s `Oxicode` instance
 /// and shared via `Arc` into every agent build path. When wired into
 /// `AgentConfig.subagent_runner`, the `subagent` tool prefers this
 /// in-process path over shelling out to the CLI binary.

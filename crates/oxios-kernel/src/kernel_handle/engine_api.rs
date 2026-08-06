@@ -1372,7 +1372,7 @@ impl EngineApi {
     }
 
     /// Test connection to a provider with a specific model.
-    /// oxi-sdk 0.56.0: create_provider consults AuthProvider port live,
+    /// oxicode-sdk 0.56.0: create_provider consults AuthProvider port live,
     /// so credential changes are picked up without engine rebuild.
     pub fn check_provider_connection(
         &self,

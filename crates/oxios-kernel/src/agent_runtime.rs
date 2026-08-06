@@ -2,7 +2,7 @@
 //!
 //! The AgentRuntime uses `OxiosEngine.oxi().agent()` (AgentBuilder pattern)
 //! to construct agents with full middleware, observability, and security
-//! integration from oxi-sdk 0.24.0.
+//! integration from oxicode-sdk 0.24.0.
 //!
 //! # Architecture
 //!
@@ -15,7 +15,7 @@
 //! 4. Builds an `Agent` via `AgentBuilder` with middleware pipeline
 //! 5. Runs via `Agent::run_streaming()` for real-time event processing
 //!
-//! # oxi-sdk 0.23.0 Integration
+//! # oxicode-sdk 0.23.0 Integration
 //!
 //! Uses `AgentBuilder` for agent construction with:
 //! - `.with_rate_limit()` — tool call rate limiting
@@ -53,12 +53,12 @@ use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 use oxicode_sdk::{BreakerState, CircuitBreaker, DefaultCircuitBreaker};
 use std::time::Duration;
 
-/// Global LLM circuit breaker — oxi-sdk 0.64 `DefaultCircuitBreaker` (R6).
+/// Global LLM circuit breaker — oxicode-sdk 0.64 `DefaultCircuitBreaker` (R6).
 ///
 /// Metrics-only today: it records success/failure and surfaces `.state()` to
 /// the `llm_circuit_breaker_state` gauge, but does not gate calls. The
 /// dedicated per-provider health registry (`resilience/health.rs`) owns actual
-/// gating. oxi-sdk 0.61 removed the old `ProviderCircuitBreaker`/
+/// gating. oxicode-sdk 0.61 removed the old `ProviderCircuitBreaker`/
 /// `CircuitBreakerConfig`; 0.64 reintroduced a minimal `CircuitBreaker` trait
 /// + this reference impl (R6) which oxios now adopts.
 ///
@@ -139,7 +139,7 @@ pub struct AgentRuntimeConfig {
     /// Populated from `ExecEnv::model_params` which the gateway fills
     /// from the WS payload.
     pub model_params: Option<oxios_ouroboros::ModelParams>,
-    // NOTE: subagent_max_depth was removed — oxi-agent hardcodes the
+    // NOTE: subagent_max_depth was removed — oxicode-agent hardcodes the
     // in-process recursion cap to 3 (subagent.rs:649). `AgentConfig.subagent_depth`
     // is the CURRENT depth (always 0 for top-level agents), not a max.
 }
@@ -724,7 +724,7 @@ impl AgentRuntime {
 /// Create and run an oxicode-sdk `Agent` with CSpace-based tool registration.
 ///
 /// Uses `engine.oxi().agent()` (AgentBuilder) for full middleware,
-/// observability, and security integration from oxi-sdk 0.23.0.
+/// observability, and security integration from oxicode-sdk 0.23.0.
 #[allow(clippy::too_many_arguments)]
 async fn run_agent(
     config: &AgentRuntimeConfig,
@@ -781,7 +781,7 @@ async fn run_agent(
     // AgentLifecycleManager::ensure_permissions() adds kernel.workspace (~/.oxios/workspace),
     // but the agent operates in different directories depending on context:
     //
-    //   1. Process CWD — oxi-sdk 0.35+ bakes `workspace_dir` into file tools
+    //   1. Process CWD — oxicode-sdk 0.35+ bakes `workspace_dir` into file tools
     //      via `with_cwd`, so ReadTool/LsTool resolve relatives against the
     //      workspace, NOT the process CWD. However, oxios's own CSpace tools
     //      (kernel-bridge tools wrapped in GatedTool) and bash/exec
@@ -988,10 +988,10 @@ async fn run_agent(
         output_mode: None,
         provider_options: config.provider_options.clone(),
         session_id: None,
-        // RFC-035 Phase B/C: pass through gap 1/3 config to oxi-sdk 0.54.0+.
+        // RFC-035 Phase B/C: pass through gap 1/3 config to oxicode-sdk 0.54.0+.
         max_tool_result_bytes: config.max_tool_result_bytes,
         // subagent_depth = CURRENT depth (0 = top-level). The in-process
-        // max is hardcoded to 3 in oxi-agent (subagent.rs:649). Do NOT
+        // max is hardcoded to 3 in oxicode-agent (subagent.rs:649). Do NOT
         // wire a "max depth" config here — it would make the agent start
         // at depth N and fail every subagent call immediately.
         subagent_depth: 0,
@@ -1007,7 +1007,7 @@ async fn run_agent(
     // ── Build Agent via AgentBuilder (RFC-014 Phase D) ──
     //
     // The legacy rate-limited `ProviderPool` path (oxicode-sdk `ProviderPool` /
-    // `RateLimitPolicy`) was removed in oxi-sdk 0.61 with no direct
+    // `RateLimitPolicy`) was removed in oxicode-sdk 0.61 with no direct
     // replacement; oxios never set `provider_rpm > 0` in production, so the
     // single AgentBuilder path below is the only path. Engine-level
     // `authorizer` / `tracer` / `cost_tracker` are propagated through the
@@ -1164,7 +1164,7 @@ async fn run_agent(
                     // while the tool is still executing. Best-effort —
                     // publish failures (e.g. lagged subscribers) are ignored.
                     //
-                    // `tab_id` and `context` come from oxi-agent 0.29+
+                    // `tab_id` and `context` come from oxicode-agent 0.29+
                     // (ToolCallContext: PageVisit, WebSearch, etc.).
                     // Older agent versions won't send these — they default
                     // to None and the UI gracefully ignores them.

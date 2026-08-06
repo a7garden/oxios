@@ -1175,7 +1175,7 @@ mod tests {
         assert_eq!(engine.default_model_id(), "openai/gpt-4o");
     }
 
-    // ── Router registration (oxi-sdk 0.66.0+) ──
+    // ── Router registration (oxicode-sdk 0.66.0+) ──
     //
     // Wires a `RouterProvider` into the engine via `with_router` and verifies:
     // 1. The provider is reachable under the name `"router"`.

@@ -1,4 +1,4 @@
-//! Observability — oxi-sdk 0.26.2 tracing, cost tracking, and audit.
+//! Observability — oxicode-sdk 0.26.2 tracing, cost tracking, and audit.
 //!
 //! Provides global instances of oxicode-sdk's `Tracer`, `CostTracker`, and `AuditLog`
 //! for use across the kernel. These complement the existing `metrics` module
@@ -70,7 +70,7 @@ pub use oxicode_sdk::{
 use std::sync::Arc;
 
 /// Global Tracer instance.
-/// Stored as `Arc<Tracer>` because `Tracer::start` takes `self: &Arc<Self>` (oxi-sdk 0.56.0+).
+/// Stored as `Arc<Tracer>` because `Tracer::start` takes `self: &Arc<Self>` (oxicode-sdk 0.56.0+).
 static TRACER: std::sync::OnceLock<Arc<Tracer>> = std::sync::OnceLock::new();
 
 /// Global CostTracker instance.

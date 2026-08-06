@@ -366,7 +366,7 @@ impl PersistenceHook {
             result_snippet,
         );
 
-        // Build a lightweight agent via EngineHandle → Oxi → AgentBuilder
+        // Build a lightweight agent via EngineHandle → Oxicode → AgentBuilder
         let engine = self.engine_handle.get();
         let model_id = engine.default_model_id().to_string();
         let agent_config = oxicode_sdk::AgentConfig {
