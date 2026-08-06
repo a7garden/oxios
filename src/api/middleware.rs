@@ -126,7 +126,7 @@ pub async fn require_auth(
     }
 
     // Allow only actual static asset paths (prefix-based, not suffix)
-    let static_prefixes = ["/assets/", "/favicon", "/knowledge/"];
+    let static_prefixes = ["/assets/", "/favicon", "/apple-touch-icon", "/knowledge/"];
     let is_static =
         static_prefixes.iter().any(|p| path.starts_with(p)) || path == "/" || path == "/index.html";
     if is_static {

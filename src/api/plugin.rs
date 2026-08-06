@@ -224,8 +224,15 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str, if_none_match: Option<
 }
 
 /// Static asset handler.
+///
+/// Serves wildcard `assets/*` paths AND fixed root files (`/favicon.png`,
+/// `/apple-touch-icon.png`, …). Fixed routes carry no `{*path}` capture, so
+/// the `Path` extractor is absent there — falling back to the request URI
+/// avoids axum's "Expected 1 path argument but got 0" rejection, which
+/// previously 500'd every fixed asset request (incl. the old `/favicon.svg`).
 async fn static_handler(
-    path: axum::extract::Path<String>,
+    path: Option<axum::extract::Path<String>>,
+    uri: axum::extract::OriginalUri,
     headers: axum::http::HeaderMap,
     state: axum::extract::State<Arc<AppState>>,
 ) -> Response {
@@ -234,6 +241,9 @@ async fn static_handler(
     let if_none_match = headers
         .get(axum::http::header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok());
+    let path = path
+        .map(|p| p.0)
+        .unwrap_or_else(|| uri.path().trim_start_matches('/').to_string());
     serve_file(dist.as_deref(), &path, if_none_match)
 }
 
