@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.37.0] - 2026-08-06
+
+### Added
+- **Remote access & mobile companion (RFC-044)** — `oxios --remote` server with
+  Tailscale-aware endpoint enumeration, pairing QR offer, Noise_XX encrypted
+  WS transport with frame gate + backpressure, RPC dispatch
+  (`status.get`, version-gated), persistent DeviceRegistry with
+  hashed-at-rest tokens, and an Expo companion app scaffold (Phase 2).
+- **Persona capabilities (RFC-044 §8.2)** — `capabilities: string[]` on
+  personas (schema v2) surfaced to the web UI; capability-pack components
+  and per-session persona resolution gate optional affordances (diff viewer,
+  worktree fanout, terminal toggle).
+- **Worktree fan-out, diff & merge (RFC-044 Phase 4)** — `/api/*` endpoints
+  for fan-out worktree results with compare/merge panel in the web UI.
+- **oxicode-sdk 0.66 router** — `RouterProvider` + synthetic models,
+  router config template/profile models in the engine API, TOML
+  deserialization wired into kernel startup, effective default model
+  resolution at boot validation.
+- **Lifecycle hooks** — `CommandHookRunner` for SDK lifecycle hooks, wired
+  into `OxiosEngine` + `build_with_routing` and config.toml.
+- **Stream deltas** — SDK `MessageUpdate` stream delta handling fixes live
+  text streaming.
+- **oximemo / oxiline app-module integration** — opt-in `memo` and `timeline`
+  cargo features; web-UI live Connect toggle with runtime-swap facade;
+  oximemo-core/oxiline-core now pulled from crates.io (path deps dropped);
+  rusqlite 0.34 → 0.40.
+
 ### Changed
 - **oxicode-sdk 0.64 → 0.66 (kernel)** — Followed the upstream `oxi → oxicode`
   rename (CHANGELOG §0.65.0 Breaking). Crate deps: `oxi-sdk`/`oxi-ai`/`oxi-agent`
@@ -21,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the hooks system (Claude Code-compatible `HookRunner` port), shake
   compaction, typed `StreamDelta`, and an LSP `reload`/`capabilities`/
   `request` action set — not yet wired in oxios.
+
+### Fixed
+- **CI gate (web)** — dropped an unused `agentId` prop in `WorktreeComparePanel`;
+  `BlockStream` tests now wrap renders in `QueryClientProvider`.
+- **RFC-044 hardening** — DeviceRegistry atomic write + error propagation,
+  order-preserving endpoint dedup (Tailscale-first), transient accept-error
+  tolerance, identity 0600 perms, `--remote` implies foreground.
+- **Engine boot** — effective default model resolved at boot validation;
+  `RouterConfig` manual `Default` matching serde defaults.
 
 ## [1.36.0] - 2026-08-04
 
