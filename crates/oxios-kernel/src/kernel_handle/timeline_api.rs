@@ -112,3 +112,58 @@ impl TimelineApi {
 #[cfg(not(feature = "timeline"))]
 #[derive(Debug, Clone, Copy)]
 pub struct TimelineApi;
+
+#[cfg(all(test, feature = "timeline"))]
+mod tests {
+    use super::*;
+
+    /// Round-trip: seed an oxiline store (activity + a completed record) via
+    /// oxiline-core's own write API on one connection, then read it back
+    /// through the `TimelineApi` facade — which opens its own connection to
+    /// the same WAL database. Proves the facade exercises oxiline-core's real
+    /// schema: `open_and_migrate` runs, and all three read paths
+    /// (`activities`, `now`, `timeline`) see the seeded data.
+    #[tokio::test]
+    async fn timeline_read_round_trip() {
+        let dir = tempfile::TempDir::new().expect("temp timeline dir");
+        let db_path = dir.path().join("oxiline.db");
+
+        // Seed on a writer connection (the facade is read-only by design).
+        {
+            let conn = db::open_and_migrate(&db_path).expect("migrate");
+            let activity = activities::create_activity(
+                &conn,
+                model::ActivityInput {
+                    name: Some("writing".into()),
+                    is_active: Some(true),
+                    ..Default::default()
+                },
+            )
+            .expect("create activity");
+            let today = util::today_local();
+            let started = Utc::now();
+            record::start(&conn, &activity.id, started, &today).expect("start");
+            record::stop(&conn, started + chrono::Duration::minutes(2), &today).expect("stop");
+        }
+
+        // Read back through the facade (separate connection, same WAL db).
+        let api = TimelineApi::open(Some(&db_path)).expect("open facade");
+
+        let acts = api.activities(true).await.expect("activities");
+        assert!(
+            acts.iter().any(|a| a.name == "writing"),
+            "seeded activity must be visible through the facade"
+        );
+
+        // After `stop` there is no active record.
+        let now_state = api.now().await.expect("now");
+        assert!(now_state.active.is_none(), "no active record after stop");
+
+        // The completed record shows up in the recent window.
+        let recs = api.timeline(1, 10).await.expect("timeline");
+        assert!(
+            !recs.is_empty(),
+            "seeded record must appear in the recent timeline"
+        );
+    }
+}

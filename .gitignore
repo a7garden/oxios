@@ -20,8 +20,8 @@ web/.tanstack/
 # Place a Cargo.toml.local at the workspace root to override workspace.dependencies.
 # Example Cargo.toml.local:
 #   [workspace.dependencies]
-#   oxi-ai = { path = "../oxi/oxi-ai" }
-#   oxi-agent = { path = "../oxi/oxi-agent" }
+#   oxicode-ai = { path = "../oxicode/oxicode-ai" }
+#   oxicode-agent = { path = "../oxicode/oxicode-agent" }
 Cargo.toml.local
 
 # AI agent temporary analysis files — generated during sessions,

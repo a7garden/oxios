@@ -1374,15 +1374,17 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
 
     // 7. oxicode CLI installed
     checks += 1;
-    let oxi_auth_exists = {
+    let oxicode_auth_exists = {
         let home = std::env::var("HOME").unwrap_or_default();
         std::path::PathBuf::from(format!("{home}/.oxicode/auth.json")).exists()
     };
-    let oxi_bin_exists = std::path::PathBuf::from("/usr/local/bin/oxi").exists()
-        || std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default() + "/.cargo/bin/oxi")
-            .exists();
-    let oxi_installed = oxi_auth_exists || oxi_bin_exists;
-    if oxi_installed {
+    let oxicode_bin_exists = std::path::PathBuf::from("/usr/local/bin/oxicode").exists()
+        || std::path::PathBuf::from(
+            std::env::var("HOME").unwrap_or_default() + "/.cargo/bin/oxicode",
+        )
+        .exists();
+    let oxicode_installed = oxicode_auth_exists || oxicode_bin_exists;
+    if oxicode_installed {
         println!(
             "  {} oxicode CLI available (shared auth store)",
             style("✓").green()
