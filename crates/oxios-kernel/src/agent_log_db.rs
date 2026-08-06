@@ -517,9 +517,9 @@ impl AgentLogDb {
             .query_row(
                 &count_sql,
                 rusqlite::params_from_iter(params.iter()),
-                |row| row.get(0),
+                |row| row.get::<_, i64>(0),
             )
-            .context("Failed to count agents")?;
+            .context("Failed to count agents")? as u64;
 
         // Data
         let safe_sort_col = filter.sort_by.as_str();

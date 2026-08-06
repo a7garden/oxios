@@ -231,9 +231,10 @@ impl SqliteMemoryStore {
         )?;
 
         let entries: Vec<MemoryEntry> = stmt
-            .query_map(rusqlite::params![memory_type.label(), limit], |row| {
-                Ok(search::row_to_memory_entry(row))
-            })?
+            .query_map(
+                rusqlite::params![memory_type.label(), limit as i64],
+                |row| Ok(search::row_to_memory_entry(row)),
+            )?
             .filter_map(|r| match r {
                 Ok(v) => Some(v),
                 Err(e) => {
@@ -569,7 +570,7 @@ impl SqliteMemoryStore {
         )?;
 
         let entries: Vec<MemoryEntry> = stmt
-            .query_map(rusqlite::params![tier_label, limit], |row| {
+            .query_map(rusqlite::params![tier_label, limit as i64], |row| {
                 Ok(search::row_to_memory_entry(row))
             })?
             .filter_map(|r| match r {

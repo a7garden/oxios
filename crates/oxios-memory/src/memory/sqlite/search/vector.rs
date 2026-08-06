@@ -46,7 +46,7 @@ pub fn search_vector(
                LIMIT ?2";
 
     let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map(rusqlite::params![query_bytes, limit], |row| {
+    let rows = stmt.query_map(rusqlite::params![query_bytes, limit as i64], |row| {
         Ok(VectorHit {
             rowid: row.get(0)?,
             distance: row.get(1)?,

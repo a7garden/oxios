@@ -984,8 +984,10 @@ impl DreamProcess {
                 // Count total patterns in store as the persistence metric
                 let conn = sqlite.db().conn();
                 let total: usize = conn
-                    .query_row("SELECT COUNT(*) FROM patterns", [], |row| row.get(0))
-                    .unwrap_or(0);
+                    .query_row("SELECT COUNT(*) FROM patterns", [], |row| {
+                        row.get::<_, i64>(0)
+                    })
+                    .unwrap_or(0) as usize;
                 total
             } else {
                 0

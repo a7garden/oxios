@@ -40,7 +40,7 @@ oxicode-agent = "0.66.0"
 # First-party app module core (optional, opt-in via the `memo` feature).
 # Sibling crate, not yet on crates.io; path for local dev, version recorded for
 # a future crates.io publish. (oxiline-core deferred — see feature note above.)
-oximemo-core = { version = "0.6.0", path = "../../../oximemo/crates/oximemo-core", optional = true }
+oximemo-core = { version = "0.7.0", path = "../../../oximemo/crates/oximemo-core", optional = true }
 # oxicode-ai no longer needed directly — all types re-exported via oxicode-sdk
 tokio = { workspace = true }
 futures = { workspace = true }
@@ -90,7 +90,7 @@ console = { workspace = true }
 indicatif = "0.17"
 
 # SQLite-based memory storage (RFC-012)
-rusqlite = { version = "0.34", features = ["bundled"], optional = true }
+rusqlite = { version = "0.40", features = ["bundled"], optional = true }
 sqlite-vec = { version = "0.1", optional = true }
 
 # MLX embedding (Apple Silicon, optional)

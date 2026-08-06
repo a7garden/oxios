@@ -88,7 +88,7 @@ pub fn search_bm25(db: &MemoryDatabase, query: &str, limit: usize) -> Result<Vec
             return Ok(Vec::new());
         }
     };
-    let rows = match stmt.query_map(rusqlite::params![fts_query, limit], |row| {
+    let rows = match stmt.query_map(rusqlite::params![fts_query, limit as i64], |row| {
         Ok(Bm25Hit {
             rowid: row.get(0)?,
             id: row.get(1)?,
