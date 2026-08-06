@@ -35,10 +35,9 @@ oxios-memory = { version = "1.36.0", path = "../oxios-memory" }
 oxicode-sdk = { workspace = true }
 oxicode-agent = "0.66.0"
 # First-party app module cores (optional, opt-in via the `memo`/`timeline`
-# features). Sibling crates, not yet on crates.io; paths for local dev,
-# versions recorded for a future crates.io publish.
-oximemo-core = { version = "0.7.0", path = "../../../oximemo/crates/oximemo-core", optional = true }
-oxiline-core = { version = "0.3.0", path = "../../../oxiline/crates/oxiline-core", optional = true }
+# features). Published to crates.io; resolved from the registry.
+oximemo-core = { version = "0.7", optional = true }
+oxiline-core = { version = "0.3", optional = true }
 # oxicode-ai no longer needed directly — all types re-exported via oxicode-sdk
 tokio = { workspace = true }
 futures = { workspace = true }

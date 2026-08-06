@@ -264,9 +264,9 @@ portal panel:
 
 ## 10. Prerequisites & phasing
 
-**Prerequisite (blocking publish):** publish `oximemo-core` (0.7.0) and
-`oxiline-core` (0.3.0) to crates.io. Until then the `memo`/`timeline` features
-use path deps and are non-publishable.
+**Crates.io publish — DONE.** `oximemo-core` (0.7.0) and `oxiline-core` (0.3.1)
+are published to crates.io; oxios-kernel now depends on them as registry
+version deps (no path), so the `memo`/`timeline` features are publishable.
 
 **SQLite alignment — RESOLVED.** oxios bumped `rusqlite` 0.34 → 0.40
 (`libsqlite3-sys` 0.32 → 0.38); sqlite-vec 0.1.9 has **no runtime rusqlite dep**

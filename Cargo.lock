@@ -6028,7 +6028,9 @@ dependencies = [
 
 [[package]]
 name = "oxiline-core"
-version = "0.3.0"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "628ac4acbc36299a50549073bfc5db46896a0ebaead0a9291f325704e3019bef"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
@@ -6044,6 +6046,8 @@ dependencies = [
 [[package]]
 name = "oximemo-core"
 version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbdb5a62c5302a3a1500c142533310c4fdc5938a72e7329a866718284b270b0d"
 dependencies = [
  "blake3",
  "fs2",
