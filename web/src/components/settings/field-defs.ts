@@ -719,7 +719,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     id: 'channels',
     labelKey: 'settings.groupChannels',
-    sectionKeys: ['channels.telegram', 'calendar'],
+    sectionKeys: ['channels.telegram', 'calendar', 'memo'],
   },
   {
     id: 'system',
@@ -809,6 +809,7 @@ export type SectionIconKey =
   | 'image'
   | 'hostTools'
   | 'notifications'
+  | 'memo'
   | 'appearance'
 
 export interface SectionMeta {
@@ -986,6 +987,14 @@ export const SECTION_META: SectionMeta[] = [
     descriptionKey: 'settings.notificationsDescription',
     groupId: 'system',
     iconKey: 'notifications',
+    custom: true,
+  },
+  {
+    id: 'memo',
+    labelKey: 'settings.sectionMemo',
+    descriptionKey: 'settings.memoDescription',
+    groupId: 'channels',
+    iconKey: 'memo',
     custom: true,
   },
   // Advanced (collapsed by default)

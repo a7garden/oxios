@@ -111,10 +111,11 @@ pub struct KernelHandle {
     /// Calendar events — create, update, delete, list, search, freebusy.
     pub calendar: Option<CalendarApi>,
     /// oximemo integration (opt-in first-party app module; `memo` feature).
-    /// `None` unless `[memo].enabled` and the vault opens. oxios is a
-    /// co-client of the vault — never its owner. Shared via `Arc` so the agent
-    /// tool can delegate to the facade (which publishes mutation events).
-    pub memo: Option<Arc<MemoApi>>,
+    /// Live runtime slot (mirrors `email`): `None` when disabled or the vault
+    /// hasn't opened; swapped in by `POST /api/memo/enable` with no restart.
+    /// oxios is a co-client of the vault — never its owner. Shared via `Arc`
+    /// so the agent tool can delegate to the facade (which publishes events).
+    pub memo: Arc<RwLock<Option<Arc<MemoApi>>>>,
     /// Email — send HTML emails via SMTP, template management.
     pub email: Arc<RwLock<Option<EmailApi>>>,
     /// Token-maxing (RFC-031): the shared QuotaTracker facade. `None` only on
@@ -188,7 +189,7 @@ impl KernelHandle {
             marketplace_api,
             calendar,
             email,
-            memo: None,
+            memo: Arc::new(RwLock::new(None)),
             token_maxing: None,
             compression: None,
             host_tools: HostToolsApi::new(),
@@ -211,9 +212,10 @@ impl KernelHandle {
     }
 
     /// Attach the oximemo facade (first-party app module). Called by the kernel
-    /// assembler when `[memo].enabled` and the vault opens.
-    pub fn with_memo(mut self, memo: Arc<MemoApi>) -> Self {
-        self.memo = Some(memo);
+    /// assembler at boot when `[memo].enabled`, and by `POST /api/memo/enable`
+    /// for a live swap (no restart). Replaces any prior facade in the slot.
+    pub fn with_memo(self, memo: Arc<MemoApi>) -> Self {
+        *self.memo.write() = Some(memo);
         self
     }
     /// Attach the unified AssetStore. Called by the kernel assembler.

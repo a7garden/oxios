@@ -26,6 +26,7 @@ import {
 } from '@/components/settings/field-defs'
 import { FieldRow } from '@/components/settings/field-row'
 import { IntegrationsSectionCard } from '@/components/settings/integrations-section'
+import { MemoSectionCard } from '@/components/settings/memo-section'
 import { MemorySection } from '@/components/settings/memory-section'
 import { NotificationSectionCard } from '@/components/settings/notification-section'
 import { SaveDock } from '@/components/settings/save-dock'
@@ -911,6 +912,10 @@ function renderActiveSection(
   // Notifications: client-side prefs card (RFC-028 SP-1e).
   if (sectionId === 'notifications') {
     return <NotificationSectionCard />
+  }
+  // Memo: oximemo integration card (first-party app module; `memo` feature).
+  if (sectionId === 'memo') {
+    return <MemoSectionCard />
   }
 
   if (!meta) return null

@@ -23,6 +23,8 @@ mod git_routes;
 mod host_tools_routes;
 mod image_routes;
 mod infra;
+#[cfg(feature = "memo")]
+mod memo_routes;
 pub(crate) use host_tools_routes::{handle_host_tools, handle_host_tools_detect};
 mod integrations_routes;
 pub(crate) use integrations_routes::{
@@ -138,6 +140,8 @@ pub(crate) use marketplace::{
     handle_marketplace_updates, handle_skills_sh_install, handle_skills_sh_list,
     handle_skills_sh_search, handle_skills_sh_skill_audit, handle_skills_sh_skill_detail,
 };
+#[cfg(feature = "memo")]
+pub(crate) use memo_routes::{handle_memo_disable, handle_memo_enable, handle_memo_status};
 pub(crate) use mount_routes::{
     handle_mount_create, handle_mount_delete, handle_mount_get, handle_mount_rescan,
     handle_mount_update, handle_mounts_list,
@@ -803,7 +807,18 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/api/worktree/merge",
             post(worktree_routes::handle_worktree_merge),
-        )
+        );
+
+    // oximemo integration (first-party app module) — only when the `memo`
+    // cargo feature is compiled in. Absent (404) otherwise; the web UI card
+    // 404-tolerates and hides itself.
+    #[cfg(feature = "memo")]
+    let api = api
+        .route("/api/memo/status", get(handle_memo_status))
+        .route("/api/memo/enable", post(handle_memo_enable))
+        .route("/api/memo/disable", post(handle_memo_disable));
+
+    let api = api
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,

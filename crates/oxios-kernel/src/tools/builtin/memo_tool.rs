@@ -31,15 +31,27 @@ use crate::kernel_handle::{KernelHandle, MemoApi};
 /// | `search` | Full-text search memos | `query`         | `limit`         |
 /// | `delete` | Soft-delete a memo     | `id`            | —               |
 pub struct MemoTool {
-    /// Shared facade handle. Cloning the `Arc` is cheap.
-    api: Arc<MemoApi>,
+    /// Live slot — re-read each call so a web-UI enable/disable takes effect
+    /// without re-registering the tool.
+    slot: Arc<parking_lot::RwLock<Option<Arc<MemoApi>>>>,
 }
 
 impl MemoTool {
-    /// Build from a kernel handle. Returns `None` when oximemo is not
-    /// configured (feature off or `[memo].enabled = false`).
+    /// Build from a kernel handle. Always registered when the `memo` feature
+    /// is compiled in; reads the live slot on each call and errors cleanly when
+    /// oximemo is disabled or not yet connected (mirrors the email tool).
     pub fn try_from_kernel(kernel: &KernelHandle) -> Option<Self> {
-        kernel.memo.as_ref().map(|api| Self { api: api.clone() })
+        Some(Self {
+            slot: kernel.memo.clone(),
+        })
+    }
+
+    /// Snapshot the live facade, or error if oximemo is not connected.
+    fn api(&self) -> Result<Arc<MemoApi>, String> {
+        self.slot
+            .read()
+            .clone()
+            .ok_or_else(|| "oximemo is not connected. Enable it in Settings → Memo.".to_string())
     }
 }
 
@@ -135,7 +147,7 @@ impl MemoTool {
             .get("category")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        match self.api.create_memo(body.to_string(), category).await {
+        match self.api()?.create_memo(body.to_string(), category).await {
             Ok(memo) => Ok(AgentToolResult::success(
                 serde_json::to_string_pretty(&json!({ "status": "created", "memo": memo }))
                     .unwrap_or_default(),
@@ -151,7 +163,7 @@ impl MemoTool {
             .get("id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| "get requires 'id' parameter".to_string())?;
-        match self.api.get_memo(id).await {
+        match self.api()?.get_memo(id).await {
             Ok(memo) => Ok(AgentToolResult::success(
                 serde_json::to_string_pretty(&memo).unwrap_or_default(),
             )),
@@ -161,7 +173,7 @@ impl MemoTool {
 
     async fn exec_list(&self, params: &Value) -> Result<AgentToolResult, String> {
         let limit = param_limit(params);
-        match self.api.list(limit).await {
+        match self.api()?.list(limit).await {
             Ok(items) => Ok(AgentToolResult::success(
                 serde_json::to_string_pretty(&json!({ "memos": items, "count": items.len() }))
                     .unwrap_or_default(),
@@ -176,7 +188,7 @@ impl MemoTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| "search requires 'query' parameter".to_string())?;
         let limit = param_limit(params);
-        match self.api.search(query, limit).await {
+        match self.api()?.search(query, limit).await {
             Ok(items) => Ok(AgentToolResult::success(
                 serde_json::to_string_pretty(&json!({
                     "query": query,
@@ -196,7 +208,7 @@ impl MemoTool {
             .get("id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| "delete requires 'id' parameter".to_string())?;
-        match self.api.delete_memo(id).await {
+        match self.api()?.delete_memo(id).await {
             Ok(()) => Ok(AgentToolResult::success(format!("Memo '{id}' deleted."))),
             Err(e) => Ok(AgentToolResult::error(format!(
                 "Failed to delete memo: {e}"
