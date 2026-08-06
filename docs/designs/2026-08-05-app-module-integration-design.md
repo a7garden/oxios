@@ -1,6 +1,6 @@
 # App Module Integration — oximemo & oxiline
 
-**Status:** oximemo module **implemented + verified** (compiles + clippy + tests in both feature configs). oxiline module **deferred** — blocked on a cross-repo SQLite version alignment (oxiline-core's rusqlite 0.32 + rusqlite_migration 1.x vs oxios's rusqlite 0.34 conflict at the native `sqlite3` link); see §10.1.
+**Status:** oximemo module **implemented + verified end-to-end** — kernel facade + agent tool + **live web-UI Connect toggle** (`/api/memo/{status,enable,disable}`, runtime RwLock swap, Settings card), green in both feature configs. oxiline module **deferred** — blocked on a cross-repo SQLite version alignment (oxiline-core's rusqlite 0.32 + rusqlite_migration 1.x vs oxios's rusqlite 0.34 conflict at the native `sqlite3` link); see §10.1.
 **Scope:** opt-in first-party integration of [oximemo](https://github.com/a7garden/oximemo) and [oxiline](https://github.com/a7garden/oxiline) into oxios
 
 ---
@@ -278,17 +278,21 @@ unaffected, hence shipped.)
 
 **Implementation phases:**
 
-1. ✅ **Framework skeleton** — features (`memo`), `MemoConfig`, `Option<Arc<MemoApi>>`
-   field + `with_memo` builder, `try_from_kernel`, assembly (`build_memo_api`) in
-   `kernel.rs`, `KernelEvent::MemoCreated/Deleted`. Build green with and without.
+1. ✅ **Framework skeleton** — `memo` feature, `MemoConfig`, live runtime slot
+   (`KernelHandle.memo: Arc<RwLock<Option<Arc<MemoApi>>>>`, `with_memo` builder),
+   `try_from_kernel`, boot assembly (`build_memo_api`), `KernelEvent::MemoCreated/Deleted`.
 2. ✅ **oximemo module** — `MemoApi` (create/get/list/search/delete over `Vault`,
-   `spawn_blocking` + event publish) + `MemoTool` (AgentTool). Verified: round-trip
-   test passes, 826 lib tests pass, clippy `-D warnings` clean both configs.
+   `spawn_blocking` + event publish) + `MemoTool` (AgentTool, live-slot aware).
+   Verified: round-trip test passes, 826 lib tests pass, clippy `-D warnings` clean.
 3. ⏸ **oxiline module** — *deferred* on the SQLite-alignment prerequisite above.
 4. ⏸ **Write-back hooks** — opt-in `PersistenceHook` analogs (deferred; v1 ships
    context-in only, per the chosen D scope).
-5. ✅ **Verify** — `cargo check/clippy` (default + `--features memo`), `cargo test`,
-   `cargo fmt --check` — all green.
+5. ✅ **Web UI Connect** — `/api/memo/{status,enable,disable}` (cfg-gated; live swap,
+   no restart) + `MemoSectionCard` in Settings (404-tolerant when feature absent).
+   Registered across all 4 nav sources + en/ko i18n; settings-consistency 9/9,
+   typecheck/biome/build clean.
+6. ✅ **Verify** — `cargo check/clippy` (default + `--features memo`), `cargo test`,
+   `cargo fmt --check`, web typecheck + vitest + vite build — all green.
 
 ## 11. Out of scope (v1)
 
