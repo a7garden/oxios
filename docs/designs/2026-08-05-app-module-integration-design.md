@@ -1,6 +1,6 @@
 # App Module Integration — oximemo & oxiline
 
-**Status:** oximemo module **implemented + verified end-to-end** — kernel facade + agent tool + **live web-UI Connect toggle** (`/api/memo/{status,enable,disable}`, runtime RwLock swap, Settings card), green in both feature configs. oxiline module **deferred** — blocked on a cross-repo SQLite version alignment (oxiline-core's rusqlite 0.32 + rusqlite_migration 1.x vs oxios's rusqlite 0.34 conflict at the native `sqlite3` link); see §10.1.
+**Status:** both app modules **implemented + verified end-to-end** — oximemo (memo) and oxiline (timeline): kernel facades + agent tools + live web-UI Connect toggles (`/api/{memo,timeline}/{status,enable,disable}`, runtime RwLock swap, Settings cards). Green across default / `memo` / `timeline` / `memo,timeline` feature configs. The SQLite-alignment blocker (§10.1) is **resolved** — oxios bumped to rusqlite 0.40, oxiline migrated to match.
 **Scope:** opt-in first-party integration of [oximemo](https://github.com/a7garden/oximemo) and [oxiline](https://github.com/a7garden/oxiline) into oxios
 
 ---
@@ -264,17 +264,17 @@ portal panel:
 
 ## 10. Prerequisites & phasing
 
-**Prerequisite (blocking publish):** publish `oximemo-core` and `oxiline-core`
-to crates.io at their current workspace versions (0.6.0 / 0.2.0).
+**Prerequisite (blocking publish):** publish `oximemo-core` (0.7.0) and
+`oxiline-core` (0.3.0) to crates.io. Until then the `memo`/`timeline` features
+use path deps and are non-publishable.
 
-**Prerequisite (blocks oxiline only):** SQLite version alignment. oxiline-core
-depends on `rusqlite 0.32` + `rusqlite_migration 1.x`; oxios-kernel uses
-`rusqlite 0.34` (constrained by `sqlite-vec` + the memory system). Both pull
-`libsqlite3-sys` with the native `links = "sqlite3"` — Cargo allows only one —
-so they cannot coexist. Unblocking oxiline requires either bumping oxios's
-rusqlite (re-validating the memory system + `sqlite-vec`) or reworking oxiline's
-migration story onto rusqlite 0.34. (oximemo uses redb+tantivy, no SQLite —
-unaffected, hence shipped.)
+**SQLite alignment — RESOLVED.** oxios bumped `rusqlite` 0.34 → 0.40
+(`libsqlite3-sys` 0.32 → 0.38); sqlite-vec 0.1.9 has **no runtime rusqlite dep**
+(FFI only), so the only cost was 8 `usize`/`u64`→`i64` casts (rusqlite 0.40
+dropped those `ToSql`/`FromSql` impls). oxiline then migrated its whole stack
+(rusqlite 0.32 → 0.40, rusqlite_migration 1.3 → 2.6, r2d2_sqlite 0.25 → 0.35,
+toolchain 1.89 → 1.96); its `M::up`/`to_latest` usage is 2.x-compatible (no
+code changes). Full test suites green on both repos.
 
 **Implementation phases:**
 
@@ -284,7 +284,9 @@ unaffected, hence shipped.)
 2. ✅ **oximemo module** — `MemoApi` (create/get/list/search/delete over `Vault`,
    `spawn_blocking` + event publish) + `MemoTool` (AgentTool, live-slot aware).
    Verified: round-trip test passes, 826 lib tests pass, clippy `-D warnings` clean.
-3. ⏸ **oxiline module** — *deferred* on the SQLite-alignment prerequisite above.
+3. ✅ **oxiline module** — `TimelineApi` (now/activities/timeline over
+   oxiline-core, read-only) + `TimelineTool`. rusqlite bumped 0.34 → 0.40 +
+   oxiline stack migrated (see §10.1). Verified: 825 lib tests, clippy clean.
 4. ⏸ **Write-back hooks** — opt-in `PersistenceHook` analogs (deferred; v1 ships
    context-in only, per the chosen D scope).
 5. ✅ **Web UI Connect** — `/api/memo/{status,enable,disable}` (cfg-gated; live swap,
