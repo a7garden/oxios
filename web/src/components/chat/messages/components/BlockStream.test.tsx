@@ -1,7 +1,19 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import type { ChatBlock } from '@/types'
 import { BlockStream } from './BlockStream'
+
+function renderBlockStream(blocks: ChatBlock[], messageId: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+  return render(<BlockStream blocks={blocks} messageId={messageId} />, { wrapper })
+}
 
 describe('BlockStream', () => {
   it('renders tool before text (execution order, not inverted)', () => {
@@ -16,7 +28,7 @@ describe('BlockStream', () => {
       },
       { type: 'text', id: 'x1', text: 'Final answer' },
     ]
-    const { container } = render(<BlockStream blocks={blocks} messageId="m1" />)
+    const { container } = renderBlockStream(blocks, 'm1')
     const text = container.textContent ?? ''
     expect(text).toContain('grep')
     expect(text).toContain('Final answer')
@@ -27,7 +39,7 @@ describe('BlockStream', () => {
 
   it('renders a lone text block (simple Q&A turn)', () => {
     const blocks: ChatBlock[] = [{ type: 'text', id: 'x1', text: 'Just an answer' }]
-    const { container } = render(<BlockStream blocks={blocks} messageId="m1" />)
+    const { container } = renderBlockStream(blocks, 'm1')
     expect(container.textContent).toContain('Just an answer')
   })
 
@@ -45,7 +57,7 @@ describe('BlockStream', () => {
       },
       { type: 'text', id: 'x1', text: 'Answer' },
     ]
-    const { container } = render(<BlockStream blocks={blocks} messageId="m1" />)
+    const { container } = renderBlockStream(blocks, 'm1')
     const text = container.textContent ?? ''
     expect(text).toContain('Considering the options first')
     // Answer still renders after the reasoning span (flow order).

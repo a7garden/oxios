@@ -106,7 +106,6 @@ function DiffTextRenderer({ text }: { text: string }) {
 // ── Diff stat card ──
 
 function DiffStatCard({
-  agentId,
   name,
   status,
   diff,
@@ -116,7 +115,6 @@ function DiffStatCard({
   onSelect,
   onMerge,
 }: {
-  agentId: string
   name: string
   status: string
   diff: DiffStat | null
@@ -338,7 +336,6 @@ export function WorktreeComparePanel({ group, open, onOpenChange }: WorktreeComp
               {completedAgents.map((agent) => (
                 <DiffStatCard
                   key={agent.agentId}
-                  agentId={agent.agentId}
                   name={agent.name ?? agent.agentId.slice(0, 8)}
                   status={agent.status}
                   diff={diffs[agent.agentId] ?? null}
