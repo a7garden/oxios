@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-08-07
+
+### Added
+- **Persona capability editing (web)** — capabilities render as badges on
+  roster cards and are editable as toggle chips in the edit dialog (en/ko).
+
 ### Changed
 - **New app icon** — replaced the legacy purple mark with the oxiOS
   terminal-window icon: web favicon (`/favicon.png`) + apple-touch-icon,
@@ -15,6 +21,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asset serving — root files like `/favicon.svg` previously 500'd because
   `static_handler` required a `{*path}` capture; it now falls back to the
   request URI.
+
+### Fixed
+- **Persona system audit** — `capabilities` are now serialized on all three
+  persona read endpoints (`PersonaSummary`, `GET /:id`, `GET /active`);
+  previously the field never reached the client, so every capability-gated
+  affordance (diff viewer, worktree fanout, terminal toggle) was unreachable.
+  Also: `persist()` writes the declared schema version (2, was hardcoded 1);
+  the agent-tool security-review comment matches its fail-open behavior;
+  `set_active` rolls back the slot and propagates persist IO errors; and
+  unimplemented capability flags were dropped from default personas so
+  declared == implemented.
+- **CLI** — extracted the CLI argument schema to `src/cli.rs`.
 
 ## [1.37.0] - 2026-08-06
 
