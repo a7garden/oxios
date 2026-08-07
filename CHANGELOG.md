@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.38.1] - 2026-08-07
+
+### Fixed
+- **`cargo install` build failure** — `utoipa-swagger-ui`'s build script
+  downloaded Swagger UI assets from GitHub at compile time, so `cargo install
+  oxios` failed with `curl: (28) … Couldn't connect to server` whenever
+  GitHub was unreachable (timeout, firewall, restricted network). Enabled
+  the `vendored` feature on `utoipa-swagger-ui` so the Swagger UI assets are
+  embedded at build time — zero network access required at build **and**
+  runtime. Fixes the 1.38.0 crates.io install.
+
 ## [1.38.0] - 2026-08-07
 
 ### Added
