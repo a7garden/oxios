@@ -29,6 +29,8 @@ pub struct PersonaSummary {
     description: String,
     enabled: bool,
     personality_traits: Vec<String>,
+    /// RFC-044 §8.2 capability flags driving UI affordances.
+    capabilities: Vec<String>,
 }
 
 /// GET /api/personas — List all personas.
@@ -44,6 +46,7 @@ pub async fn handle_personas_list(state: State<Arc<AppState>>) -> Json<Vec<Perso
                 description: p.description,
                 enabled: p.enabled,
                 personality_traits: p.personality_traits,
+                capabilities: p.capabilities,
             })
             .collect(),
     )
@@ -64,6 +67,7 @@ pub async fn handle_persona_get(
             "enabled": p.enabled,
             "model": p.model,
             "personality_traits": p.personality_traits,
+            "capabilities": p.capabilities,
         }))),
         None => Err(StatusCode::NOT_FOUND),
     }
@@ -236,6 +240,7 @@ pub async fn handle_persona_active_get(state: State<Arc<AppState>>) -> Json<serd
             "description": p.description,
             "system_prompt": p.system_prompt,
             "enabled": p.enabled,
+            "capabilities": p.capabilities,
         })),
         None => Json(serde_json::json!({
             "active": false,
@@ -278,4 +283,43 @@ pub async fn handle_persona_active_set(
         "id": body.id,
         "name": persona.map(|p| p.name).unwrap_or_default(),
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// F1 regression: the list endpoint must echo back `capabilities`.
+    /// The original bug was that the field never reached the client, so
+    /// every capability-gated affordance (diff-viewer, worktree-fanout,
+    /// terminal) was unreachable dead code. As long as `PersonaSummary`
+    /// serializes the field, the compiler forces every construction site
+    /// (e.g. `handle_personas_list`) to populate it — a missing field is a
+    /// hard compile error, not a silent omission.
+    #[test]
+    fn persona_summary_serializes_capabilities() {
+        let summary = PersonaSummary {
+            id: "dev".into(),
+            name: "Dev".into(),
+            role: "developer".into(),
+            description: "pragmatic dev".into(),
+            enabled: true,
+            personality_traits: vec!["pragmatic".into()],
+            capabilities: vec!["terminal".into(), "diff-viewer".into()],
+        };
+        let json = serde_json::to_value(&summary).expect("serialize");
+        let caps: Vec<String> = json
+            .get("capabilities")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .expect("capabilities array missing from PersonaSummary JSON");
+        assert_eq!(
+            caps,
+            vec!["terminal".to_string(), "diff-viewer".to_string()]
+        );
+    }
 }

@@ -251,8 +251,10 @@ impl AgentTool for PersonaTool {
                     capabilities: str_array(&params, "capabilities"),
                 };
 
-                // Security review (fail-closed): blocks prompt-injection in the
-                // candidate system_prompt before it can become an active prompt.
+                // Security review (fail-open on engine/parse error): an
+                // explicit `safe == false` blocks prompt-injection in the
+                // candidate system_prompt before it becomes an active prompt;
+                // a review that cannot run proceeds (see security_review).
                 if !persona.system_prompt.trim().is_empty() {
                     match security_review(&self.engine_handle, &persona).await {
                         Ok(v) if !v.safe => {

@@ -1466,7 +1466,8 @@
     "nameLabel": "Name",
     "saved": "Persona saved",
     "systemPrompt": "System prompt",
-    "systemPromptLabel": "System prompt"
+    "systemPromptLabel": "System prompt",
+    "capabilities": "Capabilities"
   },
   "projects": {
     "activity": "Activity",

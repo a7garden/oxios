@@ -196,7 +196,7 @@ impl PersonaManager {
             return Ok(());
         };
         let snapshot = crate::persona::persistence::PersonaSnapshot {
-            schema_version: 1,
+            schema_version: crate::persona::persistence::SCHEMA_VERSION,
             active_persona_id: self.active_persona_id(),
             personas: self.store.list_all(),
         };
@@ -220,17 +220,21 @@ impl PersonaManager {
         if !persona.enabled {
             anyhow::bail!("Persona '{id}' is disabled");
         }
+        let prev = self.active_persona_id.read().clone();
         *self.active_persona_id.write() = Some(id.to_string());
         tracing::info!(persona_id = %id, name = %persona.name, "Active persona set");
 
-        // Persist (no-op if no state_store).
+        // Persist then re-seed. On IO failure, roll back the slot and
+        // propagate so the in-memory state never silently diverges from
+        // disk — consistent with the create/update/delete handlers, which
+        // also propagate persist errors.
         if let Err(e) = self.persist().await {
-            tracing::warn!(error = %e, "persona set_active: persist failed");
+            *self.active_persona_id.write() = prev;
+            return Err(e);
         }
 
-        // Re-seed intent engine if callback is set.
         let prompt = persona.system_prompt.clone();
-        if let Some(ref cb) = *self.reseed_callback.read() {
+        if let Some(cb) = self.reseed_callback.read().as_ref() {
             cb(Some(prompt.clone()));
         }
         Ok(Some(prompt))

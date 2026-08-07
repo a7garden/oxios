@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use super::Persona;
 use crate::state_store::StateStore;
 
-const SCHEMA_VERSION: u32 = 2;
+pub(crate) const SCHEMA_VERSION: u32 = 2;
 /// Oldest schema version still accepted on load (for backward compat).
 const MIN_SCHEMA_VERSION: u32 = 1;
 

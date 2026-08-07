@@ -139,7 +139,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "action-oriented".to_string(),
                 "practical".to_string(),
             ],
-            capabilities: vec!["terminal".to_string(), "diff-viewer".to_string(), "approval-cards".to_string(), "worktree-fanout".to_string(), "exec".to_string()],
+            capabilities: vec!["terminal".to_string(), "diff-viewer".to_string(), "worktree-fanout".to_string()],
         },
         Persona {
             id: "review".to_string(),
@@ -171,7 +171,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "thorough".to_string(),
                 "quality-focused".to_string(),
             ],
-            capabilities: vec!["diff-viewer".to_string(), "approval-cards".to_string()],
+            capabilities: vec!["diff-viewer".to_string()],
         },
         Persona {
             id: "research".to_string(),
@@ -203,7 +203,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "analytical".to_string(),
                 "evidence-focused".to_string(),
             ],
-            capabilities: vec!["web-search".to_string()],
+            capabilities: vec![],
         },
         Persona {
             id: "architect".to_string(),
@@ -309,7 +309,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "reliability-focused".to_string(),
                 "failure-aware".to_string(),
             ],
-            capabilities: vec!["exec".to_string()],
+            capabilities: vec![],
         },
         Persona {
             id: "security".to_string(),
@@ -380,7 +380,7 @@ pub fn default_personas() -> Vec<Persona> {
                 "reader-focused".to_string(),
                 "concise".to_string(),
             ],
-            capabilities: vec!["longform-editor".to_string(), "outline".to_string()],
+            capabilities: vec![],
         },
         Persona {
             id: "planner".to_string(),
