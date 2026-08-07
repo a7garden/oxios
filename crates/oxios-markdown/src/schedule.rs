@@ -176,7 +176,8 @@ pub fn format_schedule_date(scheduled_at: i64, timezone: FixedOffset) -> String 
 
     let tz_dt = Utc
         .timestamp_opt(scheduled_at, 0)
-        .unwrap()
+        .single()
+        .expect("valid Unix timestamp")
         .with_timezone(&timezone);
 
     match diff_days {
@@ -195,10 +196,13 @@ pub fn format_schedule_date(scheduled_at: i64, timezone: FixedOffset) -> String 
 
 /// Calculate the beginning of a day (midnight) as a Unix timestamp.
 pub fn beginning_of_day(timestamp: i64) -> i64 {
-    let dt = Utc.timestamp_opt(timestamp, 0).unwrap();
+    let dt = Utc
+        .timestamp_opt(timestamp, 0)
+        .single()
+        .expect("valid Unix timestamp");
     let date = dt.date_naive();
     date.and_hms_milli_opt(0, 0, 0, 0)
-        .unwrap()
+        .expect("midnight is always a valid time")
         .and_utc()
         .timestamp()
 }
@@ -208,7 +212,7 @@ pub fn tomorrow_timestamp() -> i64 {
     let tomorrow = Utc::now().date_naive() + chrono::Duration::days(1);
     tomorrow
         .and_hms_milli_opt(0, 0, 0, 0)
-        .unwrap()
+        .expect("midnight is always a valid time")
         .and_utc()
         .timestamp()
 }
@@ -256,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_format_date() {
-        let tz = FixedOffset::east_opt(0).unwrap();
+        let tz = FixedOffset::east_opt(0).expect("valid UTC offset");
         let ts = Utc::now().timestamp() + 86400;
         let formatted = format_schedule_date(ts, tz);
         assert_eq!(formatted, "Tomorrow");

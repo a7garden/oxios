@@ -1379,7 +1379,7 @@ async fn run_agent(
                                     {
                                         s.reasoning_segments
                                             .last_mut()
-                                            .unwrap()
+                                            .expect("checked Some in the enclosing if condition")
                                             .text
                                             .push_str(&chunk);
                                     } else {

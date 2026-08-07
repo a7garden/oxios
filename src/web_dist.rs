@@ -268,7 +268,7 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
     pb.set_style(
         ProgressStyle::default_bar()
             .template("  {spinner} {msg}  [{bar:>.dim}] {bytes}/{total_bytes} ({bytes_per_sec})")
-            .unwrap()
+            .expect("valid progress-bar template")
             .progress_chars("█▉▊▋▌▍▎▏  "),
     );
     let tag_label = style(version_tag).cyan().to_string();
@@ -295,7 +295,7 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
     extract_pb.set_style(
         ProgressStyle::default_bar()
             .template("  {spinner} {msg}  [{bar:>.dim}] {pos}/{len}")
-            .unwrap()
+            .expect("valid progress-bar template")
             .progress_chars("█▉▊▋▌▍▎▏  "),
     );
     extract_pb.set_message("Extracting files".to_string());

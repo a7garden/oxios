@@ -7,8 +7,6 @@
 //! surviving external call is `review`, gated on a Directive that carries
 //! acceptance criteria.
 
-#![warn(missing_docs)]
-
 pub mod resilience;
 
 pub mod directive;

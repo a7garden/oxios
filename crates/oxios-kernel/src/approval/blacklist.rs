@@ -113,7 +113,7 @@ pub fn default_blacklist_rules() -> Vec<BlacklistRule> {
         rule(
             "sudo escalation",
             "command",
-            ArgMatcher::new_glob("sudo *").unwrap(),
+            ArgMatcher::new_glob("sudo *").expect("valid static glob pattern"),
         ),
         rule(
             "fork bomb",
@@ -123,12 +123,12 @@ pub fn default_blacklist_rules() -> Vec<BlacklistRule> {
         rule(
             "disk format",
             "command",
-            ArgMatcher::new_glob("mkfs*").unwrap(),
+            ArgMatcher::new_glob("mkfs*").expect("valid static glob pattern"),
         ),
         rule(
             "raw disk write",
             "command",
-            ArgMatcher::new_glob("dd *of=/dev/*").unwrap(),
+            ArgMatcher::new_glob("dd *of=/dev/*").expect("valid static glob pattern"),
         ),
         rule(
             "force push",

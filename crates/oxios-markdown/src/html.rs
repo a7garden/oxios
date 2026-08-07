@@ -15,11 +15,15 @@ use std::rc::Rc;
 // Pre-compiled regexes used on hot paths (F15). Compiling per call was
 // visible in profiles, especially when markdown_to_html ran over each
 // chat block during nightly cleanup.
-static RE_STRIP_TAGS: Lazy<Regex> = Lazy::new(|| Regex::new(r"<[^>]*>").unwrap());
-static RE_NEWLINES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\n{2,}").unwrap());
-static RE_CODE_BLOCK: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?s)```(.+?)```").unwrap());
-static RE_INLINE_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"`([^`]+?)`").unwrap());
-static RE_HEADER: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^#+\s*(.+)").unwrap());
+static RE_STRIP_TAGS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"<[^>]*>").expect("valid regex literal"));
+static RE_NEWLINES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\n{2,}").expect("valid regex literal"));
+static RE_CODE_BLOCK: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?s)```(.+?)```").expect("valid regex literal"));
+static RE_INLINE_CODE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"`([^`]+?)`").expect("valid regex literal"));
+static RE_HEADER: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^#+\s*(.+)").expect("valid regex literal"));
 
 // ---------------------------------------------------------------------------
 // Public API — utility functions
@@ -43,13 +47,17 @@ pub fn replace_with_placeholders(
     pattern: &str,
     placeholder: &str,
 ) -> (String, HashMap<String, String>) {
-    let re = Regex::new(pattern).unwrap();
+    let re = Regex::new(pattern).expect("valid regex literal");
     let mut placeholders = HashMap::new();
     let mut counter: usize = 0;
 
     let result = re
         .replace_all(s, |caps: &regex::Captures<'_>| {
-            let full = caps.get(0).unwrap().as_str().to_string();
+            let full = caps
+                .get(0)
+                .expect("capture group present after successful match")
+                .as_str()
+                .to_string();
             // Wrap with NUL bytes (\x00 … \x00) so user-typed content can
             // never collide with the placeholder and overwrite restored
             // text (F21). NUL is illegal in well-formed markdown.
@@ -367,7 +375,11 @@ pub fn markdown_to_html(md: &str) -> String {
     // Convert ```...``` → <pre>...</pre>
     result = RE_CODE_BLOCK
         .replace_all(&result, |caps: &regex::Captures<'_>| {
-            let inner = caps.get(1).unwrap().as_str().trim();
+            let inner = caps
+                .get(1)
+                .expect("capture group present after successful match")
+                .as_str()
+                .trim();
             format!("<pre>{inner}</pre>")
         })
         .to_string();

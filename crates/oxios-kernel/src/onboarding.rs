@@ -355,7 +355,10 @@ fn prompt_provider<'a>(providers: &[&'a str]) -> anyhow::Result<&'a str> {
         .with_starting_cursor(0)
         .prompt()?;
 
-    Ok(providers.iter().find(|&&p| p == selected.id).unwrap())
+    Ok(providers
+        .iter()
+        .find(|&&p| p == selected.id)
+        .expect("selection is drawn from the providers list"))
 }
 
 // ── Step: Model ──────────────────────────────────────────────────────────────
@@ -505,7 +508,7 @@ where
         ProgressStyle::default_spinner()
             .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ")
             .template("  {spinner} {msg}")
-            .unwrap(),
+            .expect("valid progress-bar template"),
     );
     pb.set_message(message.to_string());
     pb.enable_steady_tick(std::time::Duration::from_millis(80));

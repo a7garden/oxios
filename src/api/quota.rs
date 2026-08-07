@@ -145,7 +145,7 @@ impl QuotaFetcher for OpenAiQuotaFetcher {
             .with_day(1)
             .unwrap_or(now.date_naive())
             .and_hms_opt(0, 0, 0)
-            .unwrap()
+            .expect("valid time of day")
             .and_utc();
 
         let url = format!(

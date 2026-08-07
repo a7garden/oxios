@@ -233,13 +233,15 @@ pub fn emoji_prefix(emoji: &str, s: &str) -> String {
 
 /// Check if text contains a markdown image.
 pub fn has_image(msg: &str) -> bool {
-    Regex::new(r"!\[.*?\]\(.*?\)").unwrap().is_match(msg)
+    Regex::new(r"!\[.*?\]\(.*?\)")
+        .expect("valid regex literal")
+        .is_match(msg)
 }
 
 /// Strip a leading `` `HH:MM` `` timestamp from chat entries.
 pub fn strip_chat_timestamp(s: &str) -> String {
     Regex::new(r"^`\d{2}:\d{2}` ")
-        .unwrap()
+        .expect("valid regex literal")
         .replace(s, "")
         .to_string()
 }
@@ -248,7 +250,7 @@ pub fn strip_chat_timestamp(s: &str) -> String {
 ///
 /// Returns a list of (link_text, target_path) pairs.
 pub fn extract_markdown_links(content: &str) -> Vec<(String, String)> {
-    let re = Regex::new(r"\[([^\]]*)\]\(([^)]+)\)").unwrap();
+    let re = Regex::new(r"\[([^\]]*)\]\(([^)]+)\)").expect("valid regex literal");
     re.captures_iter(content)
         .filter_map(|cap| {
             let text = cap.get(1)?.as_str().to_string();
@@ -408,9 +410,18 @@ pub fn rewrite_wikilink_targets(
     let mut count = 0usize;
     let result = re
         .replace_all(content, |caps: &regex::Captures| {
-            let full = caps.get(0).unwrap().as_str();
-            let target = caps.get(1).unwrap().as_str();
-            let alias_part = caps.get(2).unwrap().as_str();
+            let full = caps
+                .get(0)
+                .expect("capture group present after successful match")
+                .as_str();
+            let target = caps
+                .get(1)
+                .expect("capture group present after successful match")
+                .as_str();
+            let alias_part = caps
+                .get(2)
+                .expect("capture group present after successful match")
+                .as_str();
             // Explicit-path forms are exact matches — always safe.
             // The bare-stem form is only safe when the stem is globally
             // unique (design doc §6): a stem shared by several files
@@ -469,7 +480,7 @@ fn dir_of(path: &str) -> &str {
 ///
 /// Returns heading texts (without the `#` prefix).
 pub fn extract_headings(content: &str) -> Vec<String> {
-    let re = Regex::new(r"(?m)^(#{1,6})\s+(.+)$").unwrap();
+    let re = Regex::new(r"(?m)^(#{1,6})\s+(.+)$").expect("valid regex literal");
     re.captures_iter(content)
         .filter_map(|cap| cap.get(2).map(|m| m.as_str().trim().to_string()))
         .collect()

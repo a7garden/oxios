@@ -24,3 +24,6 @@ cron = "0.16"
 
 [dev-dependencies]
 tempfile = { workspace = true }
+
+[lints]
+workspace = true

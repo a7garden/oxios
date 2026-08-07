@@ -123,8 +123,8 @@ fn backtrack(
 ///
 /// Example: `## 23 May, Friday 🤸` + `## 23 May, Friday 🤸🍽` → `## 23 May, Friday 🤸🍽`
 fn merge_journal_headers(lines: &[String]) -> Vec<String> {
-    let re = Regex::new(HEADER_RE).unwrap();
-    let emoji_re = Regex::new(r" [^\w\s\p{P}]+$").unwrap();
+    let re = Regex::new(HEADER_RE).expect("valid regex literal");
+    let emoji_re = Regex::new(r" [^\w\s\p{P}]+$").expect("valid regex literal");
     let mut merged = Vec::new();
     let groups = group_consecutive_headers(&re, lines);
 

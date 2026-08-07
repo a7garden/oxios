@@ -71,7 +71,10 @@ pub fn format_today_report(report: &TodayReport) -> String {
 fn beginning_of_day_utc() -> i64 {
     use chrono::Utc;
     let now = Utc::now();
-    let midnight = now.date_naive().and_hms_opt(0, 0, 0).unwrap();
+    let midnight = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .expect("midnight is always a valid time");
     let dt = midnight.and_utc();
     dt.timestamp_millis()
 }

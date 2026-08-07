@@ -32,9 +32,9 @@ pub fn extract_text_imgs_links(text: &str) -> ExtractResult {
     let mut images: Vec<String> = Vec::new();
     let mut links: HashMap<String, String> = HashMap::new();
 
-    let img_re = Regex::new(r"!\[.*?\]\(.*?tg_([^.]+)\..*?\)").unwrap();
-    let link_re = Regex::new(r"\[.*?\]\((.+?)\)").unwrap();
-    let wiki_re = Regex::new(r"\[\[(.+?)\]\]").unwrap();
+    let img_re = Regex::new(r"!\[.*?\]\(.*?tg_([^.]+)\..*?\)").expect("valid regex literal");
+    let link_re = Regex::new(r"\[.*?\]\((.+?)\)").expect("valid regex literal");
+    let wiki_re = Regex::new(r"\[\[(.+?)\]\]").expect("valid regex literal");
 
     // Phase 1: remove lines that contain only a link
     let lines: Vec<&str> = text.split('\n').collect();
@@ -45,7 +45,10 @@ pub fn extract_text_imgs_links(text: &str) -> ExtractResult {
         // Link-only line
         if link_re.is_match(trimmed) && link_re.find(trimmed).map(|m| m.as_str()) == Some(trimmed) {
             if let Some(caps) = link_re.captures(line) {
-                let content = caps.get(1).unwrap().as_str();
+                let content = caps
+                    .get(1)
+                    .expect("capture group present after successful match")
+                    .as_str();
                 let (link_path, link_label) = split_link_content(content, false);
                 links.insert(link_label, link_path);
             }
@@ -55,7 +58,10 @@ pub fn extract_text_imgs_links(text: &str) -> ExtractResult {
         // Wiki-link-only line
         if wiki_re.is_match(trimmed) && wiki_re.find(trimmed).map(|m| m.as_str()) == Some(trimmed) {
             if let Some(caps) = wiki_re.captures(line) {
-                let content = caps.get(1).unwrap().as_str();
+                let content = caps
+                    .get(1)
+                    .expect("capture group present after successful match")
+                    .as_str();
                 let (link_path, link_label) = split_link_content(content, true);
                 links.insert(link_label, link_path);
             }
@@ -85,7 +91,10 @@ pub fn extract_text_imgs_links(text: &str) -> ExtractResult {
                 links.insert(link_label.clone(), link_path);
                 format!("`{link_label}`")
             } else {
-                caps.get(0).unwrap().as_str().to_string()
+                caps.get(0)
+                    .expect("capture group present after successful match")
+                    .as_str()
+                    .to_string()
             }
         })
         .to_string();
@@ -99,7 +108,10 @@ pub fn extract_text_imgs_links(text: &str) -> ExtractResult {
                 links.insert(link_label.clone(), link_path);
                 format!("`{link_label}`")
             } else {
-                caps.get(0).unwrap().as_str().to_string()
+                caps.get(0)
+                    .expect("capture group present after successful match")
+                    .as_str()
+                    .to_string()
             }
         })
         .to_string();

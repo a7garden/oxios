@@ -258,7 +258,9 @@ impl CredentialStatus {
                 // Phase 3 populates TokenBundle via save_token; for now just
                 // check presence so the status is truthful today.
                 let present = oxicode_sdk::load_token(store_key)
-                    .map(|t| t.is_some() && !t.unwrap().access_token.is_empty())
+                    .ok()
+                    .flatten()
+                    .map(|t| !t.access_token.is_empty())
                     .unwrap_or(false);
                 Self {
                     configured: present,

@@ -28,3 +28,6 @@ parking_lot = { workspace = true }
 [dev-dependencies]
 oxicode-sdk = { workspace = true }
 proptest = { workspace = true }
+
+[lints]
+workspace = true

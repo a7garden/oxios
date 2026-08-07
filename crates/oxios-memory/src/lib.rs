@@ -27,8 +27,6 @@
 //! use oxios_memory::cosine_similarity_f32;
 //! ```
 
-#![warn(missing_docs)]
-
 // ─── Memory subsystem modules (extracted from oxios-kernel) ──
 pub mod memory;
 

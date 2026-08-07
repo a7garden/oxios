@@ -36,3 +36,6 @@ hf-hub = { version = "0.4", optional = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 proptest = { workspace = true }
+
+[lints]
+workspace = true

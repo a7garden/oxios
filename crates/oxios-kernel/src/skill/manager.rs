@@ -379,7 +379,11 @@ impl SkillManager {
             )
         };
         let status = {
-            let sp = skill.path.parent().unwrap().join("state.json");
+            let sp = skill
+                .path
+                .parent()
+                .expect("skill path has a parent directory")
+                .join("state.json");
             if sp.exists() {
                 if let Ok(sc) = std::fs::read_to_string(&sp) {
                     if let Ok(s) = serde_json::from_str::<SkillState>(&sc) {

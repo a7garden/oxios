@@ -22,8 +22,6 @@
 //! let content = fs.read("brain", "Rust.md").unwrap();
 //! ```
 
-#![warn(missing_docs)]
-
 pub mod backlinks;
 pub mod chat;
 pub mod checklist;

@@ -110,7 +110,11 @@ impl ClawHubInstaller {
             sha256: Some(archive.sha256.clone()),
         };
         let origin_path = target_dir.join(".clawhub").join("origin.json");
-        fs::create_dir_all(origin_path.parent().unwrap())?;
+        fs::create_dir_all(
+            origin_path
+                .parent()
+                .expect("origin path has a parent directory"),
+        )?;
         fs::write(
             &origin_path,
             serde_json::to_string_pretty(&origin).context("serialize origin")?,
@@ -196,7 +200,11 @@ impl ClawHubInstaller {
             sha256: Some(archive.sha256.clone()),
         };
         let origin_path = target_dir.join(".clawhub").join("origin.json");
-        fs::create_dir_all(origin_path.parent().unwrap())?;
+        fs::create_dir_all(
+            origin_path
+                .parent()
+                .expect("origin path has a parent directory"),
+        )?;
 
         fs::write(
             &origin_path,

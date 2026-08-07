@@ -73,8 +73,8 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
 
         let days = parts[0];
         let habit = parts[1];
-        let first_day =
-            chrono::NaiveDate::from_ymd_opt(year, month.number_from_month(), 1).unwrap();
+        let first_day = chrono::NaiveDate::from_ymd_opt(year, month.number_from_month(), 1)
+            .expect("first of month is always valid");
         let mut day_of_year = first_day.ordinal() as i32;
 
         if habit.contains(MOOD_HABIT) {
@@ -88,7 +88,14 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
         }
 
         let marker = format!("{HABIT_SKIPPED}{HABIT_COMPLETED_AT_WEEKEND}{HABIT_COMPLETED}");
-        if !days.contains(marker.chars().next().unwrap().to_string().as_str()) {
+        if !days.contains(
+            marker
+                .chars()
+                .next()
+                .expect("non-empty marker constant")
+                .to_string()
+                .as_str(),
+        ) {
             continue;
         }
 
@@ -212,7 +219,7 @@ pub fn write_habits(fs: &VirtualFs, year: i32, habits: &Habits) -> Result<(), Ha
     }
 
     let mut content = String::new();
-    let mut day = chrono::NaiveDate::from_ymd_opt(year, 1, 1).unwrap();
+    let mut day = chrono::NaiveDate::from_ymd_opt(year, 1, 1).expect("January 1st is always valid");
 
     while day.year() < year + 1 {
         let mut habits_for_month = String::new();
@@ -227,8 +234,12 @@ pub fn write_habits(fs: &VirtualFs, year: i32, habits: &Habits) -> Result<(), Ha
                 let emoji = if let Some(status_map) = habits.get(habit_name) {
                     if let Some(&status) = status_map.get(&year_day) {
                         let dt = chrono::FixedOffset::east_opt(0)
-                            .unwrap()
-                            .from_utc_datetime(&day_of_month.and_hms_opt(12, 0, 0).unwrap());
+                            .expect("valid UTC offset")
+                            .from_utc_datetime(
+                                &day_of_month
+                                    .and_hms_opt(12, 0, 0)
+                                    .expect("noon is always valid"),
+                            );
                         let e = emoji_for_status(habit_name, &dt, status);
                         if e != HABIT_SKIPPED {
                             at_least_one_completion = true;
@@ -270,7 +281,7 @@ pub fn write_habits(fs: &VirtualFs, year: i32, habits: &Habits) -> Result<(), Ha
             },
             1,
         )
-        .unwrap();
+        .expect("first of next month is always valid");
     }
 
     let filename = format!("{year} Habits.md");
@@ -313,7 +324,7 @@ mod tests {
     #[test]
     fn test_emoji_for_status() {
         let saturday = FixedOffset::east_opt(0)
-            .unwrap()
+            .expect("valid UTC offset")
             .with_ymd_and_hms(2024, 1, 6, 12, 0, 0)
             .unwrap();
         assert_eq!(
@@ -326,7 +337,7 @@ mod tests {
     #[test]
     fn test_mood_emoji() {
         let day = FixedOffset::east_opt(0)
-            .unwrap()
+            .expect("valid UTC offset")
             .with_ymd_and_hms(2024, 1, 1, 12, 0, 0)
             .unwrap();
         assert_eq!(emoji_for_status(MOOD_HABIT, &day, 0), HABIT_SKIPPED);
@@ -342,7 +353,7 @@ mod tests {
     #[test]
     fn test_last_week_habits_basic() {
         let (fs, _t) = test_fs();
-        let tz = FixedOffset::east_opt(0).unwrap();
+        let tz = FixedOffset::east_opt(0).expect("valid UTC offset");
 
         // Create a habit file so it appears in the listing
         fs.make_dir(DIR_HABITS).unwrap();

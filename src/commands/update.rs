@@ -197,7 +197,7 @@ pub async fn run_update(
         let pb = ProgressBar::new_spinner();
         pb.set_style(
             ProgressStyle::with_template("  {spinner} {msg}")
-                .unwrap()
+                .expect("valid progress-bar template")
                 .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
         );
         pb.enable_steady_tick(Duration::from_millis(100));

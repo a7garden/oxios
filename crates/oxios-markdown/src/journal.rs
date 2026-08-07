@@ -40,7 +40,7 @@ pub fn add_record(fs: &VirtualFs, record: &str, timezone: FixedOffset) -> Result
 
     let timestamp = Utc::now().with_timezone(&timezone).format("`15:04`");
     if has_image(record) {
-        let re = Regex::new(IMG_PATTERN).unwrap();
+        let re = Regex::new(IMG_PATTERN).expect("valid regex literal");
         let img_link = re
             .find(record)
             .map(|m| m.as_str().to_string())
@@ -70,7 +70,8 @@ pub fn add_emoji(fs: &VirtualFs, emoji: &str, timezone: FixedOffset) -> Result<(
     md = norm_new_lines(&md).trim().to_string();
 
     let header = today_header(timezone);
-    let header_re = Regex::new(&format!("({}) *(.*)", regex::escape(&header))).unwrap();
+    let header_re =
+        Regex::new(&format!("({}) *(.*)", regex::escape(&header))).expect("valid regex literal");
     if header_re.is_match(&md) {
         let replacement = format!("$1 {emoji}");
         md = header_re.replace(&md, &replacement).to_string();
@@ -113,14 +114,14 @@ mod tests {
 
     #[test]
     fn test_journal_filename_format() {
-        let tz = FixedOffset::east_opt(0).unwrap();
+        let tz = FixedOffset::east_opt(0).expect("valid UTC offset");
         let name = today_journal_filename(tz);
         assert!(name.ends_with(".md"));
     }
 
     #[test]
     fn test_header_format() {
-        let tz = FixedOffset::east_opt(0).unwrap();
+        let tz = FixedOffset::east_opt(0).expect("valid UTC offset");
         let header = today_header(tz);
         assert!(header.starts_with("## "));
     }
@@ -128,7 +129,7 @@ mod tests {
     #[test]
     fn test_add_record_creates_file() {
         let (fs, _t) = test_fs();
-        let tz = FixedOffset::east_opt(0).unwrap();
+        let tz = FixedOffset::east_opt(0).expect("valid UTC offset");
         add_record(&fs, "test note", tz).unwrap();
         let filename = today_journal_filename(tz);
         assert!(fs.exists(DIR_JOURNAL, &filename).unwrap());
@@ -139,7 +140,7 @@ mod tests {
     #[test]
     fn test_add_emoji_creates_file() {
         let (fs, _t) = test_fs();
-        let tz = FixedOffset::east_opt(0).unwrap();
+        let tz = FixedOffset::east_opt(0).expect("valid UTC offset");
         add_emoji(&fs, "🙂", tz).unwrap();
         let filename = today_journal_filename(tz);
         assert!(fs.exists(DIR_JOURNAL, &filename).unwrap());

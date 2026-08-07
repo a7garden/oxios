@@ -143,9 +143,11 @@ impl BacklinkIndex {
             );
         }
         for (target, alias) in &wiki_links {
-            let Some(canonical) =
-                crate::parser::resolve_wikilink(target, Some(path), stem_index.unwrap())
-            else {
+            let Some(canonical) = crate::parser::resolve_wikilink(
+                target,
+                Some(path),
+                stem_index.expect("stem index required for wiki-link resolution"),
+            ) else {
                 continue;
             };
             new_targets.insert(canonical.clone());

@@ -10,13 +10,15 @@ use regex::Regex;
 
 /// Strip the `- [ ]` / `- [x]` prefix and optional `` `HH:MM` `` timestamp.
 pub fn strip_inbox_entry_prefix(block: &str) -> String {
-    let re = Regex::new(r"^- \[[ xX]\] (?:`\d{2}:\d{2}` )?").unwrap();
+    let re = Regex::new(r"^- \[[ xX]\] (?:`\d{2}:\d{2}` )?").expect("valid regex literal");
     re.replace(block, "").to_string()
 }
 
 /// Compute a stable hash for a chat block (based on content after stripping marker).
 pub fn chat_block_hash(block: &str) -> String {
-    let stripped = Regex::new(r"^- \[[ xX]\] ").unwrap().replace_all(block, "");
+    let stripped = Regex::new(r"^- \[[ xX]\] ")
+        .expect("valid regex literal")
+        .replace_all(block, "");
     let first_line = stripped.split('\n').next().unwrap_or("");
     hash_filename(first_line)
 }
@@ -24,8 +26,8 @@ pub fn chat_block_hash(block: &str) -> String {
 /// Parse chat content into logical blocks (headers and messages).
 pub fn read_chat_msgs(content: &str) -> Vec<String> {
     let content = norm_new_lines(content);
-    let header_re = Regex::new(r"^#### ").unwrap();
-    let marker_re = Regex::new(r"^- \[[ xX]\] ").unwrap();
+    let header_re = Regex::new(r"^#### ").expect("valid regex literal");
+    let marker_re = Regex::new(r"^- \[[ xX]\] ").expect("valid regex literal");
 
     let lines: Vec<&str> = content.split('\n').collect();
     let mut blocks: Vec<String> = Vec::new();
@@ -57,7 +59,7 @@ pub fn read_chat_msgs(content: &str) -> Vec<String> {
 /// Find a chat message by its content hash.
 pub fn find_chat_msg_by_hash(content: &str, msg_hash: &str) -> Option<(usize, String)> {
     let blocks = read_chat_msgs(content);
-    let header_re = Regex::new(r"^#### ").unwrap();
+    let header_re = Regex::new(r"^#### ").expect("valid regex literal");
     for (i, block) in blocks.iter().enumerate() {
         if header_re.is_match(block) {
             continue;
@@ -72,8 +74,8 @@ pub fn find_chat_msg_by_hash(content: &str, msg_hash: &str) -> Option<(usize, St
 /// Rename a chat message identified by hash.
 pub fn rename_chat_msg(content: &str, msg_hash: &str, new_body: &str) -> Result<String, String> {
     let blocks = read_chat_msgs(content);
-    let header_re = Regex::new(r"^#### ").unwrap();
-    let prefix_re = Regex::new(r"^- \[[ xX]\] (?:`\d{2}:\d{2}` )?").unwrap();
+    let header_re = Regex::new(r"^#### ").expect("valid regex literal");
+    let prefix_re = Regex::new(r"^- \[[ xX]\] (?:`\d{2}:\d{2}` )?").expect("valid regex literal");
 
     let idx = blocks
         .iter()
@@ -96,7 +98,7 @@ pub fn rename_chat_msg(content: &str, msg_hash: &str, new_body: &str) -> Result<
 /// The appended text becomes a new indented continuation line under the original entry.
 pub fn append_to_chat_msg(content: &str, msg_hash: &str, new_text: &str) -> Result<String, String> {
     let blocks = read_chat_msgs(content);
-    let header_re = Regex::new(r"^#### ").unwrap();
+    let header_re = Regex::new(r"^#### ").expect("valid regex literal");
 
     let idx = blocks
         .iter()
@@ -160,7 +162,7 @@ pub fn move_from_chat(
 /// Delete a chat message by hash.
 pub fn delete_chat_msg(content: &str, msg_hash: &str) -> Result<String, String> {
     let blocks = read_chat_msgs(content);
-    let header_re = Regex::new(r"^#### ").unwrap();
+    let header_re = Regex::new(r"^#### ").expect("valid regex literal");
 
     let idx = blocks
         .iter()

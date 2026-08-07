@@ -71,6 +71,18 @@ members = [
     "crates/oxios-gateway",
 ]
 
+[workspace.lints.rust]
+# Public API must be documented. Every crate already satisfies this today
+# (0 violations); enforced centrally here so new `pub` items stay documented.
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+# Panics are a runtime hazard. Bare `.unwrap()` is discouraged outside tests:
+# use `?` for fallible operations, or `.expect("reason")` for a documented
+# infallible case. `expect_used` is intentionally left at `allow` so that
+# intentional, explained panics stay ergonomic.
+unwrap_used = "warn"
+
 [workspace.dependencies]
 # Async
 tokio = { version = "1", features = ["full"] }
@@ -269,3 +281,6 @@ oxios-kernel = { path = "crates/oxios-kernel" }
 # oxicode-agent = { path = "/Volumes/MERCURY/PROJECTS/oxicode/oxicode-agent" }
 # oxicode-sdk = { path = "/Volumes/MERCURY/PROJECTS/oxicode/oxicode-sdk" }
 # oxibrowser = { path = "/Volumes/MERCURY/PROJECTS/oxibrowser/crates/oxibrowser" }
+
+[lints]
+workspace = true

@@ -365,7 +365,8 @@ impl Kernel {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!(error = %e, "Invalid marketplace.base_url, using default");
-                ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
+                ClawHubClient::new(Some("https://clawhub.ai".to_string()))
+                    .expect("default client configuration is valid")
             }
         };
         let clawhub_installer = ClawHubInstaller::new(
@@ -380,7 +381,7 @@ impl Kernel {
             SkillsShClient::new(ss_config.base_url.clone(), ss_config.api_key.clone())
                 .unwrap_or_else(|e| {
                     tracing::warn!(error = %e, "Failed to create Skills.sh client, using default");
-                    SkillsShClient::new(None, None).unwrap()
+                    SkillsShClient::new(None, None).expect("default client configuration is valid")
                 });
         let skills_sh_installer = SkillsShInstaller::new(
             skills_dir,
@@ -896,7 +897,7 @@ impl Kernel {
             let mut next = now
                 .date_naive()
                 .and_hms_opt(3, 0, 0)
-                .unwrap()
+                .expect("valid time of day")
                 .and_local_timezone(chrono::Local)
                 .earliest()
                 .unwrap_or(now + chrono::Duration::hours(24));
@@ -2209,7 +2210,8 @@ fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {
     let clawhub_client =
         ClawHubClient::new(config.marketplace.base_url.clone()).unwrap_or_else(|_| {
             tracing::warn!("Invalid marketplace.base_url, using default");
-            ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
+            ClawHubClient::new(Some("https://clawhub.ai".to_string()))
+                .expect("default client configuration is valid")
         });
     let clawhub_installer = ClawHubInstaller::new(
         skills_dir.clone(),
@@ -2219,7 +2221,8 @@ fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {
 
     // Skills.sh
     let ss = &config.marketplace.skills_sh;
-    let skills_sh_client = SkillsShClient::new(ss.base_url.clone(), ss.api_key.clone()).unwrap();
+    let skills_sh_client = SkillsShClient::new(ss.base_url.clone(), ss.api_key.clone())
+        .expect("valid skills.sh client configuration");
     let skills_sh_installer =
         SkillsShInstaller::new(skills_dir, ss.base_url.clone(), ss.api_key.clone());
 

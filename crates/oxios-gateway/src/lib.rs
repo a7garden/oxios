@@ -7,8 +7,6 @@
 //! into a shared mpsc channel. The gateway dispatches them concurrently
 //! with semaphore-bounded parallelism.
 
-#![warn(missing_docs)]
-
 pub mod active_web_dist;
 pub mod channel;
 pub mod error_classify;

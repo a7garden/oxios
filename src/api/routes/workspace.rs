@@ -1543,7 +1543,7 @@ mod tests {
             is_dir: false,
             size: 1024,
         };
-        let json = serde_json::to_value(&entry).unwrap();
+        let json = serde_json::to_value(&entry).expect("serializable value");
         assert_eq!(json["name"], "hello.md");
         assert_eq!(json["is_dir"], false);
         assert_eq!(json["size"], 1024);
@@ -1553,7 +1553,7 @@ mod tests {
             is_dir: true,
             size: 0,
         };
-        let json = serde_json::to_value(&dir_entry).unwrap();
+        let json = serde_json::to_value(&dir_entry).expect("serializable value");
         assert_eq!(json["is_dir"], true);
         assert_eq!(json["size"], 0);
     }

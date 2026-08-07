@@ -170,7 +170,7 @@ fn asset_response(data: Vec<u8>, clean: &str, if_none_match: Option<&str>) -> Re
                     .header("Cache-Control", cache)
                     .header("ETag", &etag)
                     .body(Body::empty())
-                    .unwrap();
+                    .expect("static response build is infallible");
             }
         }
         return Response::builder()
@@ -179,14 +179,14 @@ fn asset_response(data: Vec<u8>, clean: &str, if_none_match: Option<&str>) -> Re
             .header("Cache-Control", cache)
             .header("ETag", &etag)
             .body(Body::from(data))
-            .unwrap();
+            .expect("static response build is infallible");
     }
     Response::builder()
         .status(200)
         .header("Content-Type", mime_type(&lookup))
         .header("Cache-Control", cache)
         .body(Body::from(data))
-        .unwrap()
+        .expect("static response build is infallible")
 }
 
 /// Serve a static file.
@@ -204,7 +204,10 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str, if_none_match: Option<
         if let Some(data) = fs_read(d, clean).or_else(|| fs_read(d, &format!("assets/{clean}"))) {
             return asset_response(data, clean, if_none_match);
         }
-        return Response::builder().status(404).body(Body::empty()).unwrap();
+        return Response::builder()
+            .status(404)
+            .body(Body::empty())
+            .expect("static response build is infallible");
     }
 
     // No active dist → embedded assets (authoritative when compiled in).
@@ -220,7 +223,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str, if_none_match: Option<
         .status(503)
         .header("Retry-After", "5")
         .body(Body::from("Web UI dist not available yet — retry shortly"))
-        .unwrap()
+        .expect("static response build is infallible")
 }
 
 /// Static asset handler.
@@ -264,7 +267,7 @@ async fn spa_handler(
             .body(Body::from(
                 r#"{"error":"Not Found","detail":"API route not registered"}"#,
             ))
-            .unwrap();
+            .expect("static response build is infallible");
     }
     // RFC-024 SP3: load the atomic pointer per request.
     let dist = state.web_dist.path();
@@ -291,7 +294,7 @@ async fn spa_handler(
                     .header("ETag", &etag)
                     .header("X-Web-Version", version)
                     .body(Body::empty())
-                    .unwrap();
+                    .expect("static response build is infallible");
             }
         }
 
@@ -302,7 +305,7 @@ async fn spa_handler(
             .header("ETag", &etag)
             .header("X-Web-Version", version)
             .body(Body::from(data))
-            .unwrap();
+            .expect("static response build is infallible");
     }
 
     // No active dist → embedded assets (authoritative when compiled in).
@@ -321,7 +324,7 @@ async fn spa_handler(
                     .header("ETag", &etag)
                     .header("X-Web-Version", version)
                     .body(Body::empty())
-                    .unwrap();
+                    .expect("static response build is infallible");
             }
         }
         return Response::builder()
@@ -331,7 +334,7 @@ async fn spa_handler(
             .header("ETag", &etag)
             .header("X-Web-Version", version)
             .body(Body::from(data.to_vec()))
-            .unwrap();
+            .expect("static response build is infallible");
     }
 
     // No active dist and no embedded assets (crates.io build whose startup
@@ -340,7 +343,7 @@ async fn spa_handler(
         .status(503)
         .header("Retry-After", "5")
         .body(Body::from("Web UI dist not available yet — retry shortly"))
-        .unwrap()
+        .expect("static response build is infallible")
 }
 
 /// Web surface — kernel-connected control dashboard.

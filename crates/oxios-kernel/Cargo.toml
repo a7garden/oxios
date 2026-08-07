@@ -104,3 +104,6 @@ async-trait = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 
  criterion = { version = "0.5", features = ["async"] }
+
+[lints]
+workspace = true

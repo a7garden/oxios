@@ -176,10 +176,10 @@ pub fn row_to_memory_entry(row: &rusqlite::Row<'_>) -> MemoryEntry {
         tags: tags_str
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default(),
-        content_hash: row.get::<_, i64>(14).unwrap() as u64,
-        pinned: row.get::<_, i64>(10).unwrap() != 0,
-        auto_classified: row.get::<_, i64>(11).unwrap() != 0,
-        session_appearances: row.get::<_, i64>(12).unwrap() as u32,
+        content_hash: row.get_unwrap::<_, i64>(14) as u64,
+        pinned: row.get_unwrap::<_, i64>(10) != 0,
+        auto_classified: row.get_unwrap::<_, i64>(11) != 0,
+        session_appearances: row.get_unwrap::<_, i64>(12) as u32,
         user_corrected: false,
         seen_in_sessions: vec![],
         created_at: created_at_str.parse().unwrap_or_else(|_| Utc::now()),
@@ -187,7 +187,7 @@ pub fn row_to_memory_entry(row: &rusqlite::Row<'_>) -> MemoryEntry {
             .and_then(|s| s.parse().ok())
             .unwrap_or_else(Utc::now),
         modified_at: updated_at_str.parse().unwrap_or_else(|_| Utc::now()),
-        access_count: row.get::<_, i64>(10).unwrap() as u32,
+        access_count: row.get_unwrap::<_, i64>(10) as u32,
         decay_score: row.get_unwrap(14),
         compaction_level: 0,
         compacted_from: vec![],

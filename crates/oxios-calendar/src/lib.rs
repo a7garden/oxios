@@ -44,8 +44,6 @@
 //! }
 //! ```
 
-#![warn(missing_docs)]
-
 pub mod alarm;
 pub mod archive;
 pub mod conflict;

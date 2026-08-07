@@ -769,7 +769,7 @@ pub(crate) async fn handle_knowledge_file_or_sub(
                 .header(axum::http::header::CONTENT_TYPE, mime)
                 .header(axum::http::header::ETAG, &etag)
                 .body(axum::body::Body::from(content))
-                .unwrap())
+                .expect("static response build is infallible"))
         }
         "PUT" => {
             const MAX_KNOWLEDGE_FILE_SIZE: usize = 5 * 1024 * 1024;
@@ -801,7 +801,7 @@ pub(crate) async fn handle_knowledge_file_or_sub(
             Ok(axum::response::Response::builder()
                 .status(StatusCode::NO_CONTENT)
                 .body(axum::body::Body::empty())
-                .unwrap())
+                .expect("static response build is infallible"))
         }
         "DELETE" => {
             state
@@ -813,7 +813,7 @@ pub(crate) async fn handle_knowledge_file_or_sub(
             Ok(axum::response::Response::builder()
                 .status(StatusCode::NO_CONTENT)
                 .body(axum::body::Body::empty())
-                .unwrap())
+                .expect("static response build is infallible"))
         }
         _ => Err(AppError::BadRequest(
             "method not allowed on this path".into(),
@@ -857,9 +857,9 @@ async fn handle_knowledge_file_history_impl(
                 "history": entries,
                 "count": entries.len(),
             }))
-            .unwrap(),
+            .expect("json! value is always serializable"),
         ))
-        .unwrap())
+        .expect("static response build is infallible"))
 }
 
 /// Internal implementation of git restore (path WITHOUT /restore suffix).
@@ -896,7 +896,7 @@ async fn handle_knowledge_file_restore_impl(
     Ok(axum::response::Response::builder()
         .status(StatusCode::OK)
         .body(axum::body::Body::empty())
-        .unwrap())
+        .expect("static response build is infallible"))
 }
 /// GET /api/knowledge/file-diff?path={path}&hash={hash} — unified diff for a
 /// file between a specific commit and HEAD. Used by the history panel
@@ -1521,7 +1521,7 @@ mod tests {
             size: 1024,
             oxios_quality: None,
         };
-        let json = serde_json::to_value(&entry).unwrap();
+        let json = serde_json::to_value(&entry).expect("serializable value");
         assert_eq!(json["name"], "Rust.md");
         assert_eq!(json["is_dir"], false);
         assert_eq!(json["size"], 1024);
@@ -1536,7 +1536,7 @@ mod tests {
             backlink_count: 3,
             name_similarity: 95,
         };
-        let json = serde_json::to_value(&hit).unwrap();
+        let json = serde_json::to_value(&hit).expect("serializable value");
         assert_eq!(json["path"], "brain/Rust.md");
         assert_eq!(json["backlink_count"], 3);
     }
@@ -1548,7 +1548,7 @@ mod tests {
             link_text: "Architecture".into(),
             context: "See [Architecture](brain/Architecture.md)".into(),
         };
-        let json = serde_json::to_value(&bl).unwrap();
+        let json = serde_json::to_value(&bl).expect("serializable value");
         assert_eq!(json["source_path"], "brain/Overview.md");
     }
 
@@ -1566,7 +1566,7 @@ mod tests {
                 label: "Ownership".into(),
             }],
         };
-        let json = serde_json::to_value(&graph).unwrap();
+        let json = serde_json::to_value(&graph).expect("serializable value");
         assert_eq!(json["nodes"][0]["label"], "Rust");
         assert_eq!(json["edges"][0]["target"], "brain/Ownership.md");
     }

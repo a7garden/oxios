@@ -123,9 +123,9 @@ pub fn remove_completed_checklist(md: &str) -> (String, String) {
 pub fn remove_completed_inbox_entries(md: &str) -> (String, String) {
     let blocks = read_chat_msgs(md);
 
-    let done_re = Regex::new(r"^- \[[xX]\] ").unwrap();
+    let done_re = Regex::new(r"^- \[[xX]\] ").expect("valid regex literal");
     // Regex that matches optional checkbox + backtick timestamp prefix
-    let ts_re = Regex::new(r"^(?:- \[[ xX]\] )?`\d{2}:\d{2}` ").unwrap();
+    let ts_re = Regex::new(r"^(?:- \[[ xX]\] )?`\d{2}:\d{2}` ").expect("valid regex literal");
 
     let mut kept: Vec<String> = Vec::new();
     let mut removed = String::new();
@@ -270,19 +270,19 @@ pub fn next_exclude_today(cron_expr: &str) -> Option<i64> {
 /// Parse a timezone string (e.g., "+09:00", "UTC") into a FixedOffset.
 fn parse_timezone(tz_str: &str) -> FixedOffset {
     if tz_str == "UTC" || tz_str.is_empty() {
-        return FixedOffset::east_opt(0).unwrap();
+        return FixedOffset::east_opt(0).expect("valid UTC offset");
     }
     // Try parsing "+HH:MM" or "-HH:MM"
     if let Ok(offset) = tz_str.parse::<FixedOffset>() {
         return offset;
     }
-    FixedOffset::east_opt(0).unwrap()
+    FixedOffset::east_opt(0).expect("valid UTC offset")
 }
 
 /// Extract checklist items from markdown text.
 /// Returns the text of each `- [x]` or `- [ ]` item (trimmed).
 fn checklist_items(md: &str) -> Vec<String> {
-    let re = Regex::new(r"^- \[[ xX]\] (.+)$").unwrap();
+    let re = Regex::new(r"^- \[[ xX]\] (.+)$").expect("valid regex literal");
     let mut items = Vec::new();
     for line in md.lines() {
         let trimmed = line.trim();
@@ -297,7 +297,7 @@ fn checklist_items(md: &str) -> Vec<String> {
 
 /// Strip a leading `` `HH:MM` `` timestamp from a chat entry.
 fn strip_chat_timestamp(s: &str) -> String {
-    let re = Regex::new(r"^`\d{2}:\d{2}` ").unwrap();
+    let re = Regex::new(r"^`\d{2}:\d{2}` ").expect("valid regex literal");
     re.replace(s, "").to_string()
 }
 
@@ -349,7 +349,10 @@ fn format_schedule_day(scheduled_at: i64, now_ts: i64) -> String {
     let task_start = beginning_of_day(scheduled_at);
     let diff_days = (task_start - today_start) / 86400;
 
-    let dt = Utc.timestamp_opt(scheduled_at, 0).unwrap();
+    let dt = Utc
+        .timestamp_opt(scheduled_at, 0)
+        .single()
+        .expect("valid Unix timestamp");
 
     match diff_days {
         0 => "Today".to_string(),
@@ -362,10 +365,13 @@ fn format_schedule_day(scheduled_at: i64, now_ts: i64) -> String {
 
 /// Calculate the beginning of a day (midnight) as a Unix timestamp.
 fn beginning_of_day(timestamp: i64) -> i64 {
-    let dt = Utc.timestamp_opt(timestamp, 0).unwrap();
+    let dt = Utc
+        .timestamp_opt(timestamp, 0)
+        .single()
+        .expect("valid Unix timestamp");
     let date = dt.date_naive();
     date.and_hms_milli_opt(0, 0, 0, 0)
-        .unwrap()
+        .expect("midnight is always a valid time")
         .and_utc()
         .timestamp()
 }
@@ -519,7 +525,10 @@ mod tests {
         let result = next_exclude_today("14:30");
         assert!(result.is_some());
         let ts = result.unwrap();
-        let dt = Utc.timestamp_opt(ts, 0).unwrap();
+        let dt = Utc
+            .timestamp_opt(ts, 0)
+            .single()
+            .expect("valid Unix timestamp");
         assert_eq!(dt.hour(), 14);
         assert_eq!(dt.minute(), 30);
     }

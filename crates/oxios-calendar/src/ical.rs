@@ -180,16 +180,25 @@ fn extract_datetimes(
     match (start_opt, end_opt) {
         // Both DATE (all-day)
         (Some(DatePerhapsTime::Date(ds)), Some(DatePerhapsTime::Date(de))) => {
-            let start = ds.and_hms_opt(0, 0, 0).unwrap().and_utc();
-            let end = de.and_hms_opt(0, 0, 0).unwrap().and_utc();
+            let start = ds
+                .and_hms_opt(0, 0, 0)
+                .expect("midnight is always a valid time")
+                .and_utc();
+            let end = de
+                .and_hms_opt(0, 0, 0)
+                .expect("midnight is always a valid time")
+                .and_utc();
             Ok((start, end, true))
         }
         // Start DATE, end missing (single all-day)
         (Some(DatePerhapsTime::Date(ds)), None) => {
-            let start = ds.and_hms_opt(0, 0, 0).unwrap().and_utc();
+            let start = ds
+                .and_hms_opt(0, 0, 0)
+                .expect("midnight is always a valid time")
+                .and_utc();
             let end = (ds + chrono::Duration::days(1))
                 .and_hms_opt(0, 0, 0)
-                .unwrap()
+                .expect("midnight is always a valid time")
                 .and_utc();
             Ok((start, end, true))
         }
@@ -281,7 +290,10 @@ fn convert_tz_to_utc(
 /// Convert a [`DatePerhapsTime`] to UTC, treating dates as midnight.
 fn date_perhaps_time_to_utc(dpt: &DatePerhapsTime) -> anyhow::Result<chrono::DateTime<Utc>> {
     match dpt {
-        DatePerhapsTime::Date(d) => Ok(d.and_hms_opt(0, 0, 0).unwrap().and_utc()),
+        DatePerhapsTime::Date(d) => Ok(d
+            .and_hms_opt(0, 0, 0)
+            .expect("midnight is always a valid time")
+            .and_utc()),
         DatePerhapsTime::DateTime(CalendarDateTime::Utc(dt)) => Ok(*dt),
         DatePerhapsTime::DateTime(CalendarDateTime::Floating(dt)) => Ok(dt.and_utc()),
         DatePerhapsTime::DateTime(CalendarDateTime::WithTimezone { date_time, tzid }) => {

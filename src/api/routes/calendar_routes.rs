@@ -151,7 +151,9 @@ pub(crate) async fn handle_calendar_event_get(
         .await
         .map_err(|e| AppError::NotFound(e.to_string()))?;
 
-    Ok(Json(serde_json::to_value(event).unwrap()))
+    Ok(Json(
+        serde_json::to_value(event).expect("serializable value"),
+    ))
 }
 
 /// POST /api/calendar/events — Create a new event.
@@ -179,7 +181,9 @@ pub(crate) async fn handle_calendar_event_create(
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    Ok(Json(serde_json::to_value(result).unwrap()))
+    Ok(Json(
+        serde_json::to_value(result).expect("serializable value"),
+    ))
 }
 
 /// PUT /api/calendar/events/{uid} — Update an existing event.
@@ -224,7 +228,9 @@ pub(crate) async fn handle_calendar_event_update(
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    Ok(Json(serde_json::to_value(result).unwrap()))
+    Ok(Json(
+        serde_json::to_value(result).expect("serializable value"),
+    ))
 }
 
 /// DELETE /api/calendar/events/{uid} — Delete an event.
