@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { Pencil } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
+import { useQuery } from '@tanstack/react-query'
+import { Pencil } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -10,54 +10,50 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/lib/api-client";
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { api } from '@/lib/api-client'
 
 /** Capability tags currently backed by a UI consumer (RFC-044 §8.4).
  * Surfaced as toggle chips in the editor. */
-const KNOWN_CAPABILITIES = [
-  "terminal",
-  "diff-viewer",
-  "worktree-fanout",
-] as const;
+const KNOWN_CAPABILITIES = ['terminal', 'diff-viewer', 'worktree-fanout'] as const
 
 export interface PersonaItem {
-  id: string;
-  name: string;
-  role: string;
-  description: string;
-  enabled: boolean;
-  personality_traits?: string[];
+  id: string
+  name: string
+  role: string
+  description: string
+  enabled: boolean
+  personality_traits?: string[]
   /// RFC-044 Phase 3: capability tags surfaced by the list endpoint.
-  capabilities?: string[];
+  capabilities?: string[]
 }
 
 export interface PersonaPatch {
-  name: string;
-  description: string;
-  system_prompt: string;
-  capabilities?: string[];
+  name: string
+  description: string
+  system_prompt: string
+  capabilities?: string[]
 }
 
 interface EditPersonaDialogProps {
-  persona: PersonaItem | null;
-  isPending: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: (patch: PersonaPatch) => void;
+  persona: PersonaItem | null
+  isPending: boolean
+  onOpenChange: (open: boolean) => void
+  onSave: (patch: PersonaPatch) => void
 }
 
 interface PersonaDetail {
-  id: string;
-  name: string;
-  role: string;
-  description: string;
-  system_prompt: string;
-  enabled: boolean;
-  personality_traits: string[];
-  capabilities?: string[];
+  id: string
+  name: string
+  role: string
+  description: string
+  system_prompt: string
+  enabled: boolean
+  personality_traits: string[]
+  capabilities?: string[]
 }
 
 /**
@@ -75,46 +71,46 @@ export function EditPersonaDialog({
   onOpenChange,
   onSave,
 }: EditPersonaDialogProps) {
-  const { t } = useTranslation();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
-  const [capabilities, setCapabilities] = useState<string[]>([]);
+  const { t } = useTranslation()
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [systemPrompt, setSystemPrompt] = useState('')
+  const [capabilities, setCapabilities] = useState<string[]>([])
 
   const detail = useQuery({
-    queryKey: ["persona", persona?.id],
+    queryKey: ['persona', persona?.id],
     queryFn: () => api.get<PersonaDetail>(`/api/personas/${persona!.id}`),
     enabled: persona !== null,
-  });
+  })
 
   // 대상 페르소나가 바뀌거나 상세가 로딩되면 로컬 필드 동기화.
   useEffect(() => {
-    if (!persona) return;
+    if (!persona) return
     if (detail.data) {
-      setName(detail.data.name);
-      setDescription(detail.data.description);
-      setSystemPrompt(detail.data.system_prompt);
-      setCapabilities(detail.data.capabilities ?? []);
+      setName(detail.data.name)
+      setDescription(detail.data.description)
+      setSystemPrompt(detail.data.system_prompt)
+      setCapabilities(detail.data.capabilities ?? [])
     } else {
-      setName(persona.name);
-      setDescription(persona.description);
+      setName(persona.name)
+      setDescription(persona.description)
     }
-  }, [persona, detail.data]);
+  }, [persona, detail.data])
 
-  const close = () => onOpenChange(false);
+  const close = () => onOpenChange(false)
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!persona) return;
-    const n = name.trim();
-    if (!n) return;
+    e.preventDefault()
+    if (!persona) return
+    const n = name.trim()
+    if (!n) return
     onSave({
       name: n,
       description: description.trim(),
       system_prompt: systemPrompt,
       capabilities,
-    });
-  };
+    })
+  }
 
   return (
     <Dialog open={persona !== null} onOpenChange={(o) => !o && close()}>
@@ -122,34 +118,28 @@ export function EditPersonaDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-5 w-5" />
-            {t("personas.edit")}
+            {t('personas.edit')}
           </DialogTitle>
-          <DialogDescription>{t("personas.editDescription")}</DialogDescription>
+          <DialogDescription>{t('personas.editDescription')}</DialogDescription>
         </DialogHeader>
         {detail.isLoading ? (
-          <div className="text-sm text-muted-foreground p-4 text-center">
-            {t("common.loading")}
-          </div>
+          <div className="text-sm text-muted-foreground p-4 text-center">{t('common.loading')}</div>
         ) : detail.isError ? (
           <div className="space-y-3 p-2">
-            <p className="text-sm text-destructive">
-              {t("personas.loadFailed")}
-            </p>
+            <p className="text-sm text-destructive">{t('personas.loadFailed')}</p>
             <Button
               type="button"
               variant="outline"
               onClick={() => detail.refetch()}
               disabled={detail.isFetching}
             >
-              {t("common.retry")}
+              {t('common.retry')}
             </Button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="persona-edit-name">
-                {t("personas.personaName")}
-              </Label>
+              <Label htmlFor="persona-edit-name">{t('personas.personaName')}</Label>
               <Input
                 id="persona-edit-name"
                 value={name}
@@ -158,9 +148,7 @@ export function EditPersonaDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="persona-edit-desc">
-                {t("common.description")}
-              </Label>
+              <Label htmlFor="persona-edit-desc">{t('common.description')}</Label>
               <Input
                 id="persona-edit-desc"
                 value={description}
@@ -168,9 +156,7 @@ export function EditPersonaDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="persona-edit-prompt">
-                {t("personas.systemPrompt")}
-              </Label>
+              <Label htmlFor="persona-edit-prompt">{t('personas.systemPrompt')}</Label>
               <Textarea
                 id="persona-edit-prompt"
                 value={systemPrompt}
@@ -179,43 +165,41 @@ export function EditPersonaDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>{t("personas.capabilities")}</Label>
+              <Label>{t('personas.capabilities')}</Label>
               <div className="flex flex-wrap gap-1.5">
                 {KNOWN_CAPABILITIES.map((cap) => {
-                  const active = capabilities.includes(cap);
+                  const active = capabilities.includes(cap)
                   return (
                     <Button
                       key={cap}
                       type="button"
-                      variant={active ? "default" : "outline"}
+                      variant={active ? 'default' : 'outline'}
                       size="sm"
                       className="h-7 gap-1 px-2 text-2xs font-normal"
                       aria-pressed={active}
                       onClick={() =>
                         setCapabilities((prev) =>
-                          active
-                            ? prev.filter((c) => c !== cap)
-                            : [...prev, cap],
+                          active ? prev.filter((c) => c !== cap) : [...prev, cap],
                         )
                       }
                     >
                       {cap}
                     </Button>
-                  );
+                  )
                 })}
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={close}>
-                {t("common.cancel")}
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={!name.trim() || isPending}>
-                {isPending ? t("common.saving") : t("common.save")}
+                {isPending ? t('common.saving') : t('common.save')}
               </Button>
             </DialogFooter>
           </form>
         )}
       </DialogContent>
     </Dialog>
-  );
+  )
 }

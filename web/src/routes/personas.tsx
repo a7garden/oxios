@@ -1,21 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { Pencil, Plus, Star, Trash2, Users } from "lucide-react";
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute } from '@tanstack/react-router'
+import { Pencil, Plus, Star, Trash2, Users } from 'lucide-react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import {
   EditPersonaDialog,
   type PersonaItem,
   type PersonaPatch,
-} from "@/components/persona/edit-persona-dialog";
-import { EmptyState } from "@/components/shared/empty-state";
-import { ErrorState } from "@/components/shared/error-state";
-import { LoadingCards } from "@/components/shared/loading";
-import { PageHeader } from "@/components/shared/page-header";
-import { RefreshButton } from "@/components/shared/refresh-button";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+} from '@/components/persona/edit-persona-dialog'
+import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
+import { LoadingCards } from '@/components/shared/loading'
+import { PageHeader } from '@/components/shared/page-header'
+import { RefreshButton } from '@/components/shared/refresh-button'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -23,23 +23,23 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/lib/api-client";
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { api } from '@/lib/api-client'
 
-export const Route = createFileRoute("/personas")({ component: PersonasPage });
+export const Route = createFileRoute('/personas')({ component: PersonasPage })
 
 function PersonasPage() {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const [showCreate, setShowCreate] = useState(false);
-  const [editing, setEditing] = useState<PersonaItem | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<PersonaItem | null>(null);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<PersonaItem | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<PersonaItem | null>(null)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [systemPrompt, setSystemPrompt] = useState('')
 
   const {
     data: personas,
@@ -48,82 +48,78 @@ function PersonasPage() {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["personas"],
+    queryKey: ['personas'],
     queryFn: async () => {
-      const res = await api.get<
-        {
-          id: string;
-          name: string;
-          role: string;
-          description: string;
-          enabled: boolean;
-          personality_traits: string[];
-          system_prompt?: string;
-          capabilities?: string[];
-        }[]
-      >("/api/personas");
+      const res =
+        await api.get<
+          {
+            id: string
+            name: string
+            role: string
+            description: string
+            enabled: boolean
+            personality_traits: string[]
+            system_prompt?: string
+            capabilities?: string[]
+          }[]
+        >('/api/personas')
       // Backend returns raw array
-      return Array.isArray(res) ? res : [];
+      return Array.isArray(res) ? res : []
     },
     refetchInterval: 30000,
-  });
+  })
 
   const createMutation = useMutation({
-    mutationFn: (p: {
-      name: string;
-      description: string;
-      system_prompt: string;
-    }) => api.post("/api/personas", p),
+    mutationFn: (p: { name: string; description: string; system_prompt: string }) =>
+      api.post('/api/personas', p),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["personas"] });
-      setShowCreate(false);
-      setName("");
-      setDescription("");
-      setSystemPrompt("");
+      queryClient.invalidateQueries({ queryKey: ['personas'] })
+      setShowCreate(false)
+      setName('')
+      setDescription('')
+      setSystemPrompt('')
     },
-  });
+  })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/personas/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["personas"] }),
-  });
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['personas'] }),
+  })
 
   const activateMutation = useMutation({
     // RFC-039: PUT /api/personas/active {id} (was POST /:id/activate — 404)
-    mutationFn: (id: string) => api.put("/api/personas/active", { id }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["personas"] }),
-  });
+    mutationFn: (id: string) => api.put('/api/personas/active', { id }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['personas'] }),
+  })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: PersonaPatch }) =>
       api.put(`/api/personas/${id}`, patch),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["personas"] });
-      setEditing(null);
-      toast.success(t("personas.saved"));
+      queryClient.invalidateQueries({ queryKey: ['personas'] })
+      setEditing(null)
+      toast.success(t('personas.saved'))
     },
     onError: (err) => {
-      toast.error(
-        err instanceof Error ? err.message : t("personas.saveFailed"),
-      );
+      toast.error(err instanceof Error ? err.message : t('personas.saveFailed'))
     },
-  });
+  })
 
-  if (isLoading) return <LoadingCards count={4} />;
-  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const items = Array.isArray(personas) ? personas : [];
+  const items = Array.isArray(personas) ? personas : []
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={t("personas.title")}
-        subtitle={`${t("personas.subtitle")} · ${t("personas.singleActiveHint")}`}
+        title={t('personas.title')}
+        subtitle={`${t('personas.subtitle')} · ${t('personas.singleActiveHint')}`}
         actions={
           <div className="flex gap-2">
             <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
             <Button size="sm" onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4" /> {t("common.create")}
+              <Plus className="h-4 w-4" /> {t('common.create')}
             </Button>
           </div>
         }
@@ -132,52 +128,46 @@ function PersonasPage() {
       <Dialog
         open={showCreate}
         onOpenChange={(open) => {
-          setShowCreate(open);
+          setShowCreate(open)
           if (!open) {
-            setName("");
-            setDescription("");
-            setSystemPrompt("");
+            setName('')
+            setDescription('')
+            setSystemPrompt('')
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("personas.createPersona")}</DialogTitle>
-            <DialogDescription>
-              {t("personas.createPersonaDescription")}
-            </DialogDescription>
+            <DialogTitle>{t('personas.createPersona')}</DialogTitle>
+            <DialogDescription>{t('personas.createPersonaDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="persona-name">{t("personas.nameLabel")}</Label>
+              <Label htmlFor="persona-name">{t('personas.nameLabel')}</Label>
               <Input
                 id="persona-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={t("personas.personaNamePlaceholder")}
+                placeholder={t('personas.personaNamePlaceholder')}
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="persona-description">
-                {t("common.description")}
-              </Label>
+              <Label htmlFor="persona-description">{t('common.description')}</Label>
               <Textarea
                 id="persona-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={t("common.description")}
+                placeholder={t('common.description')}
                 rows={2}
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="persona-prompt">
-                {t("personas.systemPromptLabel")}
-              </Label>
+              <Label htmlFor="persona-prompt">{t('personas.systemPromptLabel')}</Label>
               <Textarea
                 id="persona-prompt"
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                placeholder={t("personas.systemPromptPlaceholder")}
+                placeholder={t('personas.systemPromptPlaceholder')}
                 rows={4}
               />
             </div>
@@ -189,7 +179,7 @@ function PersonasPage() {
               onClick={() => setShowCreate(false)}
               disabled={createMutation.isPending}
             >
-              {t("common.cancel")}
+              {t('common.cancel')}
             </Button>
             <Button
               size="sm"
@@ -202,7 +192,7 @@ function PersonasPage() {
               }
               disabled={!name.trim() || createMutation.isPending}
             >
-              {t("common.create")}
+              {t('common.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -211,8 +201,8 @@ function PersonasPage() {
       {items.length === 0 && !showCreate ? (
         <EmptyState
           icon={<Users className="h-10 w-10" />}
-          title={t("personas.noPersonas")}
-          description={t("personas.descriptionHint")}
+          title={t('personas.noPersonas')}
+          description={t('personas.descriptionHint')}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -222,14 +212,10 @@ function PersonasPage() {
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Users className="h-4 w-4" /> {persona.name}
-                    {persona.enabled && (
-                      <Star className="h-3 w-3 text-warning fill-warning" />
-                    )}
+                    {persona.enabled && <Star className="h-3 w-3 text-warning fill-warning" />}
                   </CardTitle>
                   {persona.description && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {persona.description}
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{persona.description}</p>
                   )}
                 </div>
                 <div className="flex gap-1">
@@ -237,7 +223,7 @@ function PersonasPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setEditing(persona)}
-                    aria-label={t("common.edit")}
+                    aria-label={t('common.edit')}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -246,7 +232,7 @@ function PersonasPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => activateMutation.mutate(persona.id)}
-                      aria-label={t("personas.activatePersona")}
+                      aria-label={t('personas.activatePersona')}
                     >
                       <Star className="h-4 w-4" />
                     </Button>
@@ -255,7 +241,7 @@ function PersonasPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setDeleteTarget(persona)}
-                    aria-label={t("personas.deletePersona")}
+                    aria-label={t('personas.deletePersona')}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -263,7 +249,7 @@ function PersonasPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
-                  {t("personas.role")}: {persona.role}
+                  {t('personas.role')}: {persona.role}
                 </p>
                 {persona.system_prompt && (
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
@@ -293,21 +279,16 @@ function PersonasPage() {
         isPending={updateMutation.isPending}
         onOpenChange={(open) => !open && setEditing(null)}
         onSave={(patch) => {
-          if (!editing) return;
-          updateMutation.mutate({ id: editing.id, patch });
+          if (!editing) return
+          updateMutation.mutate({ id: editing.id, patch })
         }}
       />
 
-      <Dialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("personas.deletePersonaConfirmTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("personas.deletePersonaConfirmDescription")}
-            </DialogDescription>
+            <DialogTitle>{t('personas.deletePersonaConfirmTitle')}</DialogTitle>
+            <DialogDescription>{t('personas.deletePersonaConfirmDescription')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
@@ -316,24 +297,24 @@ function PersonasPage() {
               onClick={() => setDeleteTarget(null)}
               disabled={deleteMutation.isPending}
             >
-              {t("common.cancel")}
+              {t('common.cancel')}
             </Button>
             <Button
               size="sm"
               variant="destructive"
               onClick={() => {
-                if (!deleteTarget) return;
+                if (!deleteTarget) return
                 deleteMutation.mutate(deleteTarget.id, {
                   onSettled: () => setDeleteTarget(null),
-                });
+                })
               }}
               disabled={deleteMutation.isPending}
             >
-              {t("common.delete")}
+              {t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }
