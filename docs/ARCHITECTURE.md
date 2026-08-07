@@ -1,6 +1,6 @@
 # Oxios Architecture Reference
 
-> **Version:** 1.21.0 · **Stack:** Rust 2024, tokio, serde (JSON+TOML), oxicode-sdk · **License:** MIT
+> **Version:** 1.37.0 · **Stack:** Rust 2024, tokio, serde (JSON+TOML), oxicode-sdk · **License:** MIT
 
 This document is a standalone reference for every subsystem in the Oxios Agent OS.
 Read it before modifying kernel structure, adding modules, or onboarding onto the project.
@@ -34,14 +34,14 @@ Oxios is built on two foundational metaphors:
 
 | Metaphor | Realization |
 |----------|-------------|
-| **Unix** | Every component does one thing. Compose small pieces. Fork/exec/wait/kill for agents. Pipes for events. No containers — direct host execution. |
-| **Ouroboros** | Never execute without a spec. The protocol cycles: Interview → Seed → Execute → Evaluate → Evolve. Seeds can evolve up to 3 iterations. |
+| **Unix** | Process-style agent lifecycle (fork/exec/wait/kill, Supervisor as init). The metaphor is structural for lifecycle and analogical elsewhere — see §8. No containers, direct host execution. |
+| **Ouroboros** | Clarify before acting. Unified intent flow: assess → crystallize → execute → review. Depth adapts to the task (RFC-027); the former 5-phase protocol (Interview → Seed → Execute → Evaluate → Evolve) is retired. |
 
 ### Key Principles
 
 | Principle | Meaning |
 |-----------|---------|
-| **Ouroboros-first** | Every task goes through the full spec-generate-execute-evaluate-evolve lifecycle |
+| **Intent-first** | Every message is assessed; substantial tasks crystallize into a directive before execution, then review against criteria |
 | **No reimplementation** | Reuse `oxicode-sdk` (crates.io). Never reimplement what oxi already provides |
 | **Channel agnostic** | Gateway doesn't care where messages come from (Web, CLI, Telegram) |
 | **User invisible** | Users don't know how many agents are running |
@@ -96,8 +96,8 @@ Oxios is built on two foundational metaphors:
 │                                                                        │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
 │  │                  KernelHandle (Facade / Syscall Table)           │   │
-│  │  13 typed APIs: State · Agent · Security · Persona · Extension  │   │
-│  │  MCP · Infra · Space · Exec · Browser · A2A · Knowledge          │   │
+│  │  22 typed APIs (State · Agent · Security · Exec · Browser ·      │   │
+│  │  MCP · A2A · Memory · Engine · …  — full list in §4)             │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 └────────────────────────────────────────────────────────────────────────┘
        │
@@ -127,7 +127,7 @@ Oxios is built on two foundational metaphors:
         ▼
   Kernel ─── Orchestrator + Supervisor + all subsystems
         │
-        ├── KernelHandle ─── typed facade (13 APIs)
+        ├── KernelHandle ─── typed facade (22 APIs)
         │       │
         │       └── AgentRuntime ─── wraps oxicode-sdk AgentLoop
         │
@@ -166,12 +166,12 @@ The Supervisor is the "init" of Oxios. It manages agent lifecycles using Unix-li
     │                  → Stopped               │
     └──────────────────────────────────────────┘
 
-    fork(spec: Seed)          → AgentId
-    exec(id: AgentId)         → ()
-    run_with_seed(id, seed)   → ExecutionResult
-    wait(id: AgentId)         → AgentStatus
-    kill(id: AgentId)         → ()
-    list()                    → Vec<AgentInfo>
+    fork_directive(directive, env)         → AgentId
+    exec(id: AgentId)                      → ()
+    run_with_directive(id, directive, env) → ExecutionResult
+    wait(id: AgentId)                      → AgentStatus
+    kill(id: AgentId)                      → ()
+    list()                                 → Vec<AgentInfo>
 ```
 
 **Implementation (`BasicSupervisor`):**
@@ -239,8 +239,8 @@ The Orchestrator coordinates the full Ouroboros lifecycle for user messages. It 
   └────────────────────────────────────────────────────────┘
        │
        ▼
-  OrchestrationResult { response, session_id, seed_id,
-                        phase_reached, evaluation_passed, space_id }
+  OrchestrationResult { response, session_id, agent_id,
+                        phase_reached, evaluation_passed, primary_project_id }
 ```
 
 **Multi-Agent Delegation:**
@@ -694,58 +694,43 @@ Per-agent budget tracking for LLM API calls.
 
 ---
 
-### 3.15 SpaceManager — Context Partitioning
+### 3.15 ProjectManager — Context Partitioning
 
-Spaces partition conversations and resources into isolated contexts. Auto-detected from messages.
+Projects partition conversations and resources into isolated contexts, auto-detected from messages. (Renamed from "Spaces": `SpaceManager` → `ProjectManager`, `SpaceId` → `ProjectId`. The old JSON-file persistence and merge/archive operations were removed.)
 
 ```
   ┌──────────────────────────────────────────────────────────┐
-  │                    SpaceManager                           │
+  │                    ProjectManager                         │
   │                                                          │
   │  ┌────────────────────────────────────────────────────┐  │
   │  │       3-Layer Detection Strategy                   │  │
   │  │                                                    │  │
   │  │  Layer 1: Filesystem Path (fast, free)             │  │
-  │  │    "/projects/oxios/src/main.rs" → oxios Space     │  │
-  │  │    → PathMatcher: glob-based path → SpaceId map    │  │
+  │  │    "/projects/oxios/src/main.rs" → oxios Project   │  │
+  │  │    → PathMatcher: glob-based path → ProjectId map  │  │
   │  │                                                    │  │
   │  │  Layer 2: Keyword/Tag (fast, free)                 │  │
-  │  │    Message contains Space tags → match             │  │
+  │  │    Message contains Project tags → match           │  │
   │  │                                                    │  │
   │  │  Layer 3: Topic Classification (LLM, slow)         │  │
-  │  │    classify_topic_stub() → Topic { name, clear? }  │  │
-  │  │    Topic shift detection via ConversationBuffer     │  │
+  │  │    Topic shift detection via ConversationBuffer    │  │
   │  └────────────────────────────────────────────────────┘  │
   │                                                          │
-  │  Space Lifecycle:                                        │
-  │  Created (auto/manual) → Active → Archived → Restored   │
-  │                                                          │
-  │  ┌───────────────┐  ┌──────────────────┐                │
-  │  │Default Space  │  │Named Spaces      │                │
-  │  │(unnamed, id=1)│  │(auto-created or  │                │
-  │  │Always exists  │  │ manual)          │                │
-  │  └───────────────┘  └──────────────────┘                │
-  │                                                          │
-  │  Operations:                                             │
-  │  detect_or_create(msg, buffer) → SpaceId                 │
-  │  create_from_path(name, path) → Space                    │
-  │  create_from_topic(topic) → Space                        │
-  │  activate(space_id)                                      │
-  │  merge_spaces(survivor, absorbed)                        │
-  │  archive_stale() → Vec<SpaceId>                          │
-  │  restore_from_archive(space_id)                          │
+  │  Operations (ProjectManager):                            │
+  │  detect(message) → DetectionResult                       │
+  │  create_project / update_project / remove_project        │
+  │  list_projects / get_project / get_project_by_name       │
+  │  link_memory / unlink_memory (project ↔ memory)          │
+  │  touch(id) — bump last-active                            │
   │                                                          │
   │  Persistence:                                            │
-  │  ~/.oxios/spaces/_index.json                             │
-  │  ~/.oxios/spaces/{space_id}/space.json                   │
-  │  ~/.oxios/spaces/{space_id}/workspace/                   │
-  │  ~/.oxios/spaces/_archived/{space_id}/                   │
+  │  SQLite `projects` table (via ProjectDb)                 │
+  │  Project { id, name, description, tags, emoji, source,   │
+  │            mount_ids (RFC-025), instructions (RFC-025) }  │
   └──────────────────────────────────────────────────────────┘
 ```
 
-**Auto-merge:** Spaces sharing paths with low activity (<5 interactions) are candidates for automatic merging.
-
-**Source:** `crates/oxios-kernel/src/space/manager.rs`
+**Source:** `crates/oxios-kernel/src/project/manager.rs` (detection in `project/detection.rs`)
 
 ---
 
@@ -1037,46 +1022,25 @@ Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (ve
 
 ## 4. KernelHandle Facade
 
-The KernelHandle is the **syscall table** of the Agent OS. It is a facade composed of 13 typed APIs that provide the single path for all kernel operations.
+The KernelHandle is the **syscall table** of the Agent OS. It is a facade composed of **22 typed APIs** that provide the single path for all kernel operations — all tools go through it, never reaching subsystems directly (full list below).
 
-```
-  ┌──────────────────────────────────────────────────────────────────┐
-  │                       KernelHandle                               │
-  │                     (cached via OnceLock)                        │
-  │                                                                  │
-  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐          │
-  │  │ StateApi │ │ AgentApi │ │SecurityApi│ │PersonaApi│          │
-  │  │          │ │          │ │           │ │          │          │
-  │  │save/load │ │supervisor│ │auth       │ │personas  │          │
-  │  │sessions  │ │budget    │ │audit trail│ │system    │          │
-  │  │markdown  │ │memory    │ │RBAC       │ │prompts   │          │
-  │  └──────────┘ └──────────┘ │access mgr │ └──────────┘          │
-  │                            └───────────┘                        │
-  │  ┌──────────────┐ ┌────────┐ ┌────────┐ ┌──────────┐           │
-  │  │ExtensionApi  │ │ McpApi │ │InfraApi│ │ SpaceApi │           │
-  │  │              │ │        │ │        │ │          │           │
-  │  │skills        │ │bridge  │ │git     │ │spaces    │           │
-  │  │              │ │servers │ │scheduler│ │knowledge │           │
-  │  └──────────────┘ └────────┘ └────────┘ └──────────┘           │
-  │                              │resource│                        │
-  │                              │events  │                        │
-  │                              │config  │                        │
-  │                              └────────┘                        │
-  │  ┌──────────┐ ┌──────────┐ ┌──────────┐                      │
-  │  │ ExecApi  │ │BrowserApi│ │  A2aApi  │                      │
-  │  │          │ │          │ │          │                      │
-  │  │exec cfg  │ │headless  │ │A2A proto │                      │
-  │  │access mgr│ │browser   │ │registry  │                      │
-  │  └──────────┘ └──────────┘ └──────────┘                      │
-  │                                                                  │
-  │  Cross-Facade convenience methods:                               │
-  │  save_and_commit()  — State + Git                               │
-  │  delete_and_commit() — State + Git                              │
-  │  commit_all()       — flush state to git                        │
-  │  flush_audit()      — Security + Git                            │
-  │  schedule()         — Cron wrapper                              │
-  └──────────────────────────────────────────────────────────────────┘
-```
+| Domain | Typed APIs |
+|--------|-----------|
+| Lifecycle & execution | `AgentApi` · `ExecApi` · `ExtensionApi` |
+| State & persistence | `StateApi` · `MemoryApi` · `MemoApi` · `TimelineApi` · `CompressionApi` |
+| Knowledge | `KnowledgeLens` |
+| Security | `SecurityApi` |
+| Identity & persona | `PersonaApi` |
+| Communication | `A2aApi` · `McpApi` |
+| Infrastructure | `InfraApi` · `EngineApi` · `BrowserApi` · `MountApi` |
+| Integrations | `CalendarApi` · `EmailApi` |
+| Scheduling & quota | `TokenMaxingApi` |
+| Marketplace | `MarketplaceApi` |
+| Projects (was Spaces) | `ProjectApi` |
+
+> `ProjectApi` replaces the former `SpaceApi` (conversation spaces → projects). `KnowledgeLens` is the knowledge surface — there is no separate `KnowledgeBaseApi`.
+
+**Cross-facade convenience methods** compose across APIs: `save_and_commit()`, `delete_and_commit()`, `commit_all()` (State + Git); `flush_audit()` (Security + Git); `schedule()` (Cron). The handle is cached via `OnceLock`.
 
 ### Construction Order
 
@@ -1204,8 +1168,8 @@ Complete path of a user message through the system:
            │
            ▼
   OrchestrationResult {
-    session_id, space_id, space_tag, response,
-    seed_id, phase_reached, evaluation_passed, output
+    session_id, primary_project_id, project_tag, response,
+    agent_id, phase_reached, evaluation_passed, output
   }
 ```
 
@@ -1277,57 +1241,49 @@ Complete path of a user message through the system:
 
 ```
   oxios/
-  ├── src/                    # Binary crate
-  │   ├── main.rs             # Entry point, daemon mode
-  │   ├── kernel.rs           # Kernel builder + assembly
-  │   └── cmd_run.rs          # CLI run subcommand
+  ├── src/                        # Binary crate
+  │   ├── main.rs                 # Entry point, daemon mode, CLI dispatch
+  │   ├── kernel.rs               # Kernel builder + assembly
+  │   ├── supervisor.rs           # Binary-level supervisor wiring
+  │   ├── surface.rs              # Channel surface dispatch
+  │   ├── api/                    # HTTP API server (was channels/oxios-web)
+  │   │   ├── routes/             # REST route handlers
+  │   │   ├── plugin.rs           # API plugin / extension
+  │   │   ├── bridge.rs           # API ↔ kernel bridge
+  │   │   └── quota.rs            # Rate-limit / quota
+  │   ├── channels/               # In-process channels
+  │   │   ├── cli/                # CLI channel
+  │   │   └── telegram/           # Telegram channel
+  │   ├── commands/               # CLI subcommands (run, update)
+  │   ├── remote/                 # Remote RPC / pairing / transport
+  │   └── web_dist.rs             # Embedded SPA assets
   ├── crates/
-  │   ├── oxios-kernel/       # Core library
+  │   ├── oxios-kernel/           # Core library (intentionally monolithic — see §10)
   │   │   └── src/
-  │   │       ├── supervisor.rs
-  │   │       ├── orchestrator.rs
-  │   │       ├── agent_lifecycle.rs
-  │   │       ├── agent_runtime.rs
-  │   │       ├── scheduler.rs
-  │   │       ├── event_bus.rs
-  │   │       ├── audit_trail.rs
-  │   │       ├── circuit_breaker.rs
-  │   │       ├── a2a.rs
-  │   │       ├── access_manager/
-  │   │       ├── memory/
-  │   │       ├── space/
-  │   │       ├── kernel_handle/
-  │   │       ├── tools/
-  │   │       │   ├── registration.rs
-  │   │       │   ├── exec_tool.rs
-  │   │       │   ├── kernel/        # Kernel facade tools
-  │   │       │   └── retrieval.rs   # ToolRetriever
-  │   │       ├── config.rs
-  │   │       ├── budget.rs
-  │   │       ├── cron.rs
-  │   │       ├── git_layer.rs
-  │   │       ├── resource_monitor.rs
-  │   │       ├── persona_manager.rs
-  │   │       ├── skill.rs
-  │   │       ├── auth.rs
-  │   │       ├── credential.rs
-  │   │       ├── wasm_sandbox.rs
-  │   │       ├── mcp/
-  │   │       ├── capability/
-  │   │       ├── agent_group.rs
-  │   │       ├── metrics.rs
-  │   │       ├── onboarding.rs
-  │   │       ├── daemon.rs
-  │   │       └── state_store.rs
-  │   ├── oxios-ouroboros/     # Protocol engine
-  │   └── oxios-gateway/       # Message hub
-  ├── channels/
-  │   ├── oxios-web/           # Axum + Dioxus/WASM
-  │   ├── oxios-cli/           # CLI channel
-  │   └── oxios-telegram/      # Telegram channel
-  ├── share/                   # Default configs, skills
-
-  └── docs/                    # Architecture docs, RFCs
+  │   │       ├── supervisor.rs        orchestrator.rs        agent_lifecycle.rs
+  │   │       ├── agent_runtime.rs     engine.rs              event_bus.rs
+  │   │       ├── state_store.rs       config.rs              types.rs
+  │   │       ├── access_manager/      # RBAC + path sandbox + audit trail
+  │   │       ├── memory/              # Tiered memory bridge
+  │   │       ├── kernel_handle/       # Facade — 22 typed APIs (see §4)
+  │   │       ├── tools/               # builtin/, kernel_bridge.rs, exec_tool.rs
+  │   │       ├── skill/               # Unified skill system (RFC-009): clawhub, skills_sh
+  │   │       ├── persona/             a2a/                   resilience/
+  │   │       ├── token_maxing/        host_tools/            mount/
+  │   │       ├── project/             image_gen/             capability/
+  │   │       ├── cron.rs              git_layer.rs           budget.rs
+  │   │       ├── resource_monitor.rs  auth.rs                credential.rs
+  │   │       ├── wasm_sandbox.rs      mcp.rs                 agent_group.rs
+  │   │       └── metrics.rs           onboarding.rs          daemon.rs
+  │   ├── oxios-ouroboros/        # Unified intent engine (assess → crystallize → execute → review)
+  │   ├── oxios-gateway/          # Channel-agnostic message hub
+  │   ├── oxios-markdown/         # Knowledge base (VirtualFs, BacklinkIndex)
+  │   ├── oxios-mcp/              # MCP client (JSON-RPC 2.0 over stdio)
+  │   ├── oxios-memory/           # Tiered agent memory (Hot/Warm/Cold, Dream, HNSW)
+  │   └── oxios-calendar/         # .ics-based calendar event management
+  ├── web/                        # React frontend (SPA)
+  ├── share/                      # Default skills, config
+  └── docs/                       # Architecture docs, RFCs
 ```
 
 ---
@@ -1445,11 +1401,13 @@ Complete path of a user message through the system:
 
 ## 8. Unix Philosophy Mapping
 
+> **Where the metaphor is structural vs analogical.** The lifecycle rows (`init` / `fork` / `exec` / `wait` / `kill` / `ps`) are load-bearing — they name real `Supervisor` operations. The rest are analogies that aid intuition, not literal reimplementations: `EventBus` is broadcast pub/sub (not byte-stream pipes), `KernelHandle` is a facade (not a pipe-composed shell), and the kernel is deliberately monolithic (§10), so "compose small pieces" applies at the *module* boundary, not the process boundary. "Shell" maps to `ExecTool` (a host-command executor), while the human-facing surface is the Gateway — Unix conflates both under one shell, Oxios separates them.
+
 | Unix Concept       | Oxios Equivalent                           | Description                                    |
 |--------------------|--------------------------------------------|------------------------------------------------|
 | `init` (PID 1)    | `Supervisor`                               | Manages all agent lifecycles                   |
-| `fork()`          | `Supervisor::fork(seed)`                   | Create new agent from seed specification       |
-| `exec()`          | `Supervisor::exec(id)` / `run_with_seed()` | Start executing an agent                       |
+| `fork()`          | `Supervisor::fork_directive(directive, env)` | Create new agent from a unified-intent Directive |
+| `exec()`          | `Supervisor::exec(id)` / `run_with_directive()` | Start executing an agent                       |
 | `wait()`          | `Supervisor::wait(id)`                     | Wait for agent completion                      |
 | `kill()`          | `Supervisor::kill(id)`                     | Terminate an agent (cooperative + abort)       |
 | `ps`              | `Supervisor::list()`                       | List all known agents                          |
@@ -1463,7 +1421,7 @@ Complete path of a user message through the system:
 | `cron`            | `CronScheduler`                            | Scheduled job execution                        |
 | `git`             | `GitLayer`                                 | In-process version control via gix             |
 | `/etc`            | `OxiosConfig` (config.toml)                | System configuration                           |
-| Skills           | `SkillManager` + `skill.rs`              | Unified skill system (Programs + Skills)     |
+| Skills           | `SkillManager` + `skill/`                | Unified skill system (RFC-009)               |
 | `man` pages       | `SKILL.md` per skill                      | Usage documentation for capabilities           |
 | Shell             | `ExecTool` (shell/structured modes)        | Command execution with RBAC                    |
 | Sudo / polkit     | HitL Approval (RbacManager)                | Human-in-the-loop approval for dangerous ops   |
@@ -1507,7 +1465,6 @@ The construction order solves the `KernelHandle → AgentRuntime → Supervisor 
 | Mock providers | `MockProvider` implements `oxicode_sdk::Provider` with empty streams |
 | Temp directories | Use `tempfile::tempdir()` for state store tests |
 | Must pass | `cargo test --workspace` at every commit |
-| CI check | `a7garden/oxicode` at `v0.4.4` checked out alongside for oxi-related tests |
 
 ---
 
@@ -1594,7 +1551,7 @@ Instead of crate splitting, the kernel manages complexity through:
 - **`pub(crate)` encapsulation**: Module internals stay internal
 - **Directory-level mod.rs**: Each subsystem controls its own visibility
 - **lib.rs section organization**: Clear logical grouping with labeled sections
-- **KernelHandle facade**: Single entry point for all 13 APIs, preventing direct subsystem coupling in consumers
+- **KernelHandle facade**: Single entry point for all 22 APIs, preventing direct subsystem coupling in consumers
 
 ---
 
@@ -1629,11 +1586,10 @@ cargo run -- run --json --session "$SID" "follow-up"  # Multi-turn
 {
   "response": "string",
   "session_id": "uuid",
-  "space_id": "uuid | null",
-  "space_tag": "[emoji label] | null",
-  "seed_id": "uuid | null",
+  "primary_project_id": "uuid | null",
+  "project_tag": "[emoji label] | null",
   "agent_id": "uuid | null",
-  "phase_reached": "Interview | Seed | Execute | Evaluate | Evolve",
+  "phase_reached": "interview | execute",
   "evaluation_passed": true,
   "output": "string | null"
 }

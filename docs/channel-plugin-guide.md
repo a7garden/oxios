@@ -54,7 +54,6 @@ Response:
 ```json
 {
   "response": "I will help you build a TODO app...",
-  "seed_id": "550e8400-e29b-41d4-a716-446655440000",
   "evaluation_passed": true,
   "output": null
 }
@@ -228,21 +227,20 @@ curl -N http://127.0.0.1:4200/api/events
 
 ### Event Format
 
-Events follow the standard SSE format:
+Events are JSON envelopes streamed as SSE. Each carries `id`, `timestamp`, and a `type` discriminator:
 
 ```
-event: agent.started
-data: {"agent_id":"abc-123","seed_id":"def-456","goal":"Build a REST API"}
+event: agent_started
+data: {"id":"<uuid>","timestamp":"2026-08-07T12:00:00Z","type":"agent_started","agent_id":"abc-123"}
 
-event: agent.progress
-data: {"agent_id":"abc-123","step":3,"message":"Creating src/main.rs"}
+event: agent_stopped
+data: {"id":"<uuid>","timestamp":"...","type":"agent_stopped","agent_id":"abc-123","success":true}
 
-event: agent.completed
-data: {"agent_id":"abc-123","success":true,"output":"Done"}
-
-event: evaluation.result
-data: {"seed_id":"def-456","score":0.95,"mechanical_pass":true}
+event: agent_output
+data: {"id":"<uuid>","timestamp":"...","type":"agent_output","session_id":"<sid>","agent_id":"abc-123"}
 ```
+
+Event `type`s: `agent_created`, `agent_started`, `agent_stopped`, `agent_failed`, `message_received`, `agent_output`. Message *content* is omitted from `message_received` / `agent_output` (may be sensitive).
 
 ### Subscribe via JavaScript
 

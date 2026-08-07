@@ -90,7 +90,7 @@ oxios/
 See `docs/ARCHITECTURE.md` for the full reference (subsystems, data flow, dependency graph).
 
 - **Kernel** (`oxios-kernel`) — intentionally monolithic single crate. Star topology around `AgentId`, `EventBus`, `StateStore`. No circular deps. Internal boundaries via `pub(crate)` + directory mod files. See ARCHITECTURE.md §10 for rationale.
-- **KernelHandle** — Facade with 13 typed APIs (Agent, Space, Security, Persona, Exec, Browser, MCP, Extension, Infra, A2A, State, KnowledgeBase, KnowledgeLens).
+- **KernelHandle** — Facade with 22 typed APIs (Agent, Security, Exec, Browser, MCP, A2A, State, Memory, Engine, …; full list in ARCHITECTURE.md §4). `ProjectApi` replaces the former `SpaceApi`; there is no `KnowledgeBaseApi` (knowledge surface is `KnowledgeLens`).
 - **Supervisor** — Agent lifecycle: fork/exec/wait/kill.
 - **Orchestrator** — Ouroboros protocol end-to-end. The "brain".
 - **AgentRuntime** — Wraps oxicode-sdk tool-calling loop.
@@ -111,7 +111,7 @@ See `docs/ARCHITECTURE.md` for the full reference (subsystems, data flow, depend
 | File | Read when |
 |------|-----------|
 | `docs/ARCHITECTURE.md` | Modifying kernel structure, adding modules, understanding subsystems |
-| `docs/DESIGN.md` | Understanding design philosophy and Unix↔Oxios mapping |
+| `DESIGN.md` | Oxi brand design system (UI tokens, color, typography) — canonical for frontend/UI work. Unix↔Oxios mapping lives in `docs/ARCHITECTURE.md` §8 |
 | `docs/rfc-008-memory-consolidation.md` | Modifying memory system |
 | `docs/rfc-009-skill-unification.md` | Modifying skill system |
 | `docs/rfc-010-clawhub-marketplace.md` | Marketplace feature |

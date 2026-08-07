@@ -285,11 +285,10 @@ $ oxios run --json "Write a Rust function that reverses a string"
 {
   "response": "Here's a function that reverses a string in Rust...",
   "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "space_id": null,
-  "space_tag": null,
-  "seed_id": null,
+  "primary_project_id": null,
+  "project_tag": null,
   "agent_id": "f9e8d7c6-b5a4-3210-fedc-ba0987654321",
-  "phase_reached": "Execute",
+  "phase_reached": "execute",
   "evaluation_passed": true,
   "exit_code": 0,
   "duration_ms": 4200

@@ -9,9 +9,9 @@
 *Where AI agents don't just talk — they work.*
 
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/Version-1.1.0-6E40C9?logo=rust&logoColor=white)](https://crates.io/crates/oxios)
+[![Version](https://img.shields.io/badge/Version-1.37.0-6E40C9?logo=rust&logoColor=white)](https://crates.io/crates/oxios)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Lines of Code](https://img.shields.io/badge/LOC-67K%2B-00A86B?logo=rust&logoColor=white)]()
+[![Lines of Code](https://img.shields.io/badge/LOC-135K%2B-00A86B?logo=rust&logoColor=white)]()
 [![GitHub](https://img.shields.io/badge/GitHub-a7garden%2Foxios-181717?logo=github)](https://github.com/project-oxi/oxios)
 
 **Built with**
@@ -72,7 +72,7 @@ Large language models are powerful, but they're stuck in chat boxes. Oxios gives
 | LLM provider outages cascade | **Circuit Breaker**: 3-state protection against cascading failures |
 | No protocol for agent-to-agent work | **A2A**: Google's agent-to-agent protocol for horizontal communication |
 
-**~67,000 lines of Rust. 196+ source files. Zero containers. Zero subprocess browsers.** Everything runs in-process.
+**~135,000 lines of Rust. 350+ source files. Zero containers. Zero subprocess browsers.** Everything runs in-process.
 
 ---
 
@@ -134,7 +134,7 @@ That's it. The OS handles the rest.
 ```
 ┌───────────────────── Channels ─────────────────────┐
 │                                                     │
-│   Web (Axum)  ·  CLI  ·  Telegram  ·  Discord  …   │
+│   Web (Axum)  ·  CLI  ·  Telegram  ·  …             │
 │              (plugin-based, feature-gated)           │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -184,7 +184,7 @@ That's it. The OS handles the rest.
     └─────────┘
 ```
 
-**No containers. No subprocess browser.** Everything runs in-process, sandboxed by workspace rules and RBAC. The kernel exposes all functionality through `KernelHandle` — a facade with typed APIs (Agent, Space, Security, Persona, Exec, Browser, MCP, Extension, Infra, A2A, State, KnowledgeBase, KnowledgeLens).
+**No containers. No subprocess browser.** Everything runs in-process, sandboxed by workspace rules and RBAC. The kernel exposes all functionality through `KernelHandle` — a facade of 22 typed APIs (Agent, Security, Exec, Browser, MCP, A2A, State, Memory, Engine, …; full list in [ARCHITECTURE.md §4](docs/ARCHITECTURE.md#4-kernelhandle-facade)).
 
 ---
 
@@ -430,10 +430,10 @@ oxios run --json --session "$SID" "follow-up question"
 {
   "response": "...",
   "session_id": "uuid",
-  "space_id": "uuid | null",
-  "space_tag": "[emoji label] | null",
+  "primary_project_id": "uuid | null",
+  "project_tag": "[emoji label] | null",
   "agent_id": "uuid | null",
-  "phase_reached": "Execute",
+  "phase_reached": "execute",
   "evaluation_passed": true,
   "exit_code": 0,
   "duration_ms": 3500
@@ -444,7 +444,7 @@ oxios run --json --session "$SID" "follow-up question"
 
 ## REST API
 
-Full REST API on **port 4200** with 76 endpoints. Auth middleware on all `/api/*` routes.
+Full REST API on **port 4200** with 150+ endpoints. Auth middleware on all `/api/*` routes.
 
 ### Chat & Streaming
 
